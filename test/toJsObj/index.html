@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Html to Javascript Object Literal Test</title>
+  <link rel="stylesheet" href="../shared.css">
+</head>
+
+<body>
+  <div id="app">
+    <form>
+      <label> First Name </label> <br>
+      <input type="text" name="firstName" /> <br>
+
+      <label> Last Name </label> <br>
+      <input type="text" name="lastName" /> <br>
+
+      <!-- Build an phones property as an array -->
+      <div e-build="phones" e-array>
+        <label> Country Code </label> <br>
+        <input type="text" name="code" /> <br>
+
+        <label> Number </label> <br>
+        <input type="text" name="number" />
+      </div>
+
+      <!-- Build an identification property as an object -->
+      <div e-build="identification">
+        <label> Type </label> <br>
+        <select name="type">
+          <option> Id Card </option>
+          <option> Passport </option>
+        </select> <br>
+
+        <label> Code </label> <br>
+        <input type="text" name="code" />
+      </div>
+
+
+      <button type="button"> Submit </button>
+
+      <p id="output"></p>
+
+    </form>
+  </div>
+
+  <script src="../../dist/bouer.js"></script>
+
+  <script>
+    var app = new Bouer('body');
+
+    document.addEventListener('DOMContentLoaded', function () {
+
+      document.querySelector('button[type="button"]').onclick = function (evt) {
+        var form = document.querySelector('form');
+        console.log(app.toJsObj(form));
+
+        document.querySelector("#output").textContent = "Check the output in browser console"
+      }
+    });
+  </script>
+</body>
+
+</html>
