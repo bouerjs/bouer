@@ -1,8 +1,9 @@
-import Bouer from "../Bouer";
+import Bouer from "./instance/Bouer";
 import Extend from "../shared/helpers/Extend";
 import {
+  buildError,
   createEl, forEach,
-  getDescriptor, transferProperty
+  getDescriptor, GLOBAL, transferProperty
 } from "../shared/helpers/Utils";
 import Logger from "../shared/logger/Logger";
 
@@ -20,7 +21,6 @@ export default class Evalutator {
    * link: https://refactoring.guru/design-patterns/singleton
    */
   static singleton: Evalutator;
-
   private global: Window & typeof globalThis | null;
   private bouer: Bouer;
 
@@ -40,8 +40,18 @@ export default class Evalutator {
       mWindow = frame.contentWindow;
       dom.body.removeChild(frame);
     });
-
+    delete (mWindow! as any).name;
     return mWindow!;
+  }
+
+  execRaw(expression: string, context?: object): void {
+    // Executing the expression
+    try {
+      const mExpression = "return(function(){" + expression + "; }).apply(this, arguments)";
+      GLOBAL.Function(mExpression).apply(context || this.bouer);
+    } catch (error) {
+      Logger.error(buildError(error));
+    }
   }
 
   exec(options: EvalutatorOptions) {
@@ -84,9 +94,8 @@ export default class Evalutator {
       const mExpression = 'return(function(){"use strict"; ' +
         (isReturn === false ? '' : 'return') + ' ' + expression + ' }).apply(this, arguments)';
       returnedValue = this.global!.Function(mExpression).apply(this.bouer, args);
-    } catch (error: any) {
-      error.stack = '';
-      Logger.error(error);
+    } catch (error) {
+      Logger.error(buildError(error));
     }
 
     // Removing the properties

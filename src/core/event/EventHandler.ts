@@ -1,7 +1,7 @@
-import Bouer from "../../Bouer";
+import Bouer from "../instance/Bouer";
 import { Constants } from "../../shared/helpers/Constants";
 import Extend from "../../shared/helpers/Extend";
-import { createEl, forEach, isFunction, isNull, toLower, trim } from "../../shared/helpers/Utils";
+import { buildError, createEl, forEach, isFunction, isNull, toLower, trim } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Evaluator from "../Evaluator";
 import BouerEvent from "./BouerEvent";
@@ -83,9 +83,8 @@ export default class EventHandler {
       if (isFunction(isResultFunction)) {
         try {
           (isResultFunction as Function).apply(this.bouer, mArguments);
-        } catch (error: any) {
-          error.stack = '';
-          Logger.error(error);
+        } catch (error) {
+          Logger.error(buildError(error));
         }
       }
 

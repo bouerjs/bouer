@@ -1,4 +1,4 @@
-import Bouer from "../../Bouer";
+import Bouer from "../instance/Bouer";
 import { Constants } from "../../shared/helpers/Constants";
 import Extend from "../../shared/helpers/Extend";
 import {
@@ -80,7 +80,7 @@ export default class Directive {
   if(node: Node, data: object) { // TODO: Remake this code
     const ownerElement = this.toOwnerNode(node) as Element;
     const container = ownerElement.parentElement;
-    const conditionalChain: { node: Attr, element: Element }[] = [];
+    const conditions: { node: Attr, element: Element }[] = [];
     const comment = this.comment.create();
     const nodeName = node.nodeName;
     let exec = () => { };
@@ -106,7 +106,7 @@ export default class Directive {
       if (this.delimiter.run(attr.nodeValue ?? '').length !== 0)
         return this.returner(attr, () => Logger.error(this.errorMsgNodeValue(attr)));
 
-      conditionalChain.push({ node: attr, element: currentEl });
+      conditions.push({ node: attr, element: currentEl });
 
       connectNode(currentEl, container);
       connectNode(attr, container);
@@ -137,44 +137,42 @@ export default class Directive {
       this.binder.binds.push(item.reactive.watch(() => exec(), item.attr)));
 
     (exec = () => {
-      forEach(conditionalChain, chainItem => {
+      forEach(conditions, chainItem => {
         if (chainItem.element.parentElement) {
           if (comment.isConnected)
             container.removeChild(chainItem.element);
           else
             container.replaceChild(comment, chainItem.element);
         }
-      })
+      });
 
-      let shownElement: Element | null = null;
-      for (let i = 0; i < conditionalChain.length; i++) {
-        const chainItem = conditionalChain[i];
-        const mNode = chainItem.node;
-        const mElement = chainItem.element;
-        const nodeValue = trim(mNode.nodeValue ?? '');
-
-        if (shownElement) break;
-        if (mNode.nodeName !== 'e-else') {
-          const value = this.evaluator.exec({
-            expression: nodeValue,
-            data: data
-          });
-
-          if (!value) // If not truthy value continue to the next element
-            continue;
+      const conditionalExpression = conditions.map((item, index) => {
+        const $value = item.node.value;
+        switch (item.node.name) {
+          case Constants.if: return "if(" + $value + "){ _cb(" + index + "); }"
+          case Constants.elseif: return "else if(" + $value + "){ _cb(" + index + "); }"
+          case Constants.else: return "else{ _cb(" + index + "); }"
         }
+      }).join(" ");
 
-        container.replaceChild(mElement, comment);
-        shownElement = mElement;
-
-        this.htmlHandler.compile({
-          el: mElement,
-          data: data
-        })
-      }
+      this.evaluator.exec({
+        data: data,
+        isReturn: false,
+        expression: conditionalExpression,
+        aditional: {
+          _cb: (chainIndex: number) => {
+            const { element } = conditions[chainIndex];
+            container.replaceChild(element, comment);
+            this.htmlHandler.compile({
+              el: element,
+              data: data
+            })
+          }
+        }
+      });
     })();
 
-    return this.returner(conditionalChain.map(item => item.node));
+    return this.returner(conditions.map(item => item.node));
   }
 
   show(node: Node, data: object) {
@@ -346,7 +344,7 @@ export default class Directive {
       let leftHandDeclaration = 'let ' + leftHand + (leftHand.includes(',') ? '=0' : '') + ';';
 
       const hasIndex = leftHandParts.length > 1;
-      forExpression = [(hasIndex ? leftHandParts[0] : leftHand), '$$applyFilters(' + rightHand + ')']
+      forExpression = [(hasIndex ? leftHandParts[0] : leftHand), '_flt(' + rightHand + ')']
         .join(forSeparator);
 
       // Cleaning the
@@ -360,24 +358,20 @@ export default class Directive {
         data: data,
         isReturn: false,
         expression: leftHandDeclaration +
-          'for(' + forExpression + '){ ' + ' $$each(' + leftHand + (hasIndex ? '++' : '') + ')}',
+          'for(' + forExpression + '){ ' + ' _each(' + leftHand + (hasIndex ? '++' : '') + ')}',
         aditional: {
-          $$each: (item: any, index: any) => {
+          _each: (item: any, index: any) => {
             let forData: any = Extend.obj(data);
             forData[leftHandParts[0]] = item;
             if (hasIndex) forData[leftHandParts[1]] = index;
 
+            let clonedItem = container.insertBefore(forItem.cloneNode(true) as Element, comment);
             this.htmlHandler.compile({
-              el: forItem.cloneNode(true) as Element,
-              data: forData,
-              onDone: function (el) {
-                listedItems.push(
-                  container.insertBefore(el, comment)
-                );
-              }
+              el: clonedItem,
+              data: forData
             });
           },
-          $$applyFilters: (list: any[]) => {
+          _flt: (list: any[]) => {
             let listCopy = Extend.array(list);
 
             const findFilter = (fName: string) =>
@@ -548,25 +542,16 @@ export default class Directive {
   }
 
   req(node: Node, data: object) {
-
-    Logger.info(node);
-
-    return this.returner(node);
-  }
-
-  id(node: Node, data: object) {
-    return this.returner(node);
-  }
-
-  filter(node: Node, data: object) {
+    Logger.info(node, data);
     return this.returner(node);
   }
 
   data(node: Node, data: object) {
-    Logger.warn('e-anm not implemented yet.');
+    const _data = Extend.obj(data, { $this: data });
+    return this.returner(node);
   }
 
-  href(node: Element, data: object) {
+  href(node: Node, data: object) {
     return this.returner(node);
   }
 

@@ -1,8 +1,6 @@
+export const http = (input: RequestInfo, init?: RequestInit) => fetch(input, init);
 
-export const DOM = document;
-export const taskRunner = setInterval;
-
-export const code = (len?: number) => {
+export const code = (len?: number, prefix?: string, sufix?: string) => {
   const alpha = '01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   let lowerAlt = false, out = '';
   for (let i = 0; i < (len || 8); i++) {
@@ -10,7 +8,7 @@ export const code = (len?: number) => {
     out += lowerAlt ? alpha[pos].toLowerCase() : alpha[pos];
     lowerAlt = !lowerAlt;
   }
-  return out;
+  return ((prefix || "") + out + (sufix || ""));
 }
 
 export const isNull = (input: any) => {
@@ -195,3 +193,59 @@ export const connectNode = (node: Node, nodeToConnectWith: Node) => {
   defineProperty(node, 'isConnected', { get: () => nodeToConnectWith.isConnected });
   return node;
 }
+
+export const urlResolver = (url: string) => {
+  let href = url;
+  // Support: IE 9-11 only, /* doc.documentMode is only available on IE */
+  if ('documentMode' in DOM) {
+    anchor.setAttribute('href', href);
+    href = anchor.href;
+  }
+
+  anchor.setAttribute('href', href);
+  let hostname = anchor.hostname;
+  const ipv6InBrackets = anchor.hostname === '[::1]'
+
+  if (!ipv6InBrackets && hostname.indexOf(':') > -1)
+    hostname = '[' + hostname + ']';
+
+  let $return = {
+    href: anchor.href,
+    baseURI: anchor.baseURI,
+    protocol: anchor.protocol ? anchor.protocol.replace(/:$/, '') : '',
+    host: anchor.host,
+    search: anchor.search ? anchor.search.replace(/^\?/, '') : '',
+    hash: anchor.hash ? anchor.hash.replace(/^#/, '') : '',
+    hostname: hostname,
+    port: anchor.port,
+    pathname: (anchor.pathname.charAt(0) === '/') ? anchor.pathname : '/' + anchor.pathname,
+    anchor: anchor,
+    origin: ''
+  };
+
+  $return.origin = $return.protocol + '://' + $return.host;
+  return $return;
+}
+
+export const urlCombine = (base: string, ...parts: string[]) => {
+  let baseSplitted = base.split(/\/\//)
+  let protocol = baseSplitted[0] + '//';
+  let baseUrl = baseSplitted[1].split(/\//);
+  let remain: string[] = [];
+
+  forEach(baseUrl, p => trim(p) ? remain.push(p) : null);
+  forEach(parts, part => forEach(part.split(/\//),
+    p => trim(p) ? remain.push(p) : null));
+
+  return protocol + remain.join('/')
+}
+
+export const buildError = (error: any, options?: {}) => {
+  error.stack = '';
+  return error;
+}
+
+export const DOM = document;
+export const GLOBAL = globalThis;
+export const anchor = createEl('a').build();
+export const taskRunner = setInterval;

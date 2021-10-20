@@ -1,3 +1,8 @@
+* {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #575757;
+}
+
 #app {
   position: absolute;
   left: 0; top: 0;
@@ -7,8 +12,8 @@
   justify-content: center;
 }
 
-#app>* {
-  max-width: 450px;
+#app .center {
+  max-width: 550px;
   flex: 1;
   border: 1px solid #ccc;
   padding: 20px 30px;
@@ -17,7 +22,7 @@
   flex-direction: column;
 }
 
-#app>* div {
+#app .center>div {
   display: flex;
   flex-direction: column;
   flex: 1;

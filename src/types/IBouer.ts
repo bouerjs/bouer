@@ -1,6 +1,6 @@
-import Bouer from "../Bouer";
+import Component from "../core/component/Component";
+import Bouer from "../core/instance/Bouer";
 import IBouerConfig from "./IBouerConfig";
-import { ComponentDefinition } from "./IComponent";
 
 export default interface IBouer {
   /** The data of the instance */
@@ -13,7 +13,7 @@ export default interface IBouer {
   config?: IBouerConfig
 
   /** The compoment the will be loaded to the instance */
-  components?: ComponentDefinition
+  components?: Component[]
 
   /** The dependencies of the instance */
   dependencies?: any[]

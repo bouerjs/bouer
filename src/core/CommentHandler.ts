@@ -1,4 +1,4 @@
-import Bouer from "../Bouer";
+import Bouer from "./instance/Bouer";
 import { code, DOM, isNull } from "../shared/helpers/Utils";
 
 export default class CommentHandler {

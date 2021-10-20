@@ -4,6 +4,7 @@ const typescript = require('@rollup/plugin-typescript');
 const terser = require('rollup-plugin-terser').terser;
 const cleanup = require('rollup-plugin-cleanup');
 const version = require('./package.json').version;
+const babel = require('@rollup/plugin-babel').babel;
 
 const banner =
   '/*!\n' +
@@ -22,7 +23,7 @@ const buildConfig = input => {
 }
 
 export default {
-  input: path.resolve('src', 'Bouer.ts'),
+  input: path.resolve('src', 'index.ts'),
   output: [
     buildConfig({ // Development
       file: path.resolve('dist', 'bouer.js'),
@@ -38,6 +39,10 @@ export default {
   ],
   plugins: [
     cleanup({ comments: false }),
+    babel({
+      babelHelpers: 'bundled',
+
+    }),
     typescript({
       lib: ["es5", "es6", "dom"],
       target: "es5"

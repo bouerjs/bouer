@@ -1,14 +1,13 @@
-import IBouer from "./types/IBouer";
-import Logger from "./shared/logger/Logger";
-import DelimiterHandler, { Delimiter } from "./core/DelimiterHandler";
-import HtmlHandler from "./core/compiler/HtmlHandler";
-import Evalutator from "./core/Evaluator";
-import EventHandler from "./core/event/EventHandler";
-import Binder from "./core/binder/Binder";
-import { ComponentDefinition } from "./types/IComponent";
-import IBouerConfig from "./types/IBouerConfig";
-import CommentHanlder from "./core/CommentHandler";
-import Observer from "./shared/helpers/Observer";
+import IBouer from "../../types/IBouer";
+import Logger from "../../shared/logger/Logger";
+import DelimiterHandler, { Delimiter } from "../DelimiterHandler";
+import HtmlHandler from "../compiler/HtmlHandler";
+import Evalutator from "../Evaluator";
+import EventHandler from "../event/EventHandler";
+import Binder from "../binder/Binder";
+import IBouerConfig from "../../types/IBouerConfig";
+import CommentHanlder from "../CommentHandler";
+import Observer from "../../shared/helpers/Observer";
 import {
   createEl,
   DOM,
@@ -17,9 +16,11 @@ import {
   isObject,
   transferProperty,
   trim
-} from "./shared/helpers/Utils";
-import CommentHandler from "./core/CommentHandler";
-import Reactive from "./core/reactive/Reactive";
+} from "../../shared/helpers/Utils";
+import CommentHandler from "../CommentHandler";
+import Reactive from "../reactive/Reactive";
+import ComponentHandler from "../component/ComponentHandler";
+import Component from "../component/Component";
 
 export default class Bouer implements IBouer {
   el: Element;
@@ -29,7 +30,7 @@ export default class Bouer implements IBouer {
   data?: object;
   globalData?: object;
   config?: IBouerConfig;
-  components?: ComponentDefinition;
+  components?: Component[];
   dependencies?: any[];
 
   /** delimiters handler */
@@ -48,8 +49,9 @@ export default class Bouer implements IBouer {
    * @param options the options to the instance
    */
   constructor(elSelector: string, options?: IBouer) {
+    options = options || {};
     // Applying all the options defined
-    Object.assign(this, (options || {}));
+    Object.assign(this, options);
 
     if (isNull(elSelector) || trim(elSelector) === '')
       throw Logger.error('Invalid selector provided to the instance.');
@@ -79,6 +81,7 @@ export default class Bouer implements IBouer {
 
     const eventHandler = new EventHandler(this);
     const binder = new Binder(this);
+    const component = new ComponentHandler(this, options!.components);
     const htmlHandler = new HtmlHandler(this);
     const comment = new CommentHanlder(this);
 
@@ -111,7 +114,7 @@ export default class Bouer implements IBouer {
       createEl('link', (favicon) => {
         favicon.rel = 'icon';
         favicon.type = 'image/png';
-        favicon.href = 'https://afonsomatelias.github.io/easy/assets/img/main_ico.png';
+        favicon.href = 'https://afonsomatelias.github.io/assets/bouer/img/short.png';
       }).appendTo(DOM.head);
     }
   }

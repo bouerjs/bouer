@@ -1,4 +1,4 @@
-import Bouer from "../../Bouer";
+import Bouer from "../instance/Bouer";
 import { Constants } from "../../shared/helpers/Constants";
 import {
   createEl,

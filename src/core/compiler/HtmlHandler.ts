@@ -1,5 +1,4 @@
-import Bouer from "../../Bouer";
-import Extensions from "../../shared/Extensions";
+import Bouer from "../instance/Bouer";
 import { Constants } from "../../shared/helpers/Constants";
 import Extend from "../../shared/helpers/Extend";
 import {
@@ -20,19 +19,22 @@ import Binder from "../binder/Binder";
 import DelimiterHandler, { DelimiterResult } from "../DelimiterHandler";
 import EventHandler from "../event/EventHandler";
 import Directive from "./Directive";
+import ComponentHandler from "../component/ComponentHandler";
 
 export default class HtmlHandler {
   /**
    * Provide the instance of the class.
    * link: https://refactoring.guru/design-patterns/singleton
    */
-  public static singleton: HtmlHandler;
+  static singleton: HtmlHandler;
 
   private bouer: Bouer;
   private binder: Binder;
   private directive: Directive;
   private delimiter: DelimiterHandler;
   private eventHandler: EventHandler;
+  private component: ComponentHandler;
+
   private NODES_TO_IGNORE_IN_COMPILATION = {
     'SCRIPT': 1,
     '#comment': 8
@@ -45,6 +47,7 @@ export default class HtmlHandler {
     this.delimiter = DelimiterHandler.singleton;
     this.eventHandler = EventHandler.singleton;
     this.binder = Binder.singleton;
+    this.component = ComponentHandler.singleton;
 
     this.directive = new Directive(bouer, this);
   }
@@ -86,11 +89,16 @@ export default class HtmlHandler {
     const mNames = clear(options.names || '[name]');
     const mValues = clear(options.values || '[value]');
 
+    const getter = (el: Element, fieldName: string): string | number | boolean | undefined | null => {
+      if (fieldName in el) return (el as any)[fieldName];
+      return el.getAttribute(fieldName) || (el as any).innerText;
+    }
+
     const tryGetValue = (el: Element): string | number | boolean | undefined => {
       let val: string | number | boolean | undefined | null = undefined;
 
       mValues.find((field: string) => {
-        return (val = Extensions.value(el, field)) ? true : false;
+        return (val = getter(el, field)) ? true : false;
       });
 
       return val;
@@ -151,7 +159,7 @@ export default class HtmlHandler {
 
     forEach(builds, (buildElement: Element) => {
       // Getting the e-build attr value
-      const fullPath = Extensions.value(buildElement, Constants.build) as string;
+      const fullPath = getter(buildElement, Constants.build) as string;
       const isBuildAsArray = buildElement.hasAttribute(Constants.array);
       const builderObjValue = objBuilder(buildElement);
 
@@ -243,10 +251,6 @@ export default class HtmlHandler {
         if (Constants.copy in node.attributes)
           this.directive.copy(node);
 
-        // data="..." directive
-        if (Constants.data in node.attributes)
-          return this.directive.data((node.attributes as any)[Constants.data], data);
-
         // e-for="..." directive
         if (Constants.for in node.attributes)
           return this.directive.for((node.attributes as any)[Constants.for], data)
@@ -265,26 +269,30 @@ export default class HtmlHandler {
           return this.directive.show((node.attributes as any)[Constants.show], data)
             .connect(rootElement);
 
-        // <component> directive
-        if (Constants.component in node.attributes)
-          return this.directive.component((node.attributes as any)[Constants.component], data);
-
         // e-req="..." | e-req:[id]="..."  directive
         let reqNode: any = null;
         if ((reqNode = (node.attributes as any)[Constants.req]) ||
-            (reqNode = [].slice.call(node.attributes).find(attr => Constants.check(attr, Constants.req))))
+          (reqNode = [].slice.call(node.attributes).find(attr => Constants.check(attr, Constants.req))))
           return this.directive.req(reqNode, data);
 
-        // :href="..." or !href="..." directive
-        if ((Constants.href in node.attributes) || (Constants.ihref in node.attributes))
-          return this.directive.href((node.attributes as any)[Constants.href], data)
-            .connect(rootElement);
+        // <component></component>
+        if (this.component.check(node.nodeName))
+          return this.component.order(node, data);
+
+        // data="..." directive
+        if (Constants.data in node.attributes)
+          return this.directive.data((node.attributes as any)[Constants.data], data);
 
         // Looping the attributes
         forEach([].slice.call(node.attributes), (attr: Attr) => {
           walker(attr, data);
         });
       }
+
+      // :href="..." or !href="..." directive
+      if (Constants.check(node, Constants.href) || Constants.check(node, Constants.ihref))
+        return this.directive.href(node, data)
+          .connect(rootElement);
 
       // e-content="..." directive
       if (Constants.check(node, Constants.content))
@@ -316,11 +324,19 @@ export default class HtmlHandler {
       }
 
       // Looping the nodes if exists
-      let childNode: Node | null = node.childNodes[0];
-      do {
-        if (!childNode) break;
-        walker(childNode, data);
-      } while (childNode = childNode.nextSibling)
+      // let childNode: Node | null = node.firstChild;
+      // do {
+      //   if (!childNode) break;
+      //   walker(childNode, data);
+      // } while (childNode = childNode.nextSibling)
+
+      // if (!node.hasChildNodes()) return;
+      // return node.childNodes.forEach(childNode => {
+      //   walker(childNode, data);
+      // });
+
+      forEach([].slice.call(node.childNodes), (childNode: Node) =>
+        walker(childNode, data))
     }
 
     walker(rootElement, data);
