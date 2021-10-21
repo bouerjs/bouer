@@ -1,9 +1,10 @@
 export default class BouerEvent implements Event {
   private source: Event;
 
-  constructor(options: { type: string, source?: Event }) {
+  constructor(options: { type: string, source?: Event, [key: string]: any }) {
     const { source, type } = options;
     this.source = source || new Event(type);
+    Object.assign(this, options);
 
     this.bubbles = this.source.bubbles;
     this.cancelBubble = this.source.cancelBubble;

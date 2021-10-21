@@ -655,6 +655,7 @@
             };
             var source = options.source, type = options.type;
             this.source = source || new Event(type);
+            Object.assign(this, options);
             this.bubbles = this.source.bubbles;
             this.cancelBubble = this.source.cancelBubble;
             this.cancelable = this.source.cancelable;
@@ -1477,7 +1478,6 @@
             this.scripts = [];
             this.styles = [];
             // Store temporarily this component UI orders
-            this.orders = [];
             this.events = {};
             this.name = options.name;
             this.path = options.path;
@@ -1522,7 +1522,7 @@
                         return Logger.error("The component <" + $name + "></" + $name + "> seems to have multiple root element, it must have" +
                             " only one root.");
                     _this.el = htmlSnippet.children[0];
-                    _this.created(new BouerEvent({ type: 'created' }));
+                    _this.emit('created');
                 });
             }
             var rootElement = this.el;
@@ -1545,7 +1545,7 @@
                 }
                 rootElement.attributes.setNamedItem(attr);
             });
-            this.beforeMount(new BouerEvent({ type: 'beforeMount' }));
+            this.emit('beforeMount');
             container.replaceChild(rootElement, componentElement);
             var rootClassList = {};
             // Retrieving all the classes of the retu elements
@@ -1585,17 +1585,18 @@
                 if (mStyle instanceof HTMLStyleElement)
                     return changeSelector(mStyle, styleId);
             });
-            this.mounted(new BouerEvent({ type: 'mounted' }));
             var compile = function (scriptContent) {
                 try {
                     // Executing the mixed scripts
                     Evalutator.singleton.execRaw(scriptContent || '', _this);
-                    _this.beforeLoad(new BouerEvent({ type: 'beforeLoad' }));
+                    _this.emit('mounted');
+                    // TODO: Something between this two events
+                    _this.emit('beforeLoad');
                     HtmlHandler.singleton
                         .compile({
                         data: _this.data,
                         el: rootElement,
-                        onDone: function () { return _this.loaded(new BouerEvent({ type: 'loaded' })); }
+                        onDone: function () { return _this.emit('loaded'); }
                     });
                     Observer.observe(rootElement, function () {
                         if (rootElement.isConnected)
@@ -1642,7 +1643,7 @@
                     Logger.error("Error loading the <script src=\"" + url + "\"></script> in " +
                         "<" + $name + "></" + $name + "> component, remove it in order to be compiled.");
                     Logger.log(error);
-                    _this.failed(new BouerEvent({ type: 'failed' }));
+                    _this.emit('failed');
                 });
             });
         };
@@ -1660,14 +1661,31 @@
             var container = this.el.parentElement;
             if (!container)
                 return false;
-            this.beforeDestroy(new BouerEvent({ type: 'beforeDestroy' }));
+            this.emit('beforeDestroy');
+            container.removeChild(this.el) !== null;
+            this.emit('destroyed');
             // Destroying all the events attached to the this instance
             this.events = {};
-            container.removeChild(this.el) !== null;
-            this.destroyed(new BouerEvent({ type: 'destroyed' }));
         };
         Component.prototype.params = function () {
             new UriHandler(this.route || '');
+        };
+        Component.prototype.emit = function (eventName) {
+            var params = [];
+            for (var _i = 1; _i < arguments.length; _i++) {
+                params[_i - 1] = arguments[_i];
+            }
+            var thisAsAny = this;
+            if (eventName in thisAsAny && typeof thisAsAny[eventName] === 'function')
+                thisAsAny[eventName](new BouerEvent({ type: eventName, targert: this }));
+            // Firing all subscribed events
+            var events = this.events[eventName];
+            if (!events)
+                return false;
+            forEach(events, function (event) {
+                return event.apply(void 0, __spreadArray([new BouerEvent({ type: eventName })], params, false));
+            });
+            return true;
         };
         Component.prototype.on = function (eventName, callback) {
             if (!this.events[eventName])
@@ -1685,15 +1703,6 @@
             this.events[eventName].splice(eventIndex, 1);
             return true;
         };
-        Component.prototype.requested = function (event) { };
-        Component.prototype.created = function (event) { };
-        Component.prototype.beforeMount = function (event) { };
-        Component.prototype.mounted = function (event) { };
-        Component.prototype.beforeLoad = function (event) { };
-        Component.prototype.loaded = function (event) { };
-        Component.prototype.beforeDestroy = function (event) { };
-        Component.prototype.destroyed = function (event) { };
-        Component.prototype.failed = function (event) { };
         return Component;
     }());
 

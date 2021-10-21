@@ -27,7 +27,6 @@ export default class Component implements IComponent {
   scripts: Array<HTMLScriptElement> = [];
   styles: Array<HTMLStyleElement | HTMLLinkElement> = [];
   // Store temporarily this component UI orders
-  orders: any[] = [];
   events: any = {};
 
   public get isReady() {
@@ -84,7 +83,7 @@ export default class Component implements IComponent {
             " only one root.");
 
         this.el = htmlSnippet.children[0];
-        this.created(new BouerEvent({ type: 'created' }));
+        this.emit('created');
       });
     }
 
@@ -111,7 +110,7 @@ export default class Component implements IComponent {
       rootElement.attributes.setNamedItem(attr);
     });
 
-    this.beforeMount(new BouerEvent({ type: 'beforeMount' }));
+    this.emit('beforeMount');
 
     container.replaceChild(rootElement, componentElement);
 
@@ -155,20 +154,21 @@ export default class Component implements IComponent {
         return changeSelector(mStyle, styleId);
     });
 
-    this.mounted(new BouerEvent({ type: 'mounted' }));
-
     const compile = (scriptContent?: string) => {
       try {
         // Executing the mixed scripts
         Evalutator.singleton.execRaw(scriptContent || '', this);
+        this.emit('mounted');
 
-        this.beforeLoad(new BouerEvent({ type: 'beforeLoad' }));
+        // TODO: Something between this two events
+
+        this.emit('beforeLoad');
 
         HtmlHandler.singleton
           .compile({
             data: this.data,
             el: rootElement,
-            onDone: () => this.loaded(new BouerEvent({ type: 'loaded' }))
+            onDone: () => this.emit('loaded')
           });
 
         Observer.observe(rootElement, () => {
@@ -222,7 +222,7 @@ export default class Component implements IComponent {
           Logger.error("Error loading the <script src=\"" + url + "\"></script> in " +
             "<" + $name + "></" + $name + "> component, remove it in order to be compiled.");
           Logger.log(error);
-          this.failed(new BouerEvent({ type: 'failed' }));
+          this.emit('failed');
         });
     });
   }
@@ -243,20 +243,32 @@ export default class Component implements IComponent {
     if (!container)
       return false;
 
-    this.beforeDestroy(new BouerEvent({ type: 'beforeDestroy' }));
+    this.emit('beforeDestroy');
+    container.removeChild(this.el) !== null;
+    this.emit('destroyed');
 
     // Destroying all the events attached to the this instance
     this.events = {};
-
-    container.removeChild(this.el) !== null;
-    this.destroyed(new BouerEvent({ type: 'destroyed' }));
   }
 
   params() {
     new UriHandler(this.route || '')
   }
 
-  on<TKey extends keyof ILifeCycleHooks>(eventName: TKey, callback: (event: BouerEvent) => void) {
+  emit<TKey extends keyof ILifeCycleHooks>(eventName: TKey, ...params: any[]) {
+    const thisAsAny = (this as any)
+    if (eventName in thisAsAny && typeof thisAsAny[eventName] === 'function')
+      thisAsAny[eventName](new BouerEvent({ type: eventName, targert: this }));
+
+    // Firing all subscribed events
+    const events = this.events[eventName];
+    if (!events) return false;
+    forEach(events, (event: (event: BouerEvent, ...params: any[]) => void) =>
+      event(new BouerEvent({ type: eventName }), ...params));
+    return true;
+  }
+
+  on<TKey extends keyof ILifeCycleHooks>(eventName: TKey, callback: (event: BouerEvent, ...params: any[]) => void) {
     if (!this.events[eventName])
       this.events[eventName] = [];
     this.events[eventName].push(callback);
@@ -266,20 +278,10 @@ export default class Component implements IComponent {
     };
   }
 
-  off<TKey extends keyof ILifeCycleHooks>(eventName: TKey, callback: (event: BouerEvent) => void) {
+  off<TKey extends keyof ILifeCycleHooks>(eventName: TKey, callback: (event: BouerEvent, ...params: any[]) => void) {
     if (!this.events[eventName]) return false;
     const eventIndex = this.events[eventName].indexOf(callback);
     this.events[eventName].splice(eventIndex, 1);
     return true;
   }
-
-  requested(event: BouerEvent) { }
-  created(event: BouerEvent) { }
-  beforeMount(event: BouerEvent) { }
-  mounted(event: BouerEvent) { }
-  beforeLoad(event: BouerEvent) { }
-  loaded(event: BouerEvent) { }
-  beforeDestroy(event: BouerEvent) { }
-  destroyed(event: BouerEvent) { }
-  failed(event: BouerEvent) { }
 }
