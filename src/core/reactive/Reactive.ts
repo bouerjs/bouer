@@ -8,7 +8,9 @@ import {
   mapper
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
-import Watch, { CallbackWatch } from "../binder/Watch";
+import { dynamic } from "../../types/dynamic";
+import { watchCallback } from "../../types/watchCallback";
+import Watch from "../binder/Watch";
 import ReactiveEvent from "../event/ReactiveEvent";
 
 export default class Reactive<TValue, TObject> implements PropertyDescriptor {
@@ -69,7 +71,7 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
     forEach(this.watches, watch => watch.callback(this.propertyValue, oldPropertyValue));
   }
 
-  watch(callback: CallbackWatch, node?: Node): Watch<TValue, TObject> {
+  watch(callback: watchCallback, node?: Node): Watch<TValue, TObject> {
     const w = new Watch(this, callback, { node: node });
     this.watches.push(w);
     return w;
@@ -84,7 +86,7 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 
       const REACTIVE_ARRAY_METHODS = ['push', 'pop', 'unshift', 'shift', 'splice']
       const inputArray = inputObject as any;
-      const reference: any = {}; // Using clousure to cache the array methods
+      const reference: dynamic = {}; // Using clousure to cache the array methods
       const prototype = inputArray.__proto__ = Object.create(Array.prototype);
 
       forEach(REACTIVE_ARRAY_METHODS, method => {
@@ -107,7 +109,7 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
       return inputObject;
 
     forEach(Object.keys(inputObject), key => {
-      const inputObjectAsAny = inputObject as any;
+      const mInputObject = inputObject as dynamic;
 
       // Already a reactive property, do nothing
       if (isNull(getDescriptor(inputObject, key)!.value))
@@ -120,7 +122,7 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 
       defineProperty(inputObject, key, reactive);
 
-      const propertyValue = inputObjectAsAny[key];
+      const propertyValue = mInputObject[key];
 
       if (isObject(propertyValue))
         this.transform(propertyValue);

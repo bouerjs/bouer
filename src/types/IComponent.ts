@@ -1,7 +1,7 @@
 import Component from "../core/component/Component";
-import BouerEvent from "../core/event/BouerEvent";
+import ILifeCycleHooks from "./ILifeCycleHooks";
 
-export default interface IComponent {
+export default interface IComponent extends ILifeCycleHooks {
   /** The name of the component */
   name: string
 
@@ -29,30 +29,9 @@ export default interface IComponent {
   /** restrictions of this component */
   restrictions?: Array<(compoment: Component) => boolean>;
 
-  /** The hook that will be called when the component is requested */
-  requested?: (event: BouerEvent) => void;
+  /** Allow to set this component as the `default page` when the application loads */
+  isDefault?: boolean;
 
-  /** The hook that will be called when the component is created */
-  created?: (event: BouerEvent) => void;
-
-  /** The hook that will be called before the component is mounted */
-  beforeMount?: (event: BouerEvent) => void;
-
-  /** The hook that will be called after the component is mounted */
-  mounted?: (event: BouerEvent) => void;
-
-  /** The hook that will be called before the component is loaded */
-  beforeLoad?: (event: BouerEvent) => void;
-
-  /** The hook that will be called after the component is loaded (Compiled) */
-  loaded?: (event: BouerEvent) => void;
-
-  /** The hook that will be called before the component is destroyed */
-  beforeDestroy?: (event: BouerEvent) => void;
-
-  /** The hook that will be called after the component is destroyed */
-  destroyed?: (event: BouerEvent) => void;
-
-  /** The hook that will be called after the component request is failed */
-  failed?: (event: BouerEvent) => void;
+  /** Allow to set this component as the `not found page` when no route was found */
+  isNotFound?: boolean;
 }

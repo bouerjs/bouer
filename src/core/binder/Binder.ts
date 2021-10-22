@@ -8,19 +8,15 @@ import {
   toStr,
   trim
 } from "../../shared/helpers/Utils";
-import { DelimiterResult } from "../DelimiterHandler";
 import Evalutator from "../Evaluator";
 import ReactiveEvent from "../event/ReactiveEvent";
 import Reactive from "../reactive/Reactive";
 import Watch from "./Watch";
+import { dynamic } from "../../types/dynamic";
+import { delimiterResponse } from "../../types/delimiterResponse";
+import IoC from "../../shared/helpers/IoC";
 
 export default class Binder {
-  /**
-   * Provide the instance of the class.
-   * link: https://refactoring.guru/design-patterns/singleton
-   */
-  static singleton: Binder;
-
   bouer: Bouer;
   evaluator: Evalutator;
   binds: Watch<any, any>[] = [];
@@ -37,17 +33,17 @@ export default class Binder {
   }
 
   constructor(bouer: Bouer) {
-    Binder.singleton = this;
+    IoC.Register(this);
 
-    this.evaluator = Evalutator.singleton;
+    this.evaluator = IoC.Resolve('Evalutator')!;
     this.bouer = bouer;
     this.cleanup();
   }
 
   create(options: {
     node: Node,
-    data: object,
-    fields: DelimiterResult[],
+    data: dynamic,
+    fields: delimiterResponse[],
     eReplace?: boolean, // Allow to e-[?] replacing
     onChange?: (value: any, node: Node) => void
   }) {
@@ -80,7 +76,7 @@ export default class Binder {
           case this.BindingDirection.fromDataToInput:
             return ownerElement[propertyNameToBind] = value;
           case this.BindingDirection.fromInputToData:
-            return (data as any)[originalValue] = ownerElement[propertyNameToBind];
+            return data[originalValue] = ownerElement[propertyNameToBind];
         }
       }
 

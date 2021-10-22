@@ -18,6 +18,8 @@ export default class Observer {
       })
     });
 
-    mutation.observe(element, { childList: true });
+    mutation.observe(element, {
+      childList: true
+    });
   }
 }

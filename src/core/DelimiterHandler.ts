@@ -1,39 +1,18 @@
+import IoC from "../shared/helpers/IoC";
 import { isNull, trim } from "../shared/helpers/Utils";
-
-export type Delimiter = {
-  /** The name of the delimiter */
-  name: string,
-  /** The delimiter structure */
-  delimiter: {
-    /** The open syntax */
-    open: string,
-    /** The close syntax */
-    close: string
-  },
-  action?: (valueToSet: string, node: Node, data: object) => string
-}
-
-export type DelimiterResult = {
-  field: string,
-  expression: string,
-  delimiter?: Delimiter
-}
+import { delimiter } from "../types/delimiter";
+import { delimiterResponse } from "../types/delimiterResponse";
 
 export default class DelimiterHandler {
-  /**
-   * Provide the instance of the class.
-   * link: https://refactoring.guru/design-patterns/singleton
-   */
-  static singleton: DelimiterHandler;
-  delimiters: Array<Delimiter> = [];
+  delimiters: Array<delimiter> = [];
 
-  constructor(delimiters: Array<Delimiter>) {
+  constructor(delimiters: Array<delimiter>) {
+    IoC.Register(this);
+
     this.delimiters = delimiters;
-
-    DelimiterHandler.singleton = this;
   }
 
-  add(item: Delimiter) {
+  add(item: delimiter) {
     this.delimiters.push(item);
   }
 
@@ -42,9 +21,9 @@ export default class DelimiterHandler {
     this.delimiters.splice(index, 1);
   }
 
-  run(content: string): DelimiterResult[] {
+  run(content: string): delimiterResponse[] {
     if (isNull(content) || trim(content) === '') return [];
-    let mDelimiter: Delimiter | null = null;
+    let mDelimiter: delimiter | null = null;
 
     const checkContent = (text: string, flag?: string): RegExpMatchArray | undefined => {
       const center = '([\\S\\s]*?)';

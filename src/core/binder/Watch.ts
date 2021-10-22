@@ -1,16 +1,15 @@
+import { watchCallback } from "../../types/watchCallback";
 import Reactive from "../reactive/Reactive";
-
-export type CallbackWatch = <TNewValue, TOldValue>(newValue: TNewValue, oldValue: TOldValue) => void;
 
 export default class Watch<TValue, TObject> {
   property: string;
   node: Node | undefined;
-  callback: CallbackWatch;
+  callback: watchCallback;
   onDestroy?: () => void | undefined;
 
   private reactive: Reactive<TValue, TObject>;
 
-  constructor(reactive: Reactive<TValue, TObject>, callback: CallbackWatch, options?: {
+  constructor(reactive: Reactive<TValue, TObject>, callback: watchCallback, options?: {
     node?: Node,
     onDestroy?: () => void
   }) {

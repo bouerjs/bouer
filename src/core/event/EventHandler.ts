@@ -5,6 +5,7 @@ import { buildError, createEl, forEach, isFunction, isNull, toLower, trim } from
 import Logger from "../../shared/logger/Logger";
 import Evaluator from "../Evaluator";
 import BouerEvent from "./BouerEvent";
+import IoC from "../../shared/helpers/IoC";
 
 type EventSubscription = {
   eventName: string
@@ -17,23 +18,17 @@ type EventEmitterOptions = {
 }
 
 export default class EventHandler {
-  /**
-   * Provide the instance of the class.
-   * link: https://refactoring.guru/design-patterns/singleton
-   */
-  static singleton: EventHandler;
-
   private bouer: Bouer;
   private evaluator: Evaluator;
   private events: Array<EventSubscription> = [];
   private input: HTMLInputElement;
 
   constructor(bouer: Bouer) {
-    EventHandler.singleton = this;
-
     this.bouer = bouer;
-    this.evaluator = Evaluator.singleton;
+    this.evaluator = IoC.Resolve('Evaluator')!;
     this.input = createEl('input').build();
+
+    IoC.Register(this);
   }
 
   handle(node: Node, data: object) {
@@ -41,7 +36,7 @@ export default class EventHandler {
     const nodeName = node.nodeName;
 
     if (isNull(ownerElement))
-      return Logger.error("Invalid ParentElement of \"" + nodeName + "\"");
+      return Logger.error("Invalid ParentElement of “" + nodeName + "”");
 
     // <button on:submit.once.stopPropagation="times++"></button>
     const nodeValue = trim(node.nodeValue ?? '');
@@ -52,7 +47,7 @@ export default class EventHandler {
     modifiers.shift();
 
     if (nodeValue === '')
-      Logger.error("Expected an expression in the \"" + nodeName + "\" and got an <empty string>.");
+      Logger.error("Expected an expression in the “" + nodeName + "” and got an <empty string>.");
 
     const callback = (evt: Event, args: any[]) => {
       const isCallOnce = (modifiers.indexOf('once') !== -1)

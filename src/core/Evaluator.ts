@@ -6,6 +6,8 @@ import {
   getDescriptor, GLOBAL, transferProperty
 } from "../shared/helpers/Utils";
 import Logger from "../shared/logger/Logger";
+import { dynamic } from "../types/dynamic";
+import IoC from "../shared/helpers/IoC";
 
 type EvalutatorOptions = {
   data: object,
@@ -16,22 +18,17 @@ type EvalutatorOptions = {
 }
 
 export default class Evalutator {
-  /**
-   * Provide the instance of the class.
-   * link: https://refactoring.guru/design-patterns/singleton
-   */
-  static singleton: Evalutator;
   private global: Window & typeof globalThis | null;
   private bouer: Bouer;
 
   constructor(bouer: Bouer) {
+    IoC.Register(this);
+
     this.bouer = bouer;
     this.global = this.createWindow() as any;
-
-    Evalutator.singleton = this;
   }
 
-  private createWindow() {
+  private createWindow(){
     let mWindow: Window | null;
 
     createEl('iframe', (frame, dom) => {
@@ -56,10 +53,10 @@ export default class Evalutator {
 
   exec(options: EvalutatorOptions) {
     let { data, args, expression, isReturn, aditional } = options;
-    const globalAsAny = this.global as any;
-    const noConfigurableProperties: any = {};
+    const mGlobal = this.global as dynamic;
+    const noConfigurableProperties: dynamic = {};
 
-    let dataToUse: any = Extend.obj(aditional || {});
+    let dataToUse: dynamic = Extend.obj(aditional || {});
     // Defining the scope data
     forEach(Object.keys(data), key => {
       transferProperty(dataToUse, data, key);
@@ -77,16 +74,16 @@ export default class Evalutator {
 
     // Spreading all the properties
     forEach(keys, key => {
-      delete globalAsAny[key];
+      delete mGlobal[key];
 
       // In case of non-configurable property store them to be handled
-      if (key in globalAsAny && getDescriptor(globalAsAny, key)!.configurable === true)
-        noConfigurableProperties[key] = globalAsAny[key];
+      if (key in mGlobal && getDescriptor(mGlobal, key)!.configurable === true)
+        noConfigurableProperties[key] = mGlobal[key];
 
       if (key in noConfigurableProperties)
-        globalAsAny[key] = (dataToUse as any)[key];
+        mGlobal[key] = dataToUse[key];
 
-      transferProperty(globalAsAny, dataToUse, key);
+      transferProperty(mGlobal, dataToUse, key);
     });
 
     // Executing the expression
@@ -99,7 +96,7 @@ export default class Evalutator {
     }
 
     // Removing the properties
-    forEach(keys, key => delete globalAsAny[key]);
+    forEach(keys, key => delete mGlobal[key]);
     return returnedValue;
   }
 }

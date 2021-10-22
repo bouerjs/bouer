@@ -41,7 +41,7 @@ export default {
     cleanup({ comments: false }),
     babel({
       babelHelpers: 'bundled',
-
+      presets: ['@babel/preset-env'],
     }),
     typescript({
       lib: ["es5", "es6", "dom"],

@@ -1,37 +1,40 @@
-import IBouer from "../../types/IBouer";
-import Logger from "../../shared/logger/Logger";
-import DelimiterHandler, { Delimiter } from "../DelimiterHandler";
-import HtmlHandler from "../compiler/HtmlHandler";
-import Evalutator from "../Evaluator";
-import EventHandler from "../event/EventHandler";
-import Binder from "../binder/Binder";
-import IBouerConfig from "../../types/IBouerConfig";
-import CommentHanlder from "../CommentHandler";
+import IoC from "../../shared/helpers/IoC";
 import Observer from "../../shared/helpers/Observer";
 import {
   createEl,
   DOM,
   forEach,
   isNull,
-  isObject,
-  transferProperty,
+  isObject, transferProperty,
   trim
 } from "../../shared/helpers/Utils";
-import CommentHandler from "../CommentHandler";
-import Reactive from "../reactive/Reactive";
-import ComponentHandler from "../component/ComponentHandler";
+import Logger from "../../shared/logger/Logger";
+import { delimiter } from "../../types/delimiter";
+import IBouer from "../../types/IBouer";
+import IBouerConfig from "../../types/IBouerConfig";
+import IComponent from "../../types/IComponent";
+import Binder from "../binder/Binder";
+import { default as CommentHandler, default as CommentHanlder } from "../CommentHandler";
+import HtmlHandler from "../compiler/HtmlHandler";
 import Component from "../component/Component";
+import ComponentHandler from "../component/ComponentHandler";
+import DelimiterHandler from "../DelimiterHandler";
+import Evalutator from "../Evaluator";
+import EventHandler from "../event/EventHandler";
+import Reactive from "../reactive/Reactive";
+import Routing from "../routing/Routing";
 
 export default class Bouer implements IBouer {
   el: Element;
   name = 'Bouer';
   version = '3.0.0';
 
-  data?: object;
-  globalData?: object;
-  config?: IBouerConfig;
-  components?: Component[];
-  dependencies?: any[];
+  data: object;
+  globalData: object;
+  config: IBouerConfig | undefined;
+  components: (IComponent | Component)[] = [];
+  routing: Routing | undefined;
+  dependencies: any[] = [];
 
   /** delimiters handler */
   delimiters: {
@@ -40,7 +43,7 @@ export default class Bouer implements IBouer {
     /** Removes a delimiter from the instance */
     remove: Function;
     /** Retrieve all the delimiters */
-    get: () => Array<Delimiter>;
+    get: () => Array<delimiter>;
   };
 
   /**
@@ -53,6 +56,9 @@ export default class Bouer implements IBouer {
     // Applying all the options defined
     Object.assign(this, options);
 
+    // Un
+    delete (this as any).components;
+
     if (isNull(elSelector) || trim(elSelector) === '')
       throw Logger.error('Invalid selector provided to the instance.');
 
@@ -60,7 +66,7 @@ export default class Bouer implements IBouer {
     const el = DOM.querySelector(elSelector);
 
     if (isNull(el))
-      throw Logger.error('Element with selector \'' + elSelector + '\' not found.');
+      throw Logger.error("Element with selector “" + elSelector + "” not found.");
 
     this.el = el!;
     app.beforeMount(app.el, app);
@@ -81,6 +87,7 @@ export default class Bouer implements IBouer {
 
     const eventHandler = new EventHandler(this);
     const binder = new Binder(this);
+    const routing = this.routing = new Routing(this);
     const component = new ComponentHandler(this, options!.components);
     const htmlHandler = new HtmlHandler(this);
     const comment = new CommentHanlder(this);
@@ -90,9 +97,7 @@ export default class Bouer implements IBouer {
     htmlHandler.compile({
       el: this.el,
       data: this.data,
-      onDone: () => {
-        app.loaded(app.el, app);
-      }
+      onDone: () => app.loaded(app.el, app)
     });
 
     Observer.observe(this.el, (options) => {
@@ -103,11 +108,14 @@ export default class Bouer implements IBouer {
       }
     });
 
+    // Initializing Routing
+    routing.init();
+
     // Assing the two methods available
     this.delimiters = {
       add: delimiter.add,
       remove: delimiter.remove,
-      get: () => delimiter.delimiters
+      get: () => [].slice.call(delimiter.delimiters)
     };
 
     if (!DOM.head.querySelector("link[rel~='icon']")) {
@@ -138,7 +146,7 @@ export default class Bouer implements IBouer {
      */
     values?: string
   }, onSet?: (builtObject: object, propName: string, value: any, element: Element) => void) {
-    return HtmlHandler.singleton.toJsObj(input, options, onSet);
+    return IoC.Resolve<HtmlHandler>('HtmlHandler')!.toJsObj(input, options, onSet);
   }
 
   /**
@@ -161,7 +169,6 @@ export default class Bouer implements IBouer {
 
     // Transfering the properties
     forEach(Object.keys(inputData), key => transferProperty(targetObject, inputData, key));
-
     return targetObject;
   }
 

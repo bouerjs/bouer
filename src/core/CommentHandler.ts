@@ -1,18 +1,14 @@
 import Bouer from "./instance/Bouer";
 import { code, DOM, isNull } from "../shared/helpers/Utils";
+import IoC from "../shared/helpers/IoC";
 
 export default class CommentHandler {
-  /**
-   * Provide the instance of the class.
-   * link: https://refactoring.guru/design-patterns/singleton
-   */
-  static singleton: CommentHandler;
-
   bouer: Bouer;
 
   constructor(bouer: Bouer) {
+    IoC.Register(this);
+
     this.bouer = bouer;
-    CommentHandler.singleton = this;
   }
 
   /** Creates a comment with some identifier */

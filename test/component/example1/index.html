@@ -30,26 +30,11 @@
     var app = new Bouer('#app', {
       data: {
         version: '3.0.0',
-        links: [
-          {
-            name: 'Afonso',
-            age: 25
-          },
-          {
-            name: 'Diambo',
-            age: 26
-          },
-          {
-            name: 'Matumona',
-            age: 27
-          },
-        ]
       },
       components: [
         {
           name: 'app:header',
           path: '/components/header.html',
-          route: '/client/{id}',
         },
         {
           name: 'app:footer',

@@ -1,9 +1,10 @@
+import { dynamic } from "../../types/dynamic";
 import { forEach, isNull, transferProperty } from "./Utils";
 
 export default class Extend {
   // join objects into one
-  static obj(...args: Array<object>) {
-    let out: any = {};
+  static obj(...args: object[]) {
+    let out: dynamic = {};
 
     forEach(args, arg => {
       if (isNull(arg)) return;
@@ -22,7 +23,7 @@ export default class Extend {
   }
 
   /** Add properties to the first object extracting from the next arguments */
-  static addToObj(destination: object, ...args: Array<object>) {
+  static addToObj(destination: object, ...args: object[]) {
     forEach(args, arg => {
       if (isNull(arg)) return;
 

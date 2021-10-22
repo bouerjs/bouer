@@ -1,10 +1,8 @@
-import Bouer from "../instance/Bouer";
 import { Constants } from "../../shared/helpers/Constants";
 import Extend from "../../shared/helpers/Extend";
+import IoC from "../../shared/helpers/IoC";
 import {
-  DOM,
-  connectNode,
-  findAttribute,
+  connectNode, DOM, findAttribute,
   forEach,
   isEmptyObject,
   isFilledObj,
@@ -15,19 +13,15 @@ import {
   trim
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
+import { delimiterResponse } from "../../types/delimiterResponse";
 import Binder from "../binder/Binder";
-import DelimiterHandler, { DelimiterResult } from "../DelimiterHandler";
-import EventHandler from "../event/EventHandler";
-import Directive from "./Directive";
 import ComponentHandler from "../component/ComponentHandler";
+import DelimiterHandler from "../DelimiterHandler";
+import EventHandler from "../event/EventHandler";
+import Bouer from "../instance/Bouer";
+import Directive from "./Directive";
 
 export default class HtmlHandler {
-  /**
-   * Provide the instance of the class.
-   * link: https://refactoring.guru/design-patterns/singleton
-   */
-  static singleton: HtmlHandler;
-
   private bouer: Bouer;
   private binder: Binder;
   private directive: Directive;
@@ -41,13 +35,13 @@ export default class HtmlHandler {
   }
 
   constructor(bouer: Bouer) {
-    HtmlHandler.singleton = this;
+    IoC.Register(this);
 
     this.bouer = bouer;
-    this.delimiter = DelimiterHandler.singleton;
-    this.eventHandler = EventHandler.singleton;
-    this.binder = Binder.singleton;
-    this.component = ComponentHandler.singleton;
+    this.delimiter = IoC.Resolve('DelimiterHandler')!;
+    this.eventHandler = IoC.Resolve('EventHandler')!;
+    this.binder = IoC.Resolve('Binder')!;
+    this.component = IoC.Resolve('ComponentHandler')!;
 
     this.directive = new Directive(bouer, this);
   }
@@ -276,7 +270,7 @@ export default class HtmlHandler {
           return this.directive.req(reqNode, data);
 
         // <component></component>
-        if (this.component.check(node.nodeName))
+        if (this.component.check(node.localName))
           return this.component.order(node, data);
 
         // data="..." directive
@@ -314,7 +308,7 @@ export default class HtmlHandler {
         return this.eventHandler.handle(node, data);
 
       // Property binding
-      let delimitersFields: DelimiterResult[];
+      let delimitersFields: delimiterResponse[];
       if (isString(node.nodeValue) && (delimitersFields = this.delimiter.run(node.nodeValue!)) && delimitersFields.length !== 0) {
         this.binder.create({
           node: connectNode(node, rootElement),

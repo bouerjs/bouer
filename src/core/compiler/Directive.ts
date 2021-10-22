@@ -9,7 +9,8 @@ import {
   isNull,
   isObject,
   toStr,
-  trim
+  trim,
+  urlCombine
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Binder from "../binder/Binder";
@@ -20,6 +21,8 @@ import Evalutator from "../Evaluator";
 import ReactiveEvent from "../event/ReactiveEvent";
 import Reactive from "../reactive/Reactive";
 import HtmlHandler from "./HtmlHandler";
+import IoC from "../../shared/helpers/IoC";
+import Routing from "../routing/Routing";
 
 class DirectiveReturn {
   private node: Node[];
@@ -49,10 +52,10 @@ export default class Directive {
     this.bouer = bouer;
     this.htmlHandler = htmlHandler;
 
-    this.evaluator = Evalutator.singleton;
-    this.delimiter = DelimiterHandler.singleton;
-    this.binder = Binder.singleton;
-    this.comment = CommentHandler.singleton;
+    this.evaluator = IoC.Resolve('Evalutator')!;
+    this.delimiter = IoC.Resolve('DelimiterHandler')!;
+    this.comment = IoC.Resolve('CommentHandler')!;
+    this.binder = IoC.Resolve('Binder')!;
   }
 
   // Helper functions
@@ -60,10 +63,10 @@ export default class Directive {
     return (node as any).ownerElement || node.parentNode;
   }
 
-  errorMsgEmptyNode = (node: Node) => "Expected an expression in \"" + node.nodeName
-    + "\" and got an <empty string>.";
-  errorMsgNodeValue = (node: Node) => "Expected an expression in \"" + node.nodeName
-    + "\" and got \"" + (node.nodeValue ?? '') + "\".";
+  errorMsgEmptyNode = (node: Node) => "Expected an expression in “" + node.nodeName +
+    "” and got an <empty string>.";
+  errorMsgNodeValue = (node: Node) => "Expected an expression in “" + node.nodeName +
+    "” and got “" + (node.nodeValue ?? '') + "”.";
 
   returner(node: Node, callback?: () => void): DirectiveReturn;
   returner(node: Node[], callback?: () => void): DirectiveReturn;
@@ -231,8 +234,8 @@ export default class Directive {
 
     if (!nodeValue.includes(' of ') && !nodeValue.includes(' in '))
       return this.returner(node, () => {
-        Logger.error("Expected a valid \"for\" expression in \"" + nodeName + "\" and got \"" +
-          nodeValue + "\"." + "\nValid: e-for=\"item of items\".");
+        Logger.error("Expected a valid “for” expression in “" + nodeName + "” and got “" + nodeValue + "”."
+          + "\nValid: e-for=\"item of items\".");
       });
 
     // Binding the e-for if got delimiters
@@ -258,7 +261,7 @@ export default class Directive {
       let filterKeys = filterConfigParts[2];
 
       if (isNull(filterValue) || filterValue === '') {
-        Logger.error("Invalid filter-value in \"" + nodeName + "\" \"" + nodeValue + "\" expression.");
+        Logger.error("Invalid filter-value in “" + nodeName + "” with “" + nodeValue + "” expression.");
         return list;
       }
 
@@ -273,7 +276,7 @@ export default class Directive {
       } else {
         // filter:search:name
         if (isNull(filterKeys) || filterKeys === '') {
-          Logger.error("Invalid filter-keys in \"" + nodeName + "\" \"" + nodeValue + "\" expression, " +
+          Logger.error("Invalid filter-keys in “" + nodeName + "” with “" + nodeValue + "” expression, " +
             "at least one filter-key to be provided.");
           return list;
         }
@@ -300,8 +303,8 @@ export default class Directive {
           switch (type.toLowerCase()) {
             case 'asc': return asc ? 1 : -1;
             case 'desc': return desc ? -1 : 1;
-            default: Logger.log("The \"" + type + "\" order type is invalid: \"" + nodeValue +
-              "\". Available types are: " + "\"asc\" for order ascendent and \"desc\" for order descendent.");
+            default: Logger.log("The “" + type + "” order type is invalid: “" + nodeValue +
+              "”. Available types are: “asc”  for order ascendent and “desc” for order descendent.");
               return 0;
           }
         }
@@ -383,8 +386,8 @@ export default class Directive {
               const filterConfigParts = filterConfig.split(':').map(item => trim(item));
 
               if (filterConfigParts.length == 1) {
-                Logger.error("Invalid \"" + nodeName + "\" filter expression \"" + nodeValue +
-                  "\", at least a filter-value and filter-keys, or a filter-function must be provided");
+                Logger.error("Invalid “" + nodeName + "” filter expression “" + nodeValue +
+                  "”, at least a filter-value and filter-keys, or a filter-function must be provided");
               } else {
                 listCopy = filter(listCopy, filterConfigParts);
               }
@@ -395,8 +398,8 @@ export default class Directive {
             if (orderConfig) {
               const orderConfigParts = orderConfig.split(':').map(item => trim(item));
               if (orderConfigParts.length == 1) {
-                Logger.error("Invalid \"" + nodeName + "\" order  expression \"" + nodeValue +
-                  "\", at least the order type must be provided");
+                Logger.error("Invalid “" + nodeName + "” order  expression “" + nodeValue +
+                  "”, at least the order type must be provided");
               } else {
                 listCopy = order(listCopy, orderConfigParts[1], orderConfigParts[2]);
               }
@@ -434,7 +437,7 @@ export default class Directive {
 
     if (!isObject(inputData))
       return this.returner(node, () => {
-        Logger.error("Expected a valid Object Literal expression in \"" + node.nodeName + "\" and got \"" + nodeValue + "\".");
+        Logger.error("Expected a valid Object Literal expression in “" + node.nodeName + "” and got “" + nodeValue + "”.");
       })
 
     this.bouer.setData(inputData, data);
@@ -486,8 +489,8 @@ export default class Directive {
     let exec = (obj: object) => { };
 
     const errorInvalidValue = (node: Node) =>
-      "Invalid value, expected an Object/Object Literal in \"" + node.nodeName +
-      "\" and got \"" + (node.nodeValue ?? '') + "\".";
+      "Invalid value, expected an Object/Object Literal in “" + node.nodeName
+      + "” and got “" + (node.nodeValue ?? '') + "”.";
 
     if (nodeValue === '')
       return this.returner(node, () => {
@@ -552,7 +555,39 @@ export default class Directive {
   }
 
   href(node: Node, data: object) {
-    return this.returner(node);
+    const ownerElement = this.toOwnerNode(node);
+    let nodeValue = trim(node.nodeValue ?? '');
+
+    if (nodeValue === '')
+      return this.returner(node, () => {
+        Logger.error(this.errorMsgEmptyNode(node));
+      });
+
+    ownerElement.removeAttribute(node.nodeName);
+
+    const usehash = (this.bouer.config || {}).usehash ?? true;
+    const routeToSet = urlCombine((usehash ? '#' : ''), nodeValue);
+
+    ownerElement.setAttribute('href', routeToSet);
+    const href = ownerElement.attributes['href'] as Attr;
+    const delimiters = this.delimiter.run(nodeValue);
+
+    if (delimiters.length !== 0)
+      this.binder.create({
+        data: data,
+        node: href,
+        fields: delimiters
+      });
+
+    (ownerElement as HTMLAnchorElement)
+      .addEventListener('click', event => {
+        event.preventDefault();
+
+        IoC.Resolve<Routing>('Routing')!
+          .navigate(href.value);
+      }, false);
+
+    return this.returner(href);
   }
 
   skeleton(node: Node, data: object) {
