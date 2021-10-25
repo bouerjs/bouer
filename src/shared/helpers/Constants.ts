@@ -1,3 +1,4 @@
+import { startWith } from "./Utils";
 
 export const Constants = {
   ignore: 'e-ignore',
@@ -35,13 +36,15 @@ export const Constants = {
   href: ':href',
   ihref: '!href',
 
-  copy: 'e-copy',
+  entry: 'e-entry',
   component: ':name',
 
   on: 'on:',
 
+  tagContent: 'content',
+
   check: function (node: Node, cmd: string) {
-    return node.nodeName.substr(0, cmd.length) === cmd;
+    return startWith(node.nodeName, cmd);
   },
 
   isConstant: function (value: string) {

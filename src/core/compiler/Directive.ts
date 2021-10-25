@@ -1,8 +1,9 @@
-import Bouer from "../instance/Bouer";
 import { Constants } from "../../shared/helpers/Constants";
 import Extend from "../../shared/helpers/Extend";
+import IoC from "../../shared/helpers/IoC";
 import {
   connectNode,
+  defineProperty,
   findAttribute,
   forEach,
   isFunction,
@@ -13,32 +14,19 @@ import {
   urlCombine
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
+import { dynamic } from "../../types/dynamic";
 import Binder from "../binder/Binder";
 import Watch from "../binder/Watch";
 import CommentHandler from "../CommentHandler";
+import ComponentHandler from "../component/ComponentHandler";
 import DelimiterHandler from "../DelimiterHandler";
 import Evalutator from "../Evaluator";
 import ReactiveEvent from "../event/ReactiveEvent";
+import Bouer from "../instance/Bouer";
 import Reactive from "../reactive/Reactive";
-import HtmlHandler from "./HtmlHandler";
-import IoC from "../../shared/helpers/IoC";
 import Routing from "../routing/Routing";
-
-class DirectiveReturn {
-  private node: Node[];
-
-  constructor(...node: Node[]) {
-    this.node = node;
-  }
-
-  /**
-   * Connects the node with the element that will be provided
-   * @param element the root element that will be connected with
-   */
-  connect(element: Element) {
-    forEach(this.node, node => connectNode(node, element));
-  }
-}
+import DataStore from "../store/DataStore";
+import Compiler from "./Compiler";
 
 export default class Directive {
   private bouer: Bouer;
@@ -46,11 +34,11 @@ export default class Directive {
   private evaluator: Evalutator;
   private delimiter: DelimiterHandler;
   private comment: CommentHandler;
-  private htmlHandler: HtmlHandler;
+  private compiler: Compiler;
 
-  constructor(bouer: Bouer, htmlHandler: HtmlHandler) {
+  constructor(bouer: Bouer, compiler: Compiler) {
     this.bouer = bouer;
-    this.htmlHandler = htmlHandler;
+    this.compiler = compiler;
 
     this.evaluator = IoC.Resolve('Evalutator')!;
     this.delimiter = IoC.Resolve('DelimiterHandler')!;
@@ -68,19 +56,12 @@ export default class Directive {
   errorMsgNodeValue = (node: Node) => "Expected an expression in “" + node.nodeName +
     "” and got “" + (node.nodeValue ?? '') + "”.";
 
-  returner(node: Node, callback?: () => void): DirectiveReturn;
-  returner(node: Node[], callback?: () => void): DirectiveReturn;
-  returner(node: any, callback?: () => void): DirectiveReturn {
-    if (isFunction(callback)) callback!();
-    return new DirectiveReturn(...node);
-  }
-
   // Directives
   ignore(node: Element) {
     node.nodeValue = 'true';
   }
 
-  if(node: Node, data: object) { // TODO: Remake this code
+  if(node: Node, data: object) {
     const ownerElement = this.toOwnerNode(node) as Element;
     const container = ownerElement.parentElement;
     const conditions: { node: Attr, element: Element }[] = [];
@@ -88,11 +69,9 @@ export default class Directive {
     const nodeName = node.nodeName;
     let exec = () => { };
 
-    if (!container)
-      return this.returner(node);
+    if (!container) return;
 
-    if (nodeName === Constants.elseif || nodeName === Constants.else)
-      return this.returner(node);
+    if (nodeName === Constants.elseif || nodeName === Constants.else) return;
 
     let currentEl: Element | null = ownerElement;
     let reactives: { attr: Attr, reactive: Reactive<any, any> }[] = [];
@@ -104,10 +83,10 @@ export default class Directive {
       if (!attr) break;
 
       if ((attr.nodeName !== 'e-else') && (trim(attr.nodeValue ?? '') === ''))
-        return this.returner(attr, () => Logger.error(this.errorMsgEmptyNode(attr)));
+        return Logger.error(this.errorMsgEmptyNode(attr));
 
       if (this.delimiter.run(attr.nodeValue ?? '').length !== 0)
-        return this.returner(attr, () => Logger.error(this.errorMsgNodeValue(attr)));
+        return Logger.error(this.errorMsgNodeValue(attr));
 
       conditions.push({ node: attr, element: currentEl });
 
@@ -166,7 +145,7 @@ export default class Directive {
           _cb: (chainIndex: number) => {
             const { element } = conditions[chainIndex];
             container.replaceChild(element, comment);
-            this.htmlHandler.compile({
+            this.compiler.compile({
               el: element,
               data: data
             })
@@ -174,8 +153,6 @@ export default class Directive {
         }
       });
     })();
-
-    return this.returner(conditions.map(item => item.node));
   }
 
   show(node: Node, data: object) {
@@ -184,14 +161,10 @@ export default class Directive {
     const hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
 
     if (nodeValue === '')
-      return this.returner(node, () => {
-        Logger.error(this.errorMsgEmptyNode(node));
-      });
+      return Logger.error(this.errorMsgEmptyNode(node));
 
     if (hasDelimiter)
-      return this.returner(node, () => {
-        Logger.error(this.errorMsgNodeValue(node));
-      });
+      return Logger.error(this.errorMsgNodeValue(node));
 
     const exec = (element: HTMLElement) => {
       const value = this.evaluator.exec({
@@ -202,6 +175,7 @@ export default class Directive {
       element.style.display = value ? '' : 'none';
     }
 
+    connectNode(node, ownerElement);
     const bindResult = this.binder.create({
       data: data,
       node: node,
@@ -212,7 +186,6 @@ export default class Directive {
     exec(ownerElement);
 
     ownerElement.removeAttribute(bindResult.boundNode.nodeName);
-    return this.returner(node);
   }
 
   for(node: Node, data: object) {
@@ -224,19 +197,14 @@ export default class Directive {
     let listedItems: Element[] = [];
     let exec = () => { };
 
-    if (!container)
-      return this.returner(node);
+    if (!container) return;
 
     if (nodeValue === '')
-      return this.returner(node, () => {
-        Logger.error(this.errorMsgEmptyNode(node));
-      });
+    return Logger.error(this.errorMsgEmptyNode(node));
 
     if (!nodeValue.includes(' of ') && !nodeValue.includes(' in '))
-      return this.returner(node, () => {
-        Logger.error("Expected a valid “for” expression in “" + nodeName + "” and got “" + nodeValue + "”."
-          + "\nValid: e-for=\"item of items\".");
-      });
+      return Logger.error("Expected a valid “for” expression in “" + nodeName + "” and got “" + nodeValue + "”."
+      + "\nValid: e-for=\"item of items\".");
 
     // Binding the e-for if got delimiters
     const delimiters = this.delimiter.run(nodeValue);
@@ -316,13 +284,28 @@ export default class Directive {
     const reactivePropertyEvent = ReactiveEvent.on('AfterGet',
       reactive => this.binder.binds.push(reactive.watch(() => exec(), node)));
 
-    const reactiveArrayEvent = ReactiveEvent.on('AfterArrayChanges', reactive => exec());
+    const reactiveArrayEvent = ReactiveEvent.on('AfterArrayChanges', () => exec());
 
     // Creating a fake reactive prop and fake Watch to destroy AfterArrayChanges Event
-    this.binder.binds.push(new Watch(new Reactive({ propertyName: '_', sourceObject: { _: [] } }), () => { }, {
-      node: node,
-      onDestroy: () => ReactiveEvent.off('AfterArrayChanges', reactiveArrayEvent.callback)
-    }));
+    this.binder.binds.push(
+      // Watch instance
+      new Watch(
+        // Reactive instance for the Watch
+        new Reactive({
+          propertyName: '_',
+          sourceObject: { _: [] }
+        }),
+
+        // Watch Callback
+        () => { },
+
+        // Watch Instance Options
+        {
+          node: node,
+          onDestroy: () => ReactiveEvent.off('AfterArrayChanges', reactiveArrayEvent.callback)
+        }
+      )
+    );
 
     (exec = () => {
       // updating the nodeValue
@@ -369,10 +352,12 @@ export default class Directive {
             if (hasIndex) forData[leftHandParts[1]] = index;
 
             let clonedItem = container.insertBefore(forItem.cloneNode(true) as Element, comment);
-            this.htmlHandler.compile({
+            this.compiler.compile({
               el: clonedItem,
               data: forData
             });
+
+            listedItems.push(clonedItem);
           },
           _flt: (list: any[]) => {
             let listCopy = Extend.array(list);
@@ -412,7 +397,6 @@ export default class Directive {
     })();
 
     ReactiveEvent.off('AfterGet', reactivePropertyEvent.callback);
-    return this.returner(node);
   }
 
   def(node: Node, data: object) {
@@ -421,14 +405,10 @@ export default class Directive {
     const hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
 
     if (nodeValue === '')
-      return this.returner(node, () => {
-        Logger.error(this.errorMsgEmptyNode(node));
-      });
+      return Logger.error(this.errorMsgEmptyNode(node));
 
     if (hasDelimiter)
-      return this.returner(node, () => {
-        Logger.error(this.errorMsgNodeValue(node));
-      });
+      return Logger.error(this.errorMsgNodeValue(node));
 
     let inputData = this.evaluator.exec({
       data: data,
@@ -436,9 +416,7 @@ export default class Directive {
     });
 
     if (!isObject(inputData))
-      return this.returner(node, () => {
-        Logger.error("Expected a valid Object Literal expression in “" + node.nodeName + "” and got “" + nodeValue + "”.");
-      })
+      return Logger.error("Expected a valid Object Literal expression in “" + node.nodeName + "” and got “" + nodeValue + "”.");
 
     this.bouer.setData(inputData, data);
     ownerElement.removeAttribute(node.nodeName);
@@ -449,9 +427,7 @@ export default class Directive {
     const nodeValue = trim(node.nodeValue ?? '');
 
     if (nodeValue === '')
-      return this.returner(node, () => {
-        Logger.error(this.errorMsgEmptyNode(node));
-      })
+      return Logger.error(this.errorMsgEmptyNode(node));
 
     ownerElement.innerText = nodeValue;
     ownerElement.removeAttribute(node.nodeName);
@@ -463,23 +439,18 @@ export default class Directive {
     const hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
 
     if (nodeValue === '')
-      return this.returner(node, () => {
-        Logger.error(this.errorMsgEmptyNode(node));
-      });
+      return Logger.error(this.errorMsgEmptyNode(node));
 
     if (hasDelimiter)
-      return this.returner(node, () => {
-        Logger.error(this.errorMsgNodeValue(node));
-      });
+      return Logger.error(this.errorMsgNodeValue(node));
 
     this.binder.create({
-      node: node,
+      node: connectNode(node, ownerElement),
       fields: [{ field: nodeValue, expression: nodeValue }],
       data: data
     });
 
     ownerElement.removeAttribute(node.nodeName);
-    return this.returner(node);
   }
 
   property(node: Node, data: object) {
@@ -493,12 +464,9 @@ export default class Directive {
       + "” and got “" + (node.nodeValue ?? '') + "”.";
 
     if (nodeValue === '')
-      return this.returner(node, () => {
-        Logger.error(errorInvalidValue(node));
-      });
+      return Logger.error(errorInvalidValue(node));
 
-    if (hasDelimiter)
-      return this.returner(node);
+    if (hasDelimiter) return;
 
     let inputData = this.evaluator.exec({
       data: data,
@@ -506,13 +474,11 @@ export default class Directive {
     });
 
     if (!isObject(inputData))
-      return this.returner(node, () => {
-        Logger.error(errorInvalidValue(node));
-      });
+      return Logger.error(errorInvalidValue(node));
 
     this.binder.create({
       data: data,
-      node: node,
+      node: connectNode(node, ownerElement),
       eReplace: false,
       fields: [{ expression: nodeValue, field: nodeValue }],
       onChange: () => exec(this.evaluator.exec({
@@ -524,11 +490,11 @@ export default class Directive {
     ownerElement.removeAttribute(node.nodeName);
 
     (exec = (obj: any) => {
-      const nameAttrToSet = node.nodeName.substr(Constants.property.length);
-      let attr = (ownerElement.attributes as any)[nameAttrToSet] as Attr;
+      const attrNameToSet = node.nodeName.substr(Constants.property.length);
+      let attr = (ownerElement.attributes as any)[attrNameToSet] as Attr;
       if (!attr) {
-        (ownerElement.setAttribute(nameAttrToSet, ''));
-        attr = (ownerElement.attributes as any)[nameAttrToSet] as Attr;
+        (ownerElement.setAttribute(attrNameToSet, ''));
+        attr = (ownerElement.attributes as any)[attrNameToSet] as Attr;
       }
 
       forEach(Object.keys(obj), key => {
@@ -538,30 +504,67 @@ export default class Directive {
       });
 
       if (attr.value === '')
-        return ownerElement.removeAttribute(nameAttrToSet);
+        return ownerElement.removeAttribute(attrNameToSet);
     })(inputData);
-
-    return this.returner(node);
-  }
-
-  req(node: Node, data: object) {
-    Logger.info(node, data);
-    return this.returner(node);
   }
 
   data(node: Node, data: object) {
-    const _data = Extend.obj(data, { $this: data });
-    return this.returner(node);
+    const ownerElement = this.toOwnerNode(node);
+    const nodeValue = trim(node.nodeValue ?? '');
+    const hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
+    let inputData: dynamic = {};
+
+    if (hasDelimiter)
+      return Logger.error("The “data” attribute cannot contain delimiter.");
+
+    ownerElement.removeAttribute(node.nodeName);
+
+    const mData = Extend.obj(data, { $this: data });
+    const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
+      inputData[reactive.propertyName] = undefined;
+      defineProperty(inputData, reactive.propertyName, reactive);
+    });
+
+    // If data value is empty gets the main scope value
+    if (nodeValue === '')
+      inputData = Extend.obj(this.bouer.data);
+    else {
+      // Other wise, compiles the object provided
+      const mInputData = this.evaluator.exec({ data: mData, expression: nodeValue });
+
+      if (!isObject(mInputData))
+        return Logger.error("Expected a valid Object Literal expression in “" + node.nodeName +
+          "” and got “" + nodeValue + "”.");
+
+      // Adding all non-existing properties
+      forEach(Object.keys(mInputData), key => {
+        if (!(key in inputData))
+          inputData[key] = mInputData[key];
+      });
+    }
+
+    ReactiveEvent.off('AfterGet', reactiveEvent.callback);
+
+    let dataKey = node.nodeName.split(':')[1];
+    if (dataKey) {
+      dataKey = dataKey.replace(/\[|\]/g, '');
+      DataStore.set('data', dataKey, inputData);
+    }
+
+    Reactive.transform(inputData);
+    return this.compiler.compile({
+      data: inputData,
+      el: ownerElement
+    });
   }
 
   href(node: Node, data: object) {
     const ownerElement = this.toOwnerNode(node);
+    const nodeName = node.nodeName;
     let nodeValue = trim(node.nodeValue ?? '');
 
     if (nodeValue === '')
-      return this.returner(node, () => {
-        Logger.error(this.errorMsgEmptyNode(node));
-      });
+      return Logger.error(this.errorMsgEmptyNode(node));
 
     ownerElement.removeAttribute(node.nodeName);
 
@@ -575,7 +578,7 @@ export default class Directive {
     if (delimiters.length !== 0)
       this.binder.create({
         data: data,
-        node: href,
+        node: connectNode(href, ownerElement),
         fields: delimiters
       });
 
@@ -587,7 +590,33 @@ export default class Directive {
           .navigate(href.value);
       }, false);
 
-    return this.returner(href);
+    (href as any).markable = nodeName[0] === ':';
+  }
+
+  entry(node: Node, data: object) {
+    const ownerElement = this.toOwnerNode(node) as Element;
+    const nodeValue = trim(node.nodeValue ?? '');
+    const hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
+
+    if (nodeValue === '')
+      return Logger.error(this.errorMsgEmptyNode(node));
+
+    if (hasDelimiter)
+      return Logger.error(this.errorMsgNodeValue(node));
+
+    ownerElement.removeAttribute(node.nodeName);
+    IoC.Resolve<ComponentHandler>('ComponentHandler')!
+      .prepare([
+        {
+          name: nodeValue,
+          template: ownerElement.outerHTML,
+          data: data
+        }
+      ]);
+  }
+
+  req(node: Node, data: object) {
+    Logger.info(node, data);
   }
 
   skeleton(node: Node, data: object) {
@@ -595,14 +624,8 @@ export default class Directive {
   }
 
   wait(node: Node, data: object) {
+
     Logger.warn('wait-data not implemented yet.');
-  }
 
-  copy(node: Element) {
-    Logger.warn('e-copy not implemented yet.');
-  }
-
-  component(node: Element, data: object) {
-    Logger.warn('<component /> not implemented yet.');
   }
 }

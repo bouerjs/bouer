@@ -1,28 +1,17 @@
-import Extend from "../../shared/helpers/Extend";
-import IoC from "../../shared/helpers/IoC";
-import Observer from "../../shared/helpers/Observer";
 import UriHandler from "../../shared/helpers/UriHandler";
+import {
+  DOM,
+  forEach, isNull,
+  isObject,
+  transferProperty
+} from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import { dynamic } from "../../types/dynamic";
 import IComponent from "../../types/IComponent";
 import ILifeCycleHooks from "../../types/ILifeCycleHooks";
-import HtmlHandler from "../compiler/HtmlHandler";
-import Evalutator from "../Evaluator";
 import BouerEvent from "../event/BouerEvent";
 import Bouer from "../instance/Bouer";
 import Reactive from "../reactive/Reactive";
-import {
-  buildError,
-  code,
-  createEl,
-  DOM,
-  forEach,
-  http,
-  isNull,
-  isObject,
-  transferProperty,
-  trim
-} from "../../shared/helpers/Utils";
 
 export default class Component implements IComponent {
   name: string
@@ -51,8 +40,8 @@ export default class Component implements IComponent {
   private links?: Array<HTMLAnchorElement>;
 
   constructor(options: IComponent) {
-    this.name = options.name;
-    this.path = options.path;
+    this.name = options.name!;
+    this.path = options.path!;
 
     Object.assign(this, options);
     this.data = Reactive.transform(this.data || {});
@@ -63,6 +52,7 @@ export default class Component implements IComponent {
       return Logger.log("Invalid object for component.export(...), only \"Object Literal\" is allowed.");
 
     return forEach(Object.keys(options), key => {
+      (this.data as any)[key] = (options as any)[key];
       transferProperty(this.data, options, key);
     });
   }
@@ -85,7 +75,7 @@ export default class Component implements IComponent {
   }
 
   params() {
-    new UriHandler(this.route || '')
+    return new UriHandler().params(this.route);
   }
 
   emit<TKey extends keyof ILifeCycleHooks>(eventName: TKey, ...params: any[]) {

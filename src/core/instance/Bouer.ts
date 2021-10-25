@@ -13,16 +13,21 @@ import { delimiter } from "../../types/delimiter";
 import IBouer from "../../types/IBouer";
 import IBouerConfig from "../../types/IBouerConfig";
 import IComponent from "../../types/IComponent";
+import { watchCallback } from "../../types/watchCallback";
 import Binder from "../binder/Binder";
+import Watch from "../binder/Watch";
 import { default as CommentHandler, default as CommentHanlder } from "../CommentHandler";
-import HtmlHandler from "../compiler/HtmlHandler";
+import Compiler from "../compiler/Compiler";
+import Converter from "../compiler/Converter";
 import Component from "../component/Component";
 import ComponentHandler from "../component/ComponentHandler";
 import DelimiterHandler from "../DelimiterHandler";
 import Evalutator from "../Evaluator";
 import EventHandler from "../event/EventHandler";
+import ReactiveEvent from "../event/ReactiveEvent";
 import Reactive from "../reactive/Reactive";
 import Routing from "../routing/Routing";
+import DataStore from "../store/DataStore";
 
 export default class Bouer implements IBouer {
   el: Element;
@@ -71,6 +76,7 @@ export default class Bouer implements IBouer {
     this.el = el!;
     app.beforeMount(app.el, app);
 
+    new DataStore();
     new Evalutator(this);
     new CommentHandler(this)
     // Transform the data properties into a reative
@@ -89,12 +95,13 @@ export default class Bouer implements IBouer {
     const binder = new Binder(this);
     const routing = this.routing = new Routing(this);
     const component = new ComponentHandler(this, options!.components);
-    const htmlHandler = new HtmlHandler(this);
+    const compiler = new Compiler(this);
+    const converter = new Converter(this);
     const comment = new CommentHanlder(this);
 
     app.beforeLoad(app.el, app);
     // compile the app
-    htmlHandler.compile({
+    compiler.compile({
       el: this.el,
       data: this.data,
       onDone: () => app.loaded(app.el, app)
@@ -146,7 +153,7 @@ export default class Bouer implements IBouer {
      */
     values?: string
   }, onSet?: (builtObject: object, propName: string, value: any, element: Element) => void) {
-    return IoC.Resolve<HtmlHandler>('HtmlHandler')!.toJsObj(input, options, onSet);
+    return IoC.Resolve<Converter>('Converter')!.htmlToJsObj(input, options, onSet);
   }
 
   /**
@@ -170,6 +177,10 @@ export default class Bouer implements IBouer {
     // Transfering the properties
     forEach(Object.keys(inputData), key => transferProperty(targetObject, inputData, key));
     return targetObject;
+  }
+
+  watch(propertyName: string, callback: watchCallback, targetObject?: object) {
+    return IoC.Resolve<Binder>('Binder')!.watch(propertyName, callback, targetObject);
   }
 
   // Lifecycle Hooks

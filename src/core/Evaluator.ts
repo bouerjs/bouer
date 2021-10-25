@@ -44,7 +44,7 @@ export default class Evalutator {
   execRaw(expression: string, context?: object): void {
     // Executing the expression
     try {
-      const mExpression = "return(function(){" + expression + "; }).apply(this, arguments)";
+      const mExpression = "(function(){ " + expression + " }).apply(this, arguments)";
       GLOBAL.Function(mExpression).apply(context || this.bouer);
     } catch (error) {
       Logger.error(buildError(error));

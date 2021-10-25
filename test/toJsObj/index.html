@@ -12,33 +12,42 @@
 <body>
   <div id="app">
     <form class="center">
-      <label> First Name </label> <br>
-      <input type="text" name="firstName" /> <br>
 
-      <label> Last Name </label> <br>
-      <input type="text" name="lastName" /> <br>
+      <input-field data="{ label: 'First Name', name: 'firstName', value: '' }">
+        <input e-bind="value" type="text" e-name="{{ name }}" />
+      </input-field>
+
+      <input-field data="{ label: 'Last Name', name: 'lastName', value: '' }">
+        <input e-bind="value" type="text" e-name="{{ name }}" />
+      </input-field>
 
       <!-- Build an phones property as an array -->
       <div e-build="phones" e-array>
-        <label> Country Code </label> <br>
-        <input type="text" name="code" /> <br>
 
-        <label> Number </label> <br>
-        <input type="text" name="number" />
+        <input-field data="{ label: 'Country Code', name: 'code', value: '' }">
+          <input e-bind="value" type="text" e-name="{{ name }}" />
+        </input-field>
+
+        <input-field data="{ label: 'Number', name: 'number', value: '' }">
+          <input e-bind="value" type="number" e-name="{{ name }}" />
+        </input-field>
+
       </div>
 
       <!-- Build an identification property as an object -->
       <div e-build="identification">
-        <label> Type </label> <br>
-        <select name="type">
-          <option> Id Card </option>
-          <option> Passport </option>
-        </select> <br>
+        <input-field data="{ label: 'Type', name: 'type', value: '' }">
+          <select e-name="{{ name }}" e-bind="value">
+            <option> Id Card </option>
+            <option> Passport </option>
+          </select>
+        </input-field>
 
-        <label> Code </label> <br>
-        <input type="text" name="code" />
+
+        <input-field data="{ label: 'Code', name: 'code', value: '' }">
+          <input e-bind="value" type="text" e-name="{{ name }}" />
+        </input-field>
       </div>
-
 
       <button type="button"> Submit </button>
 
@@ -50,11 +59,20 @@
   <script src="../../dist/bouer.js"></script>
 
   <script>
-    var app = new Bouer('#app');
+    var app = new Bouer('#app', {
+      components: [
+        {
+          name: 'input-field',
+          path: '/components/input-field.html'
+        }
+      ]
+    });
 
     document.addEventListener('DOMContentLoaded', function () {
+      const button = document.querySelector('button[type="button"]');
+      if (!button) return;
 
-      document.querySelector('button[type="button"]').onclick = function (evt) {
+      button.onclick = function (evt) {
         var form = document.querySelector('form');
         console.log(app.toJsObj(form));
 

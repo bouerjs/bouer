@@ -3,10 +3,10 @@ import ILifeCycleHooks from "./ILifeCycleHooks";
 
 export default interface IComponent extends ILifeCycleHooks {
   /** The name of the component */
-  name: string
+  name?: string
 
   /** The path of the component (required) */
-  path: string;
+  path?: string;
 
   /** The title that will be replaced when the page is loaded */
   title?: string;

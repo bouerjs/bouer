@@ -71,6 +71,10 @@ export function trim(value: string) {
   return value ? value.trim() : value;
 }
 
+export function startWith(value: string, pattern: string) {
+  return (value.substr(0, pattern.length) === pattern);
+}
+
 export function toLower(str: string) {
   return str.toLowerCase();
 }

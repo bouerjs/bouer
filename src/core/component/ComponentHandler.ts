@@ -8,22 +8,28 @@ import { dynamic } from "../../types/dynamic";
 import Routing from "../routing/Routing";
 import IoC from "../../shared/helpers/IoC";
 import Evalutator from "../Evaluator";
-import HtmlHandler from "../compiler/HtmlHandler";
+import Compiler from "../compiler/Compiler";
 import Observer from "../../shared/helpers/Observer";
+import DelimiterHandler from "../DelimiterHandler";
 import {
-  anchor,
-  buildError,
-  code,
-  createEl,
   DOM,
-  forEach,
+  code,
   http,
-  isNull,
-  transferProperty,
   trim,
+  isNull,
+  anchor,
+  forEach,
+  createEl,
+  buildError,
+  transferProperty,
   urlCombine,
-  urlResolver
+  urlResolver,
+  isFunction,
+  defineProperty,
+  isObject
 } from "../../shared/helpers/Utils";
+import ReactiveEvent from "../event/ReactiveEvent";
+import Reactive from "../reactive/Reactive";
 
 
 export default class ComponentHandler {
@@ -31,11 +37,14 @@ export default class ComponentHandler {
   private components: { [key: string]: (Component | IComponent) } = {};
   // Handle all the components web requests to avoid multiple requests
   private requests: dynamic = {};
+  delimiter: DelimiterHandler;
 
   constructor(bouer: Bouer, components?: IComponent[]) {
     IoC.Register(this)!;
 
     this.bouer = bouer;
+    this.delimiter = IoC.Resolve('DelimiterHandler')!;
+
     if (components) this.prepare(components);
   }
 
@@ -54,7 +63,10 @@ export default class ComponentHandler {
 
     const urlPath = urlCombine(urlResolver(anchor.baseURI).baseURI, url);
     http(urlPath, { headers: { 'Content-Type': 'text/plain' } })
-      .then(result => result.text())
+      .then(response => {
+        if (!response.ok) throw(new Error(response.statusText));
+        return response.text();
+      })
       .then(content => {
         forEach(this.requests[url], (request: dynamic) => {
           request.success(content, url);
@@ -74,10 +86,11 @@ export default class ComponentHandler {
       if (isNull(component.name))
         component.name = code(9, 'component-').toLowerCase();
 
-      if (isNull(component.path))
-        return Logger.warn("The component with name “" + component.name +
-          "” and the route “" + component.route + "” has not “path” property defined," +
-          " then it was ignored.");
+      if (isNull(component.path) && isNull(component.template))
+        return Logger.warn("The component with name “" + component.name + "”" +
+          component.route ? (" and the route “" + component.route + "”") : "" +
+          " has not “path” or “template” property defined, " +
+        "then it was ignored.");
 
       if (!isNull(parent)) { // TODO: Inherit the parent info
       }
@@ -91,24 +104,25 @@ export default class ComponentHandler {
           component.route!);
       }
 
-      if (!isNull((this.components as any)[component.name]))
+      if (!isNull((this.components as any)[component.name!]))
         return Logger.warn("The component name “" + component.name + "” is already define, try changing the name.");
 
-      IoC.Resolve<Routing>('Routing')!.configure(this.components[component.name] = component);
+      IoC.Resolve<Routing>('Routing')!.configure(this.components[component.name!] = component);
 
       const preload = (this.bouer.config || {}).preload ?? true;
       if (!preload) return;
 
-      this.request(component.path, {
-        success: content => {
-          component.template = content;
-        },
-        fail: () => {}
-      });
+      if (!isNull(component.path))
+        this.request(component.path!, {
+          success: content => {
+            component.template = content;
+          },
+          fail: () => { }
+        });
     });
   }
 
-  order(componentElement: Element, data: object) {
+  order(componentElement: Element, data: object, callback?: (component: Component) => void) {
     const $name = componentElement.nodeName.toLowerCase();
     const mComponents = this.components as dynamic;
     let hasComponent = mComponents[$name];
@@ -121,6 +135,10 @@ export default class ComponentHandler {
     if (icomponent.template) {
       const component = new Component(icomponent);
       component.bouer = this.bouer;
+
+      if (isFunction(callback))
+        callback!(component);
+
       this.insert(componentElement, component, mData);
 
       if (component.keepAlive === true)
@@ -132,26 +150,39 @@ export default class ComponentHandler {
       icomponent.requested(new BouerEvent({ type: 'requested' }));
 
     // Make or Add request
-    this.request(icomponent.path, {
+    this.request(icomponent.path!, {
       success: content => {
         icomponent.template = content;
         const component = new Component(icomponent);
         component.bouer = this.bouer;
+
+        if (isFunction(callback))
+          callback!(component);
+
         this.insert(componentElement, component, mData);
 
         if (component.keepAlive === true)
           mComponents[$name] = component;
       },
       fail: (error) => {
+        Logger.error("Failed to request <" + $name + "></" + $name + "> component with path “" + icomponent.path + "”.");
         Logger.error(buildError(error));
-
         if (typeof icomponent.failed !== 'function') return;
         icomponent.failed(new BouerEvent({ type: 'failed' }));
       }
-    })
+    });
   }
 
-  insert(element: Element, component: Component, data: object) {
+  find(callback: (item: (Component | IComponent)) => boolean) {
+    const keys = Object.keys(this.components);
+    for (let i = 0; i < keys.length; i++) {
+      const component = this.components[keys[i]];
+      if (callback(component)) return component;
+    }
+    return null;
+  }
+
+  private insert(element: Element, component: Component, data: object) {
     const $name = element.nodeName.toLowerCase();
     const container = element.parentElement;
     if (!element.isConnected || !container)
@@ -159,6 +190,11 @@ export default class ComponentHandler {
 
     if (!component.isReady)
       return Logger.error("The <" + $name + "></" + $name + "> component is not ready yet to be inserted.");
+
+    const elementContent = createEl('div', el => {
+      el.innerHTML = element.innerHTML
+      element.innerHTML = "";
+    }).build();
 
     // Component Creation
     if ((component.keepAlive ?? false) === false || isNull(component.el)) {
@@ -204,13 +240,40 @@ export default class ComponentHandler {
         });
 
       if (attr.nodeName === 'data') {
-        const mData = IoC.Resolve<Evalutator>('Evalutator')!
-          .exec({
-            data: data,
-            expression: trim(attr.value) !== '' ? attr.value : 'this.data',
-          })
-        return forEach(Object.keys(mData), key => {
-          transferProperty(component.data, mData, key);
+        if (this.delimiter.run(attr.value).length !== 0)
+          return Logger.error("The “data” attribute cannot contain delimiter, source element: <" + $name + "></" + $name + ">.");
+
+        let inputData: dynamic = {};
+        const mData = Extend.obj(data, { $this: data });
+        const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
+          inputData[reactive.propertyName] = undefined;
+          defineProperty(inputData, reactive.propertyName, reactive);
+        });
+
+        // If data value is empty gets the main scope value
+        if (attr.value === '')
+          inputData = Extend.obj(this.bouer.data);
+        else {
+          // Other wise, compiles the object provided
+          const mInputData = IoC.Resolve<Evalutator>('Evalutator')!
+            .exec({ data: mData, expression: attr.value });
+
+          if (!isObject(mInputData))
+            return Logger.error("Expected a valid Object Literal expression in “" + attr.nodeName +
+              "” and got “" + attr.value + "”.");
+
+          // Adding all non-existing properties
+          forEach(Object.keys(mInputData), key => {
+            if (!(key in inputData))
+              inputData[key] = mInputData[key];
+          });
+        }
+
+        ReactiveEvent.off('AfterGet', reactiveEvent.callback);
+        Reactive.transform(inputData);
+
+        return forEach(Object.keys(inputData), key => {
+          transferProperty(component.data, inputData, key);
         });
       }
 
@@ -271,11 +334,11 @@ export default class ComponentHandler {
         // TODO: Something between this two events
 
         component.emit('beforeLoad');
-
-        IoC.Resolve<HtmlHandler>('HtmlHandler')!
+        IoC.Resolve<Compiler>('Compiler')!
           .compile({
-            data: component.data,
+            data: Reactive.transform(component.data),
             el: rootElement,
+            componentContent: elementContent,
             onDone: () => component.emit('loaded')
           });
 
@@ -294,9 +357,10 @@ export default class ComponentHandler {
 
     // Mixing all the scripts
     const localScriptsContent: string[] = [],
-      webRequestChecker: any = {},
       onlineScriptsContent: string[] = [],
-      onlineScriptsUrls: string[] = [];
+      onlineScriptsUrls: string[] = [],
+      webRequestChecker: any = {};
+
     // Grouping the online scripts and collecting the online url
     forEach(component.scripts, function (script) {
       if (script.src == '' || script.innerHTML)
@@ -315,7 +379,10 @@ export default class ComponentHandler {
       // Getting script content from a web request
       http(url, {
         headers: { "Content-Type": 'text/plain' }
-      }).then(response => response.text())
+      }).then(response => {
+        if (!response.ok) throw(new Error(response.statusText));
+        return response.text();
+      })
         .then(text => {
           delete webRequestChecker[url];
           // Adding the scripts according to the defined order
@@ -333,14 +400,5 @@ export default class ComponentHandler {
           component.emit('failed');
         });
     });
-  }
-
-  find(callback: (item: (Component | IComponent)) => boolean) {
-    const keys = Object.keys(this.components);
-    for (let i = 0; i < keys.length; i++) {
-      const component = this.components[keys[i]];
-      if (callback(component)) return component;
-    }
-    return null;
   }
 }

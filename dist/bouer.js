@@ -164,6 +164,9 @@
     function trim(value) {
         return value ? value.trim() : value;
     }
+    function startWith(value, pattern) {
+        return (value.substr(0, pattern.length) === pattern);
+    }
     function toLower(str) {
         return str.toLowerCase();
     }
@@ -335,11 +338,12 @@
         route: 'route-view',
         href: ':href',
         ihref: '!href',
-        copy: 'e-copy',
+        entry: 'e-entry',
         component: ':name',
         on: 'on:',
+        tagContent: 'content',
         check: function (node, cmd) {
-            return node.nodeName.substr(0, cmd.length) === cmd;
+            return startWith(node.nodeName, cmd);
         },
         isConstant: function (value) {
             var _this = this;
@@ -504,6 +508,17 @@
                 ReactiveEvent.off('BeforeGet', reactiveEvent.callback);
             propertyBindConfig.boundNode = nodeToBind;
             return propertyBindConfig;
+        };
+        Binder.prototype.watch = function (propertyName, callback, targetObject) {
+            var mWatch = null;
+            var mTargetObject = targetObject || this.bouer.data;
+            var reactiveEvent = ReactiveEvent.on('AfterGet', function (reactive) {
+                return mWatch = reactive.watch(callback);
+            });
+            mTargetObject[propertyName];
+            if (reactiveEvent)
+                ReactiveEvent.off('AfterGet', reactiveEvent.callback);
+            return mWatch;
         };
         /** Creates a process for unbind properties when it does not exists anymore in the DOM */
         Binder.prototype.cleanup = function () {
@@ -751,25 +766,30 @@
         return Reactive;
     }());
 
-    var DirectiveReturn = /** @class */ (function () {
-        function DirectiveReturn() {
-            var node = [];
-            for (var _i = 0; _i < arguments.length; _i++) {
-                node[_i] = arguments[_i];
-            }
-            this.node = node;
+    var DataStore = /** @class */ (function () {
+        function DataStore() {
+            this.wait = {};
+            this.data = {};
+            this.req = {};
+            IoC.Register(this);
         }
-        /**
-         * Connects the node with the element that will be provided
-         * @param element the root element that will be connected with
-         */
-        DirectiveReturn.prototype.connect = function (element) {
-            forEach(this.node, function (node) { return connectNode(node, element); });
+        DataStore.set = function (key, dataKey, data) {
+            IoC.Resolve(DataStore.name)[key][dataKey] = data;
         };
-        return DirectiveReturn;
+        DataStore.get = function (key, dataKey, once) {
+            var result = IoC.Resolve(DataStore.name)[key][dataKey];
+            if (once === true)
+                DataStore.unset(key, dataKey);
+            return result;
+        };
+        DataStore.unset = function (key, dataKey) {
+            delete IoC.Resolve(DataStore.name)[key][dataKey];
+        };
+        return DataStore;
     }());
+
     var Directive = /** @class */ (function () {
-        function Directive(bouer, htmlHandler) {
+        function Directive(bouer, compiler) {
             this.errorMsgEmptyNode = function (node) { return "Expected an expression in “" + node.nodeName +
                 "” and got an <empty string>."; };
             this.errorMsgNodeValue = function (node) {
@@ -778,7 +798,7 @@
                     "” and got “" + ((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '') + "”.";
             };
             this.bouer = bouer;
-            this.htmlHandler = htmlHandler;
+            this.compiler = compiler;
             this.evaluator = IoC.Resolve('Evalutator');
             this.delimiter = IoC.Resolve('DelimiterHandler');
             this.comment = IoC.Resolve('CommentHandler');
@@ -787,11 +807,6 @@
         // Helper functions
         Directive.prototype.toOwnerNode = function (node) {
             return node.ownerElement || node.parentNode;
-        };
-        Directive.prototype.returner = function (node, callback) {
-            if (isFunction(callback))
-                callback();
-            return new (DirectiveReturn.bind.apply(DirectiveReturn, __spreadArray([void 0], node, false)))();
         };
         // Directives
         Directive.prototype.ignore = function (node) {
@@ -807,9 +822,9 @@
             var nodeName = node.nodeName;
             var exec = function () { };
             if (!container)
-                return this.returner(node);
+                return;
             if (nodeName === Constants.elseif || nodeName === Constants.else)
-                return this.returner(node);
+                return;
             var currentEl = ownerElement;
             var reactives = [];
             var _loop_1 = function () {
@@ -819,9 +834,9 @@
                 if (!attr)
                     return "break";
                 if ((attr.nodeName !== 'e-else') && (trim((_a = attr.nodeValue) !== null && _a !== void 0 ? _a : '') === ''))
-                    return { value: this_1.returner(attr, function () { return Logger.error(_this.errorMsgEmptyNode(attr)); }) };
+                    return { value: Logger.error(this_1.errorMsgEmptyNode(attr)) };
                 if (this_1.delimiter.run((_b = attr.nodeValue) !== null && _b !== void 0 ? _b : '').length !== 0)
-                    return { value: this_1.returner(attr, function () { return Logger.error(_this.errorMsgNodeValue(attr)); }) };
+                    return { value: Logger.error(this_1.errorMsgNodeValue(attr)) };
                 conditions.push({ node: attr, element: currentEl });
                 connectNode(currentEl, container);
                 connectNode(attr, container);
@@ -880,7 +895,7 @@
                         _cb: function (chainIndex) {
                             var element = conditions[chainIndex].element;
                             container.replaceChild(element, comment);
-                            _this.htmlHandler.compile({
+                            _this.compiler.compile({
                                 el: element,
                                 data: data
                             });
@@ -888,7 +903,6 @@
                     }
                 });
             })();
-            return this.returner(conditions.map(function (item) { return item.node; }));
         };
         Directive.prototype.show = function (node, data) {
             var _this = this;
@@ -897,13 +911,9 @@
             var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
             var hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
             if (nodeValue === '')
-                return this.returner(node, function () {
-                    Logger.error(_this.errorMsgEmptyNode(node));
-                });
+                return Logger.error(this.errorMsgEmptyNode(node));
             if (hasDelimiter)
-                return this.returner(node, function () {
-                    Logger.error(_this.errorMsgNodeValue(node));
-                });
+                return Logger.error(this.errorMsgNodeValue(node));
             var exec = function (element) {
                 var value = _this.evaluator.exec({
                     expression: nodeValue,
@@ -911,6 +921,7 @@
                 });
                 element.style.display = value ? '' : 'none';
             };
+            connectNode(node, ownerElement);
             var bindResult = this.binder.create({
                 data: data,
                 node: node,
@@ -919,7 +930,6 @@
             });
             exec(ownerElement);
             ownerElement.removeAttribute(bindResult.boundNode.nodeName);
-            return this.returner(node);
         };
         Directive.prototype.for = function (node, data) {
             var _this = this;
@@ -932,16 +942,12 @@
             var listedItems = [];
             var exec = function () { };
             if (!container)
-                return this.returner(node);
+                return;
             if (nodeValue === '')
-                return this.returner(node, function () {
-                    Logger.error(_this.errorMsgEmptyNode(node));
-                });
+                return Logger.error(this.errorMsgEmptyNode(node));
             if (!nodeValue.includes(' of ') && !nodeValue.includes(' in '))
-                return this.returner(node, function () {
-                    Logger.error("Expected a valid “for” expression in “" + nodeName + "” and got “" + nodeValue + "”."
-                        + "\nValid: e-for=\"item of items\".");
-                });
+                return Logger.error("Expected a valid “for” expression in “" + nodeName + "” and got “" + nodeValue + "”."
+                    + "\nValid: e-for=\"item of items\".");
             // Binding the e-for if got delimiters
             var delimiters = this.delimiter.run(nodeValue);
             if (delimiters.length !== 0)
@@ -1015,9 +1021,20 @@
                 });
             };
             var reactivePropertyEvent = ReactiveEvent.on('AfterGet', function (reactive) { return _this.binder.binds.push(reactive.watch(function () { return exec(); }, node)); });
-            var reactiveArrayEvent = ReactiveEvent.on('AfterArrayChanges', function (reactive) { return exec(); });
+            var reactiveArrayEvent = ReactiveEvent.on('AfterArrayChanges', function () { return exec(); });
             // Creating a fake reactive prop and fake Watch to destroy AfterArrayChanges Event
-            this.binder.binds.push(new Watch(new Reactive({ propertyName: '_', sourceObject: { _: [] } }), function () { }, {
+            this.binder.binds.push(
+            // Watch instance
+            new Watch(
+            // Reactive instance for the Watch
+            new Reactive({
+                propertyName: '_',
+                sourceObject: { _: [] }
+            }), 
+            // Watch Callback
+            function () { }, 
+            // Watch Instance Options
+            {
                 node: node,
                 onDestroy: function () { return ReactiveEvent.off('AfterArrayChanges', reactiveArrayEvent.callback); }
             }));
@@ -1062,10 +1079,11 @@
                             if (hasIndex)
                                 forData[leftHandParts[1]] = index;
                             var clonedItem = container.insertBefore(forItem.cloneNode(true), comment);
-                            _this.htmlHandler.compile({
+                            _this.compiler.compile({
                                 el: clonedItem,
                                 data: forData
                             });
+                            listedItems.push(clonedItem);
                         },
                         _flt: function (list) {
                             var listCopy = Extend.array(list);
@@ -1102,66 +1120,49 @@
                 });
             })();
             ReactiveEvent.off('AfterGet', reactivePropertyEvent.callback);
-            return this.returner(node);
         };
         Directive.prototype.def = function (node, data) {
-            var _this = this;
             var _a;
             var ownerElement = this.toOwnerNode(node);
             var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
             var hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
             if (nodeValue === '')
-                return this.returner(node, function () {
-                    Logger.error(_this.errorMsgEmptyNode(node));
-                });
+                return Logger.error(this.errorMsgEmptyNode(node));
             if (hasDelimiter)
-                return this.returner(node, function () {
-                    Logger.error(_this.errorMsgNodeValue(node));
-                });
+                return Logger.error(this.errorMsgNodeValue(node));
             var inputData = this.evaluator.exec({
                 data: data,
                 expression: nodeValue
             });
             if (!isObject(inputData))
-                return this.returner(node, function () {
-                    Logger.error("Expected a valid Object Literal expression in “" + node.nodeName + "” and got “" + nodeValue + "”.");
-                });
+                return Logger.error("Expected a valid Object Literal expression in “" + node.nodeName + "” and got “" + nodeValue + "”.");
             this.bouer.setData(inputData, data);
             ownerElement.removeAttribute(node.nodeName);
         };
         Directive.prototype.content = function (node) {
-            var _this = this;
             var _a;
             var ownerElement = this.toOwnerNode(node);
             var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
             if (nodeValue === '')
-                return this.returner(node, function () {
-                    Logger.error(_this.errorMsgEmptyNode(node));
-                });
+                return Logger.error(this.errorMsgEmptyNode(node));
             ownerElement.innerText = nodeValue;
             ownerElement.removeAttribute(node.nodeName);
         };
         Directive.prototype.bind = function (node, data) {
-            var _this = this;
             var _a;
             var ownerElement = this.toOwnerNode(node);
             var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
             var hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
             if (nodeValue === '')
-                return this.returner(node, function () {
-                    Logger.error(_this.errorMsgEmptyNode(node));
-                });
+                return Logger.error(this.errorMsgEmptyNode(node));
             if (hasDelimiter)
-                return this.returner(node, function () {
-                    Logger.error(_this.errorMsgNodeValue(node));
-                });
+                return Logger.error(this.errorMsgNodeValue(node));
             this.binder.create({
-                node: node,
+                node: connectNode(node, ownerElement),
                 fields: [{ field: nodeValue, expression: nodeValue }],
                 data: data
             });
             ownerElement.removeAttribute(node.nodeName);
-            return this.returner(node);
         };
         Directive.prototype.property = function (node, data) {
             var _this = this;
@@ -1176,22 +1177,18 @@
                     + "” and got “" + ((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '') + "”.";
             };
             if (nodeValue === '')
-                return this.returner(node, function () {
-                    Logger.error(errorInvalidValue(node));
-                });
+                return Logger.error(errorInvalidValue(node));
             if (hasDelimiter)
-                return this.returner(node);
+                return;
             var inputData = this.evaluator.exec({
                 data: data,
                 expression: nodeValue
             });
             if (!isObject(inputData))
-                return this.returner(node, function () {
-                    Logger.error(errorInvalidValue(node));
-                });
+                return Logger.error(errorInvalidValue(node));
             this.binder.create({
                 data: data,
-                node: node,
+                node: connectNode(node, ownerElement),
                 eReplace: false,
                 fields: [{ expression: nodeValue, field: nodeValue }],
                 onChange: function () { return exec(_this.evaluator.exec({
@@ -1201,11 +1198,11 @@
             });
             ownerElement.removeAttribute(node.nodeName);
             (exec = function (obj) {
-                var nameAttrToSet = node.nodeName.substr(Constants.property.length);
-                var attr = ownerElement.attributes[nameAttrToSet];
+                var attrNameToSet = node.nodeName.substr(Constants.property.length);
+                var attr = ownerElement.attributes[attrNameToSet];
                 if (!attr) {
-                    (ownerElement.setAttribute(nameAttrToSet, ''));
-                    attr = ownerElement.attributes[nameAttrToSet];
+                    (ownerElement.setAttribute(attrNameToSet, ''));
+                    attr = ownerElement.attributes[attrNameToSet];
                 }
                 forEach(Object.keys(obj), function (key) {
                     /* if has a falsy value remove the key */
@@ -1214,27 +1211,57 @@
                     attr.value = (attr.value.includes(key) ? attr.value : trim(attr.value + ' ' + key));
                 });
                 if (attr.value === '')
-                    return ownerElement.removeAttribute(nameAttrToSet);
+                    return ownerElement.removeAttribute(attrNameToSet);
             })(inputData);
-            return this.returner(node);
-        };
-        Directive.prototype.req = function (node, data) {
-            Logger.info(node, data);
-            return this.returner(node);
         };
         Directive.prototype.data = function (node, data) {
-            Extend.obj(data, { $this: data });
-            return this.returner(node);
-        };
-        Directive.prototype.href = function (node, data) {
-            var _this = this;
-            var _a, _b;
+            var _a;
             var ownerElement = this.toOwnerNode(node);
             var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
+            var hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
+            var inputData = {};
+            if (hasDelimiter)
+                return Logger.error("The “data” attribute cannot contain delimiter.");
+            ownerElement.removeAttribute(node.nodeName);
+            var mData = Extend.obj(data, { $this: data });
+            var reactiveEvent = ReactiveEvent.on('AfterGet', function (reactive) {
+                inputData[reactive.propertyName] = undefined;
+                defineProperty(inputData, reactive.propertyName, reactive);
+            });
+            // If data value is empty gets the main scope value
             if (nodeValue === '')
-                return this.returner(node, function () {
-                    Logger.error(_this.errorMsgEmptyNode(node));
+                inputData = Extend.obj(this.bouer.data);
+            else {
+                // Other wise, compiles the object provided
+                var mInputData_1 = this.evaluator.exec({ data: mData, expression: nodeValue });
+                if (!isObject(mInputData_1))
+                    return Logger.error("Expected a valid Object Literal expression in “" + node.nodeName +
+                        "” and got “" + nodeValue + "”.");
+                // Adding all non-existing properties
+                forEach(Object.keys(mInputData_1), function (key) {
+                    if (!(key in inputData))
+                        inputData[key] = mInputData_1[key];
                 });
+            }
+            ReactiveEvent.off('AfterGet', reactiveEvent.callback);
+            var dataKey = node.nodeName.split(':')[1];
+            if (dataKey) {
+                dataKey = dataKey.replace(/\[|\]/g, '');
+                DataStore.set('data', dataKey, inputData);
+            }
+            Reactive.transform(inputData);
+            return this.compiler.compile({
+                data: inputData,
+                el: ownerElement
+            });
+        };
+        Directive.prototype.href = function (node, data) {
+            var _a, _b;
+            var ownerElement = this.toOwnerNode(node);
+            var nodeName = node.nodeName;
+            var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
+            if (nodeValue === '')
+                return Logger.error(this.errorMsgEmptyNode(node));
             ownerElement.removeAttribute(node.nodeName);
             var usehash = (_b = (this.bouer.config || {}).usehash) !== null && _b !== void 0 ? _b : true;
             var routeToSet = urlCombine((usehash ? '#' : ''), nodeValue);
@@ -1244,7 +1271,7 @@
             if (delimiters.length !== 0)
                 this.binder.create({
                     data: data,
-                    node: href,
+                    node: connectNode(href, ownerElement),
                     fields: delimiters
                 });
             ownerElement
@@ -1253,7 +1280,29 @@
                 IoC.Resolve('Routing')
                     .navigate(href.value);
             }, false);
-            return this.returner(href);
+            href.markable = nodeName[0] === ':';
+        };
+        Directive.prototype.entry = function (node, data) {
+            var _a;
+            var ownerElement = this.toOwnerNode(node);
+            var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
+            var hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
+            if (nodeValue === '')
+                return Logger.error(this.errorMsgEmptyNode(node));
+            if (hasDelimiter)
+                return Logger.error(this.errorMsgNodeValue(node));
+            ownerElement.removeAttribute(node.nodeName);
+            IoC.Resolve('ComponentHandler')
+                .prepare([
+                {
+                    name: nodeValue,
+                    template: ownerElement.outerHTML,
+                    data: data
+                }
+            ]);
+        };
+        Directive.prototype.req = function (node, data) {
+            Logger.info(node, data);
         };
         Directive.prototype.skeleton = function (node, data) {
             Logger.warn('e-skeleton not implemented yet.');
@@ -1261,30 +1310,150 @@
         Directive.prototype.wait = function (node, data) {
             Logger.warn('wait-data not implemented yet.');
         };
-        Directive.prototype.copy = function (node) {
-            Logger.warn('e-copy not implemented yet.');
-        };
-        Directive.prototype.component = function (node, data) {
-            Logger.warn('<component /> not implemented yet.');
-        };
         return Directive;
     }());
 
-    var HtmlHandler = /** @class */ (function () {
-        function HtmlHandler(bouer) {
+    var Compiler = /** @class */ (function () {
+        function Compiler(bouer) {
             this.NODES_TO_IGNORE_IN_COMPILATION = {
                 'SCRIPT': 1,
                 '#comment': 8
             };
             IoC.Register(this);
             this.bouer = bouer;
+            this.binder = IoC.Resolve('Binder');
             this.delimiter = IoC.Resolve('DelimiterHandler');
             this.eventHandler = IoC.Resolve('EventHandler');
-            this.binder = IoC.Resolve('Binder');
             this.component = IoC.Resolve('ComponentHandler');
             this.directive = new Directive(bouer, this);
         }
-        HtmlHandler.prototype.toJsObj = function (input, options, onSet) {
+        Compiler.prototype.compile = function (options) {
+            var _this = this;
+            var rootElement = options.el;
+            var data = (options.data || this.bouer.data);
+            if (!this.analize(rootElement.outerHTML))
+                return;
+            var walker = function (node, data) {
+                if (node.nodeName in _this.NODES_TO_IGNORE_IN_COMPILATION)
+                    return;
+                // First Element Attributes compilation
+                if (node instanceof Element) {
+                    // e-ignore" directive
+                    if (Constants.ignore in node.attributes)
+                        return _this.directive.ignore(node);
+                    if (node.localName === Constants.tagContent && options.componentContent) {
+                        var insertContent_1 = function (content, reference) {
+                            forEach([].slice.call(content.childNodes), function (child) {
+                                var cloned = child.cloneNode(true);
+                                rootElement.insertBefore(cloned, reference);
+                                walker(cloned, data);
+                            });
+                            rootElement.removeChild(reference);
+                        };
+                        if (node.hasAttribute('default')) {
+                            // In case of default content insertion
+                            return insertContent_1(options.componentContent, node);
+                        }
+                        else if (node.hasAttribute('target')) {
+                            // In case of target content insertion
+                            var target_1 = node.attributes['target'];
+                            return forEach([].slice.call(options.componentContent.children), function (child) {
+                                if (child.localName === Constants.tagContent && child.getAttribute('target') !== target_1.value)
+                                    return;
+                                insertContent_1(child, node);
+                            });
+                        }
+                    }
+                    // e-def="{...}" directive
+                    if (Constants.def in node.attributes)
+                        _this.directive.def(node.attributes[Constants.def], data);
+                    // e-entry="..." directive
+                    if (Constants.entry in node.attributes)
+                        _this.directive.entry(node.attributes[Constants.entry], data);
+                    // wait-data="..." directive
+                    if (Constants.wait in node.attributes)
+                        return _this.directive.wait(node.attributes[Constants.wait], data);
+                    // e-for="..." directive
+                    if (Constants.for in node.attributes)
+                        return _this.directive.for(node.attributes[Constants.for], data);
+                    // e-if="..." directive
+                    if (Constants.if in node.attributes)
+                        return _this.directive.if(node.attributes[Constants.if], data);
+                    // e-else-if="..." or e-else directive
+                    if ((Constants.elseif in node.attributes) || (Constants.else in node.attributes))
+                        Logger.warn('The "' + Constants.elseif + '" or "' + Constants.else + '" requires an element with "' + Constants.if + '" above.');
+                    // e-show="..." directive
+                    if (Constants.show in node.attributes)
+                        _this.directive.show(node.attributes[Constants.show], data);
+                    // e-req="..." | e-req:[id]="..."  directive
+                    var reqNode = null;
+                    if ((reqNode = node.attributes[Constants.req]) ||
+                        (reqNode = [].slice.call(node.attributes).find(function (attr) { return Constants.check(attr, Constants.req); })))
+                        return _this.directive.req(reqNode, data);
+                    // <component></component>
+                    if (_this.component.check(node.localName))
+                        return _this.component.order(node, data);
+                    // data="..." | data:[id]="..." directive
+                    var dataNode = null;
+                    if (dataNode = [].slice.call(node.attributes).find(function (attr) {
+                        var attrName = attr.name;
+                        // In case of data="..."
+                        if (attrName === Constants.data)
+                            return true;
+                        // In case of data:[data-id]="..."
+                        return startWith(attrName, Constants.data + ':');
+                    }))
+                        return _this.directive.data(dataNode, data);
+                    // Looping the attributes
+                    forEach([].slice.call(node.attributes), function (attr) {
+                        walker(attr, data);
+                    });
+                }
+                // :href="..." or !href="..." directive
+                if (Constants.check(node, Constants.href) || Constants.check(node, Constants.ihref))
+                    return _this.directive.href(node, data);
+                // e-content="..." directive
+                if (Constants.check(node, Constants.content))
+                    return _this.directive.content(node);
+                // e-bind:[?]="..." directive
+                if (Constants.check(node, Constants.bind))
+                    return _this.directive.bind(node, data);
+                // e-[?]="..." directive
+                if (Constants.check(node, Constants.property) && !Constants.isConstant(node.nodeName))
+                    _this.directive.property(node, data);
+                // Event handler
+                // on:[?]="..." directive
+                if (Constants.check(node, Constants.on))
+                    return _this.eventHandler.handle(node, data);
+                // Property binding
+                var delimitersFields;
+                if (isString(node.nodeValue) && (delimitersFields = _this.delimiter.run(node.nodeValue)) && delimitersFields.length !== 0) {
+                    _this.binder.create({
+                        node: connectNode(node, rootElement),
+                        fields: delimitersFields,
+                        data: data
+                    });
+                }
+                forEach([].slice.call(node.childNodes), function (childNode) {
+                    return walker(childNode, data);
+                });
+            };
+            walker(rootElement, data);
+            if (isFunction(options.onDone))
+                options.onDone.call(this.bouer, rootElement);
+        };
+        Compiler.prototype.analize = function (htmlSnippet) {
+            return true;
+        };
+        return Compiler;
+    }());
+
+    var Converter = /** @class */ (function () {
+        function Converter(bouer) {
+            IoC.Register(this);
+            this.bouer = bouer;
+        }
+        Converter.prototype.htmlToJsObj = function (input, options, onSet) {
             var element = undefined;
             var instance = this;
             // If it's not a HTML Element, just return
@@ -1306,13 +1475,10 @@
             // If the element is not
             if (isNull(element))
                 throw Logger.error("Invalid element passed in app.toJsObj(...)");
-            // Clear [ ] and , and return an array of the names provided
-            var clear = function (value) {
-                return value.split(',').map(function (item) { return trim(item.replace('[', '').replace(']', '')); });
-            };
             options = options || {};
-            var mNames = clear(options.names || '[name]');
-            var mValues = clear(options.values || '[value]');
+            // Clear [ ] and , and return an array of the names provided
+            var mNames = (options.names || '[name]').replace(/\[|\]/g, '').split(',');
+            var mValues = (options.values || '[value]').replace(/\[|\]/g, '').split(',');
             var getter = function (el, fieldName) {
                 if (fieldName in el)
                     return el[fieldName];
@@ -1419,120 +1585,49 @@
             });
             return builtObject;
         };
-        HtmlHandler.prototype.compile = function (options) {
-            var _this = this;
-            var rootElement = options.el;
-            var data = (options.data || this.bouer.data);
-            if (!this.analizer(rootElement.outerHTML))
-                return;
-            var walker = function (node, data) {
-                if (node.nodeName in _this.NODES_TO_IGNORE_IN_COMPILATION)
-                    return;
-                // First Element Attributes compilation
-                if (node instanceof Element) {
-                    // e-ignore" directive
-                    if (Constants.ignore in node.attributes)
-                        return _this.directive.ignore(node);
-                    // e-def="{...}" directive
-                    if (Constants.def in node.attributes)
-                        _this.directive.def(node.attributes[Constants.def], data);
-                    // wait-data="..." directive
-                    if (Constants.wait in node.attributes)
-                        return _this.directive.wait(node.attributes[Constants.wait], data);
-                    // e-copy="..." directive
-                    if (Constants.copy in node.attributes)
-                        _this.directive.copy(node);
-                    // e-for="..." directive
-                    if (Constants.for in node.attributes)
-                        return _this.directive.for(node.attributes[Constants.for], data)
-                            .connect(rootElement);
-                    // e-if="..." directive
-                    if (Constants.if in node.attributes)
-                        return _this.directive.if(node.attributes[Constants.if], data);
-                    // e-else-if="..." or e-else directive
-                    if ((Constants.elseif in node.attributes) || (Constants.else in node.attributes))
-                        Logger.warn('The "' + Constants.elseif + '" or "' + Constants.else + '" requires an element with "' + Constants.if + '" above.');
-                    // e-show="..." directive
-                    if (Constants.show in node.attributes)
-                        return _this.directive.show(node.attributes[Constants.show], data)
-                            .connect(rootElement);
-                    // e-req="..." | e-req:[id]="..."  directive
-                    var reqNode = null;
-                    if ((reqNode = node.attributes[Constants.req]) ||
-                        (reqNode = [].slice.call(node.attributes).find(function (attr) { return Constants.check(attr, Constants.req); })))
-                        return _this.directive.req(reqNode, data);
-                    // <component></component>
-                    if (_this.component.check(node.localName))
-                        return _this.component.order(node, data);
-                    // data="..." directive
-                    if (Constants.data in node.attributes)
-                        return _this.directive.data(node.attributes[Constants.data], data);
-                    // Looping the attributes
-                    forEach([].slice.call(node.attributes), function (attr) {
-                        walker(attr, data);
-                    });
-                }
-                // :href="..." or !href="..." directive
-                if (Constants.check(node, Constants.href) || Constants.check(node, Constants.ihref))
-                    return _this.directive.href(node, data)
-                        .connect(rootElement);
-                // e-content="..." directive
-                if (Constants.check(node, Constants.content))
-                    return _this.directive.content(node);
-                // e-bind:[?]="..." directive
-                if (Constants.check(node, Constants.bind))
-                    return _this.directive.bind(node, data)
-                        .connect(rootElement);
-                // e-[?]="..." directive
-                if (Constants.check(node, Constants.property) && !Constants.isConstant(node.nodeName))
-                    _this.directive.property(node, data)
-                        .connect(rootElement);
-                // Event handler
-                // on:[?]="..." directive
-                if (Constants.check(node, Constants.on))
-                    return _this.eventHandler.handle(node, data);
-                // Property binding
-                var delimitersFields;
-                if (isString(node.nodeValue) && (delimitersFields = _this.delimiter.run(node.nodeValue)) && delimitersFields.length !== 0) {
-                    _this.binder.create({
-                        node: connectNode(node, rootElement),
-                        fields: delimitersFields,
-                        data: data
-                    });
-                }
-                // Looping the nodes if exists
-                // let childNode: Node | null = node.firstChild;
-                // do {
-                //   if (!childNode) break;
-                //   walker(childNode, data);
-                // } while (childNode = childNode.nextSibling)
-                // if (!node.hasChildNodes()) return;
-                // return node.childNodes.forEach(childNode => {
-                //   walker(childNode, data);
-                // });
-                forEach([].slice.call(node.childNodes), function (childNode) {
-                    return walker(childNode, data);
-                });
-            };
-            walker(rootElement, data);
-            if (isFunction(options.onDone))
-                options.onDone.call(this.bouer, rootElement);
-        };
-        HtmlHandler.prototype.analizer = function (htmlSnippet) {
-            return true;
-        };
-        return HtmlHandler;
+        return Converter;
     }());
 
     var UriHandler = /** @class */ (function () {
         function UriHandler(url) {
-            this.url = url;
+            this.url = url || DOM.location.href;
         }
-        UriHandler.prototype.params = function () {
-            return {};
+        UriHandler.prototype.params = function (urlPattern) {
+            var _this = this;
+            var mParams = {};
+            var buildQueryParams = function () {
+                // Building from query string
+                var queryStr = _this.url.split('?')[1];
+                if (!queryStr)
+                    return _this;
+                var keys = queryStr.split('&');
+                forEach(keys, function (key) {
+                    var pair = key.split('=');
+                    mParams[pair[0]] = (pair[1] || '').split('#')[0];
+                });
+            };
+            if (urlPattern && isString(urlPattern)) {
+                var urlWithQueryParamsIgnored = this.url.split('?')[0];
+                var urlPartsReversed_1 = urlWithQueryParamsIgnored.split('/').reverse();
+                if (urlPartsReversed_1[0] === '')
+                    urlPartsReversed_1.shift();
+                var urlPatternReversed = urlPattern.split('/').reverse();
+                forEach(urlPatternReversed, function (value, index) {
+                    var valueExec = RegExp("{([\\S\\s]*?)}").exec(value);
+                    if (Array.isArray(valueExec))
+                        mParams[valueExec[1]] = urlPartsReversed_1[index];
+                });
+            }
+            buildQueryParams();
+            return mParams;
         };
-        UriHandler.prototype.add = function (param) {
-            return param;
+        UriHandler.prototype.add = function (params) {
+            var mParams = [];
+            forEach(Object.keys(params), function (key) {
+                mParams.push(key + '=' + params[key]);
+            });
+            var joined = mParams.join('&');
+            return (this.url.includes('?')) ? '&' + joined : '?' + joined;
         };
         UriHandler.prototype.remove = function (param) {
             return param;
@@ -1607,6 +1702,7 @@
             if (!isObject(options))
                 return Logger.log("Invalid object for component.export(...), only \"Object Literal\" is allowed.");
             return forEach(Object.keys(options), function (key) {
+                _this.data[key] = options[key];
                 transferProperty(_this.data, options, key);
             });
         };
@@ -1628,7 +1724,7 @@
             });
         };
         Component.prototype.params = function () {
-            new UriHandler(this.route || '');
+            return new UriHandler().params(this.route);
         };
         Component.prototype.emit = function (eventName) {
             var params = [];
@@ -1673,6 +1769,7 @@
             this.requests = {};
             IoC.Register(this);
             this.bouer = bouer;
+            this.delimiter = IoC.Resolve('DelimiterHandler');
             if (components)
                 this.prepare(components);
         }
@@ -1686,7 +1783,11 @@
             this.requests[url] = [response];
             var urlPath = urlCombine(urlResolver(anchor.baseURI).baseURI, url);
             http(urlPath, { headers: { 'Content-Type': 'text/plain' } })
-                .then(function (result) { return result.text(); })
+                .then(function (response) {
+                if (!response.ok)
+                    throw (new Error(response.statusText));
+                return response.text();
+            })
                 .then(function (content) {
                 forEach(_this.requests[url], function (request) {
                     request.success(content, url);
@@ -1706,10 +1807,11 @@
                 var _a;
                 if (isNull(component.name))
                     component.name = code(9, 'component-').toLowerCase();
-                if (isNull(component.path))
-                    return Logger.warn("The component with name “" + component.name +
-                        "” and the route “" + component.route + "” has not “path” property defined," +
-                        " then it was ignored.");
+                if (isNull(component.path) && isNull(component.template))
+                    return Logger.warn("The component with name “" + component.name + "”" +
+                        component.route ? (" and the route “" + component.route + "”") : "" +
+                        " has not “path” or “template” property defined, " +
+                        "then it was ignored.");
                 if (Array.isArray(component.children))
                     _this.prepare(component.children, component);
                 if (!isNull(component.route)) { // Completing the API
@@ -1721,15 +1823,16 @@
                 var preload = (_a = (_this.bouer.config || {}).preload) !== null && _a !== void 0 ? _a : true;
                 if (!preload)
                     return;
-                _this.request(component.path, {
-                    success: function (content) {
-                        component.template = content;
-                    },
-                    fail: function () { }
-                });
+                if (!isNull(component.path))
+                    _this.request(component.path, {
+                        success: function (content) {
+                            component.template = content;
+                        },
+                        fail: function () { }
+                    });
             });
         };
-        ComponentHandler.prototype.order = function (componentElement, data) {
+        ComponentHandler.prototype.order = function (componentElement, data, callback) {
             var _this = this;
             var $name = componentElement.nodeName.toLowerCase();
             var mComponents = this.components;
@@ -1741,6 +1844,8 @@
             if (icomponent.template) {
                 var component = new Component(icomponent);
                 component.bouer = this.bouer;
+                if (isFunction(callback))
+                    callback(component);
                 this.insert(componentElement, component, mData);
                 if (component.keepAlive === true)
                     mComponents[$name] = component;
@@ -1754,11 +1859,14 @@
                     icomponent.template = content;
                     var component = new Component(icomponent);
                     component.bouer = _this.bouer;
+                    if (isFunction(callback))
+                        callback(component);
                     _this.insert(componentElement, component, mData);
                     if (component.keepAlive === true)
                         mComponents[$name] = component;
                 },
                 fail: function (error) {
+                    Logger.error("Failed to request <" + $name + "></" + $name + "> component with path “" + icomponent.path + "”.");
                     Logger.error(buildError(error));
                     if (typeof icomponent.failed !== 'function')
                         return;
@@ -1766,7 +1874,17 @@
                 }
             });
         };
+        ComponentHandler.prototype.find = function (callback) {
+            var keys = Object.keys(this.components);
+            for (var i = 0; i < keys.length; i++) {
+                var component = this.components[keys[i]];
+                if (callback(component))
+                    return component;
+            }
+            return null;
+        };
         ComponentHandler.prototype.insert = function (element, component, data) {
+            var _this = this;
             var _a;
             var $name = element.nodeName.toLowerCase();
             var container = element.parentElement;
@@ -1774,6 +1892,10 @@
                 return; //Logger.warn("Insert location of component <" + $name + "></" + $name + "> not found.");
             if (!component.isReady)
                 return Logger.error("The <" + $name + "></" + $name + "> component is not ready yet to be inserted.");
+            var elementContent = createEl('div', function (el) {
+                el.innerHTML = element.innerHTML;
+                element.innerHTML = "";
+            }).build();
             // Component Creation
             if (((_a = component.keepAlive) !== null && _a !== void 0 ? _a : false) === false || isNull(component.el)) {
                 createEl('body', function (htmlSnippet) {
@@ -1809,13 +1931,34 @@
                         rootElement.classList.add(cls);
                     });
                 if (attr.nodeName === 'data') {
-                    var mData_1 = IoC.Resolve('Evalutator')
-                        .exec({
-                        data: data,
-                        expression: trim(attr.value) !== '' ? attr.value : 'this.data',
+                    if (_this.delimiter.run(attr.value).length !== 0)
+                        return Logger.error("The “data” attribute cannot contain delimiter, source element: <" + $name + "></" + $name + ">.");
+                    var inputData_1 = {};
+                    var mData = Extend.obj(data, { $this: data });
+                    var reactiveEvent = ReactiveEvent.on('AfterGet', function (reactive) {
+                        inputData_1[reactive.propertyName] = undefined;
+                        defineProperty(inputData_1, reactive.propertyName, reactive);
                     });
-                    return forEach(Object.keys(mData_1), function (key) {
-                        transferProperty(component.data, mData_1, key);
+                    // If data value is empty gets the main scope value
+                    if (attr.value === '')
+                        inputData_1 = Extend.obj(_this.bouer.data);
+                    else {
+                        // Other wise, compiles the object provided
+                        var mInputData_1 = IoC.Resolve('Evalutator')
+                            .exec({ data: mData, expression: attr.value });
+                        if (!isObject(mInputData_1))
+                            return Logger.error("Expected a valid Object Literal expression in “" + attr.nodeName +
+                                "” and got “" + attr.value + "”.");
+                        // Adding all non-existing properties
+                        forEach(Object.keys(mInputData_1), function (key) {
+                            if (!(key in inputData_1))
+                                inputData_1[key] = mInputData_1[key];
+                        });
+                    }
+                    ReactiveEvent.off('AfterGet', reactiveEvent.callback);
+                    Reactive.transform(inputData_1);
+                    return forEach(Object.keys(inputData_1), function (key) {
+                        transferProperty(component.data, inputData_1, key);
                     });
                 }
                 rootElement.attributes.setNamedItem(attr);
@@ -1868,10 +2011,11 @@
                     component.emit('mounted');
                     // TODO: Something between this two events
                     component.emit('beforeLoad');
-                    IoC.Resolve('HtmlHandler')
+                    IoC.Resolve('Compiler')
                         .compile({
-                        data: component.data,
+                        data: Reactive.transform(component.data),
                         el: rootElement,
+                        componentContent: elementContent,
                         onDone: function () { return component.emit('loaded'); }
                     });
                     Observer.observe(container, function () {
@@ -1888,7 +2032,7 @@
             if (component.scripts.length === 0)
                 return compile();
             // Mixing all the scripts
-            var localScriptsContent = [], webRequestChecker = {}, onlineScriptsContent = [], onlineScriptsUrls = [];
+            var localScriptsContent = [], onlineScriptsContent = [], onlineScriptsUrls = [], webRequestChecker = {};
             // Grouping the online scripts and collecting the online url
             forEach(component.scripts, function (script) {
                 if (script.src == '' || script.innerHTML)
@@ -1905,7 +2049,11 @@
                 // Getting script content from a web request
                 http(url, {
                     headers: { "Content-Type": 'text/plain' }
-                }).then(function (response) { return response.text(); })
+                }).then(function (response) {
+                    if (!response.ok)
+                        throw (new Error(response.statusText));
+                    return response.text();
+                })
                     .then(function (text) {
                     delete webRequestChecker[url];
                     // Adding the scripts according to the defined order
@@ -1922,15 +2070,6 @@
                     component.emit('failed');
                 });
             });
-        };
-        ComponentHandler.prototype.find = function (callback) {
-            var keys = Object.keys(this.components);
-            for (var i = 0; i < keys.length; i++) {
-                var component = this.components[keys[i]];
-                if (callback(component))
-                    return component;
-            }
-            return null;
         };
         return ComponentHandler;
     }());
@@ -1999,7 +2138,7 @@
         Evalutator.prototype.execRaw = function (expression, context) {
             // Executing the expression
             try {
-                var mExpression = "return(function(){" + expression + "; }).apply(this, arguments)";
+                var mExpression = "(function(){ " + expression + " }).apply(this, arguments)";
                 GLOBAL.Function(mExpression).apply(context || this.bouer);
             }
             catch (error) {
@@ -2156,6 +2295,7 @@
             this.defaultPage = null;
             this.notFoundPage = null;
             this.routeView = null;
+            this.activeAnchors = [];
             // Store `href` value of the <base /> tag
             this.base = null;
             IoC.Register(this);
@@ -2183,15 +2323,19 @@
             });
         };
         Routing.prototype.navigate = function (url) {
+            var _this = this;
             var _a;
             if (isNull(url))
                 return Logger.log("Invalid url provided to the navigation method.");
             url = trim(url);
             var resolver = urlResolver(url);
-            this.clear();
             var usehash = (_a = (this.bouer.config || {}).usehash) !== null && _a !== void 0 ? _a : true;
-            var navigatoTo = usehash ? resolver.hash : resolver.pathname;
+            var navigatoTo = (usehash ? resolver.hash : resolver.pathname).split('?')[0];
+            // In case of: /about/me/, remove the last forward slash
+            if (navigatoTo[navigatoTo.length - 1] === '/')
+                navigatoTo = navigatoTo.substr(0, navigatoTo.length - 1);
             var page = this.toPage(navigatoTo);
+            this.clear();
             if (!page)
                 return; // Page Not Found and NotFound Page Not Defined
             // If it's not found and the url matches .html do nothing
@@ -2200,12 +2344,16 @@
             var componentElement = createAnyEl(page.name)
                 .appendTo(this.routeView)
                 .build();
-            IoC.Resolve('ComponentHandler')
-                .order(componentElement, {});
             var routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route);
+            IoC.Resolve('ComponentHandler')
+                .order(componentElement, {}, function (component) {
+                component.on('loaded', function () {
+                    _this.markActiveAnchors(routeToSet);
+                });
+            });
             // Document info configuration
             DOM.title = page.title || DOM.title;
-            this.pushState(routeToSet, DOM.title);
+            this.pushState(resolver.href, DOM.title);
         };
         Routing.prototype.pushState = function (url, title) {
             GLOBAL.history.pushState({ url: url }, (title || ''), url);
@@ -2231,6 +2379,23 @@
                     return true;
                 return false;
             }) || this.notFoundPage;
+        };
+        Routing.prototype.markActiveAnchors = function (route) {
+            var _this = this;
+            var className = (this.bouer.config || {}).activeClassName || 'active-link';
+            var anchors = this.bouer.el.querySelectorAll('a');
+            forEach(this.activeAnchors, function (anchor) {
+                return anchor.classList.remove(className);
+            });
+            this.activeAnchors = [];
+            forEach([].slice.call(anchors), function (anchor) {
+                if (anchor.href !== route)
+                    return;
+                if (!anchor.markable)
+                    return;
+                anchor.classList.add(className);
+                _this.activeAnchors.push(anchor);
+            });
         };
         Routing.prototype.clear = function () {
             this.routeView.innerHTML = '';
@@ -2276,6 +2441,7 @@
                 throw Logger.error("Element with selector “" + elSelector + "” not found.");
             this.el = el;
             app.beforeMount(app.el, app);
+            new DataStore();
             new Evalutator(this);
             new CommentHandler(this);
             // Transform the data properties into a reative
@@ -2291,11 +2457,12 @@
             new Binder(this);
             var routing = this.routing = new Routing(this);
             new ComponentHandler(this, options.components);
-            var htmlHandler = new HtmlHandler(this);
+            var compiler = new Compiler(this);
+            new Converter(this);
             new CommentHandler(this);
             app.beforeLoad(app.el, app);
             // compile the app
-            htmlHandler.compile({
+            compiler.compile({
                 el: this.el,
                 data: this.data,
                 onDone: function () { return app.loaded(app.el, app); }
@@ -2331,7 +2498,7 @@
          * @returns the Object Compiled from the HTML
          */
         Bouer.prototype.toJsObj = function (input, options, onSet) {
-            return IoC.Resolve('HtmlHandler').toJsObj(input, options, onSet);
+            return IoC.Resolve('Converter').htmlToJsObj(input, options, onSet);
         };
         /**
          * Sets data into a target object, by default is the `app.data`
@@ -2350,6 +2517,9 @@
             // Transfering the properties
             forEach(Object.keys(inputData), function (key) { return transferProperty(targetObject, inputData, key); });
             return targetObject;
+        };
+        Bouer.prototype.watch = function (propertyName, callback, targetObject) {
+            return IoC.Resolve('Binder').watch(propertyName, callback, targetObject);
         };
         // Lifecycle Hooks
         Bouer.prototype.beforeMount = function (element, bouer) { };

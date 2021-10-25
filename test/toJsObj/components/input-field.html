@@ -1,0 +1,34 @@
+<div class="input-field">
+  <label e-content="{{ label }}"> Label Name </label>
+  <content default></content>
+  <small e-show="enableWarn" e-content="{{ required }}"></small>
+</div>
+<script>
+  let watch;
+
+  this.on('loaded', (evt, el) => {
+    watch = this.bouer.watch('value', (v) => {
+      this.data.enableWarn = (v === '');
+    }, this.data);
+  });
+
+  this.on('destroyed', (params) => {
+    if (watch) watch.destroy();
+  });
+
+  this.export({
+    enableWarn: false,
+    required: 'The Field "'+ this.data.label +'" is Required *'
+  });
+</script>
+
+<style scoped>
+  small {
+    color: red;
+  }
+  .input-field {
+    margin: 4px 0;
+    display: flex;
+    flex-direction: column;
+  }
+</style>

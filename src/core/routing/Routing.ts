@@ -1,6 +1,6 @@
 import Bouer from "../..";
 import IoC from "../../shared/helpers/IoC";
-import { createAnyEl, createEl, DOM, GLOBAL, isNull, trim, urlCombine, urlResolver } from "../../shared/helpers/Utils";
+import { createAnyEl, createEl, DOM, forEach, GLOBAL, isNull, trim, urlCombine, urlResolver } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import IComponent from "../../types/IComponent";
 import ComponentHandler from "../component/ComponentHandler";
@@ -10,6 +10,7 @@ export default class Routing {
   defaultPage: IComponent | null = null;
   notFoundPage: IComponent | null = null;
   routeView: Element | null = null;
+  activeAnchors: HTMLAnchorElement[] = [];
 
   // Store `href` value of the <base /> tag
   base: string | null = null;
@@ -27,7 +28,7 @@ export default class Routing {
     const base = DOM.head.querySelector('base');
 
     if (!base)
-      return Logger.error("No <base href=\"/\"/> element was found in the Document>Head, "+
+      return Logger.error("No <base href=\"/\"/> element was found in the Document>Head, " +
         "consider to defined it in order to use “Routing” service.");
 
     const baseHref = (base.attributes as any)['href'];
@@ -46,38 +47,42 @@ export default class Routing {
 
   navigate(url: string) {
     if (isNull(url))
-      return Logger.log("Invalid url provided to the navigation method.")
+      return Logger.log("Invalid url provided to the navigation method.");
 
     url = trim(url);
 
     const resolver = urlResolver(url);
-    this.clear();
-
     const usehash = (this.bouer.config || {}).usehash ?? true;
-    const navigatoTo = usehash ? resolver.hash : resolver.pathname;
+    let navigatoTo = (usehash ? resolver.hash : resolver.pathname).split('?')[0];
+
+    // In case of: /about/me/, remove the last forward slash
+    if (navigatoTo[navigatoTo.length - 1] === '/')
+      navigatoTo = navigatoTo.substr(0, navigatoTo.length - 1);
+
     const page = this.toPage(navigatoTo);
 
+    this.clear();
     if (!page) return; // Page Not Found and NotFound Page Not Defined
 
     // If it's not found and the url matches .html do nothing
     if (!page && url.endsWith('.html')) return;
 
-    const componentElement = createAnyEl(page.name)
+    const componentElement = createAnyEl(page.name!)
       .appendTo(this.routeView!)
       .build();
 
+    const routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route!);
     IoC.Resolve<ComponentHandler>('ComponentHandler')!
-      .order(componentElement, {});
-
-    const routeToSet = urlCombine(
-      resolver.baseURI,
-      (usehash ? '#' : ''),
-      page.route!);
+      .order(componentElement, {}, component => {
+        component.on('loaded', () => {
+          this.markActiveAnchors(routeToSet);
+        });
+      });
 
     // Document info configuration
     DOM.title = page.title || DOM.title;
 
-    this.pushState(routeToSet, DOM.title);
+    this.pushState(resolver.href, DOM.title);
   }
 
   pushState(url: string, title?: string) {
@@ -92,7 +97,7 @@ export default class Routing {
   toPage(url: string) {
     // Default Page
     if (url === '' || url === '/' ||
-        url === "/" + urlCombine((this.base, "index.html"))) {
+      url === "/" + urlCombine((this.base, "index.html"))) {
       return this.defaultPage;
     }
 
@@ -108,6 +113,24 @@ export default class Routing {
 
         return false;
       }) || this.notFoundPage;
+  }
+
+  markActiveAnchors(route: string) {
+    const className = (this.bouer.config || {}).activeClassName || 'active-link';
+    const anchors = this.bouer.el.querySelectorAll('a');
+
+    forEach(this.activeAnchors, anchor =>
+      anchor.classList.remove(className));
+
+    this.activeAnchors = [];
+
+    forEach([].slice.call(anchors), (anchor: HTMLAnchorElement) => {
+      if (anchor.href !== route) return;
+      if (!(anchor as any).markable) return;
+
+      anchor.classList.add(className);
+      this.activeAnchors.push(anchor);
+    });
   }
 
   clear() {

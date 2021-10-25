@@ -15,6 +15,7 @@ import Watch from "./Watch";
 import { dynamic } from "../../types/dynamic";
 import { delimiterResponse } from "../../types/delimiterResponse";
 import IoC from "../../shared/helpers/IoC";
+import { watchCallback } from "../../types/watchCallback";
 
 export default class Binder {
   bouer: Bouer;
@@ -174,6 +175,20 @@ export default class Binder {
 
     propertyBindConfig.boundNode = nodeToBind;
     return propertyBindConfig;
+  }
+
+  watch(propertyName: string, callback: watchCallback, targetObject?: object) {
+    let mWatch: Watch<any, any> | null = null;
+    const mTargetObject = targetObject || this.bouer.data;
+
+    const reactiveEvent = ReactiveEvent.on('AfterGet', reactive =>
+      mWatch = reactive.watch(callback));
+
+    const _ = (mTargetObject as any)[propertyName];
+
+    if (reactiveEvent) ReactiveEvent.off('AfterGet', reactiveEvent.callback);
+
+    return mWatch;
   }
 
   /** Creates a process for unbind properties when it does not exists anymore in the DOM */

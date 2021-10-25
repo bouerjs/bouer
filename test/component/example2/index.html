@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+  <base href="/test/component/example2/">
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,13 +14,8 @@
   <div id="app">
     <div class="center">
 
-      <app:header></app:header>
-
-      <div class="main">
-        <p>This is a Bouer v {{ version }} componentized app.</p>
-      </div>
-
-      <app:footer></app:footer>
+      <label>Social Networks</label>
+      <list-item e-for="link of links" data="link"></list-item>
 
     </div>
   </div>
@@ -28,8 +24,23 @@
   <script>
     var app = new Bouer('#app', {
       data: {
-        version: '3.0.0'
-      }
+        links: [
+          {
+            name: 'GitHub',
+            url: 'https://github.com/bouerjs/bouer'
+          },
+          {
+            name: 'Twitter',
+            url: 'https://twitter.com/bouerjs'
+          }
+        ]
+      },
+      components: [
+        {
+          name: 'list-item',
+          path: '/components/list-item.html',
+        }
+      ]
     });
   </script>
 </body>
