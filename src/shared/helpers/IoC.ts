@@ -1,4 +1,4 @@
-import { dynamic } from "../../types/dynamic";
+import dynamic from "../../types/dynamic";
 
 /**
  * Store instances of classes to provide any where of

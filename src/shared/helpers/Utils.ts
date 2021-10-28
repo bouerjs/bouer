@@ -1,7 +1,6 @@
 
-/* Quotes “"+  +"” */
-/* From: \\"" (.*?) "\\" to: “" $1 "” */
-import { dynamic } from "../../types/dynamic";
+// Quotes “"+  +"”
+import dynamic from "../../types/dynamic";
 import Logger from "../logger/Logger";
 
 export function http(input: RequestInfo, init?: RequestInit) { return fetch(input, init) }
@@ -95,19 +94,6 @@ export function toStr(input: any) {
   }
 }
 
-export function objectDesign(obj: object, options: object) {
-  obj = obj || {};
-  options = options || {};
-
-  forEach(Object.keys(options), key => {
-    const mObj = obj as any;
-    const sKey = key as string;
-    if (isNull(mObj[sKey]))
-      transferProperty(obj, options, sKey);
-  });
-  return obj;
-}
-
 export function defineProperty<TObject>(object: TObject, property: string, descriptor: PropertyDescriptor) {
   Object.defineProperty(object, property, descriptor);
   return object;
@@ -145,17 +131,10 @@ export function forEach<TArray>(iterable: TArray[], callback?: (item: TArray, in
   }
 }
 
-export function toArray<TArray>(array: TArray[], callback?: (item: TArray, index: number) => void, context?: object) {
+export function toArray(array: any) {
   if (!array) return [];
-  array = [].slice.call(array);
-
-  if (isFunction(callback))
-    forEach(array, callback, context);
-
-  return array;
+  return [].slice.call(array);
 }
-
-
 
 export function createAnyEl(elName: string,
   callback?: (element: HTMLElement, dom: Document) => void) {
@@ -260,16 +239,6 @@ export function urlCombine(base: string, ...parts: string[]) {
 export function buildError(error: any, options?: dynamic) {
   error.stack = '';
   return error;
-}
-
-export function optionsResolver<TOptions>(options: dynamic, fakeInstance: TOptions, source: string) {
-  forEach(Object.keys(options), key => {
-    if (!(key in fakeInstance)) {
-      delete options[key]
-      Logger.warn("Unknown “" + key + "” property provided in “" + source + "” options, " +
-        "consider removing it to make this message disappear.")
-    }
-  });
 }
 
 export const DOM = document;

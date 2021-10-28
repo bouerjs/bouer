@@ -15,7 +15,8 @@ import {
   isFunction,
   isString,
   startWith,
-  isNull
+  isNull,
+  toArray
 } from "../../shared/helpers/Utils";
 
 export default class Compiler {
@@ -49,12 +50,12 @@ export default class Compiler {
     data?: object,
     /**
      * In case of components having content inside of the definition,
-     * a wrapper (E.g.: <div>) with the content need to be provided
+     * a wrapper (Example: <div>) with the content need to be provided
      * in `componentContent` property in order to be replaced on the compilation.
      */
     componentContent?: Element
     /** The function that will be fired when the compilation is done */
-    onDone?: (element: Element) => void
+    onDone?: (element: Element, data?: object) => void
   }) {
     const rootElement = options.el;
     const data = (options.data || this.bouer.data!);
@@ -73,9 +74,8 @@ export default class Compiler {
           return this.directive.ignore(node);
 
         if (node.localName === Constants.tagContent && options.componentContent) {
-
           const insertContent = (content: Element, reference: Node) => {
-            forEach([].slice.call(content.childNodes), (child: Node) => {
+            forEach(toArray(content.childNodes), (child: Node) => {
               const cloned = child.cloneNode(true);
               rootElement.insertBefore(cloned, reference);
               walker(cloned, data);
@@ -89,7 +89,7 @@ export default class Compiler {
           } else if (node.hasAttribute('target')) {
             // In case of target content insertion
             const target = (node.attributes as any)['target'] as Attr;
-            return forEach([].slice.call(options.componentContent!.children), (child: Element) => {
+            return forEach(toArray(options.componentContent!.children), (child: Element) => {
               if (child.localName === Constants.tagContent && child.getAttribute('target') !== target.value)
                 return;
 
@@ -108,7 +108,7 @@ export default class Compiler {
 
         // wait-data="..." directive
         if (Constants.wait in node.attributes)
-          return this.directive.wait((node.attributes as any)[Constants.wait], data);
+          return this.directive.wait((node.attributes as any)[Constants.wait]);
 
         // e-for="..." directive
         if (Constants.for in node.attributes)
@@ -129,7 +129,7 @@ export default class Compiler {
         // e-req="..." | e-req:[id]="..."  directive
         let reqNode: any = null;
         if ((reqNode = (node.attributes as any)[Constants.req]) ||
-          (reqNode = [].slice.call(node.attributes).find(attr => Constants.check(attr, Constants.req))))
+          (reqNode = toArray(node.attributes).find(attr => Constants.check(attr, Constants.req))))
           return this.directive.req(reqNode, data);
 
         // <component></component>
@@ -138,7 +138,7 @@ export default class Compiler {
 
         // data="..." | data:[id]="..." directive
         let dataNode: any = null;
-        if (dataNode = [].slice.call(node.attributes).find((attr: Attr) => {
+        if (dataNode = toArray(node.attributes).find((attr: Attr) => {
           const attrName = attr.name;
           // In case of data="..."
           if (attrName === Constants.data) return true;
@@ -148,8 +148,12 @@ export default class Compiler {
         }))
           return this.directive.data(dataNode, data);
 
+        // put="..." directive
+        if (Constants.put in node.attributes)
+          return this.directive.put((node.attributes as any)[Constants.put], data);
+
         // Looping the attributes
-        forEach([].slice.call(node.attributes), (attr: Attr) => {
+        forEach(toArray(node.attributes), (attr: Attr) => {
           walker(attr, data);
         });
       }
@@ -185,7 +189,7 @@ export default class Compiler {
         });
       }
 
-      forEach([].slice.call(node.childNodes), (childNode: Node) =>
+      forEach(toArray(node.childNodes), (childNode: Node) =>
         walker(childNode, data))
     }
 

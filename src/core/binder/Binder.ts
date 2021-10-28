@@ -8,18 +8,18 @@ import {
   toStr,
   trim
 } from "../../shared/helpers/Utils";
-import Evalutator from "../Evaluator";
+import Evaluator from "../Evaluator";
 import ReactiveEvent from "../event/ReactiveEvent";
 import Reactive from "../reactive/Reactive";
 import Watch from "./Watch";
-import { dynamic } from "../../types/dynamic";
+import dynamic from "../../types/dynamic";
 import { delimiterResponse } from "../../types/delimiterResponse";
 import IoC from "../../shared/helpers/IoC";
-import { watchCallback } from "../../types/watchCallback";
+import watchCallback from "../../types/watchCallback";
 
 export default class Binder {
   bouer: Bouer;
-  evaluator: Evalutator;
+  evaluator: Evaluator;
   binds: Watch<any, any>[] = [];
 
   private DEFAULT_BINDER_PROPERTIES: any = {
@@ -36,7 +36,7 @@ export default class Binder {
   constructor(bouer: Bouer) {
     IoC.Register(this);
 
-    this.evaluator = IoC.Resolve('Evalutator')!;
+    this.evaluator = IoC.Resolve('Evaluator')!;
     this.bouer = bouer;
     this.cleanup();
   }
@@ -81,22 +81,21 @@ export default class Binder {
         }
       }
 
-      const reactiveEvent = ReactiveEvent.on('AfterGet', (reactive: Reactive<any, any>) => {
-        this.binds.push(reactive.watch(value => {
-          callback(this.BindingDirection.fromDataToInput, value)
-          onChange(value, node);
-        }, node));
-      })
+      ReactiveEvent.once('AfterGet', event => {
+        event.onemit = reactive => {
+          this.binds.push(reactive.watch(value => {
+            callback(this.BindingDirection.fromDataToInput, value)
+            onChange(value, node);
+          }, node));
+        }
 
-      const result = this.evaluator.exec({
-        expression: originalValue,
-        data: data
+        const result = this.evaluator.exec({
+          expression: originalValue,
+          data: data
+        });
+
+        ownerElement[propertyNameToBind] = (isObject(result) ? toStr(result) : (isNull(result) ? '' : result))
       });
-
-      if (reactiveEvent)
-        ReactiveEvent.off('AfterGet', reactiveEvent.callback);
-
-      ownerElement[propertyNameToBind] = (isObject(result) ? toStr(result) : (isNull(result) ? '' : result))
 
       const listeners = [ownerElement.nodeName.toLowerCase(), 'propertychange', 'change'];
 
@@ -160,18 +159,16 @@ export default class Binder {
       }
     }
 
-    // Listening to the property get only if the callback function is defined
-    const reactiveEvent = ReactiveEvent.on('BeforeGet', reactive => {
-      this.binds.push(reactive.watch(value => {
-        setter();
-        onChange(value, node);
-      }, node));
-    })
+    ReactiveEvent.once('AfterGet', event => {
+      event.onemit = reactive => {
+        this.binds.push(reactive.watch(value => {
+          setter();
+          onChange(value, node);
+        }, node));
+      }
 
-    setter();
-
-    if (reactiveEvent)
-      ReactiveEvent.off('BeforeGet', reactiveEvent.callback);
+      setter();
+    });
 
     propertyBindConfig.boundNode = nodeToBind;
     return propertyBindConfig;
@@ -181,24 +178,26 @@ export default class Binder {
     let mWatch: Watch<any, any> | null = null;
     const mTargetObject = targetObject || this.bouer.data;
 
-    const reactiveEvent = ReactiveEvent.on('AfterGet', reactive =>
-      mWatch = reactive.watch(callback));
-
-    const _ = (mTargetObject as any)[propertyName];
-
-    if (reactiveEvent) ReactiveEvent.off('AfterGet', reactiveEvent.callback);
+    ReactiveEvent.once('AfterGet', event => {
+      event.onemit = reactive => mWatch = reactive.watch(callback);
+      const _ = (mTargetObject as any)[propertyName];
+    });
 
     return mWatch;
   }
 
   /** Creates a process for unbind properties when it does not exists anymore in the DOM */
   private cleanup() {
-    taskRunner(() => forEach(this.binds, (watch, index) => {
-      if (!watch.node) return;
+    taskRunner(() => {
+      const availableBinds: Watch<any, any>[] = [];
 
-      if (watch.node.isConnected) return;
-      watch.destroy();
-      this.binds.splice(index, 1);
-    }), 1000);
+      forEach(this.binds, watch => {
+        if (!watch.node) return availableBinds.push(watch);
+        if (watch.node.isConnected) return availableBinds.push(watch);
+        watch.destroy();
+      })
+
+      this.binds = availableBinds;
+    }, 1000);
   }
 }

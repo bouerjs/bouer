@@ -1,6 +1,6 @@
 import Bouer from "../..";
 import IoC from "../../shared/helpers/IoC";
-import { createAnyEl, createEl, DOM, forEach, GLOBAL, isNull, trim, urlCombine, urlResolver } from "../../shared/helpers/Utils";
+import { createAnyEl, createEl, DOM, forEach, GLOBAL, isNull, toArray, trim, urlCombine, urlResolver } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import IComponent from "../../types/IComponent";
 import ComponentHandler from "../component/ComponentHandler";
@@ -27,13 +27,10 @@ export default class Routing {
     this.routeView!.removeAttribute('route-view');
     const base = DOM.head.querySelector('base');
 
-    if (!base)
-      return Logger.error("No <base href=\"/\"/> element was found in the Document>Head, " +
-        "consider to defined it in order to use “Routing” service.");
-
+    if (!base) return;
     const baseHref = (base.attributes as any)['href'];
     if (!baseHref)
-      return Logger.error("The href=\"/\" attribute is required in base element.");
+      return Logger.error(new Error("The href=\"/\" attribute is required in base element."));
 
     this.base = baseHref.value;
     this.navigate(DOM.location.href);
@@ -86,6 +83,7 @@ export default class Routing {
   }
 
   pushState(url: string, title?: string) {
+    url = urlResolver(url).href;
     GLOBAL.history.pushState({ url: url }, (title || ''), url);
   }
 
@@ -124,7 +122,7 @@ export default class Routing {
 
     this.activeAnchors = [];
 
-    forEach([].slice.call(anchors), (anchor: HTMLAnchorElement) => {
+    forEach(toArray(anchors), (anchor: HTMLAnchorElement) => {
       if (anchor.href !== route) return;
       if (!(anchor as any).markable) return;
 

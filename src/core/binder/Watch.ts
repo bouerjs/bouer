@@ -1,4 +1,4 @@
-import { watchCallback } from "../../types/watchCallback";
+import watchCallback from "../../types/watchCallback";
 import Reactive from "../reactive/Reactive";
 
 export default class Watch<TValue, TObject> {

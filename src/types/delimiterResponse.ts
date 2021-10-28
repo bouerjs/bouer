@@ -1,4 +1,4 @@
-import { delimiter } from "./delimiter";
+import delimiter from "./delimiter";
 
 export type delimiterResponse = {
   field: string,

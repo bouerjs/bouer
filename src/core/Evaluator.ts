@@ -6,10 +6,10 @@ import {
   getDescriptor, GLOBAL, transferProperty
 } from "../shared/helpers/Utils";
 import Logger from "../shared/logger/Logger";
-import { dynamic } from "../types/dynamic";
+import dynamic from "../types/dynamic";
 import IoC from "../shared/helpers/IoC";
 
-type EvalutatorOptions = {
+type EvaluatorOptions = {
   data: object,
   expression: string,
   isReturn?: boolean,
@@ -17,7 +17,7 @@ type EvalutatorOptions = {
   args?: any[],
 }
 
-export default class Evalutator {
+export default class Evaluator {
   private global: Window & typeof globalThis | null;
   private bouer: Bouer;
 
@@ -51,7 +51,7 @@ export default class Evalutator {
     }
   }
 
-  exec(options: EvalutatorOptions) {
+  exec(options: EvaluatorOptions) {
     let { data, args, expression, isReturn, aditional } = options;
     const mGlobal = this.global as dynamic;
     const noConfigurableProperties: dynamic = {};

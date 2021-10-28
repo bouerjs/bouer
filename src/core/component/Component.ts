@@ -3,10 +3,11 @@ import {
   DOM,
   forEach, isNull,
   isObject,
+  toArray,
   transferProperty
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
-import { dynamic } from "../../types/dynamic";
+import dynamic from "../../types/dynamic";
 import IComponent from "../../types/IComponent";
 import ILifeCycleHooks from "../../types/ILifeCycleHooks";
 import BouerEvent from "../event/BouerEvent";
@@ -68,7 +69,7 @@ export default class Component implements IComponent {
     this.events = {};
 
     forEach(this.styles, style =>
-      forEach([].slice.call(DOM.head.children), item => {
+      forEach(toArray(DOM.head.children), item => {
         if (item === style)
           DOM.removeChild(style);
       }))

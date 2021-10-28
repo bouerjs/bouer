@@ -9,5 +9,5 @@ export default interface IBouerConfig {
   preload?: boolean;
 
   /** Defines the default color of the skeleton */
-  skeleton: { background: string, wave: string }
+  skeleton?: { background: string, wave: string }
 }

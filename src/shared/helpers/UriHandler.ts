@@ -1,4 +1,4 @@
-import { dynamic } from "../../types/dynamic";
+import dynamic from "../../types/dynamic";
 import { DOM, forEach, isString } from "./Utils";
 
 export default class UriHandler {

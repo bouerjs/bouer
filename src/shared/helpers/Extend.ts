@@ -1,4 +1,4 @@
-import { dynamic } from "../../types/dynamic";
+import dynamic from "../../types/dynamic";
 import { forEach, isNull, transferProperty } from "./Utils";
 
 export default class Extend {
@@ -45,7 +45,10 @@ export default class Extend {
     forEach(args, arg => {
       if (isNull(arg)) return;
 
-      forEach(Object.keys(arg), key => {
+      if (!Array.isArray(arg))
+        return out.push(arg);
+
+      forEach(Object.keys(arg), (key:any) => {
 
         const value = arg[key];
         if (isNull(value))

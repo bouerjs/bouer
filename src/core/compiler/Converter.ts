@@ -12,6 +12,7 @@ import {
   isNull,
   isObject,
   isString,
+  toArray,
   trim
 } from "../../shared/helpers/Utils";
 
@@ -49,7 +50,7 @@ export default class Converter {
 
     // If the element is not
     if (isNull(element))
-      throw Logger.error("Invalid element passed in app.toJsObj(...)");
+      throw Logger.error(new TypeError("Invalid element passed in app.toJsObj(...)."));
 
     options = options || {};
 
@@ -111,7 +112,7 @@ export default class Converter {
             onSet!.call(instance, builtObject, propName, value, el);
         }
 
-        forEach([].slice.call(el.children), (child: Element) => {
+        forEach(toArray(el.children), (child: Element) => {
           if (!findAttribute(child, [Constants.build]))
             walker(child);
         });
@@ -121,7 +122,7 @@ export default class Converter {
     }
 
     const builtObject = objBuilder(element!);
-    const builds = [].slice.call(element!.querySelectorAll(`[${Constants.build}]`));
+    const builds = toArray(element!.querySelectorAll(`[${Constants.build}]`));
 
     forEach(builds, (buildElement: Element) => {
       // Getting the e-build attr value

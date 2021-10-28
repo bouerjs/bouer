@@ -4,10 +4,10 @@ import Component from "./Component";
 import IComponent from "../../types/IComponent";
 import Extend from "../../shared/helpers/Extend";
 import BouerEvent from "../event/BouerEvent";
-import { dynamic } from "../../types/dynamic";
+import dynamic from "../../types/dynamic";
 import Routing from "../routing/Routing";
 import IoC from "../../shared/helpers/IoC";
-import Evalutator from "../Evaluator";
+import Evaluator from "../Evaluator";
 import Compiler from "../compiler/Compiler";
 import Observer from "../../shared/helpers/Observer";
 import DelimiterHandler from "../DelimiterHandler";
@@ -26,7 +26,8 @@ import {
   urlResolver,
   isFunction,
   defineProperty,
-  isObject
+  isObject,
+  toArray
 } from "../../shared/helpers/Utils";
 import ReactiveEvent from "../event/ReactiveEvent";
 import Reactive from "../reactive/Reactive";
@@ -45,7 +46,14 @@ export default class ComponentHandler {
     this.bouer = bouer;
     this.delimiter = IoC.Resolve('DelimiterHandler')!;
 
-    if (components) this.prepare(components);
+    if (components) {
+      if (!DOM.head.querySelector('base'))
+        Logger.warn("“<base href=\"/\" />” element not found, we advise to set it " +
+          "as first element of “<head></head>” to avoid errors when url have extension (.html)."+
+          "\n@see: https://www.w3schools.com/tags/tag_base.asp");
+
+      this.prepare(components);
+    }
   }
 
   check(nodeName: string) {
@@ -60,11 +68,10 @@ export default class ComponentHandler {
       return this.requests[url].push(response);
 
     this.requests[url] = [response];
-
     const urlPath = urlCombine(urlResolver(anchor.baseURI).baseURI, url);
     http(urlPath, { headers: { 'Content-Type': 'text/plain' } })
       .then(response => {
-        if (!response.ok) throw(new Error(response.statusText));
+        if (!response.ok) throw (new Error(response.statusText));
         return response.text();
       })
       .then(content => {
@@ -117,7 +124,9 @@ export default class ComponentHandler {
           success: content => {
             component.template = content;
           },
-          fail: () => { }
+          fail: error => {
+            Logger.error(buildError(error));
+          }
         });
     });
   }
@@ -127,7 +136,7 @@ export default class ComponentHandler {
     const mComponents = this.components as dynamic;
     let hasComponent = mComponents[$name];
     if (!hasComponent)
-      return Logger.error("No component with name “" + $name + "” registered.");
+      return Logger.error(new Error("No component with name “" + $name + "” registered."));
 
     const icomponent = (hasComponent as IComponent);
     const mData = Extend.obj(data, { $this: data });
@@ -165,7 +174,7 @@ export default class ComponentHandler {
           mComponents[$name] = component;
       },
       fail: (error) => {
-        Logger.error("Failed to request <" + $name + "></" + $name + "> component with path “" + icomponent.path + "”.");
+        Logger.error(new Error("Failed to request <" + $name + "></" + $name + "> component with path “" + icomponent.path + "”."));
         Logger.error(buildError(error));
         if (typeof icomponent.failed !== 'function') return;
         icomponent.failed(new BouerEvent({ type: 'failed' }));
@@ -189,7 +198,7 @@ export default class ComponentHandler {
       return; //Logger.warn("Insert location of component <" + $name + "></" + $name + "> not found.");
 
     if (!component.isReady)
-      return Logger.error("The <" + $name + "></" + $name + "> component is not ready yet to be inserted.");
+      return Logger.error(new Error("The <" + $name + "></" + $name + "> component is not ready yet to be inserted."));
 
     const elementContent = createEl('div', el => {
       el.innerHTML = element.innerHTML
@@ -218,12 +227,12 @@ export default class ComponentHandler {
           });
 
         if (htmlSnippet.children.length === 0)
-          return Logger.error("The component <" + $name + "></" + $name + "> seems to be empty or it has not a root element." +
-            "eg.: <div></div>, to be included.");
+          return Logger.error(new SyntaxError("The component <" + $name + "></" + $name + "> " +
+            "seems to be empty or it has not a root element. Example: <div></div>, to be included."));
 
         if (htmlSnippet.children.length > 1)
-          return Logger.error("The component <" + $name + "></" + $name + "> seems to have multiple root element, it must have" +
-            " only one root.");
+          return Logger.error(new SyntaxError("The component <" + $name + "></" + $name + "> " +
+            "seems to have multiple root element, it must have only one root."));
 
         component.el = htmlSnippet.children[0];
         component.emit('created');
@@ -232,7 +241,7 @@ export default class ComponentHandler {
 
     let rootElement = component.el!;
     // tranfering the attributes
-    forEach([].slice.call(element.attributes), (attr: Attr) => {
+    forEach(toArray(element.attributes), (attr: Attr) => {
       element.removeAttribute(attr.name);
       if (attr.nodeName === 'class')
         return element.classList.forEach(cls => {
@@ -241,10 +250,12 @@ export default class ComponentHandler {
 
       if (attr.nodeName === 'data') {
         if (this.delimiter.run(attr.value).length !== 0)
-          return Logger.error("The “data” attribute cannot contain delimiter, source element: <" + $name + "></" + $name + ">.");
+          return Logger.error(new SyntaxError("The “data” attribute cannot contain delimiter, " +
+            "source element: <" + $name + "></" + $name + ">."));
 
         let inputData: dynamic = {};
         const mData = Extend.obj(data, { $this: data });
+
         const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
           inputData[reactive.propertyName] = undefined;
           defineProperty(inputData, reactive.propertyName, reactive);
@@ -255,12 +266,12 @@ export default class ComponentHandler {
           inputData = Extend.obj(this.bouer.data);
         else {
           // Other wise, compiles the object provided
-          const mInputData = IoC.Resolve<Evalutator>('Evalutator')!
+          const mInputData = IoC.Resolve<Evaluator>('Evaluator')!
             .exec({ data: mData, expression: attr.value });
 
           if (!isObject(mInputData))
-            return Logger.error("Expected a valid Object Literal expression in “" + attr.nodeName +
-              "” and got “" + attr.value + "”.");
+            return Logger.error(new TypeError("Expected a valid Object Literal expression in “"
+              + attr.nodeName + "” and got “" + attr.value + "”."));
 
           // Adding all non-existing properties
           forEach(Object.keys(mInputData), key => {
@@ -327,7 +338,7 @@ export default class ComponentHandler {
     const compile = (scriptContent?: string) => {
       try {
         // Executing the mixed scripts
-        IoC.Resolve<Evalutator>('Evalutator')!
+        IoC.Resolve<Evaluator>('Evaluator')!
           .execRaw(scriptContent || '', component);
         component.emit('mounted');
 
@@ -347,7 +358,7 @@ export default class ComponentHandler {
           component.destroy();
         });
       } catch (error) {
-        Logger.error("Error in <" + $name + "></" + $name + "> component.");
+        Logger.error(new Error("Error in <" + $name + "></" + $name + "> component."));
         Logger.error(buildError(error));
       }
     }
@@ -380,7 +391,7 @@ export default class ComponentHandler {
       http(url, {
         headers: { "Content-Type": 'text/plain' }
       }).then(response => {
-        if (!response.ok) throw(new Error(response.statusText));
+        if (!response.ok) throw (new Error(response.statusText));
         return response.text();
       })
         .then(text => {
@@ -394,8 +405,8 @@ export default class ComponentHandler {
         })
         .catch(error => {
           error.stack = "";
-          Logger.error("Error loading the <script src=\"" + url + "\"></script> in " +
-            "<" + $name + "></" + $name + "> component, remove it in order to be compiled.");
+          Logger.error(new Error("Error loading the <script src=\"" + url + "\"></script> in " +
+            "<" + $name + "></" + $name + "> component, remove it in order to be compiled."));
           Logger.log(error);
           component.emit('failed');
         });

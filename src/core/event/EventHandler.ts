@@ -1,7 +1,7 @@
 import Bouer from "../instance/Bouer";
 import { Constants } from "../../shared/helpers/Constants";
 import Extend from "../../shared/helpers/Extend";
-import { buildError, createEl, forEach, isFunction, isNull, toLower, trim } from "../../shared/helpers/Utils";
+import { buildError, connectNode, createEl, forEach, isFunction, isNull, taskRunner, toLower, trim } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Evaluator from "../Evaluator";
 import BouerEvent from "./BouerEvent";
@@ -9,18 +9,21 @@ import IoC from "../../shared/helpers/IoC";
 
 type EventSubscription = {
   eventName: string
-  callback: (evt: BouerEvent, args: any[]) => void
+  callback: (evt: BouerEvent, ...args: any[]) => void,
+  attachedNode?: Node
 }
 
 type EventEmitterOptions = {
   eventName: string
-  arguments?: any[]
+  arguments?: any[],
+  once?: boolean,
+  attachedNode?: Node
 }
 
 export default class EventHandler {
   private bouer: Bouer;
   private evaluator: Evaluator;
-  private events: Array<EventSubscription> = [];
+  private events: EventSubscription[] = [];
   private input: HTMLInputElement;
 
   constructor(bouer: Bouer) {
@@ -29,6 +32,7 @@ export default class EventHandler {
     this.input = createEl('input').build();
 
     IoC.Register(this);
+    this.cleanup();
   }
 
   handle(node: Node, data: object) {
@@ -36,7 +40,7 @@ export default class EventHandler {
     const nodeName = node.nodeName;
 
     if (isNull(ownerElement))
-      return Logger.error("Invalid ParentElement of “" + nodeName + "”");
+      return Logger.error(new Error("Invalid ParentElement of “" + nodeName + "”"));
 
     // <button on:submit.once.stopPropagation="times++"></button>
     const nodeValue = trim(node.nodeValue ?? '');
@@ -47,7 +51,10 @@ export default class EventHandler {
     modifiers.shift();
 
     if (nodeValue === '')
-      Logger.error("Expected an expression in the “" + nodeName + "” and got an <empty string>.");
+      return Logger.error(new Error("Expected an expression in the “" + nodeName + "” and got an <empty string>."));
+
+    connectNode(node, ownerElement);
+    ownerElement.removeAttribute(nodeName);
 
     const callback = (evt: Event, args: any[]) => {
       const isCallOnce = (modifiers.indexOf('once') !== -1)
@@ -95,14 +102,15 @@ export default class EventHandler {
 
       ownerElement.addEventListener(eventName, callbackNavite, false);
     } else {
-      this.on(eventName, callback)
+      this.on(eventName, callback, ownerElement)
     }
   }
 
-  on(eventName: string, callback: (event: BouerEvent, ...args: any[]) => void) {
+  on(eventName: string, callback: (event: BouerEvent, ...args: any[]) => void, attachedNode?: Node) {
     const event: EventSubscription = {
       eventName: eventName,
-      callback: (evt, args) => callback(evt, args)
+      callback: (evt, args) => callback(evt, args),
+      attachedNode: attachedNode
     };
 
     this.events.push(event);
@@ -119,20 +127,38 @@ export default class EventHandler {
       }
     });
 
-    if (event)
-      this.events.splice(index, 1);
+    if (event) this.events.splice(index, 1);
 
     return event;
   }
 
   emit(options: EventEmitterOptions) {
     const { eventName, arguments: mArguments } = options;
-    forEach(this.events, event => {
+    forEach(this.events, (event, index) => {
       if (eventName !== event.eventName)
         return;
+
+      if (!options.attachedNode && event.attachedNode !== options.attachedNode)
+        return;
+
       event.callback.call(this.bouer, new BouerEvent({
-        type: eventName
-      }), mArguments || []);
+        type: eventName,
+        target: options.attachedNode
+      }), (mArguments || []));
+
+      if ((options.once ?? false) === true)
+        this.events.splice(index, 1);
     });
+  }
+
+  private cleanup() {
+    taskRunner(() => {
+      const availableEvents: EventSubscription[] = [];
+      forEach(this.events, event => {
+        if (!event.attachedNode) return availableEvents.push(event);
+        if (event.attachedNode.isConnected) return availableEvents.push(event);
+      });
+      this.events = availableEvents;
+    }, 1000);
   }
 }

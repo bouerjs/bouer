@@ -5,11 +5,13 @@ import {
   isNode,
   isNull,
   isObject,
-  mapper
+  mapper,
+  toArray,
+  transferProperty
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
-import { dynamic } from "../../types/dynamic";
-import { watchCallback } from "../../types/watchCallback";
+import dynamic from "../../types/dynamic";
+import watchCallback from "../../types/watchCallback";
 import Watch from "../binder/Watch";
 import ReactiveEvent from "../event/ReactiveEvent";
 
@@ -41,23 +43,22 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
     ReactiveEvent.emit('BeforeSet', this);
 
     if (isObject(value) || Array.isArray(value)) {
+      if ((typeof this.propertyValue) !== (typeof value))
+        return Logger.error(new TypeError("Cannot set “" + (typeof value) + "” in “" +
+          this.propertyName + "” property."));
+
       if (Array.isArray(value)) {
         Reactive.transform(value, this);
-
-        if (!isNull(this.propertyValue)) {
-          if (Array.isArray(this.propertyValue))
-            this.propertyValue.splice(0, this.propertyValue.length);
-          [].push.apply(this.propertyValue, (value as any));
-        } else {
-          this.propertyValue = value;
-        }
+        const propValueAsAny = this.propertyValue as any;
+        propValueAsAny.splice(0, propValueAsAny.length);
+        propValueAsAny.push.apply(propValueAsAny, (value as any));
       } else if (isObject(value)) {
         if (isNode(value)) // If some html element
           this.propertyValue = value;
         else {
           Reactive.transform(value);
           if (!isNull(this.propertyValue))
-            mapper(this.propertyValue as any, value as any);
+            mapper(value, this.propertyValue);
           else
             this.propertyValue = value;
         }
@@ -96,6 +97,15 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
         prototype[method] = function reactive() {
           const oldArrayValue = inputArray.slice();
           ReactiveEvent.emit('BeforeArrayChanges', reactiveObj!, method, { arrayNew: oldArrayValue, arrayOld: oldArrayValue });
+
+          switch (method) {
+            case 'push': case 'unshift':
+              forEach(toArray(arguments), arg => {
+                if (!isObject(arg) && !Array.isArray(arg)) return;
+                Reactive.transform(arg);
+              });
+          }
+
           const result = reference[method].apply(inputArray, arguments);
           ReactiveEvent.emit('AfterArrayChanges', reactiveObj!, method, { arrayNew: oldArrayValue, arrayOld: oldArrayValue });
           return result;
@@ -133,5 +143,20 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
     });
 
     return inputObject;
+  }
+
+  static setData(inputData: object, targetObject?: object) {
+    if (!isObject(inputData))
+      return Logger.error(new TypeError('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".'));
+
+    if (isObject(targetObject) && targetObject !== null)
+      return Logger.error(new TypeError('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".'));
+
+    // Transforming the input
+    Reactive.transform(inputData);
+
+    // Transfering the properties
+    forEach(Object.keys(inputData), key => transferProperty(targetObject, inputData, key));
+    return targetObject;
   }
 }

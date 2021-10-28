@@ -42,6 +42,18 @@ export const Constants = {
   on: 'on:',
 
   tagContent: 'content',
+  ref: 'ref',
+  put: 'put',
+
+  connector: 'connector',
+
+  events: {
+    compile: 'compile',
+    request: 'request',
+    response: 'response',
+    fail: 'fail',
+    done: 'done',
+  },
 
   check: function (node: Node, cmd: string) {
     return startWith(node.nodeName, cmd);

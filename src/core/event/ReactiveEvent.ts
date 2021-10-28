@@ -37,7 +37,7 @@ export default class ReactiveEvent {
   ): ReactiveEventResult<CallbackReactiveProperty>;
   static on<TKey extends keyof ReactiveArrayEvents>(
     eventName: TKey,
-    callback: CallbackReactiveArray,
+    callback: CallbackReactiveArray
   ): ReactiveEventResult<CallbackReactiveArray>;
   static on(
     eventName: any,
@@ -66,6 +66,22 @@ export default class ReactiveEvent {
     let array = ((this as any)[eventName] as any[]);
     array.splice(array.indexOf(callback), 1);
     return true;
+  }
+
+  static once<TKey extends keyof ReactivePropertyEvents>(eventName: TKey, callback: (event: { onemit?: CallbackReactiveProperty }) => void): void;
+  static once<TKey extends keyof ReactiveArrayEvents>(eventName: TKey, callback: (event: { onemit?: CallbackReactiveArray }) => void): void;
+  static once(eventName: any, callback: any) {
+    const event: { onemit?: (CallbackReactiveProperty | CallbackReactiveArray) } = {}
+    const mEvent = ReactiveEvent.on(eventName, (reactive: any, method?: any, options?: any) => {
+      if (event.onemit) event.onemit(reactive, method, options);
+    });
+    try {
+      callback(event);
+    }
+    catch (error) { Logger.error(buildError(error)); }
+    finally {
+      ReactiveEvent.off(eventName, mEvent.callback);
+    }
   }
 
   static emit<TKey extends keyof ReactivePropertyEvents, TProperty, TObject>(

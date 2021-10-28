@@ -1,7 +1,9 @@
 import Component from "../core/component/Component";
 import Bouer from "../core/instance/Bouer";
+import dynamic from "./dynamic";
 import IBouerConfig from "./IBouerConfig";
 import IComponent from "./IComponent";
+import IInterceptor from "./IInterceptor";
 
 export default interface IBouer {
   /** The data of the instance */
@@ -17,7 +19,16 @@ export default interface IBouer {
   components?: (IComponent | Component)[];
 
   /** The dependencies of the instance */
-  dependencies?: any[]
+  dependencies?: dynamic,
+
+  /** Middlewares that will be used in the application */
+  interceptor?: (
+    intercept: (
+      action: string,
+      callback: (context: IInterceptor, next: () => void) => void
+    ) => void,
+    app: Bouer
+  ) => void;
 
   /** The hook that will be called before the component is mounted */
   beforeMount?(element: Element, bouer: Bouer): void;
