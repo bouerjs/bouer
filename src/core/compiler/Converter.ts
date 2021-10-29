@@ -50,7 +50,7 @@ export default class Converter {
 
     // If the element is not
     if (isNull(element))
-      throw Logger.error(new TypeError("Invalid element passed in app.toJsObj(...)."));
+      throw Logger.error(("Invalid element passed in app.toJsObj(...)."));
 
     options = options || {};
 

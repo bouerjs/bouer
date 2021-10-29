@@ -708,7 +708,7 @@
                 ReactiveEvent.emit('BeforeSet', _this);
                 if (isObject(value) || Array.isArray(value)) {
                     if ((typeof _this.propertyValue) !== (typeof value))
-                        return Logger.error(new TypeError("Cannot set “" + (typeof value) + "” in “" +
+                        return Logger.error(("Cannot set “" + (typeof value) + "” in “" +
                             _this.propertyName + "” property."));
                     if (Array.isArray(value)) {
                         Reactive.transform(value, _this);
@@ -748,9 +748,9 @@
         };
         Reactive.setData = function (inputData, targetObject) {
             if (!isObject(inputData))
-                return Logger.error(new TypeError('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".'));
+                return Logger.error(('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".'));
             if (isObject(targetObject) && targetObject !== null)
-                return Logger.error(new TypeError('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".'));
+                return Logger.error(('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".'));
             // Transforming the input
             Reactive.transform(inputData);
             // Transfering the properties
@@ -843,11 +843,11 @@
 
     var Directive = /** @class */ (function () {
         function Directive(bouer, compiler) {
-            this.errorMsgEmptyNode = function (node) { return new SyntaxError("Expected an expression in “" + node.nodeName +
+            this.errorMsgEmptyNode = function (node) { return ("Expected an expression in “" + node.nodeName +
                 "” and got an <empty string>."); };
             this.errorMsgNodeValue = function (node) {
                 var _a;
-                return new SyntaxError("Expected an expression in “" + node.nodeName +
+                return ("Expected an expression in “" + node.nodeName +
                     "” and got “" + ((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '') + "”.");
             };
             this.bouer = bouer;
@@ -1000,7 +1000,7 @@
             if (nodeValue === '')
                 return Logger.error(this.errorMsgEmptyNode(node));
             if (!nodeValue.includes(' of ') && !nodeValue.includes(' in '))
-                return Logger.error(new SyntaxError("Expected a valid “for” expression in “" + nodeName + "” and got “" + nodeValue + "”."
+                return Logger.error(("Expected a valid “for” expression in “" + nodeName + "” and got “" + nodeValue + "”."
                     + "\nValid: e-for=\"item of items\"."));
             // Binding the e-for if got delimiters
             var delimiters = this.delimiter.run(nodeValue);
@@ -1021,7 +1021,7 @@
                 var filterValue = filterConfigParts[1];
                 var filterKeys = filterConfigParts[2];
                 if (isNull(filterValue) || filterValue === '') {
-                    Logger.error(new SyntaxError("Invalid filter-value in “" + nodeName + "” with “" + nodeValue + "” expression."));
+                    Logger.error(("Invalid filter-value in “" + nodeName + "” with “" + nodeValue + "” expression."));
                     return list;
                 }
                 filterValue = _this.evaluator.exec({
@@ -1035,7 +1035,7 @@
                 else {
                     // filter:search:name
                     if (isNull(filterKeys) || filterKeys === '') {
-                        Logger.error(new SyntaxError("Invalid filter-keys in “" + nodeName + "” with “" + nodeValue + "” expression, " +
+                        Logger.error(("Invalid filter-keys in “" + nodeName + "” with “" + nodeValue + "” expression, " +
                             "at least one filter-key to be provided."));
                         return list;
                     }
@@ -1099,6 +1099,10 @@
                 var filters = nodeValue.split('|').map(function (item) { return trim(item); });
                 var forExpression = filters[0].replace(/\(|\)/g, '');
                 filters.shift();
+                // for types:
+                // e-for="item of items",  e-for="(item, index) of items"
+                // e-for="key in object", e-for="(key, value) in object"
+                // e-for="(key, value, index) in object"
                 var forSeparator = ' of ';
                 var forParts = forExpression.split(forSeparator);
                 if (!(forParts.length > 1))
@@ -1106,12 +1110,6 @@
                 var leftHand = forParts[0];
                 var rightHand = forParts[1];
                 var leftHandParts = leftHand.split(',').map(function (x) { return trim(x); });
-                // Preparing variables declaration
-                // Example: let item; | let item, index=0;
-                var leftHandDeclaration = 'let ' + leftHand + (leftHand.includes(',') ? '=0' : '') + ';';
-                var hasIndex = leftHandParts.length > 1;
-                forExpression = [(hasIndex ? leftHandParts[0] : leftHand), '_flt(' + rightHand + ')']
-                    .join(forSeparator);
                 // Cleaning the
                 forEach(listedItems, function (item) {
                     if (!item.parentElement)
@@ -1119,17 +1117,23 @@
                     container.removeChild(item);
                 });
                 listedItems = [];
+                var source = _this.evaluator.exec({ data: data, expression: rightHand });
+                var isForOf = trim(forSeparator) === 'of';
+                var iterable = isForOf ? rightHand : "Object.keys(" + rightHand + ")";
                 _this.evaluator.exec({
                     data: data,
                     isReturn: false,
-                    expression: leftHandDeclaration +
-                        'for(' + forExpression + '){ ' + ' _each(' + leftHand + (hasIndex ? '++' : '') + ')}',
+                    expression: "_for(" + iterable + ", ($$itm, $$idx) => { _each($$itm, $$idx); })",
                     aditional: {
+                        _for: forEach,
                         _each: function (item, index) {
                             var forData = Extend.obj(data);
-                            forData[leftHandParts[0]] = item;
-                            if (hasIndex)
-                                forData[leftHandParts[1]] = index;
+                            var _item_key = leftHandParts[0];
+                            var _index_or_value = leftHandParts[1] || 'index_or_value';
+                            var _index = leftHandParts[2] || 'for_in_index';
+                            forData[_item_key] = item;
+                            forData[_index_or_value] = isForOf ? index : source[item];
+                            forData[_index] = index;
                             var clonedItem = container.insertBefore(forItem.cloneNode(true), comment);
                             _this.compiler.compile({
                                 el: clonedItem,
@@ -1147,7 +1151,7 @@
                             if (filterConfig) {
                                 var filterConfigParts = filterConfig.split(':').map(function (item) { return trim(item); });
                                 if (filterConfigParts.length == 1) {
-                                    Logger.error(new SyntaxError("Invalid “" + nodeName + "” filter expression “" + nodeValue +
+                                    Logger.error(("Invalid “" + nodeName + "” filter expression “" + nodeValue +
                                         "”, at least a filter-value and filter-keys, or a filter-function must be provided"));
                                 }
                                 else {
@@ -1159,7 +1163,7 @@
                             if (orderConfig) {
                                 var orderConfigParts = orderConfig.split(':').map(function (item) { return trim(item); });
                                 if (orderConfigParts.length == 1) {
-                                    Logger.error(new SyntaxError("Invalid “" + nodeName + "” order  expression “" + nodeValue +
+                                    Logger.error(("Invalid “" + nodeName + "” order  expression “" + nodeValue +
                                         "”, at least the order type must be provided"));
                                 }
                                 else {
@@ -1187,7 +1191,7 @@
                 expression: nodeValue
             });
             if (!isObject(inputData))
-                return Logger.error(new TypeError("Expected a valid Object Literal expression in “"
+                return Logger.error(("Expected a valid Object Literal expression in “"
                     + node.nodeName + "” and got “" + nodeValue + "”."));
             this.bouer.setData(inputData, data);
             ownerElement.removeAttribute(node.nodeName);
@@ -1226,7 +1230,7 @@
             var exec = function (obj) { };
             var errorInvalidValue = function (node) {
                 var _a;
-                return new TypeError("Invalid value, expected an Object/Object Literal in “" + node.nodeName
+                return ("Invalid value, expected an Object/Object Literal in “" + node.nodeName
                     + "” and got “" + ((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '') + "”.");
             };
             if (nodeValue === '')
@@ -1274,7 +1278,7 @@
             var hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
             var inputData = {};
             if (hasDelimiter)
-                return Logger.error(new SyntaxError("The “data” attribute cannot contain delimiter."));
+                return Logger.error(("The “data” attribute cannot contain delimiter."));
             ownerElement.removeAttribute(node.nodeName);
             var mData = Extend.obj(data, { $this: data });
             var reactiveEvent = ReactiveEvent.on('AfterGet', function (reactive) {
@@ -1288,7 +1292,7 @@
                 // Other wise, compiles the object provided
                 var mInputData_1 = this.evaluator.exec({ data: mData, expression: nodeValue });
                 if (!isObject(mInputData_1))
-                    return Logger.error(new TypeError("Expected a valid Object Literal expression in “" + node.nodeName +
+                    return Logger.error(("Expected a valid Object Literal expression in “" + node.nodeName +
                         "” and got “" + nodeValue + "”."));
                 // Adding all non-existing properties
                 forEach(Object.keys(mInputData_1), function (key) {
@@ -1392,7 +1396,7 @@
             var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
             var exec = function () { };
             if (!nodeValue.includes(' of ') && !nodeValue.includes(' as '))
-                return Logger.error(new SyntaxError("Expected a valid “for” expression in “" + nodeName
+                return Logger.error(("Expected a valid “for” expression in “" + nodeName
                     + "” and got “" + nodeValue + "”." + "\nValid: e-req=\"item of [url]\"."));
             // If it's list request type, connect ownerNode
             if (nodeValue.includes(' of '))
@@ -1413,11 +1417,13 @@
                 if (attr)
                     _this.eventHandler.handle(attr, data);
                 return {
-                    emit: function (args) {
+                    emit: function (detailObj) {
                         _this.eventHandler.emit({
                             attachedNode: ownerElement,
                             eventName: eventName,
-                            arguments: args,
+                            init: {
+                                detail: detailObj
+                            },
                         });
                     }
                 };
@@ -1439,7 +1445,7 @@
                 var mReqSeparator = trim(reqSeparator);
                 var dataKey = node.nodeName.split(':')[1];
                 dataKey = dataKey ? dataKey.replace(/\[|\]/g, '') : '';
-                requestEvent.emit([]);
+                requestEvent.emit();
                 interceptor.run('req', {
                     http: http,
                     type: mReqSeparator,
@@ -1447,19 +1453,21 @@
                     success: function (response) {
                         var _a;
                         if (!response)
-                            return Logger.error(new TypeError("the “success” parameter must be an object containing " +
+                            return Logger.error(("the “success” parameter must be an object containing " +
                                 "“data” property. Example: { data: {} | [] }"));
                         if (!("data" in response))
-                            return Logger.error(new SyntaxError("the “success” parameter must be contain the “data” " +
+                            return Logger.error(("the “success” parameter must be contain the “data” " +
                                 "property. Example: { data: {} | [] }"));
                         if ((mReqSeparator === 'of' && !Array.isArray(response.data)))
-                            return Logger.error(new TypeError("Using e-ref=\"... “of” ...\" the response must be a " +
+                            return Logger.error(("Using e-ref=\"... “of” ...\" the response must be a " +
                                 "list of items, and got “" + typeof response.data + "”."));
                         if ((mReqSeparator === 'as' && !(typeof response.data === 'object')))
-                            return Logger.error(new TypeError("Using e-ref=\"... “as” ...\" the response must be a list " +
+                            return Logger.error(("Using e-ref=\"... “as” ...\" the response must be a list " +
                                 "of items, and got “" + typeof response.data + "”."));
                         Reactive.transform(response);
-                        responseEvent.emit([response]);
+                        responseEvent.emit({
+                            response: response
+                        });
                         // Handle Content Insert/Update
                         if (!('data' in localDataStore)) {
                             // Store the data
@@ -1481,7 +1489,9 @@
                                     data: Extend.obj((_a = {}, _a[variable] = response.data, _a), data),
                                     onDone: function (_, inData) {
                                         subcribeEvent(Constants.events.compile)
-                                            .emit([inData]);
+                                            .emit({
+                                            data: inData
+                                        });
                                     }
                                 });
                             case 'of':
@@ -1492,13 +1502,17 @@
                                     data: Extend.obj({ _response_: response.data }, data),
                                     onDone: function (_, inData) {
                                         subcribeEvent(Constants.events.compile)
-                                            .emit([inData]);
+                                            .emit({
+                                            data: inData
+                                        });
                                     }
                                 });
                         }
                     },
-                    fail: function (error) { return failEvent.emit([error]); },
-                    done: function () { return doneEvent.emit([]); }
+                    fail: function (error) { return failEvent.emit({
+                        error: error
+                    }); },
+                    done: function () { return doneEvent.emit(); }
                 });
             })();
         };
@@ -1596,6 +1610,9 @@
                     // wait-data="..." directive
                     if (Constants.wait in node.attributes)
                         return _this.directive.wait(node.attributes[Constants.wait]);
+                    // <component></component>
+                    if (_this.component.check(node.localName))
+                        return _this.component.order(node, data);
                     // e-for="..." directive
                     if (Constants.for in node.attributes)
                         return _this.directive.for(node.attributes[Constants.for], data);
@@ -1613,9 +1630,6 @@
                     if ((reqNode = node.attributes[Constants.req]) ||
                         (reqNode = toArray(node.attributes).find(function (attr) { return Constants.check(attr, Constants.req); })))
                         return _this.directive.req(reqNode, data);
-                    // <component></component>
-                    if (_this.component.check(node.localName))
-                        return _this.component.order(node, data);
                     // data="..." | data:[id]="..." directive
                     var dataNode = null;
                     if (dataNode = toArray(node.attributes).find(function (attr) {
@@ -1700,7 +1714,7 @@
             }
             // If the element is not
             if (isNull(element))
-                throw Logger.error(new TypeError("Invalid element passed in app.toJsObj(...)."));
+                throw Logger.error(("Invalid element passed in app.toJsObj(...)."));
             options = options || {};
             // Clear [ ] and , and return an array of the names provided
             var mNames = (options.names || '[name]').replace(/\[|\]/g, '').split(',');
@@ -1861,56 +1875,12 @@
         return UriHandler;
     }());
 
-    var BouerEvent = /** @class */ (function () {
-        function BouerEvent(options) {
-            var _this = this;
-            this.composedPath = function () {
-                return _this.source.composedPath();
-            };
-            this.initEvent = function (type, bubbles, cancelable) {
-                return _this.source.initEvent(type, bubbles, cancelable);
-            };
-            this.preventDefault = function () {
-                return _this.source.preventDefault();
-            };
-            this.stopImmediatePropagation = function () {
-                return _this.source.stopImmediatePropagation();
-            };
-            this.stopPropagation = function () {
-                return _this.source.stopPropagation();
-            };
-            var source = options.source, type = options.type;
-            this.source = source || new Event(type);
-            Object.assign(this, options);
-            this.bubbles = this.source.bubbles;
-            this.cancelBubble = this.source.cancelBubble;
-            this.cancelable = this.source.cancelable;
-            this.composed = this.source.composed;
-            this.currentTarget = this.source.currentTarget;
-            this.defaultPrevented = this.source.defaultPrevented;
-            this.eventPhase = this.source.eventPhase;
-            this.isTrusted = this.source.isTrusted;
-            this.target = this.source.target;
-            this.timeStamp = this.source.timeStamp;
-            this.type = this.source.type;
-            /* @deprecated but required on Typescript */
-            this.returnValue = this.source.returnValue;
-            this.srcElement = this.source.srcElement;
-            /* End @deprecated but required on Typescript */
-            this.AT_TARGET = this.source.AT_TARGET;
-            this.BUBBLING_PHASE = this.source.BUBBLING_PHASE;
-            this.CAPTURING_PHASE = this.source.CAPTURING_PHASE;
-            this.NONE = this.source.NONE;
-        }
-        return BouerEvent;
-    }());
-
     var Component = /** @class */ (function () {
         function Component(options) {
             this.scripts = [];
             this.styles = [];
             // Store temporarily this component UI orders
-            this.events = {};
+            this.events = [];
             this.name = options.name;
             this.path = options.path;
             Object.assign(this, options);
@@ -1933,6 +1903,7 @@
             });
         };
         Component.prototype.destroy = function () {
+            var _this = this;
             if (!this.el)
                 return false;
             this.emit('beforeDestroy');
@@ -1941,7 +1912,8 @@
                 container.removeChild(this.el) !== null;
             this.emit('destroyed');
             // Destroying all the events attached to the this instance
-            this.events = {};
+            forEach(this.events, function (evt) { return _this.off(evt.eventName, evt.callback); });
+            this.events = [];
             forEach(this.styles, function (style) {
                 return forEach(toArray(DOM.head.children), function (item) {
                     if (item === style)
@@ -1952,38 +1924,22 @@
         Component.prototype.params = function () {
             return new UriHandler().params(this.route);
         };
-        Component.prototype.emit = function (eventName) {
-            var params = [];
-            for (var _i = 1; _i < arguments.length; _i++) {
-                params[_i - 1] = arguments[_i];
-            }
-            var mThis = this;
-            if (eventName in mThis && typeof mThis[eventName] === 'function')
-                mThis[eventName](new BouerEvent({ type: eventName, targert: this }));
-            // Firing all subscribed events
-            var events = this.events[eventName];
-            if (!events)
-                return false;
-            forEach(events, function (event) {
-                return event.apply(void 0, __spreadArray([new BouerEvent({ type: eventName })], params, false));
+        Component.prototype.emit = function (eventName, init) {
+            var eventHandler = IoC.Resolve('EventHandler');
+            eventHandler.emit({
+                eventName: eventName,
+                attachedNode: this.el,
+                init: init
             });
-            return true;
         };
         Component.prototype.on = function (eventName, callback) {
-            if (!this.events[eventName])
-                this.events[eventName] = [];
-            this.events[eventName].push(callback);
-            return {
-                eventName: eventName,
-                callback: callback
-            };
+            var eventHandler = IoC.Resolve('EventHandler');
+            var evt = eventHandler.on(eventName, callback, this.el);
+            this.events.push(evt);
         };
         Component.prototype.off = function (eventName, callback) {
-            if (!this.events[eventName])
-                return false;
-            var eventIndex = this.events[eventName].indexOf(callback);
-            this.events[eventName].splice(eventIndex, 1);
-            return true;
+            var eventHandler = IoC.Resolve('EventHandler');
+            eventHandler.on(eventName, callback, this.el);
         };
         return Component;
     }());
@@ -1996,6 +1952,7 @@
             IoC.Register(this);
             this.bouer = bouer;
             this.delimiter = IoC.Resolve('DelimiterHandler');
+            this.eventHandler = IoC.Resolve('EventHandler');
             if (components) {
                 if (!DOM.head.querySelector('base'))
                     Logger.warn("“<base href=\"/\" />” element not found, we advise to set it " +
@@ -2016,7 +1973,7 @@
             http(urlPath, { headers: { 'Content-Type': 'text/plain' } })
                 .then(function (response) {
                 if (!response.ok)
-                    throw (new Error(response.statusText));
+                    throw ((response.statusText));
                 return response.text();
             })
                 .then(function (content) {
@@ -2071,7 +2028,7 @@
             var mComponents = this.components;
             var hasComponent = mComponents[$name];
             if (!hasComponent)
-                return Logger.error(new Error("No component with name “" + $name + "” registered."));
+                return Logger.error(("No component with name “" + $name + "” registered."));
             var icomponent = hasComponent;
             var mData = Extend.obj(data, { $this: data });
             if (icomponent.template) {
@@ -2084,8 +2041,9 @@
                     mComponents[$name] = component;
                 return;
             }
-            if (typeof icomponent.requested === 'function')
-                icomponent.requested(new BouerEvent({ type: 'requested' }));
+            var requestedEvent = this.$addEvent('requested', componentElement, icomponent);
+            if (requestedEvent)
+                requestedEvent.emit();
             // Make or Add request
             this.request(icomponent.path, {
                 success: function (content) {
@@ -2099,11 +2057,11 @@
                         mComponents[$name] = component;
                 },
                 fail: function (error) {
-                    Logger.error(new Error("Failed to request <" + $name + "></" + $name + "> component with path “" + icomponent.path + "”."));
+                    Logger.error(("Failed to request <" + $name + "></" + $name + "> component with path “" + icomponent.path + "”."));
                     Logger.error(buildError(error));
                     if (typeof icomponent.failed !== 'function')
                         return;
-                    icomponent.failed(new BouerEvent({ type: 'failed' }));
+                    icomponent.failed(new CustomEvent('failed'));
                 }
             });
         };
@@ -2116,18 +2074,33 @@
             }
             return null;
         };
-        ComponentHandler.prototype.insert = function (element, component, data) {
+        /** Subscribe the hooks of the instance */
+        ComponentHandler.prototype.$addEvent = function (eventName, element, callbackSource) {
+            var callback = callbackSource[eventName];
+            if (typeof callback !== 'function')
+                return { emit: (function () { }) };
+            var emitter = this.eventHandler.on(eventName, function (evt) { return callback(evt); }, element).emit;
+            return {
+                emit: function () {
+                    emitter({
+                        eventName: eventName,
+                        attachedNode: element
+                    });
+                }
+            };
+        };
+        ComponentHandler.prototype.insert = function (componentElement, component, data) {
             var _this = this;
             var _a;
-            var $name = element.nodeName.toLowerCase();
-            var container = element.parentElement;
-            if (!element.isConnected || !container)
+            var $name = componentElement.nodeName.toLowerCase();
+            var container = componentElement.parentElement;
+            if (!componentElement.isConnected || !container)
                 return; //Logger.warn("Insert location of component <" + $name + "></" + $name + "> not found.");
             if (!component.isReady)
-                return Logger.error(new Error("The <" + $name + "></" + $name + "> component is not ready yet to be inserted."));
+                return Logger.error(("The <" + $name + "></" + $name + "> component is not ready yet to be inserted."));
             var elementContent = createEl('div', function (el) {
-                el.innerHTML = element.innerHTML;
-                element.innerHTML = "";
+                el.innerHTML = componentElement.innerHTML;
+                componentElement.innerHTML = "";
             }).build();
             // Component Creation
             if (((_a = component.keepAlive) !== null && _a !== void 0 ? _a : false) === false || isNull(component.el)) {
@@ -2146,26 +2119,27 @@
                         htmlSnippet.removeChild(style);
                     });
                     if (htmlSnippet.children.length === 0)
-                        return Logger.error(new SyntaxError("The component <" + $name + "></" + $name + "> " +
+                        return Logger.error(("The component <" + $name + "></" + $name + "> " +
                             "seems to be empty or it has not a root element. Example: <div></div>, to be included."));
                     if (htmlSnippet.children.length > 1)
-                        return Logger.error(new SyntaxError("The component <" + $name + "></" + $name + "> " +
+                        return Logger.error(("The component <" + $name + "></" + $name + "> " +
                             "seems to have multiple root element, it must have only one root."));
                     component.el = htmlSnippet.children[0];
+                    _this.$addEvent('created', component.el, component);
                     component.emit('created');
                 });
             }
             var rootElement = component.el;
             // tranfering the attributes
-            forEach(toArray(element.attributes), function (attr) {
-                element.removeAttribute(attr.name);
+            forEach(toArray(componentElement.attributes), function (attr) {
+                componentElement.removeAttribute(attr.name);
                 if (attr.nodeName === 'class')
-                    return element.classList.forEach(function (cls) {
+                    return componentElement.classList.forEach(function (cls) {
                         rootElement.classList.add(cls);
                     });
                 if (attr.nodeName === 'data') {
                     if (_this.delimiter.run(attr.value).length !== 0)
-                        return Logger.error(new SyntaxError("The “data” attribute cannot contain delimiter, " +
+                        return Logger.error(("The “data” attribute cannot contain delimiter, " +
                             "source element: <" + $name + "></" + $name + ">."));
                     var inputData_1 = {};
                     var mData = Extend.obj(data, { $this: data });
@@ -2181,7 +2155,7 @@
                         var mInputData_1 = IoC.Resolve('Evaluator')
                             .exec({ data: mData, expression: attr.value });
                         if (!isObject(mInputData_1))
-                            return Logger.error(new TypeError("Expected a valid Object Literal expression in “"
+                            return Logger.error(("Expected a valid Object Literal expression in “"
                                 + attr.nodeName + "” and got “" + attr.value + "”."));
                         // Adding all non-existing properties
                         forEach(Object.keys(mInputData_1), function (key) {
@@ -2197,8 +2171,9 @@
                 }
                 rootElement.attributes.setNamedItem(attr);
             });
+            this.$addEvent('beforeMount', component.el, component);
             component.emit('beforeMount');
-            container.replaceChild(rootElement, element);
+            container.replaceChild(rootElement, componentElement);
             var rootClassList = {};
             // Retrieving all the classes of the retu elements
             rootElement.classList.forEach(function (key) { return rootClassList[key] = true; });
@@ -2241,16 +2216,21 @@
                 try {
                     // Executing the mixed scripts
                     IoC.Resolve('Evaluator')
-                        .execRaw(scriptContent || '', component);
+                        .execRaw((scriptContent || ''), component);
+                    _this.$addEvent('mounted', component.el, component);
                     component.emit('mounted');
                     // TODO: Something between this two events
+                    _this.$addEvent('beforeLoad', component.el, component);
                     component.emit('beforeLoad');
                     IoC.Resolve('Compiler')
                         .compile({
                         data: Reactive.transform(component.data),
                         el: rootElement,
                         componentContent: elementContent,
-                        onDone: function () { return component.emit('loaded'); }
+                        onDone: function () {
+                            _this.$addEvent('loaded', component.el, component);
+                            component.emit('loaded');
+                        }
                     });
                     Observer.observe(container, function () {
                         if (rootElement.isConnected)
@@ -2259,7 +2239,7 @@
                     });
                 }
                 catch (error) {
-                    Logger.error(new Error("Error in <" + $name + "></" + $name + "> component."));
+                    Logger.error(("Error in <" + $name + "></" + $name + "> component."));
                     Logger.error(buildError(error));
                 }
             };
@@ -2285,23 +2265,22 @@
                     headers: { "Content-Type": 'text/plain' }
                 }).then(function (response) {
                     if (!response.ok)
-                        throw (new Error(response.statusText));
+                        throw ((response.statusText));
                     return response.text();
-                })
-                    .then(function (text) {
+                }).then(function (text) {
                     delete webRequestChecker[url];
                     // Adding the scripts according to the defined order
                     onlineScriptsContent[index] = text;
                     // if there are not web requests compile the element
                     if (Object.keys(webRequestChecker).length === 0)
                         return compile(Extend.array(onlineScriptsContent, localScriptsContent).join('\n\n'));
-                })
-                    .catch(function (error) {
+                }).catch(function (error) {
                     error.stack = "";
-                    Logger.error(new Error("Error loading the <script src=\"" + url + "\"></script> in " +
+                    Logger.error(("Error loading the <script src=\"" + url + "\"></script> in " +
                         "<" + $name + "></" + $name + "> component, remove it in order to be compiled."));
                     Logger.log(error);
-                    component.emit('failed');
+                    _this.$addEvent('failed', componentElement, component)
+                        .emit();
                 });
             });
         };
@@ -2429,7 +2408,6 @@
             this.events = [];
             this.bouer = bouer;
             this.evaluator = IoC.Resolve('Evaluator');
-            this.input = createEl('input').build();
             IoC.Register(this);
             this.cleanup();
         }
@@ -2439,21 +2417,20 @@
             var ownerElement = (node.ownerElement || node.parentNode);
             var nodeName = node.nodeName;
             if (isNull(ownerElement))
-                return Logger.error(new Error("Invalid ParentElement of “" + nodeName + "”"));
+                return Logger.error(("Invalid ParentElement of “" + nodeName + "”"));
             // <button on:submit.once.stopPropagation="times++"></button>
             var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
             var eventNameWithModifiers = nodeName.substr(Constants.on.length);
-            var modifiers = eventNameWithModifiers.split('.');
-            var eventName = modifiers[0];
-            modifiers.shift();
+            var modifiersList = eventNameWithModifiers.split('.');
+            var eventName = modifiersList[0];
+            modifiersList.shift();
             if (nodeValue === '')
-                return Logger.error(new Error("Expected an expression in the “" + nodeName + "” and got an <empty string>."));
+                return Logger.error(("Expected an expression in the “" + nodeName + "” and got an <empty string>."));
             connectNode(node, ownerElement);
             ownerElement.removeAttribute(nodeName);
-            var callback = function (evt, args) {
-                var isCallOnce = (modifiers.indexOf('once') !== -1);
+            var callback = function (evt) {
                 // Calling the modifiers
-                forEach(modifiers, function (modifier) {
+                forEach(modifiersList, function (modifier) {
                     forEach(Object.keys(evt), function (key) {
                         var fnModifier;
                         if (fnModifier = evt[key] && isFunction(fnModifier) &&
@@ -2461,13 +2438,9 @@
                             fnModifier();
                     });
                 });
-                var event = new BouerEvent({
-                    source: evt,
-                    type: evt.type
-                });
-                var mArguments = Extend.array(event, args);
+                var mArguments = [{ event: evt }];
                 var isResultFunction = _this.evaluator.exec({
-                    data: Extend.obj(data, { event: event }),
+                    data: data,
                     expression: nodeValue,
                     args: mArguments
                 });
@@ -2479,54 +2452,54 @@
                         Logger.error(buildError(error));
                     }
                 }
-                return isCallOnce;
             };
-            // Native Event Subscription
-            if (('on' + eventName) in this.input) {
-                var callbackNavite_1 = function (evt) {
-                    if (callback(evt, [])) // Returns isCallOnce boolean value
-                        ownerElement.removeEventListener(eventName, callbackNavite_1, false);
-                };
-                ownerElement.addEventListener(eventName, callbackNavite_1, false);
-            }
-            else {
-                this.on(eventName, callback, ownerElement);
-            }
+            var modifiers = {};
+            var addEventListenerOptions = ['capture', 'once', 'passive'];
+            forEach(modifiersList, function (md) {
+                md = md.toLocaleLowerCase();
+                if (addEventListenerOptions.indexOf(md) !== -1)
+                    modifiers[md] = true;
+            });
+            this.on(eventName, callback, ownerElement, modifiers);
         };
-        EventHandler.prototype.on = function (eventName, callback, attachedNode) {
+        EventHandler.prototype.on = function (eventName, callback, attachedNode, modifiers) {
+            var _this = this;
             var event = {
                 eventName: eventName,
-                callback: function (evt, args) { return callback(evt, args); },
-                attachedNode: attachedNode
+                callback: function (evt) { return callback.call(_this.bouer, evt); },
+                attachedNode: attachedNode,
+                emit: this.emit
             };
-            this.events.push(event);
+            if (attachedNode)
+                attachedNode.addEventListener(eventName, event.callback, modifiers || false);
+            else {
+                this.events.push(event);
+            }
             return event;
         };
-        EventHandler.prototype.off = function (eventName, callback) {
+        EventHandler.prototype.off = function (eventName, callback, attachedNode) {
+            if (attachedNode)
+                return attachedNode.removeEventListener(eventName, callback);
             var index = -1;
-            var event = this.events.find(function (evt, idx) {
+            this.events.find(function (evt, idx) {
                 if (evt.eventName === eventName && callback == evt.callback) {
                     index = idx;
                     return true;
                 }
             });
-            if (event)
-                this.events.splice(index, 1);
-            return event;
+            this.events.splice(index, 1);
         };
         EventHandler.prototype.emit = function (options) {
             var _this = this;
-            var eventName = options.eventName, mArguments = options.arguments;
+            var eventName = options.eventName, init = options.init, attachedNode = options.attachedNode;
+            var customEvent = new CustomEvent(eventName, init);
+            if (attachedNode)
+                return attachedNode.dispatchEvent(customEvent);
             forEach(this.events, function (event, index) {
                 var _a;
                 if (eventName !== event.eventName)
                     return;
-                if (!options.attachedNode && event.attachedNode !== options.attachedNode)
-                    return;
-                event.callback.call(_this.bouer, new BouerEvent({
-                    type: eventName,
-                    target: options.attachedNode
-                }), (mArguments || []));
+                event.callback.call(_this.bouer, customEvent);
                 if (((_a = options.once) !== null && _a !== void 0 ? _a : false) === true)
                     _this.events.splice(index, 1);
             });
@@ -2569,7 +2542,7 @@
                 return;
             var baseHref = base.attributes['href'];
             if (!baseHref)
-                return Logger.error(new Error("The href=\"/\" attribute is required in base element."));
+                return Logger.error(("The href=\"/\" attribute is required in base element."));
             this.base = baseHref.value;
             this.navigate(DOM.location.href);
             // Listening to the page navigation
@@ -2682,17 +2655,9 @@
                 var mInterceptors = _this.container[action];
                 if (!mInterceptors)
                     return Logger.log("There is not interceptor for “" + action + "”.");
-                var _loop_1 = function (index) {
-                    var interceptor = mInterceptors[index];
-                    interceptor(options, function () {
-                        index++;
-                    });
-                    out_index_1 = index;
-                };
-                var out_index_1;
                 for (var index = 0; index < mInterceptors.length; index++) {
-                    _loop_1(index);
-                    index = out_index_1;
+                    var interceptor = mInterceptors[index];
+                    interceptor(options);
                 }
             };
             this.register = function (action, callback) {
@@ -2726,11 +2691,11 @@
             this.interceptor = options.interceptor;
             Object.assign(this, options);
             if (isNull(selector) || trim(selector) === '')
-                throw Logger.error(new TypeError('Invalid selector provided to the instance.'));
+                throw Logger.error(('Invalid selector provided to the instance.'));
             var app = this;
             var el = DOM.querySelector(selector);
             if (!el)
-                throw Logger.error(new Error("Element with selector “" + selector + "” not found."));
+                throw Logger.error(("Element with selector “" + selector + "” not found."));
             var dataStore = new DataStore();
             new Evaluator(this);
             new CommentHandler(this);
@@ -2766,7 +2731,7 @@
                 get: function (key) { return key ? dataStore.data[key] : dataStore.data; },
                 set: function (key, data, toReactive) {
                     if (key in dataStore.data)
-                        return Logger.log(new Error("There is already a data stored with this key “" + key + "”."));
+                        return Logger.log(("There is already a data stored with this key “" + key + "”."));
                     if ((toReactive !== null && toReactive !== void 0 ? toReactive : false) === true)
                         Reactive.transform(data);
                     return DataStore.set('data', key, data);
@@ -2826,11 +2791,15 @@
              */
             get: function () {
                 var mRefs = {};
-                forEach(toArray(this.el.querySelectorAll(Constants.ref)), function (ref) {
+                forEach(toArray(this.el.querySelectorAll("[" + Constants.ref + "]")), function (ref) {
                     var mRef = ref.attributes[Constants.ref];
-                    var value = trim(mRef.value);
-                    if (value === '')
-                        return Logger.error(new SyntaxError("Expected an expression in “" + ref.name + "” and got “" + ref.value + "”."));
+                    var value = trim(mRef.value) || ref.name || '';
+                    if (value === '') {
+                        return Logger.error("Expected an expression in “" + ref.name +
+                            "” or at least “name” attribute to combine with “" + ref.name + "”.");
+                    }
+                    if (value in mRefs)
+                        return Logger.warn("The key “" + value + "” in “" + ref.name + "” is taken, choose another key.", ref);
                     mRefs[value] = ref;
                 });
                 return mRefs;
@@ -2867,6 +2836,9 @@
         Bouer.prototype.watch = function (propertyName, callback, targetObject) {
             return IoC.Resolve('Binder').watch(propertyName, callback, targetObject);
         };
+        Bouer.prototype.on = function () { };
+        Bouer.prototype.off = function () { };
+        Bouer.prototype.emit = function () { };
         // Lifecycle Hooks
         Bouer.prototype.beforeMount = function (element, bouer) { };
         Bouer.prototype.mounted = function (element, bouer) { };

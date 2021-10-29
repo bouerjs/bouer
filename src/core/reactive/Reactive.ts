@@ -44,7 +44,7 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 
     if (isObject(value) || Array.isArray(value)) {
       if ((typeof this.propertyValue) !== (typeof value))
-        return Logger.error(new TypeError("Cannot set “" + (typeof value) + "” in “" +
+        return Logger.error(("Cannot set “" + (typeof value) + "” in “" +
           this.propertyName + "” property."));
 
       if (Array.isArray(value)) {
@@ -147,10 +147,10 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 
   static setData(inputData: object, targetObject?: object) {
     if (!isObject(inputData))
-      return Logger.error(new TypeError('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".'));
+      return Logger.error(('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".'));
 
     if (isObject(targetObject) && targetObject !== null)
-      return Logger.error(new TypeError('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".'));
+      return Logger.error(('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".'));
 
     // Transforming the input
     Reactive.transform(inputData);

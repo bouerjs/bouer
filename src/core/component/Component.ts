@@ -1,3 +1,4 @@
+import IoC from "../../shared/helpers/IoC";
 import UriHandler from "../../shared/helpers/UriHandler";
 import {
   DOM,
@@ -10,9 +11,10 @@ import Logger from "../../shared/logger/Logger";
 import dynamic from "../../types/dynamic";
 import IComponent from "../../types/IComponent";
 import ILifeCycleHooks from "../../types/ILifeCycleHooks";
-import BouerEvent from "../event/BouerEvent";
+import EventHandler, { EventSubscription } from "../event/EventHandler";
 import Bouer from "../instance/Bouer";
 import Reactive from "../reactive/Reactive";
+import ComponentHandler from "./ComponentHandler";
 
 export default class Component implements IComponent {
   name: string
@@ -31,7 +33,7 @@ export default class Component implements IComponent {
   scripts: Array<HTMLScriptElement> = [];
   styles: Array<HTMLStyleElement | HTMLLinkElement> = [];
   // Store temporarily this component UI orders
-  events: any = {};
+  events: EventSubscription[] = [];
 
   public get isReady() {
     return !isNull(this.template);
@@ -61,12 +63,15 @@ export default class Component implements IComponent {
   destroy() {
     if (!this.el) return false;
     this.emit('beforeDestroy');
+
     let container = this.el.parentElement;
     if (container) container.removeChild(this.el) !== null;
+
     this.emit('destroyed');
 
     // Destroying all the events attached to the this instance
-    this.events = {};
+    forEach(this.events, evt => this.off((evt.eventName as any), evt.callback));
+    this.events = [];
 
     forEach(this.styles, style =>
       forEach(toArray(DOM.head.children), item => {
@@ -79,33 +84,23 @@ export default class Component implements IComponent {
     return new UriHandler().params(this.route);
   }
 
-  emit<TKey extends keyof ILifeCycleHooks>(eventName: TKey, ...params: any[]) {
-    const mThis = this as dynamic;
-    if (eventName in mThis && typeof mThis[eventName] === 'function')
-      mThis[eventName](new BouerEvent({ type: eventName, targert: this }));
-
-    // Firing all subscribed events
-    const events = this.events[eventName];
-    if (!events) return false;
-    forEach(events, (event: (event: BouerEvent, ...params: any[]) => void) =>
-      event(new BouerEvent({ type: eventName }), ...params));
-    return true;
+  emit<TKey extends keyof ILifeCycleHooks>(eventName: TKey, init?: CustomEventInit) {
+    const eventHandler = IoC.Resolve<EventHandler>('EventHandler')!;
+    eventHandler.emit({
+      eventName: eventName,
+      attachedNode: this.el!,
+      init: init
+    })
   }
 
-  on<TKey extends keyof ILifeCycleHooks>(eventName: TKey, callback: (event: BouerEvent, ...params: any[]) => void) {
-    if (!this.events[eventName])
-      this.events[eventName] = [];
-    this.events[eventName].push(callback);
-    return {
-      eventName,
-      callback
-    };
+  on<TKey extends keyof ILifeCycleHooks>(eventName: TKey, callback: (event: CustomEvent) => void) {
+    const eventHandler = IoC.Resolve<EventHandler>('EventHandler')!;
+    const evt = eventHandler.on(eventName, callback as any, this.el!);
+    this.events.push(evt);
   }
 
-  off<TKey extends keyof ILifeCycleHooks>(eventName: TKey, callback: (event: BouerEvent, ...params: any[]) => void) {
-    if (!this.events[eventName]) return false;
-    const eventIndex = this.events[eventName].indexOf(callback);
-    this.events[eventName].splice(eventIndex, 1);
-    return true;
+  off<TKey extends keyof ILifeCycleHooks>(eventName: TKey, callback: (event: CustomEvent) => void) {
+    const eventHandler = IoC.Resolve<EventHandler>('EventHandler')!;
+    eventHandler.on(eventName, callback as any, this.el!);
   }
 }

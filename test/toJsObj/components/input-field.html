@@ -6,13 +6,13 @@
 <script>
   let watch;
 
-  this.on('loaded', (evt, el) => {
+  this.on('loaded', (evt) => {
     watch = this.bouer.watch('value', (v) => {
       this.data.enableWarn = (v === '');
     }, this.data);
   });
 
-  this.on('destroyed', (params) => {
+  this.on('destroyed', () => {
     if (watch) watch.destroy();
   });
 

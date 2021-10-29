@@ -58,9 +58,9 @@ export default class Directive {
     return (node as any).ownerElement || node.parentNode;
   }
 
-  errorMsgEmptyNode = (node: Node) => new SyntaxError("Expected an expression in “" + node.nodeName +
+  errorMsgEmptyNode = (node: Node) => ("Expected an expression in “" + node.nodeName +
     "” and got an <empty string>.");
-  errorMsgNodeValue = (node: Node) => new SyntaxError("Expected an expression in “" + node.nodeName +
+  errorMsgNodeValue = (node: Node) => ("Expected an expression in “" + node.nodeName +
     "” and got “" + (node.nodeValue ?? '') + "”.");
 
   // Directives
@@ -211,7 +211,7 @@ export default class Directive {
       return Logger.error(this.errorMsgEmptyNode(node));
 
     if (!nodeValue.includes(' of ') && !nodeValue.includes(' in '))
-      return Logger.error(new SyntaxError("Expected a valid “for” expression in “" + nodeName + "” and got “" + nodeValue + "”."
+      return Logger.error(("Expected a valid “for” expression in “" + nodeName + "” and got “" + nodeValue + "”."
         + "\nValid: e-for=\"item of items\"."));
 
     // Binding the e-for if got delimiters
@@ -237,7 +237,7 @@ export default class Directive {
       let filterKeys = filterConfigParts[2];
 
       if (isNull(filterValue) || filterValue === '') {
-        Logger.error(new SyntaxError("Invalid filter-value in “" + nodeName + "” with “" + nodeValue + "” expression."));
+        Logger.error(("Invalid filter-value in “" + nodeName + "” with “" + nodeValue + "” expression."));
         return list;
       }
 
@@ -252,7 +252,7 @@ export default class Directive {
       } else {
         // filter:search:name
         if (isNull(filterKeys) || filterKeys === '') {
-          Logger.error(new SyntaxError("Invalid filter-keys in “" + nodeName + "” with “" + nodeValue + "” expression, " +
+          Logger.error(("Invalid filter-keys in “" + nodeName + "” with “" + nodeValue + "” expression, " +
             "at least one filter-key to be provided."));
           return list;
         }
@@ -323,21 +323,19 @@ export default class Directive {
       let forExpression = filters[0].replace(/\(|\)/g, '');
       filters.shift();
 
+      // for types:
+      // e-for="item of items",  e-for="(item, index) of items"
+      // e-for="key in object", e-for="(key, value) in object"
+      // e-for="(key, value, index) in object"
+
       let forSeparator = ' of ';
       let forParts = forExpression.split(forSeparator);
       if (!(forParts.length > 1))
         forParts = forExpression.split(forSeparator = ' in ');
 
-      let leftHand = forParts[0];
-      let rightHand = forParts[1];
-      let leftHandParts = leftHand.split(',').map(x => trim(x));
-      // Preparing variables declaration
-      // Example: let item; | let item, index=0;
-      let leftHandDeclaration = 'let ' + leftHand + (leftHand.includes(',') ? '=0' : '') + ';';
-
-      const hasIndex = leftHandParts.length > 1;
-      forExpression = [(hasIndex ? leftHandParts[0] : leftHand), '_flt(' + rightHand + ')']
-        .join(forSeparator);
+      const leftHand = forParts[0];
+      const rightHand = forParts[1];
+      const leftHandParts = leftHand.split(',').map(x => trim(x));
 
       // Cleaning the
       forEach(listedItems, item => {
@@ -346,18 +344,28 @@ export default class Directive {
       });
       listedItems = [];
 
+      const source = this.evaluator.exec({ data: data, expression: rightHand });
+      const isForOf = trim(forSeparator) === 'of';
+      let iterable = isForOf ? rightHand : "Object.keys(" + rightHand + ")";
+
+
       this.evaluator.exec({
         data: data,
         isReturn: false,
-        expression: leftHandDeclaration +
-          'for(' + forExpression + '){ ' + ' _each(' + leftHand + (hasIndex ? '++' : '') + ')}',
+        expression: "_for(" + iterable + ", ($$itm, $$idx) => { _each($$itm, $$idx); })",
         aditional: {
+          _for: forEach,
           _each: (item: any, index: any) => {
-            let forData: any = Extend.obj(data);
-            forData[leftHandParts[0]] = item;
-            if (hasIndex) forData[leftHandParts[1]] = index;
+            const forData: any = Extend.obj(data);
+            const _item_key = leftHandParts[0];
+            const _index_or_value = leftHandParts[1] || 'index_or_value';
+            const _index = leftHandParts[2] || 'for_in_index';
 
-            let clonedItem = container.insertBefore(forItem.cloneNode(true) as Element, comment);
+            forData[_item_key] = item;
+            forData[_index_or_value] = isForOf ? index : source[item];
+            forData[_index] = index;
+
+            const clonedItem = container.insertBefore(forItem.cloneNode(true) as Element, comment);
             this.compiler.compile({
               el: clonedItem,
               data: forData
@@ -377,7 +385,7 @@ export default class Directive {
               const filterConfigParts = filterConfig.split(':').map(item => trim(item));
 
               if (filterConfigParts.length == 1) {
-                Logger.error(new SyntaxError("Invalid “" + nodeName + "” filter expression “" + nodeValue +
+                Logger.error(("Invalid “" + nodeName + "” filter expression “" + nodeValue +
                   "”, at least a filter-value and filter-keys, or a filter-function must be provided"));
               } else {
                 listCopy = filter(listCopy, filterConfigParts);
@@ -389,7 +397,7 @@ export default class Directive {
             if (orderConfig) {
               const orderConfigParts = orderConfig.split(':').map(item => trim(item));
               if (orderConfigParts.length == 1) {
-                Logger.error(new SyntaxError("Invalid “" + nodeName + "” order  expression “" + nodeValue +
+                Logger.error(("Invalid “" + nodeName + "” order  expression “" + nodeValue +
                   "”, at least the order type must be provided"));
               } else {
                 listCopy = order(listCopy, orderConfigParts[1], orderConfigParts[2]);
@@ -422,7 +430,7 @@ export default class Directive {
     });
 
     if (!isObject(inputData))
-      return Logger.error(new TypeError("Expected a valid Object Literal expression in “"
+      return Logger.error(("Expected a valid Object Literal expression in “"
         + node.nodeName + "” and got “" + nodeValue + "”."));
 
     this.bouer.setData(inputData, data);
@@ -467,8 +475,8 @@ export default class Directive {
     let exec = (obj: object) => { };
 
     const errorInvalidValue = (node: Node) =>
-      new TypeError("Invalid value, expected an Object/Object Literal in “" + node.nodeName
-        + "” and got “" + (node.nodeValue ?? '') + "”.");
+    ("Invalid value, expected an Object/Object Literal in “" + node.nodeName
+      + "” and got “" + (node.nodeValue ?? '') + "”.");
 
     if (nodeValue === '')
       return Logger.error(errorInvalidValue(node));
@@ -522,7 +530,7 @@ export default class Directive {
     let inputData: dynamic = {};
 
     if (hasDelimiter)
-      return Logger.error(new SyntaxError("The “data” attribute cannot contain delimiter."));
+      return Logger.error(("The “data” attribute cannot contain delimiter."));
 
     ownerElement.removeAttribute(node.nodeName);
 
@@ -540,7 +548,7 @@ export default class Directive {
       const mInputData = this.evaluator.exec({ data: mData, expression: nodeValue });
 
       if (!isObject(mInputData))
-        return Logger.error(new TypeError("Expected a valid Object Literal expression in “" + node.nodeName +
+        return Logger.error(("Expected a valid Object Literal expression in “" + node.nodeName +
           "” and got “" + nodeValue + "”."));
 
       // Adding all non-existing properties
@@ -664,7 +672,7 @@ export default class Directive {
     let exec = () => { };
 
     if (!nodeValue.includes(' of ') && !nodeValue.includes(' as '))
-      return Logger.error(new SyntaxError("Expected a valid “for” expression in “" + nodeName
+      return Logger.error(("Expected a valid “for” expression in “" + nodeName
         + "” and got “" + nodeValue + "”." + "\nValid: e-req=\"item of [url]\"."));
 
     // If it's list request type, connect ownerNode
@@ -690,11 +698,13 @@ export default class Directive {
       if (attr) this.eventHandler.handle(attr, data);
 
       return {
-        emit: (args: any[]) => {
+        emit: (detailObj?: dynamic) => {
           this.eventHandler.emit({
             attachedNode: ownerElement,
             eventName: eventName,
-            arguments: args,
+            init: {
+              detail: detailObj
+            },
           })
         }
       };
@@ -721,7 +731,7 @@ export default class Directive {
       let dataKey = node.nodeName.split(':')[1];
       dataKey = dataKey ? dataKey.replace(/\[|\]/g, '') : '';
 
-      requestEvent.emit([]);
+      requestEvent.emit();
 
       interceptor.run('req', {
         http: http,
@@ -729,24 +739,26 @@ export default class Directive {
         path: reqParts[1].replace(/\[|\]/g, ''),
         success: (response: { data: any, [key: string]: any }) => {
           if (!response)
-            return Logger.error(new TypeError("the “success” parameter must be an object containing " +
+            return Logger.error(("the “success” parameter must be an object containing " +
               "“data” property. Example: { data: {} | [] }"));
 
           if (!("data" in response))
-            return Logger.error(new SyntaxError("the “success” parameter must be contain the “data” " +
+            return Logger.error(("the “success” parameter must be contain the “data” " +
               "property. Example: { data: {} | [] }"));
 
           if ((mReqSeparator === 'of' && !Array.isArray(response.data)))
-            return Logger.error(new TypeError("Using e-ref=\"... “of” ...\" the response must be a " +
+            return Logger.error(("Using e-ref=\"... “of” ...\" the response must be a " +
               "list of items, and got “" + typeof response.data + "”."));
 
           if ((mReqSeparator === 'as' && !(typeof response.data === 'object')))
-            return Logger.error(new TypeError("Using e-ref=\"... “as” ...\" the response must be a list " +
+            return Logger.error(("Using e-ref=\"... “as” ...\" the response must be a list " +
               "of items, and got “" + typeof response.data + "”."));
 
           Reactive.transform(response);
 
-          responseEvent.emit([response]);
+          responseEvent.emit({
+            response: response
+          });
 
           // Handle Content Insert/Update
           if (!('data' in localDataStore)) {
@@ -769,7 +781,9 @@ export default class Directive {
                 data: Extend.obj({ [variable]: response.data }, data),
                 onDone: (_, inData) => {
                   subcribeEvent(Constants.events.compile)
-                    .emit([inData]);
+                    .emit({
+                      data: inData
+                    });
                 }
               });
             case 'of':
@@ -781,13 +795,17 @@ export default class Directive {
                 data: Extend.obj({ _response_: response.data }, data),
                 onDone: (_, inData) => {
                   subcribeEvent(Constants.events.compile)
-                    .emit([inData]);
+                    .emit({
+                      data: inData
+                    });
                 }
               });
           }
         },
-        fail: (error) => failEvent.emit([error]),
-        done: () => doneEvent.emit([])
+        fail: (error) => failEvent.emit({
+          error: error
+        }),
+        done: () => doneEvent.emit()
       });
     })();
   }

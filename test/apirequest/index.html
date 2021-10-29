@@ -40,21 +40,21 @@
 
         // Methods
         requested: function (evt) {
-          console.log(evt.type);
+          // console.log(evt);
         },
-        responded: function (evt, data) {
-          console.log(evt.type, data);
+        responded: function (evt) {
+          console.log(evt);
         },
-        failed: function (evt, error) {
-          console.log(evt.type, error);
+        failed: function (evt) {
+          // console.log(evt);
         },
         done: function (evt) {
-          console.log(evt.type);
+          // console.log(evt);
         },
       },
       interceptor: (intercep, app) => {
 
-        intercep('req', options => {
+        intercep('req', (options, next) => {
           const http = options.http;
           const url = options.path;
           const type = options.type;

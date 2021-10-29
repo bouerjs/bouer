@@ -3,7 +3,6 @@ import Logger from "../../shared/logger/Logger";
 import Component from "./Component";
 import IComponent from "../../types/IComponent";
 import Extend from "../../shared/helpers/Extend";
-import BouerEvent from "../event/BouerEvent";
 import dynamic from "../../types/dynamic";
 import Routing from "../routing/Routing";
 import IoC from "../../shared/helpers/IoC";
@@ -31,6 +30,7 @@ import {
 } from "../../shared/helpers/Utils";
 import ReactiveEvent from "../event/ReactiveEvent";
 import Reactive from "../reactive/Reactive";
+import EventHandler from "../event/EventHandler";
 
 
 export default class ComponentHandler {
@@ -39,17 +39,19 @@ export default class ComponentHandler {
   // Handle all the components web requests to avoid multiple requests
   private requests: dynamic = {};
   delimiter: DelimiterHandler;
+  eventHandler: EventHandler;
 
   constructor(bouer: Bouer, components?: IComponent[]) {
     IoC.Register(this)!;
 
     this.bouer = bouer;
     this.delimiter = IoC.Resolve('DelimiterHandler')!;
+    this.eventHandler = IoC.Resolve('EventHandler')!;
 
     if (components) {
       if (!DOM.head.querySelector('base'))
         Logger.warn("“<base href=\"/\" />” element not found, we advise to set it " +
-          "as first element of “<head></head>” to avoid errors when url have extension (.html)."+
+          "as first element of “<head></head>” to avoid errors when url have extension (.html)." +
           "\n@see: https://www.w3schools.com/tags/tag_base.asp");
 
       this.prepare(components);
@@ -71,7 +73,7 @@ export default class ComponentHandler {
     const urlPath = urlCombine(urlResolver(anchor.baseURI).baseURI, url);
     http(urlPath, { headers: { 'Content-Type': 'text/plain' } })
       .then(response => {
-        if (!response.ok) throw (new Error(response.statusText));
+        if (!response.ok) throw ((response.statusText));
         return response.text();
       })
       .then(content => {
@@ -136,7 +138,7 @@ export default class ComponentHandler {
     const mComponents = this.components as dynamic;
     let hasComponent = mComponents[$name];
     if (!hasComponent)
-      return Logger.error(new Error("No component with name “" + $name + "” registered."));
+      return Logger.error(("No component with name “" + $name + "” registered."));
 
     const icomponent = (hasComponent as IComponent);
     const mData = Extend.obj(data, { $this: data });
@@ -155,9 +157,8 @@ export default class ComponentHandler {
       return;
     }
 
-    if (typeof icomponent.requested === 'function')
-      icomponent.requested(new BouerEvent({ type: 'requested' }));
-
+    const requestedEvent = this.$addEvent('requested', componentElement, icomponent);
+    if (requestedEvent) requestedEvent.emit();
     // Make or Add request
     this.request(icomponent.path!, {
       success: content => {
@@ -174,10 +175,11 @@ export default class ComponentHandler {
           mComponents[$name] = component;
       },
       fail: (error) => {
-        Logger.error(new Error("Failed to request <" + $name + "></" + $name + "> component with path “" + icomponent.path + "”."));
+        Logger.error(("Failed to request <" + $name + "></" + $name + "> component with path “" + icomponent.path + "”."));
         Logger.error(buildError(error));
+
         if (typeof icomponent.failed !== 'function') return;
-        icomponent.failed(new BouerEvent({ type: 'failed' }));
+        icomponent.failed(new CustomEvent('failed'));
       }
     });
   }
@@ -191,18 +193,34 @@ export default class ComponentHandler {
     return null;
   }
 
-  private insert(element: Element, component: Component, data: object) {
-    const $name = element.nodeName.toLowerCase();
-    const container = element.parentElement;
-    if (!element.isConnected || !container)
+  /** Subscribe the hooks of the instance */
+  $addEvent(eventName: string, element: Element, callbackSource: any) {
+    const callback = callbackSource[eventName];
+    if (typeof callback !== 'function') return { emit: (() => { }) }
+
+    const emitter = this.eventHandler.on(eventName, evt => callback(evt), element).emit;
+    return {
+      emit: () => {
+        emitter({
+          eventName: eventName,
+          attachedNode: element
+        })
+      }
+    }
+  }
+
+  private insert(componentElement: Element, component: Component, data: object) {
+    const $name = componentElement.nodeName.toLowerCase();
+    const container = componentElement.parentElement;
+    if (!componentElement.isConnected || !container)
       return; //Logger.warn("Insert location of component <" + $name + "></" + $name + "> not found.");
 
     if (!component.isReady)
-      return Logger.error(new Error("The <" + $name + "></" + $name + "> component is not ready yet to be inserted."));
+      return Logger.error(("The <" + $name + "></" + $name + "> component is not ready yet to be inserted."));
 
     const elementContent = createEl('div', el => {
-      el.innerHTML = element.innerHTML
-      element.innerHTML = "";
+      el.innerHTML = componentElement.innerHTML
+      componentElement.innerHTML = "";
     }).build();
 
     // Component Creation
@@ -227,30 +245,32 @@ export default class ComponentHandler {
           });
 
         if (htmlSnippet.children.length === 0)
-          return Logger.error(new SyntaxError("The component <" + $name + "></" + $name + "> " +
+          return Logger.error(("The component <" + $name + "></" + $name + "> " +
             "seems to be empty or it has not a root element. Example: <div></div>, to be included."));
 
         if (htmlSnippet.children.length > 1)
-          return Logger.error(new SyntaxError("The component <" + $name + "></" + $name + "> " +
+          return Logger.error(("The component <" + $name + "></" + $name + "> " +
             "seems to have multiple root element, it must have only one root."));
 
         component.el = htmlSnippet.children[0];
+
+        this.$addEvent('created', component.el!, component)
         component.emit('created');
       });
     }
 
     let rootElement = component.el!;
     // tranfering the attributes
-    forEach(toArray(element.attributes), (attr: Attr) => {
-      element.removeAttribute(attr.name);
+    forEach(toArray(componentElement.attributes), (attr: Attr) => {
+      componentElement.removeAttribute(attr.name);
       if (attr.nodeName === 'class')
-        return element.classList.forEach(cls => {
+        return componentElement.classList.forEach(cls => {
           rootElement.classList.add(cls);
         });
 
       if (attr.nodeName === 'data') {
         if (this.delimiter.run(attr.value).length !== 0)
-          return Logger.error(new SyntaxError("The “data” attribute cannot contain delimiter, " +
+          return Logger.error(("The “data” attribute cannot contain delimiter, " +
             "source element: <" + $name + "></" + $name + ">."));
 
         let inputData: dynamic = {};
@@ -270,7 +290,7 @@ export default class ComponentHandler {
             .exec({ data: mData, expression: attr.value });
 
           if (!isObject(mInputData))
-            return Logger.error(new TypeError("Expected a valid Object Literal expression in “"
+            return Logger.error(("Expected a valid Object Literal expression in “"
               + attr.nodeName + "” and got “" + attr.value + "”."));
 
           // Adding all non-existing properties
@@ -291,9 +311,10 @@ export default class ComponentHandler {
       rootElement.attributes.setNamedItem(attr);
     });
 
+    this.$addEvent('beforeMount', component.el!, component)
     component.emit('beforeMount');
 
-    container.replaceChild(rootElement, element);
+    container.replaceChild(rootElement, componentElement);
 
     let rootClassList: any = {};
     // Retrieving all the classes of the retu elements
@@ -339,18 +360,25 @@ export default class ComponentHandler {
       try {
         // Executing the mixed scripts
         IoC.Resolve<Evaluator>('Evaluator')!
-          .execRaw(scriptContent || '', component);
+          .execRaw((scriptContent || ''), component);
+
+        this.$addEvent('mounted', component.el!, component);
         component.emit('mounted');
 
         // TODO: Something between this two events
 
+        this.$addEvent('beforeLoad', component.el!, component)
         component.emit('beforeLoad');
+
         IoC.Resolve<Compiler>('Compiler')!
           .compile({
             data: Reactive.transform(component.data),
             el: rootElement,
             componentContent: elementContent,
-            onDone: () => component.emit('loaded')
+            onDone: () => {
+              this.$addEvent('loaded', component.el!, component);
+              component.emit('loaded');
+            }
           });
 
         Observer.observe(container, () => {
@@ -358,7 +386,7 @@ export default class ComponentHandler {
           component.destroy();
         });
       } catch (error) {
-        Logger.error(new Error("Error in <" + $name + "></" + $name + "> component."));
+        Logger.error(("Error in <" + $name + "></" + $name + "> component."));
         Logger.error(buildError(error));
       }
     }
@@ -391,25 +419,25 @@ export default class ComponentHandler {
       http(url, {
         headers: { "Content-Type": 'text/plain' }
       }).then(response => {
-        if (!response.ok) throw (new Error(response.statusText));
+        if (!response.ok) throw ((response.statusText));
         return response.text();
-      })
-        .then(text => {
-          delete webRequestChecker[url];
-          // Adding the scripts according to the defined order
-          onlineScriptsContent[index] = text;
+      }).then(text => {
+        delete webRequestChecker[url];
+        // Adding the scripts according to the defined order
+        onlineScriptsContent[index] = text;
 
-          // if there are not web requests compile the element
-          if (Object.keys(webRequestChecker).length === 0)
-            return compile(Extend.array(onlineScriptsContent, localScriptsContent).join('\n\n'));
-        })
-        .catch(error => {
-          error.stack = "";
-          Logger.error(new Error("Error loading the <script src=\"" + url + "\"></script> in " +
-            "<" + $name + "></" + $name + "> component, remove it in order to be compiled."));
-          Logger.log(error);
-          component.emit('failed');
-        });
+        // if there are not web requests compile the element
+        if (Object.keys(webRequestChecker).length === 0)
+          return compile(Extend.array(onlineScriptsContent, localScriptsContent).join('\n\n'));
+      }).catch(error => {
+        error.stack = "";
+        Logger.error(("Error loading the <script src=\"" + url + "\"></script> in " +
+          "<" + $name + "></" + $name + "> component, remove it in order to be compiled."));
+        Logger.log(error);
+
+        this.$addEvent('failed', componentElement, (component as any['failed']))
+          .emit();
+      });
     });
   }
 }

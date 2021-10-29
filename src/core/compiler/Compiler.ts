@@ -110,6 +110,10 @@ export default class Compiler {
         if (Constants.wait in node.attributes)
           return this.directive.wait((node.attributes as any)[Constants.wait]);
 
+        // <component></component>
+        if (this.component.check(node.localName))
+          return this.component.order(node, data);
+
         // e-for="..." directive
         if (Constants.for in node.attributes)
           return this.directive.for((node.attributes as any)[Constants.for], data);
@@ -131,10 +135,6 @@ export default class Compiler {
         if ((reqNode = (node.attributes as any)[Constants.req]) ||
           (reqNode = toArray(node.attributes).find(attr => Constants.check(attr, Constants.req))))
           return this.directive.req(reqNode, data);
-
-        // <component></component>
-        if (this.component.check(node.localName))
-          return this.component.order(node, data);
 
         // data="..." | data:[id]="..." directive
         let dataNode: any = null;

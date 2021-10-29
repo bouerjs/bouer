@@ -48,7 +48,7 @@ export default class Bouer implements IBouer {
   interceptor?: (
     intercept: (
       action: string,
-      callback: (context: IInterceptor, next: () => void) => void
+      callback: (context: IInterceptor) => void
     ) => void,
     app: Bouer
   ) => void;
@@ -142,12 +142,12 @@ export default class Bouer implements IBouer {
     Object.assign(this, options);
 
     if (isNull(selector) || trim(selector) === '')
-      throw Logger.error(new TypeError('Invalid selector provided to the instance.'));
+      throw Logger.error(('Invalid selector provided to the instance.'));
 
     const app = this;
     const el = DOM.querySelector(selector);
 
-    if (!el) throw Logger.error(new Error("Element with selector “" + selector + "” not found."));
+    if (!el) throw Logger.error(("Element with selector “" + selector + "” not found."));
 
     const dataStore = new DataStore();
     new Evaluator(this);
@@ -192,7 +192,7 @@ export default class Bouer implements IBouer {
       get: key => key ? dataStore.data[key] : dataStore.data,
       set: (key, data, toReactive) => {
         if (key in dataStore.data)
-          return Logger.log(new Error("There is already a data stored with this key “" + key + "”."));
+          return Logger.log(("There is already a data stored with this key “" + key + "”."));
 
         if ((toReactive ?? false) === true)
           Reactive.transform(data);
@@ -259,12 +259,17 @@ export default class Bouer implements IBouer {
    */
   get refs(): dynamic {
     const mRefs: dynamic = {};
-    forEach(toArray(this.el.querySelectorAll(Constants.ref)), (ref: any) => {
+    forEach(toArray(this.el.querySelectorAll("[" + Constants.ref + "]")), (ref: any) => {
       const mRef = ref.attributes[Constants.ref] as Attr;
-      const value = trim(mRef.value);
+      let value = trim(mRef.value) || ref.name || '';
 
-      if (value === '')
-        return Logger.error(new SyntaxError("Expected an expression in “" + ref.name + "” and got “" + ref.value + "”."));
+      if (value === '') {
+        return Logger.error("Expected an expression in “" + ref.name +
+          "” or at least “name” attribute to combine with “" + ref.name + "”.");
+      }
+
+      if (value in mRefs)
+        return Logger.warn("The key “" + value + "” in “" + ref.name + "” is taken, choose another key.", ref);
 
       mRefs[value] = ref;
     });
@@ -314,6 +319,10 @@ export default class Bouer implements IBouer {
   watch(propertyName: string, callback: watchCallback, targetObject?: object) {
     return IoC.Resolve<Binder>('Binder')!.watch(propertyName, callback, targetObject);
   }
+
+  on() { }
+  off() { }
+  emit() { }
 
   // Lifecycle Hooks
   beforeMount(element: Element, bouer: Bouer) { }

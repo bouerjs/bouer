@@ -30,7 +30,7 @@ export default class Routing {
     if (!base) return;
     const baseHref = (base.attributes as any)['href'];
     if (!baseHref)
-      return Logger.error(new Error("The href=\"/\" attribute is required in base element."));
+      return Logger.error(("The href=\"/\" attribute is required in base element."));
 
     this.base = baseHref.value;
     this.navigate(DOM.location.href);

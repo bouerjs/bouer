@@ -1,30 +1,28 @@
-import BouerEvent from "../core/event/BouerEvent";
-
 export default interface ILifeCycleHooks {
   /** The hook that will be called when the component is requested */
-  requested?: (event: BouerEvent) => void;
+  requested?: (event: CustomEvent) => void;
 
   /** The hook that will be called when the component is created */
-  created?: (event: BouerEvent) => void;
+  created?: (event: CustomEvent) => void;
 
   /** The hook that will be called before the component is mounted */
-  beforeMount?: (event: BouerEvent) => void;
+  beforeMount?: (event: CustomEvent) => void;
 
   /** The hook that will be called after the component is mounted */
-  mounted?: (event: BouerEvent) => void;
+  mounted?: (event: CustomEvent) => void;
 
   /** The hook that will be called before the component is loaded */
-  beforeLoad?: (event: BouerEvent) => void;
+  beforeLoad?: (event: CustomEvent) => void;
 
   /** The hook that will be called after the component is loaded (Compiled) */
-  loaded?: (event: BouerEvent) => void;
+  loaded?: (event: CustomEvent) => void;
 
   /** The hook that will be called before the component is destroyed */
-  beforeDestroy?: (event: BouerEvent) => void;
+  beforeDestroy?: (event: CustomEvent) => void;
 
   /** The hook that will be called after the component is destroyed */
-  destroyed?: (event: BouerEvent) => void;
+  destroyed?: (event: CustomEvent) => void;
 
   /** The hook that will be called after the component request is failed */
-  failed?: (event: BouerEvent) => void;
+  failed?: (event: CustomEvent) => void;
 }

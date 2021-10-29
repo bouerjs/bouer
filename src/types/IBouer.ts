@@ -1,5 +1,6 @@
 import Component from "../core/component/Component";
 import Bouer from "../core/instance/Bouer";
+import delimiter from "./delimiter";
 import dynamic from "./dynamic";
 import IBouerConfig from "./IBouerConfig";
 import IComponent from "./IComponent";
@@ -21,11 +22,14 @@ export default interface IBouer {
   /** The dependencies of the instance */
   dependencies?: dynamic,
 
+  // /** Apeends delimiters to the instance */
+  // delimiters?: delimiter[],
+
   /** Middlewares that will be used in the application */
   interceptor?: (
     intercept: (
       action: string,
-      callback: (context: IInterceptor, next: () => void) => void
+      callback: (context: IInterceptor) => void
     ) => void,
     app: Bouer
   ) => void;

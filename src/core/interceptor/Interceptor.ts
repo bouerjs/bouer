@@ -14,15 +14,14 @@ export default class Interceptor {
     const mInterceptors = this.container[action];
     if (!mInterceptors) return Logger.log("There is not interceptor for “" + action + "”.");
 
+
     for (let index = 0; index < mInterceptors.length; index++) {
       const interceptor = mInterceptors[index];
-      interceptor(options, () => {
-        index++;
-      });
+      interceptor(options);
     }
   }
 
-  register = (action: string, callback: (options: IInterceptor, next: () => void) => void) => {
+  register = (action: string, callback: (options: IInterceptor) => void) => {
     let mMiddlewares = this.container[action];
 
     if (!mMiddlewares) {
