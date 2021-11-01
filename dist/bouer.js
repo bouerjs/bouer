@@ -155,14 +155,6 @@
             transferProperty(destination, source, key);
         });
     }
-    /**
-     * Used to Bind the `isConnected` property of a node to another
-     * in order to avoid binding cleanup where the element is not in the DOM
-     */
-    function connectNode(node, nodeToConnectWith) {
-        defineProperty(node, 'isConnected', { get: function () { return nodeToConnectWith.isConnected; } });
-        return node;
-    }
     function urlResolver(url) {
         var href = url;
         // Support: IE 9-11 only, /* doc.documentMode is only available on IE */
@@ -207,6 +199,14 @@
     function buildError(error, options) {
         error.stack = '';
         return error;
+    }
+    /**
+     * Used to Bind the `isConnected` property of a node to another
+     * in order to avoid binding cleanup where the element is not in the DOM
+     */
+    function connectNode(node, nodeToConnectWith) {
+        defineProperty(node, 'isConnected', { get: function () { return nodeToConnectWith.isConnected; } });
+        return node;
     }
     var DOM = document;
     var GLOBAL = globalThis;
@@ -374,7 +374,8 @@
             array.push(callback);
             return {
                 eventName: eventName,
-                callback: callback
+                callback: callback,
+                off: function () { return ReactiveEvent.off(eventName, callback); }
             };
         };
         ReactiveEvent.off = function (eventName, callback) {
@@ -386,7 +387,7 @@
             var event = {};
             var mEvent = ReactiveEvent.on(eventName, function (reactive, method, options) {
                 if (event.onemit)
-                    event.onemit(reactive, method, options);
+                    event.onemit(reactive);
             });
             try {
                 callback(event);
@@ -398,9 +399,9 @@
                 ReactiveEvent.off(eventName, mEvent.callback);
             }
         };
-        ReactiveEvent.emit = function (eventName, reactive, method, options) {
+        ReactiveEvent.emit = function (eventName, reactive) {
             try {
-                forEach(this[eventName], function (evt) { return evt(reactive, method, options); });
+                forEach(this[eventName], function (evt) { return evt(reactive); });
             }
             catch (error) {
                 Logger.error(buildError(error));
@@ -410,8 +411,6 @@
         ReactiveEvent.AfterGet = [];
         ReactiveEvent.BeforeSet = [];
         ReactiveEvent.AfterSet = [];
-        ReactiveEvent.BeforeArrayChanges = [];
-        ReactiveEvent.AfterArrayChanges = [];
         return ReactiveEvent;
     }());
 
@@ -422,7 +421,7 @@
                 'text': 'value',
                 'number': 'valueAsNumber',
                 'checkbox': 'checked',
-                'radio': 'checked'
+                'radio': 'checked',
             };
             this.BindingDirection = {
                 fromInputToData: 'to-data-property',
@@ -441,7 +440,6 @@
             var originalName = node.nodeName;
             var ownerElement = node.ownerElement || node.parentNode;
             var onChange = options.onChange || (function (value, node) { });
-            // let reactiveEvent: ReactiveEvent | undefined;
             // Clousure cache property settings
             var propertyBindConfig = {
                 name: originalName,
@@ -453,38 +451,109 @@
             if (originalName.substr(0, Constants.bind.length) === Constants.bind) {
                 var propertyNameToBind_1 = '';
                 if (Constants.bind === originalName) {
-                    propertyNameToBind_1 = this.DEFAULT_BINDER_PROPERTIES[ownerElement.type] || 'value';
+                    var key = ownerElement.type || ownerElement.localName;
+                    propertyNameToBind_1 = this.DEFAULT_BINDER_PROPERTIES[key] || 'value';
                 }
                 else {
                     propertyNameToBind_1 = originalName.split(':')[1]; // e-bind:value -> value
                 }
+                var isSelect_1 = (ownerElement instanceof HTMLSelectElement);
+                var isSelectMultiple_1 = isSelect_1 && ownerElement.multiple === true;
+                var bindConfig_1 = originalValue.split('|').map(function (x) { return trim(x); });
+                var bindProperty_1 = bindConfig_1[0];
+                var boundPropertyValue_1;
+                var bindModelValue_1;
+                var bindModel_1;
                 var callback_1 = function (direction, value) {
+                    if (!(bindModel_1 = bindConfig_1[1])) {
+                        var attrValue = trim(ownerElement.getAttribute('value'));
+                        if (attrValue)
+                            bindModel_1 = "'" + attrValue + "'";
+                    }
+                    if (isSelect_1 && !isSelectMultiple_1 && Array.isArray(boundPropertyValue_1) && !bindModel_1) {
+                        return Logger.error("Since it's a <select> array binding, it expects the “multiple” attribute in" +
+                            " order to bind the multi values.");
+                    }
+                    // Array Binding
+                    if (!isSelectMultiple_1 && (Array.isArray(boundPropertyValue_1) && !bindModel_1)) {
+                        return Logger.error("Since it's an array binding it expects a model but it has not been defined" +
+                            ", provide a model as it follows " +
+                            originalName + "=\"" + bindProperty_1 + " | Model\" or value=\"String-Model\".");
+                    }
                     switch (direction) {
-                        case _this.BindingDirection.fromDataToInput:
-                            return ownerElement[propertyNameToBind_1] = value;
-                        case _this.BindingDirection.fromInputToData:
-                            return data[originalValue] = ownerElement[propertyNameToBind_1];
+                        case _this.BindingDirection.fromDataToInput: {
+                            if (Array.isArray(boundPropertyValue_1)) {
+                                // select-multiple handling
+                                if (isSelectMultiple_1) {
+                                    return forEach(toArray(ownerElement.options), function (option) {
+                                        option.selected = boundPropertyValue_1.indexOf(trim(option.value)) !== -1;
+                                    });
+                                }
+                                // checkboxes, radio, etc
+                                if (boundPropertyValue_1.indexOf(bindModelValue_1) === -1) {
+                                    switch (typeof ownerElement[propertyNameToBind_1]) {
+                                        case 'boolean':
+                                            ownerElement[propertyNameToBind_1] = false;
+                                            break;
+                                        case 'number':
+                                            ownerElement[propertyNameToBind_1] = 0;
+                                            break;
+                                        default:
+                                            ownerElement[propertyNameToBind_1] = "";
+                                            break;
+                                    }
+                                }
+                                return;
+                            }
+                            // Default Binding
+                            return ownerElement[propertyNameToBind_1] = (isObject(value) ? toStr(value) : (isNull(value) ? '' : value));
+                        }
+                        case _this.BindingDirection.fromInputToData: {
+                            if (Array.isArray(boundPropertyValue_1)) {
+                                // select-multiple handling
+                                if (isSelectMultiple_1) {
+                                    var optionCollection_1 = [];
+                                    forEach(toArray(ownerElement.options), function (option) {
+                                        if (option.selected === true)
+                                            optionCollection_1.push(trim(option.value));
+                                    });
+                                    boundPropertyValue_1.splice(0, boundPropertyValue_1.length);
+                                    return boundPropertyValue_1.push.apply(boundPropertyValue_1, optionCollection_1);
+                                }
+                                bindModelValue_1 = bindModelValue_1 || _this.evaluator.exec({ data: data, expression: bindModel_1 });
+                                if (value)
+                                    boundPropertyValue_1.push(bindModelValue_1);
+                                else
+                                    boundPropertyValue_1.splice(boundPropertyValue_1.indexOf(bindModelValue_1), 1);
+                                return;
+                            }
+                            // Default Binding
+                            return data[bindProperty_1] = value;
+                        }
                     }
                 };
-                ReactiveEvent.once('AfterGet', function (event) {
-                    event.onemit = function (reactive) {
-                        _this.binds.push(reactive.watch(function (value) {
-                            callback_1(_this.BindingDirection.fromDataToInput, value);
-                            onChange(value, node);
-                        }, node));
-                    };
-                    var result = _this.evaluator.exec({
-                        expression: originalValue,
-                        data: data
-                    });
-                    ownerElement[propertyNameToBind_1] = (isObject(result) ? toStr(result) : (isNull(result) ? '' : result));
+                var reactiveEvent = ReactiveEvent.on('AfterGet', function (reactive) {
+                    _this.binds.push(reactive.watch(function (value) {
+                        callback_1(_this.BindingDirection.fromDataToInput, value);
+                        onChange(value, node);
+                    }, node));
                 });
+                var result = boundPropertyValue_1 = this.evaluator.exec({
+                    expression: bindProperty_1,
+                    data: data
+                });
+                reactiveEvent.off();
+                callback_1(this.BindingDirection.fromDataToInput, result);
                 var listeners = [ownerElement.nodeName.toLowerCase(), 'propertychange', 'change'];
                 var callbackEvent_1 = function () {
                     callback_1(_this.BindingDirection.fromInputToData, ownerElement[propertyNameToBind_1]);
                 };
                 // Applying the events
-                forEach(listeners, function (listener) { return ownerElement.addEventListener(listener, callbackEvent_1, false); });
+                forEach(listeners, function (listener) {
+                    if (listener === 'change' && ownerElement.localName !== 'select')
+                        return;
+                    ownerElement.addEventListener(listener, callbackEvent_1, false);
+                });
                 // Removing the e-bind attr
                 ownerElement.removeAttribute(node.nodeName);
                 return propertyBindConfig; // Stop Two-Way Data Binding Process
@@ -520,11 +589,14 @@
                 if (!isHtml)
                     nodeToBind.nodeValue = valueToSet;
                 else {
-                    var htmlData = createEl('div', function (el) {
+                    var htmlSnippit = createEl('div', function (el) {
                         el.innerHTML = valueToSet;
                     }).build().children[0];
-                    ownerElement.appendChild(htmlData);
-                    // TODO: Compile HTML Element Here
+                    ownerElement.appendChild(htmlSnippit);
+                    IoC.Resolve('Compiler').compile({
+                        el: htmlSnippit,
+                        data: data
+                    });
                 }
             };
             ReactiveEvent.once('AfterGet', function (event) {
@@ -553,12 +625,12 @@
             var _this = this;
             taskRunner(function () {
                 var availableBinds = [];
-                forEach(_this.binds, function (watch) {
-                    if (!watch.node)
-                        return availableBinds.push(watch);
-                    if (watch.node.isConnected)
-                        return availableBinds.push(watch);
-                    watch.destroy();
+                forEach(_this.binds, function (bind) {
+                    if (!bind.node)
+                        return availableBinds.push(bind);
+                    if (bind.node.isConnected)
+                        return availableBinds.push(bind);
+                    bind.destroy();
                 });
                 _this.binds = availableBinds;
             }, 1000);
@@ -775,7 +847,6 @@
                     // changing to the reactive one
                     prototype_1[method] = function reactive() {
                         var oldArrayValue = inputArray_1.slice();
-                        ReactiveEvent.emit('BeforeArrayChanges', reactiveObj, method, { arrayNew: oldArrayValue, arrayOld: oldArrayValue });
                         switch (method) {
                             case 'push':
                             case 'unshift':
@@ -786,7 +857,7 @@
                                 });
                         }
                         var result = reference_1[method].apply(inputArray_1, arguments);
-                        ReactiveEvent.emit('AfterArrayChanges', reactiveObj, method, { arrayNew: oldArrayValue, arrayOld: oldArrayValue });
+                        forEach(reactiveObj.watches, function (watch) { return watch.callback(inputArray_1, oldArrayValue); });
                         return result;
                     };
                 });
@@ -1074,29 +1145,8 @@
                     return comparison(a[prop] > b[prop], b[prop] < a[prop]);
                 });
             };
-            var reactivePropertyEvent = ReactiveEvent.on('AfterGet', function (reactive) { return _this.binder.binds.push(reactive.watch(function () { return exec(); }, node)); });
-            var reactiveArrayEvent = ReactiveEvent.on('AfterArrayChanges', function () { return exec(); });
-            // Creating a fake reactive prop and fake Watch to destroy AfterArrayChanges Event
-            this.binder.binds.push(
-            // Watch instance
-            new Watch(
-            // Reactive instance for the Watch
-            new Reactive({
-                propertyName: '_',
-                sourceObject: { _: [] }
-            }), 
-            // Watch Callback
-            function () { }, 
-            // Watch Instance Options
-            {
-                node: node,
-                onDestroy: function () { return ReactiveEvent.off('AfterArrayChanges', reactiveArrayEvent.callback); }
-            }));
-            (exec = function () {
-                var _a;
-                // updating the nodeValue
-                nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
-                var filters = nodeValue.split('|').map(function (item) { return trim(item); });
+            var expressionToObj = function (expression) {
+                var filters = expression.split('|').map(function (item) { return trim(item); });
                 var forExpression = filters[0].replace(/\(|\)/g, '');
                 filters.shift();
                 // for types:
@@ -1110,6 +1160,27 @@
                 var leftHand = forParts[0];
                 var rightHand = forParts[1];
                 var leftHandParts = leftHand.split(',').map(function (x) { return trim(x); });
+                var isForOf = trim(forSeparator) === 'of';
+                var iterable = isForOf ? rightHand : "Object.keys(" + rightHand + ")";
+                var sourceValue = _this.evaluator.exec({ data: data, expression: rightHand });
+                return {
+                    filters: filters,
+                    type: forSeparator,
+                    leftHand: leftHand,
+                    rightHand: rightHand,
+                    sourceValue: sourceValue,
+                    leftHandParts: leftHandParts,
+                    iterableExpression: iterable,
+                    isForOf: trim(forSeparator) === 'of',
+                };
+            };
+            var reactivePropertyEvent = ReactiveEvent.on('AfterGet', function (reactive) { return _this.binder.binds.push(reactive.watch(function () { return exec(); }, node)); });
+            var expressionObj = expressionToObj(nodeValue);
+            reactivePropertyEvent.off();
+            (exec = function () {
+                var _a;
+                expressionObj = expressionObj || expressionToObj(trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : ''));
+                var iterable = expressionObj.iterableExpression, leftHandParts = expressionObj.leftHandParts, sourceValue = expressionObj.sourceValue, isForOf = expressionObj.isForOf, filters = expressionObj.filters;
                 // Cleaning the
                 forEach(listedItems, function (item) {
                     if (!item.parentElement)
@@ -1117,9 +1188,6 @@
                     container.removeChild(item);
                 });
                 listedItems = [];
-                var source = _this.evaluator.exec({ data: data, expression: rightHand });
-                var isForOf = trim(forSeparator) === 'of';
-                var iterable = isForOf ? rightHand : "Object.keys(" + rightHand + ")";
                 _this.evaluator.exec({
                     data: data,
                     isReturn: false,
@@ -1132,7 +1200,7 @@
                             var _index_or_value = leftHandParts[1] || 'index_or_value';
                             var _index = leftHandParts[2] || 'for_in_index';
                             forData[_item_key] = item;
-                            forData[_index_or_value] = isForOf ? index : source[item];
+                            forData[_index_or_value] = isForOf ? index : sourceValue[item];
                             forData[_index] = index;
                             var clonedItem = container.insertBefore(forItem.cloneNode(true), comment);
                             _this.compiler.compile({
@@ -1174,8 +1242,8 @@
                         }
                     }
                 });
+                expressionObj = null;
             })();
-            ReactiveEvent.off('AfterGet', reactivePropertyEvent.callback);
         };
         Directive.prototype.def = function (node, data) {
             var _a;
@@ -2163,7 +2231,7 @@
                                 inputData_1[key] = mInputData_1[key];
                         });
                     }
-                    ReactiveEvent.off('AfterGet', reactiveEvent.callback);
+                    reactiveEvent.off();
                     Reactive.transform(inputData_1);
                     return forEach(Object.keys(inputData_1), function (key) {
                         transferProperty(component.data, inputData_1, key);
@@ -2433,16 +2501,16 @@
                 forEach(modifiersList, function (modifier) {
                     forEach(Object.keys(evt), function (key) {
                         var fnModifier;
-                        if (fnModifier = evt[key] && isFunction(fnModifier) &&
-                            toLower(key) === toLower(modifier))
+                        if (fnModifier = evt[key] && isFunction(fnModifier) && toLower(key) === toLower(modifier))
                             fnModifier();
                     });
                 });
-                var mArguments = [{ event: evt }];
+                var mArguments = [evt];
                 var isResultFunction = _this.evaluator.exec({
                     data: data,
                     expression: nodeValue,
-                    args: mArguments
+                    args: mArguments,
+                    aditional: { event: evt }
                 });
                 if (isFunction(isResultFunction)) {
                     try {
@@ -2466,15 +2534,14 @@
             var _this = this;
             var event = {
                 eventName: eventName,
-                callback: function (evt) { return callback.call(_this.bouer, evt); },
+                callback: function (evt) { return callback.apply(_this.bouer, [evt]); },
                 attachedNode: attachedNode,
                 emit: this.emit
             };
             if (attachedNode)
                 attachedNode.addEventListener(eventName, event.callback, modifiers || false);
-            else {
+            else
                 this.events.push(event);
-            }
             return event;
         };
         EventHandler.prototype.off = function (eventName, callback, attachedNode) {

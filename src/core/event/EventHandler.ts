@@ -1,11 +1,10 @@
-import Bouer from "../instance/Bouer";
 import { Constants } from "../../shared/helpers/Constants";
-import Extend from "../../shared/helpers/Extend";
-import { buildError, connectNode, createEl, forEach, isFunction, isNull, taskRunner, toLower, trim } from "../../shared/helpers/Utils";
-import Logger from "../../shared/logger/Logger";
-import Evaluator from "../Evaluator";
 import IoC from "../../shared/helpers/IoC";
+import { buildError, connectNode, forEach, isFunction, isNull, taskRunner, toLower, trim } from "../../shared/helpers/Utils";
+import Logger from "../../shared/logger/Logger";
 import dynamic from "../../types/dynamic";
+import Evaluator from "../Evaluator";
+import Bouer from "../instance/Bouer";
 
 type EventEmitterOptions = {
   eventName: string
@@ -59,17 +58,17 @@ export default class EventHandler {
       forEach(modifiersList, modifier => {
         forEach(Object.keys(evt), key => {
           let fnModifier;
-          if (fnModifier = (evt as any)[key] && isFunction(fnModifier) &&
-            toLower(key) === toLower(modifier))
+          if (fnModifier = (evt as any)[key] && isFunction(fnModifier) && toLower(key) === toLower(modifier))
             fnModifier();
         })
       });
 
-      const mArguments = [{ event: evt }];
+      const mArguments = [evt];
       const isResultFunction = this.evaluator.exec({
         data: data,
         expression: nodeValue,
-        args: mArguments
+        args: mArguments,
+        aditional: { event: evt }
       });
 
       if (isFunction(isResultFunction)) {
@@ -103,21 +102,19 @@ export default class EventHandler {
     }) {
     const event: EventSubscription = {
       eventName: eventName,
-      callback: evt => callback.call(this.bouer, evt),
+      callback: evt => callback.apply(this.bouer, [evt]),
       attachedNode: attachedNode,
       emit: this.emit
     };
 
     if (attachedNode)
       attachedNode.addEventListener(eventName, event.callback, modifiers || false);
-    else {
+    else
       this.events.push(event);
-    }
     return event;
   }
 
   off(eventName: string, callback: (event: CustomEvent | Event) => void, attachedNode?: Node) {
-
     if (attachedNode)
       return attachedNode.removeEventListener(eventName, callback);
 

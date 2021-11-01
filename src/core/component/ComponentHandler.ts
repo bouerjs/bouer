@@ -300,7 +300,7 @@ export default class ComponentHandler {
           });
         }
 
-        ReactiveEvent.off('AfterGet', reactiveEvent.callback);
+        reactiveEvent.off();
         Reactive.transform(inputData);
 
         return forEach(Object.keys(inputData), key => {

@@ -1,21 +1,25 @@
-import Bouer from "../instance/Bouer";
 import { Constants } from "../../shared/helpers/Constants";
+import IoC from "../../shared/helpers/IoC";
 import {
   createEl,
   forEach, isFunction, isNull,
   isObject,
   taskRunner,
+  toArray,
   toStr,
   trim
 } from "../../shared/helpers/Utils";
+import Logger from "../../shared/logger/Logger";
+import { delimiterResponse } from "../../types/delimiterResponse";
+import dynamic from "../../types/dynamic";
+import watchCallback from "../../types/watchCallback";
+import Compiler from "../compiler/Compiler";
 import Evaluator from "../Evaluator";
 import ReactiveEvent from "../event/ReactiveEvent";
+import Bouer from "../instance/Bouer";
 import Reactive from "../reactive/Reactive";
 import Watch from "./Watch";
-import dynamic from "../../types/dynamic";
-import { delimiterResponse } from "../../types/delimiterResponse";
-import IoC from "../../shared/helpers/IoC";
-import watchCallback from "../../types/watchCallback";
+
 
 export default class Binder {
   bouer: Bouer;
@@ -26,7 +30,7 @@ export default class Binder {
     'text': 'value',
     'number': 'valueAsNumber',
     'checkbox': 'checked',
-    'radio': 'checked'
+    'radio': 'checked',
   }
   private BindingDirection = {
     fromInputToData: 'to-data-property',
@@ -53,7 +57,6 @@ export default class Binder {
     const originalName = node.nodeName;
     const ownerElement = (node as any).ownerElement || node.parentNode;
     const onChange = options.onChange || ((value: any, node: Node) => { });
-    // let reactiveEvent: ReactiveEvent | undefined;
 
     // Clousure cache property settings
     const propertyBindConfig = {
@@ -67,44 +70,118 @@ export default class Binder {
     if (originalName.substr(0, Constants.bind.length) === Constants.bind) {
       let propertyNameToBind = '';
       if (Constants.bind === originalName) {
-        propertyNameToBind = this.DEFAULT_BINDER_PROPERTIES[ownerElement.type] || 'value';
+        const key = ownerElement.type || ownerElement.localName;
+        propertyNameToBind = this.DEFAULT_BINDER_PROPERTIES[key] || 'value';
       } else {
         propertyNameToBind = originalName.split(':')[1]; // e-bind:value -> value
       }
 
-      const callback = (direction: string, value: any) => {
+      const isSelect = (ownerElement instanceof HTMLSelectElement);
+      const isSelectMultiple = isSelect && ownerElement.multiple === true;
+      const bindConfig = originalValue.split('|').map(x => trim(x));
+      const bindProperty = bindConfig[0];
+      let boundPropertyValue: any;
+      let bindModelValue: any;
+      let bindModel: any;
+
+
+      const callback = (direction: string, value: any,) => {
+        if (!(bindModel = bindConfig[1])) {
+          const attrValue = trim(ownerElement.getAttribute('value'))
+          if (attrValue) bindModel = "'" + attrValue + "'";
+        }
+
+        if (isSelect && !isSelectMultiple && Array.isArray(boundPropertyValue) && !bindModel) {
+          return Logger.error("Since it's a <select> array binding, it expects the “multiple” attribute in" +
+            " order to bind the multi values.");
+        }
+
+        // Array Binding
+        if (!isSelectMultiple && (Array.isArray(boundPropertyValue) && !bindModel)) {
+          return Logger.error("Since it's an array binding it expects a model but it has not been defined" +
+            ", provide a model as it follows " +
+            originalName + "=\"" + bindProperty + " | Model\" or value=\"String-Model\".");
+        }
+
         switch (direction) {
-          case this.BindingDirection.fromDataToInput:
-            return ownerElement[propertyNameToBind] = value;
-          case this.BindingDirection.fromInputToData:
-            return data[originalValue] = ownerElement[propertyNameToBind];
+          case this.BindingDirection.fromDataToInput: {
+            if (Array.isArray(boundPropertyValue)) {
+              // select-multiple handling
+              if (isSelectMultiple) {
+                return forEach(toArray(ownerElement.options), (option: HTMLOptionElement) => {
+                  option.selected = boundPropertyValue.indexOf(trim(option.value)) !== -1;
+                });
+              }
+
+              // checkboxes, radio, etc
+              if (boundPropertyValue.indexOf(bindModelValue) === -1) {
+                switch (typeof ownerElement[propertyNameToBind]) {
+                  case 'boolean': ownerElement[propertyNameToBind] = false; break;
+                  case 'number': ownerElement[propertyNameToBind] = 0; break;
+                  default: ownerElement[propertyNameToBind] = ""; break;
+                }
+              }
+
+              return;
+            }
+
+            // Default Binding
+            return ownerElement[propertyNameToBind] = (isObject(value) ? toStr(value) : (isNull(value) ? '' : value));
+          }
+          case this.BindingDirection.fromInputToData: {
+            if (Array.isArray(boundPropertyValue)) {
+              // select-multiple handling
+              if (isSelectMultiple) {
+                const optionCollection: string[] = [];
+                forEach(toArray(ownerElement.options), (option: HTMLOptionElement) => {
+                  if (option.selected === true)
+                    optionCollection.push(trim(option.value));
+                });
+
+                boundPropertyValue.splice(0, boundPropertyValue.length);
+                return boundPropertyValue.push.apply(boundPropertyValue, optionCollection);
+              }
+
+              bindModelValue = bindModelValue || this.evaluator.exec({ data: data, expression: bindModel });
+              if (value)
+                boundPropertyValue.push(bindModelValue);
+              else
+                boundPropertyValue.splice(boundPropertyValue.indexOf(bindModelValue), 1);
+              return;
+            }
+
+            // Default Binding
+            return data[bindProperty] = value;
+          }
         }
       }
 
-      ReactiveEvent.once('AfterGet', event => {
-        event.onemit = reactive => {
-          this.binds.push(reactive.watch(value => {
-            callback(this.BindingDirection.fromDataToInput, value)
-            onChange(value, node);
-          }, node));
-        }
-
-        const result = this.evaluator.exec({
-          expression: originalValue,
-          data: data
-        });
-
-        ownerElement[propertyNameToBind] = (isObject(result) ? toStr(result) : (isNull(result) ? '' : result))
+      const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
+        this.binds.push(reactive.watch(value => {
+          callback(this.BindingDirection.fromDataToInput, value)
+          onChange(value, node);
+        }, node));
       });
 
-      const listeners = [ownerElement.nodeName.toLowerCase(), 'propertychange', 'change'];
+      const result = boundPropertyValue = this.evaluator.exec({
+        expression: bindProperty,
+        data: data
+      });
 
+      reactiveEvent.off();
+
+      callback(this.BindingDirection.fromDataToInput, result);
+
+      const listeners = [ownerElement.nodeName.toLowerCase(), 'propertychange', 'change'];
       const callbackEvent = () => {
         callback(this.BindingDirection.fromInputToData, ownerElement[propertyNameToBind]);
-      }
+      };
 
       // Applying the events
-      forEach(listeners, listener => ownerElement.addEventListener(listener, callbackEvent, false));
+      forEach(listeners, listener => {
+        if (listener === 'change' && ownerElement.localName !== 'select') return;
+        ownerElement.addEventListener(listener, callbackEvent, false);
+      });
 
       // Removing the e-bind attr
       ownerElement.removeAttribute(node.nodeName);
@@ -151,11 +228,14 @@ export default class Binder {
       if (!isHtml)
         nodeToBind.nodeValue = valueToSet;
       else {
-        const htmlData = createEl('div', el => {
+        const htmlSnippit = createEl('div', el => {
           el.innerHTML = valueToSet;
         }).build().children[0];
-        ownerElement.appendChild(htmlData);
-        // TODO: Compile HTML Element Here
+        ownerElement.appendChild(htmlSnippit);
+        IoC.Resolve<Compiler>('Compiler')!.compile({
+          el: htmlSnippit,
+          data: data
+        })
       }
     }
 
@@ -166,7 +246,6 @@ export default class Binder {
           onChange(value, node);
         }, node));
       }
-
       setter();
     });
 
@@ -191,11 +270,11 @@ export default class Binder {
     taskRunner(() => {
       const availableBinds: Watch<any, any>[] = [];
 
-      forEach(this.binds, watch => {
-        if (!watch.node) return availableBinds.push(watch);
-        if (watch.node.isConnected) return availableBinds.push(watch);
-        watch.destroy();
-      })
+      forEach(this.binds, bind => {
+        if (!bind.node) return availableBinds.push(bind);
+        if (bind.node.isConnected) return availableBinds.push(bind);
+        bind.destroy();
+      });
 
       this.binds = availableBinds;
     }, 1000);

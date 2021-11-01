@@ -289,37 +289,19 @@ export default class Directive {
       });
     }
 
-    const reactivePropertyEvent = ReactiveEvent.on('AfterGet',
-      reactive => this.binder.binds.push(reactive.watch(() => exec(), node)));
+    type ExpressionObj = {
+      type: string,
+      filters: string[],
+      isForOf: boolean,
+      leftHand: string,
+      rightHand: string,
+      sourceValue: any,
+      leftHandParts: string[],
+      iterableExpression: string
+    }
 
-    const reactiveArrayEvent = ReactiveEvent.on('AfterArrayChanges', () => exec());
-
-    // Creating a fake reactive prop and fake Watch to destroy AfterArrayChanges Event
-    this.binder.binds.push(
-      // Watch instance
-      new Watch(
-        // Reactive instance for the Watch
-        new Reactive({
-          propertyName: '_',
-          sourceObject: { _: [] }
-        }),
-
-        // Watch Callback
-        () => { },
-
-        // Watch Instance Options
-        {
-          node: node,
-          onDestroy: () => ReactiveEvent.off('AfterArrayChanges', reactiveArrayEvent.callback)
-        }
-      )
-    );
-
-    (exec = () => {
-      // updating the nodeValue
-      nodeValue = trim(node.nodeValue ?? '');
-
-      const filters = nodeValue.split('|').map(item => trim(item));
+    const expressionToObj = (expression: string): ExpressionObj => {
+      const filters = expression.split('|').map(item => trim(item));
       let forExpression = filters[0].replace(/\(|\)/g, '');
       filters.shift();
 
@@ -337,17 +319,42 @@ export default class Directive {
       const rightHand = forParts[1];
       const leftHandParts = leftHand.split(',').map(x => trim(x));
 
+      const isForOf = trim(forSeparator) === 'of';
+      const iterable = isForOf ? rightHand : "Object.keys(" + rightHand + ")";
+      const sourceValue = this.evaluator.exec({ data: data, expression: rightHand });
+
+      return {
+        filters: filters,
+        type: forSeparator,
+        leftHand: leftHand,
+        rightHand: rightHand,
+        sourceValue: sourceValue,
+        leftHandParts: leftHandParts,
+        iterableExpression: iterable,
+        isForOf: trim(forSeparator) === 'of',
+      }
+    }
+
+    const reactivePropertyEvent = ReactiveEvent.on('AfterGet',
+      reactive => this.binder.binds.push(reactive.watch(() => exec(), node)));
+    let expressionObj: ExpressionObj | null = expressionToObj(nodeValue);
+    reactivePropertyEvent.off();
+
+    (exec = () => {
+      expressionObj = expressionObj || expressionToObj(trim(node.nodeValue ?? ''));
+
+      let iterable = expressionObj.iterableExpression
+        , leftHandParts = expressionObj.leftHandParts
+        , sourceValue = expressionObj.sourceValue
+        , isForOf = expressionObj.isForOf
+        , filters = expressionObj.filters;
+
       // Cleaning the
       forEach(listedItems, item => {
         if (!item.parentElement) return;
         container.removeChild(item);
       });
       listedItems = [];
-
-      const source = this.evaluator.exec({ data: data, expression: rightHand });
-      const isForOf = trim(forSeparator) === 'of';
-      let iterable = isForOf ? rightHand : "Object.keys(" + rightHand + ")";
-
 
       this.evaluator.exec({
         data: data,
@@ -362,7 +369,7 @@ export default class Directive {
             const _index = leftHandParts[2] || 'for_in_index';
 
             forData[_item_key] = item;
-            forData[_index_or_value] = isForOf ? index : source[item];
+            forData[_index_or_value] = isForOf ? index : sourceValue[item];
             forData[_index] = index;
 
             const clonedItem = container.insertBefore(forItem.cloneNode(true) as Element, comment);
@@ -408,9 +415,9 @@ export default class Directive {
           }
         }
       });
-    })();
 
-    ReactiveEvent.off('AfterGet', reactivePropertyEvent.callback);
+      expressionObj = null;
+    })();
   }
 
   def(node: Node, data: object) {

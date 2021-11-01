@@ -96,7 +96,6 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
         // changing to the reactive one
         prototype[method] = function reactive() {
           const oldArrayValue = inputArray.slice();
-          ReactiveEvent.emit('BeforeArrayChanges', reactiveObj!, method, { arrayNew: oldArrayValue, arrayOld: oldArrayValue });
 
           switch (method) {
             case 'push': case 'unshift':
@@ -107,7 +106,8 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
           }
 
           const result = reference[method].apply(inputArray, arguments);
-          ReactiveEvent.emit('AfterArrayChanges', reactiveObj!, method, { arrayNew: oldArrayValue, arrayOld: oldArrayValue });
+
+          forEach(reactiveObj.watches, watch => watch.callback(inputArray, oldArrayValue));
           return result;
         }
       });

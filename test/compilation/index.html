@@ -12,8 +12,7 @@
 <body>
   <div id="app">
     <div class="center">
-
-      <h3 on:click="_event" >Bouer.js v{{ version }}</h3>
+      <h3>Bouer.js v{{ version }}</h3>
 
       <div>
         <input type="text" e-bind="value" placeholder="Type Something...">
@@ -27,11 +26,7 @@
     var app = new Bouer('#app', {
       data: {
         version: '3.0.0',
-        value: '',
-
-        _event: function (){
-          console.log(arguments)
-        }
+        value: ''
       }
     });
   </script>

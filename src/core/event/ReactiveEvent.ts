@@ -2,8 +2,9 @@ import { buildError, forEach } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Reactive from "../reactive/Reactive";
 
-type CallbackReactiveProperty = <TProperty, TObject>(reactive: Reactive<TProperty, TObject>) => void;
-type CallbackReactiveArray = <TProperty, TObject>(reactive: Reactive<TProperty, TObject>, method: string, options: { arrayNew: any[]; arrayOld: any[]; }) => void;
+type CallbackReactiveProperty = <TProperty, TObject>(
+  reactive: Reactive<TProperty,
+    TObject>) => void;
 
 interface ReactivePropertyEvents {
   BeforeGet: 'BeforeGet',
@@ -12,14 +13,10 @@ interface ReactivePropertyEvents {
   AfterSet: 'AfterSet',
 }
 
-interface ReactiveArrayEvents {
-  BeforeArrayChanges: 'BeforeArrayChanges',
-  AfterArrayChanges: 'AfterArrayChanges',
-}
-
-type ReactiveEventResult<TCallback> = {
-  eventName: keyof ReactiveArrayEvents,
-  callback: TCallback,
+type ReactiveEventResult = {
+  eventName: keyof ReactivePropertyEvents,
+  callback: CallbackReactiveProperty,
+  off: () => void
 }
 
 export default class ReactiveEvent {
@@ -28,52 +25,34 @@ export default class ReactiveEvent {
   private static BeforeSet: CallbackReactiveProperty[] = []
   private static AfterSet: CallbackReactiveProperty[] = []
 
-  private static BeforeArrayChanges: CallbackReactiveArray[] = []
-  private static AfterArrayChanges: CallbackReactiveArray[] = []
-
   static on<TKey extends keyof ReactivePropertyEvents>(
     eventName: TKey,
     callback: CallbackReactiveProperty
-  ): ReactiveEventResult<CallbackReactiveProperty>;
-  static on<TKey extends keyof ReactiveArrayEvents>(
-    eventName: TKey,
-    callback: CallbackReactiveArray
-  ): ReactiveEventResult<CallbackReactiveArray>;
-  static on(
-    eventName: any,
-    callback: any
-  ): ReactiveEventResult<CallbackReactiveProperty> | ReactiveEventResult<CallbackReactiveArray> {
+  ): ReactiveEventResult {
+
     let array = ((this as any)[eventName]) as any[];
     array.push(callback);
     return {
-      eventName,
-      callback
+      eventName: eventName,
+      callback: callback,
+      off: () => ReactiveEvent.off(eventName, callback)
     }
   }
+
 
   static off<TKey extends keyof ReactivePropertyEvents>(
     eventName: TKey,
     callback: CallbackReactiveProperty
-  ): boolean;
-  static off<TKey extends keyof ReactiveArrayEvents>(
-    eventName: TKey,
-    callback: CallbackReactiveArray
-  ): boolean;
-  static off(
-    eventName: any,
-    callback: any
   ): boolean {
     let array = ((this as any)[eventName] as any[]);
     array.splice(array.indexOf(callback), 1);
     return true;
   }
 
-  static once<TKey extends keyof ReactivePropertyEvents>(eventName: TKey, callback: (event: { onemit?: CallbackReactiveProperty }) => void): void;
-  static once<TKey extends keyof ReactiveArrayEvents>(eventName: TKey, callback: (event: { onemit?: CallbackReactiveArray }) => void): void;
-  static once(eventName: any, callback: any) {
-    const event: { onemit?: (CallbackReactiveProperty | CallbackReactiveArray) } = {}
+  static once<TKey extends keyof ReactivePropertyEvents>(eventName: TKey, callback: (event: { onemit?: CallbackReactiveProperty }) => void): void {
+    const event: { onemit?: CallbackReactiveProperty } = {}
     const mEvent = ReactiveEvent.on(eventName, (reactive: any, method?: any, options?: any) => {
-      if (event.onemit) event.onemit(reactive, method, options);
+      if (event.onemit) event.onemit(reactive);
     });
     try {
       callback(event);
@@ -87,16 +66,9 @@ export default class ReactiveEvent {
   static emit<TKey extends keyof ReactivePropertyEvents, TProperty, TObject>(
     eventName: TKey,
     reactive: Reactive<TProperty, TObject>
-  ): void;
-  static emit<TKey extends keyof ReactiveArrayEvents, TProperty, TObject>(
-    eventName: TKey,
-    reactive: Reactive<TProperty, TObject>,
-    method: string,
-    options: { arrayNew: any[]; arrayOld: any[]; }
-  ): void;
-  static emit(eventName: any, reactive: any, method?: any, options?: any): void {
+  ): void {
     try {
-      forEach(((this as any)[eventName] as any[]), evt => evt(reactive, method, options));
+      forEach(((this as any)[eventName] as any[]), evt => evt(reactive));
     } catch (error) {
       Logger.error(buildError(error));
     }
