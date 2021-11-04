@@ -33,7 +33,9 @@ export default class Routing {
       return Logger.error(("The href=\"/\" attribute is required in base element."));
 
     this.base = baseHref.value;
-    this.navigate(DOM.location.href);
+
+    if (this.defaultPage)
+      this.navigate(DOM.location.href);
 
     // Listening to the page navigation
     GLOBAL.addEventListener('popstate', evt => {

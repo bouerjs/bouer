@@ -113,6 +113,16 @@
                 callback.call(context, iterable[index], index);
         }
     }
+    function where(iterable, callback, context) {
+        var out = [];
+        for (var index = 0; index < iterable.length; index++) {
+            var item = iterable[index];
+            if (isFunction(callback) && callback.call(context, item, index)) {
+                out.push(item);
+            }
+        }
+        return out;
+    }
     function toArray(array) {
         if (!array)
             return [];
@@ -589,12 +599,12 @@
                 if (!isHtml)
                     nodeToBind.nodeValue = valueToSet;
                 else {
-                    var htmlSnippit = createEl('div', function (el) {
+                    var htmlSnippet = createEl('div', function (el) {
                         el.innerHTML = valueToSet;
                     }).build().children[0];
-                    ownerElement.appendChild(htmlSnippit);
+                    ownerElement.appendChild(htmlSnippet);
                     IoC.Resolve('Compiler').compile({
-                        el: htmlSnippit,
+                        el: htmlSnippet,
                         data: data
                     });
                 }
@@ -624,15 +634,13 @@
         Binder.prototype.cleanup = function () {
             var _this = this;
             taskRunner(function () {
-                var availableBinds = [];
-                forEach(_this.binds, function (bind) {
+                _this.binds = where(_this.binds, function (bind) {
                     if (!bind.node)
-                        return availableBinds.push(bind);
+                        return true;
                     if (bind.node.isConnected)
-                        return availableBinds.push(bind);
+                        return true;
                     bind.destroy();
                 });
-                _this.binds = availableBinds;
             }, 1000);
         };
         return Binder;
@@ -769,6 +777,7 @@
             this.watches = [];
             this.get = function () {
                 ReactiveEvent.emit('BeforeGet', _this);
+                _this.propertyValue = _this.isComputed ? _this.computedGetter() : _this.propertyValue;
                 var value = _this.propertyValue;
                 ReactiveEvent.emit('AfterGet', _this);
                 return value;
@@ -803,15 +812,31 @@
                 else {
                     _this.propertyValue = value;
                 }
+                if (_this.isComputed && _this.computedSetter)
+                    _this.computedSetter(value);
                 ReactiveEvent.emit('AfterSet', _this);
                 // Calling all the watches
                 forEach(_this.watches, function (watch) { return watch.callback(_this.propertyValue, oldPropertyValue); });
             };
             this.propertyName = options.propertyName;
             this.propertySource = options.sourceObject;
-            this.propertyDescriptor = getDescriptor(this.propertySource, this.propertyName);
             // Setting the value of the property
+            this.propertyDescriptor = getDescriptor(this.propertySource, this.propertyName);
             this.propertyValue = this.propertyDescriptor.value;
+            this.isComputed = typeof this.propertyValue === 'function' && this.propertyValue.name === '$computed';
+            if (this.isComputed) {
+                var computedResult = this.propertyValue.call(IoC.Resolve('Bouer'));
+                if ('get' in computedResult || isFunction(computedResult)) {
+                    this.computedGetter = computedResult.get || computedResult;
+                }
+                if ('set' in computedResult) {
+                    this.computedSetter = computedResult.set;
+                }
+                if (!this.computedGetter)
+                    throw new Error("Computed property must be a function “function $computed(){...}” " +
+                        "that returns a function for “getter only” or an object with a “get” and/or “set” function");
+                this.propertyValue = undefined;
+            }
         }
         Reactive.prototype.watch = function (callback, node) {
             var w = new Watch(this, callback, { node: node });
@@ -1978,10 +2003,10 @@
             var container = this.el.parentElement;
             if (container)
                 container.removeChild(this.el) !== null;
-            this.emit('destroyed');
             // Destroying all the events attached to the this instance
             forEach(this.events, function (evt) { return _this.off(evt.eventName, evt.callback); });
             this.events = [];
+            this.emit('destroyed');
             forEach(this.styles, function (style) {
                 return forEach(toArray(DOM.head.children), function (item) {
                     if (item === style)
@@ -2004,10 +2029,12 @@
             var eventHandler = IoC.Resolve('EventHandler');
             var evt = eventHandler.on(eventName, callback, this.el);
             this.events.push(evt);
+            return evt;
         };
         Component.prototype.off = function (eventName, callback) {
             var eventHandler = IoC.Resolve('EventHandler');
-            eventHandler.on(eventName, callback, this.el);
+            eventHandler.off(eventName, callback, this.el);
+            this.events = where(this.events, function (evt) { return !(evt.eventName == eventName && evt.callback == callback); });
         };
         return Component;
     }());
@@ -2574,14 +2601,12 @@
         EventHandler.prototype.cleanup = function () {
             var _this = this;
             taskRunner(function () {
-                var availableEvents = [];
-                forEach(_this.events, function (event) {
+                _this.events = where(_this.events, function (event) {
                     if (!event.attachedNode)
-                        return availableEvents.push(event);
+                        return true;
                     if (event.attachedNode.isConnected)
-                        return availableEvents.push(event);
+                        return true;
                 });
-                _this.events = availableEvents;
             }, 1000);
         };
         return EventHandler;
@@ -2611,7 +2636,8 @@
             if (!baseHref)
                 return Logger.error(("The href=\"/\" attribute is required in base element."));
             this.base = baseHref.value;
-            this.navigate(DOM.location.href);
+            if (this.defaultPage)
+                this.navigate(DOM.location.href);
             // Listening to the page navigation
             GLOBAL.addEventListener('popstate', function (evt) {
                 evt.preventDefault();
@@ -2767,6 +2793,7 @@
             new Evaluator(this);
             new CommentHandler(this);
             var interceptor = new Interceptor();
+            IoC.Register(this);
             app.beforeMount(el, app);
             this.el = el;
             // Register the interceptor
@@ -2903,9 +2930,37 @@
         Bouer.prototype.watch = function (propertyName, callback, targetObject) {
             return IoC.Resolve('Binder').watch(propertyName, callback, targetObject);
         };
-        Bouer.prototype.on = function () { };
-        Bouer.prototype.off = function () { };
-        Bouer.prototype.emit = function () { };
+        Bouer.prototype.on = function (eventName, callback, attachedNode, modifiers) {
+            return IoC.Resolve('EventHandler').
+                on(eventName, callback, attachedNode, modifiers);
+        };
+        Bouer.prototype.off = function (eventName, callback, attachedNode) {
+            return IoC.Resolve('EventHandler').
+                off(eventName, callback, attachedNode);
+        };
+        Bouer.prototype.emit = function (options) {
+            return IoC.Resolve('EventHandler').
+                emit(options);
+        };
+        Bouer.prototype.lazy = function (callback, wait) {
+            var _this = this;
+            var timeout;
+            wait = isNull(wait) ? 500 : wait;
+            var immediate = arguments[2];
+            return function executable() {
+                var args = arguments;
+                var later = function () {
+                    timeout = null;
+                    if (!immediate)
+                        callback.call(_this, args);
+                };
+                var callNow = immediate && !timeout;
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+                if (callNow)
+                    callback.call(_this, args);
+            };
+        };
         // Lifecycle Hooks
         Bouer.prototype.beforeMount = function (element, bouer) { };
         Bouer.prototype.mounted = function (element, bouer) { };

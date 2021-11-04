@@ -1,7 +1,9 @@
+import IoC from "../../shared/helpers/IoC";
 import {
   defineProperty,
   forEach,
   getDescriptor,
+  isFunction,
   isNode,
   isNull,
   isObject,
@@ -21,17 +23,41 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
   propertySource: TObject;
   propertyDescriptor: PropertyDescriptor | undefined;
   watches: Array<Watch<TValue, TObject>> = [];
+  isComputed: boolean;
+
+  computedGetter?: () => any
+  computedSetter?: (value: TValue) => void
 
   constructor(options: { propertyName: string, sourceObject: TObject }) {
     this.propertyName = options.propertyName;
     this.propertySource = options.sourceObject;
-    this.propertyDescriptor = getDescriptor(this.propertySource, this.propertyName);
     // Setting the value of the property
+    this.propertyDescriptor = getDescriptor(this.propertySource, this.propertyName);
+
     this.propertyValue = this.propertyDescriptor!.value as TValue;
+    this.isComputed = typeof this.propertyValue === 'function' && this.propertyValue.name === '$computed';
+    if (this.isComputed) {
+    const computedResult = (this.propertyValue as any).call(IoC.Resolve('Bouer'));
+
+      if ('get' in computedResult || isFunction(computedResult)) {
+        this.computedGetter = computedResult.get || computedResult;
+      }
+
+      if ('set' in computedResult) {
+        this.computedSetter = computedResult.set;
+      }
+
+      if (!this.computedGetter)
+        throw new Error("Computed property must be a function “function $computed(){...}” " +
+          "that returns a function for “getter only” or an object with a “get” and/or “set” function");
+
+      (this.propertyValue as any) = undefined;
+    }
   }
 
   get = () => {
     ReactiveEvent.emit('BeforeGet', this);
+    this.propertyValue = this.isComputed ? this.computedGetter!() : this.propertyValue;
     const value = this.propertyValue;
     ReactiveEvent.emit('AfterGet', this);
     return value;
@@ -66,6 +92,9 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
     } else {
       this.propertyValue = value;
     }
+
+    if (this.isComputed && this.computedSetter)
+      this.computedSetter(value);
 
     ReactiveEvent.emit('AfterSet', this);
     // Calling all the watches

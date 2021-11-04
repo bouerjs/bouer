@@ -16,7 +16,7 @@ import Component from "../component/Component";
 import ComponentHandler from "../component/ComponentHandler";
 import DelimiterHandler from "../DelimiterHandler";
 import Evaluator from "../Evaluator";
-import EventHandler from "../event/EventHandler";
+import EventHandler, { EventEmitterOptions } from "../event/EventHandler";
 import Reactive from "../reactive/Reactive";
 import Routing from "../routing/Routing";
 import DataStore from "../store/DataStore";
@@ -153,6 +153,7 @@ export default class Bouer implements IBouer {
     new Evaluator(this);
     new CommentHandler(this);
     const interceptor = new Interceptor();
+    IoC.Register(this);
 
     app.beforeMount(el, app);
     this.el = el;
@@ -320,9 +321,46 @@ export default class Bouer implements IBouer {
     return IoC.Resolve<Binder>('Binder')!.watch(propertyName, callback, targetObject);
   }
 
-  on() { }
-  off() { }
-  emit() { }
+  on(eventName: string,
+    callback: (event: CustomEvent | Event) => void,
+    attachedNode?: Node,
+    modifiers?: {
+      capture?: boolean;
+      once?: boolean;
+      passive?: boolean;
+      signal?: AbortSignal;
+    }) {
+    return IoC.Resolve<EventHandler>('EventHandler')!.
+      on(eventName, callback, attachedNode, modifiers);
+  }
+
+  off(eventName: string, callback: (event: CustomEvent | Event) => void, attachedNode?: Node) {
+    return IoC.Resolve<EventHandler>('EventHandler')!.
+      off(eventName, callback, attachedNode);
+  }
+
+  emit(options: EventEmitterOptions) {
+    return IoC.Resolve<EventHandler>('EventHandler')!.
+      emit(options);
+  }
+
+  lazy(callback: (args: IArguments) => void, wait?: number) {
+    const _this = this;
+    let timeout: any; wait = isNull(wait) ? 500 : wait;
+    let immediate = arguments[2];
+
+    return function executable() {
+        const args = arguments;
+        const later = function () {
+            timeout = null;
+            if (!immediate) callback.call(_this, args);
+        };
+        const callNow = immediate && !timeout;
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+        if (callNow) callback.call(_this, args);
+    };
+}
 
   // Lifecycle Hooks
   beforeMount(element: Element, bouer: Bouer) { }

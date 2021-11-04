@@ -1,12 +1,12 @@
 import { Constants } from "../../shared/helpers/Constants";
 import IoC from "../../shared/helpers/IoC";
-import { buildError, connectNode, forEach, isFunction, isNull, taskRunner, toLower, trim } from "../../shared/helpers/Utils";
+import { buildError, connectNode, forEach, isFunction, isNull, taskRunner, toLower, trim, where } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import dynamic from "../../types/dynamic";
 import Evaluator from "../Evaluator";
 import Bouer from "../instance/Bouer";
 
-type EventEmitterOptions = {
+export type EventEmitterOptions = {
   eventName: string
   init?: CustomEventInit,
   once?: boolean,
@@ -114,7 +114,9 @@ export default class EventHandler {
     return event;
   }
 
-  off(eventName: string, callback: (event: CustomEvent | Event) => void, attachedNode?: Node) {
+  off(eventName: string,
+    callback: (event: CustomEvent | Event) => void,
+    attachedNode?: Node) {
     if (attachedNode)
       return attachedNode.removeEventListener(eventName, callback);
 
@@ -131,15 +133,13 @@ export default class EventHandler {
 
   emit(options: EventEmitterOptions) {
     const { eventName, init, attachedNode } = options;
-
     const customEvent = new CustomEvent(eventName, init);
+
     if (attachedNode)
       return attachedNode.dispatchEvent(customEvent)
 
     forEach(this.events, (event, index) => {
-      if (eventName !== event.eventName)
-        return;
-
+      if (eventName !== event.eventName) return;
       event.callback.call(this.bouer, customEvent);
       if ((options.once ?? false) === true)
         this.events.splice(index, 1);
@@ -149,11 +149,10 @@ export default class EventHandler {
   private cleanup() {
     taskRunner(() => {
       const availableEvents: EventSubscription[] = [];
-      forEach(this.events, event => {
-        if (!event.attachedNode) return availableEvents.push(event);
-        if (event.attachedNode.isConnected) return availableEvents.push(event);
+      this.events = where(this.events, event => {
+        if (!event.attachedNode) return true;
+        if (event.attachedNode.isConnected) return true;
       });
-      this.events = availableEvents;
     }, 1000);
   }
 }

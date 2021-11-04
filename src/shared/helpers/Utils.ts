@@ -131,6 +131,17 @@ export function forEach<TArray>(iterable: TArray[], callback?: (item: TArray, in
   }
 }
 
+export function where<TArray>(iterable: TArray[], callback?: (item: TArray, index: number) => any, context?: object) {
+  const out: TArray[] = [];
+  for (let index = 0; index < iterable.length; index++) {
+    const item = iterable[index];
+    if (isFunction(callback) && callback!.call(context, item, index)) {
+      out.push(item);
+    }
+  }
+  return out;
+}
+
 export function toArray(array: any) {
   if (!array) return [];
   return [].slice.call(array);
@@ -236,7 +247,7 @@ export function buildError(error: any, options?: dynamic) {
  * Used to Bind the `isConnected` property of a node to another
  * in order to avoid binding cleanup where the element is not in the DOM
  */
- export function connectNode(node: Node, nodeToConnectWith: Node) {
+export function connectNode(node: Node, nodeToConnectWith: Node) {
   defineProperty(node, 'isConnected', { get: () => nodeToConnectWith.isConnected });
   return node;
 }

@@ -7,7 +7,8 @@ import {
   taskRunner,
   toArray,
   toStr,
-  trim
+  trim,
+  where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import { delimiterResponse } from "../../types/delimiterResponse";
@@ -17,9 +18,7 @@ import Compiler from "../compiler/Compiler";
 import Evaluator from "../Evaluator";
 import ReactiveEvent from "../event/ReactiveEvent";
 import Bouer from "../instance/Bouer";
-import Reactive from "../reactive/Reactive";
 import Watch from "./Watch";
-
 
 export default class Binder {
   bouer: Bouer;
@@ -228,12 +227,12 @@ export default class Binder {
       if (!isHtml)
         nodeToBind.nodeValue = valueToSet;
       else {
-        const htmlSnippit = createEl('div', el => {
+        const htmlSnippet = createEl('div', el => {
           el.innerHTML = valueToSet;
         }).build().children[0];
-        ownerElement.appendChild(htmlSnippit);
+        ownerElement.appendChild(htmlSnippet);
         IoC.Resolve<Compiler>('Compiler')!.compile({
-          el: htmlSnippit,
+          el: htmlSnippet,
           data: data
         })
       }
@@ -268,15 +267,11 @@ export default class Binder {
   /** Creates a process for unbind properties when it does not exists anymore in the DOM */
   private cleanup() {
     taskRunner(() => {
-      const availableBinds: Watch<any, any>[] = [];
-
-      forEach(this.binds, bind => {
-        if (!bind.node) return availableBinds.push(bind);
-        if (bind.node.isConnected) return availableBinds.push(bind);
+      this.binds = where(this.binds, bind => {
+        if (!bind.node) return true;
+        if (bind.node.isConnected) return true;
         bind.destroy();
       });
-
-      this.binds = availableBinds;
     }, 1000);
   }
 }

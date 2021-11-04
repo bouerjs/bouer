@@ -5,16 +5,15 @@ import {
   forEach, isNull,
   isObject,
   toArray,
-  transferProperty
+  transferProperty,
+  where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
-import dynamic from "../../types/dynamic";
 import IComponent from "../../types/IComponent";
 import ILifeCycleHooks from "../../types/ILifeCycleHooks";
 import EventHandler, { EventSubscription } from "../event/EventHandler";
 import Bouer from "../instance/Bouer";
 import Reactive from "../reactive/Reactive";
-import ComponentHandler from "./ComponentHandler";
 
 export default class Component implements IComponent {
   name: string
@@ -33,7 +32,7 @@ export default class Component implements IComponent {
   scripts: Array<HTMLScriptElement> = [];
   styles: Array<HTMLStyleElement | HTMLLinkElement> = [];
   // Store temporarily this component UI orders
-  events: EventSubscription[] = [];
+  private events: EventSubscription[] = [];
 
   public get isReady() {
     return !isNull(this.template);
@@ -67,11 +66,11 @@ export default class Component implements IComponent {
     let container = this.el.parentElement;
     if (container) container.removeChild(this.el) !== null;
 
-    this.emit('destroyed');
-
     // Destroying all the events attached to the this instance
     forEach(this.events, evt => this.off((evt.eventName as any), evt.callback));
     this.events = [];
+
+    this.emit('destroyed');
 
     forEach(this.styles, style =>
       forEach(toArray(DOM.head.children), item => {
@@ -97,10 +96,12 @@ export default class Component implements IComponent {
     const eventHandler = IoC.Resolve<EventHandler>('EventHandler')!;
     const evt = eventHandler.on(eventName, callback as any, this.el!);
     this.events.push(evt);
+    return evt;
   }
 
   off<TKey extends keyof ILifeCycleHooks>(eventName: TKey, callback: (event: CustomEvent) => void) {
     const eventHandler = IoC.Resolve<EventHandler>('EventHandler')!;
-    eventHandler.on(eventName, callback as any, this.el!);
+    eventHandler.off(eventName, callback as any, this.el!);
+    this.events = where(this.events, evt => !(evt.eventName == eventName && evt.callback == callback));
   }
 }
