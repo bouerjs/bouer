@@ -381,9 +381,11 @@ export default class ComponentHandler {
             }
           });
 
-        Observer.observe(container, () => {
+        Observer.observe(container, options => {
           if (rootElement.isConnected) return;
+          const { mutation, element } = options;
           component.destroy();
+          mutation.disconnect();
         });
       } catch (error) {
         Logger.error(("Error in <" + $name + "></" + $name + "> component."));

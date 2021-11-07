@@ -18,21 +18,23 @@ import {
   isNull,
   toArray
 } from "../../shared/helpers/Utils";
+import customDirective from "../../types/customDirective";
+import IBouer from "../../types/IBouer";
 
 export default class Compiler {
-  private bouer: Bouer;
-  private binder: Binder;
-  private directive: Directive;
-  private delimiter: DelimiterHandler;
-  private eventHandler: EventHandler;
-  private component: ComponentHandler;
+  bouer: Bouer;
+  binder: Binder;
+  directive: Directive;
+  delimiter: DelimiterHandler;
+  eventHandler: EventHandler;
+  component: ComponentHandler;
 
   private NODES_TO_IGNORE_IN_COMPILATION = {
     'SCRIPT': 1,
     '#comment': 8
   }
 
-  constructor(bouer: Bouer) {
+  constructor(bouer: Bouer, options: IBouer) {
     IoC.Register(this);
 
     this.bouer = bouer;
@@ -40,7 +42,7 @@ export default class Compiler {
     this.delimiter = IoC.Resolve('DelimiterHandler')!;
     this.eventHandler = IoC.Resolve('EventHandler')!;
     this.component = IoC.Resolve('ComponentHandler')!;
-    this.directive = new Directive(bouer, this);
+    this.directive = new Directive(options.directives || {}, this);
   }
 
   compile(options: {
@@ -169,6 +171,11 @@ export default class Compiler {
       // e-bind:[?]="..." directive
       if (Constants.check(node, Constants.bind))
         return this.directive.bind(node, data);
+
+      // Custom directive
+      if (Object.keys(this.directive.$custom).find(name => Constants.check(node, name)))
+        if (this.directive.custom(node, data))
+          return;
 
       // e-[?]="..." directive
       if (Constants.check(node, Constants.property) && !Constants.isConstant(node.nodeName))

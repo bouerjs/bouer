@@ -19,6 +19,17 @@ import Evaluator from "../Evaluator";
 import ReactiveEvent from "../event/ReactiveEvent";
 import Bouer from "../instance/Bouer";
 import Watch from "./Watch";
+export interface BinderConfig {
+  node: Node,
+  data: dynamic,
+  parent: Element,
+  nodeName: string,
+  nodeValue: string,
+  fields: delimiterResponse[],
+  argument?: string,
+  modifiers?: string[],
+  value: string
+}
 
 export default class Binder {
   bouer: Bouer;
@@ -48,21 +59,24 @@ export default class Binder {
     node: Node,
     data: dynamic,
     fields: delimiterResponse[],
-    eReplace?: boolean, // Allow to e-[?] replacing
+    replaceProperty?: boolean,
     onChange?: (value: any, node: Node) => void
   }) {
-    const { node, data, fields, eReplace } = options;
+    const { node, data, fields, replaceProperty } = options;
     const originalValue = trim(node.nodeValue ?? '');
     const originalName = node.nodeName;
     const ownerElement = (node as any).ownerElement || node.parentNode;
     const onChange = options.onChange || ((value: any, node: Node) => { });
 
     // Clousure cache property settings
-    const propertyBindConfig = {
-      name: originalName,
-      value: originalValue,
-      bindOptions: options,
-      boundNode: node
+    const propertyBindConfig: BinderConfig = {
+      node: node,
+      data: data,
+      nodeName: originalName,
+      nodeValue: originalValue,
+      fields: options.fields,
+      parent: ownerElement,
+      value: ''
     };
 
     // Two-Way Data Binding: e-bind:[?]="..."
@@ -82,7 +96,6 @@ export default class Binder {
       let boundPropertyValue: any;
       let bindModelValue: any;
       let bindModel: any;
-
 
       const callback = (direction: string, value: any,) => {
         if (!(bindModel = bindConfig[1])) {
@@ -191,10 +204,10 @@ export default class Binder {
     let nodeToBind = node;
 
     // If definable property e-[?]="..."
-    if (originalName.substr(0, Constants.property.length) === Constants.property && isNull(eReplace)) {
-      propertyBindConfig.name = originalName.substr(Constants.property.length);
-      ownerElement.setAttribute(propertyBindConfig.name, originalValue);
-      nodeToBind = ownerElement.attributes[propertyBindConfig.name];
+    if (originalName.substr(0, Constants.property.length) === Constants.property && isNull(replaceProperty)) {
+      propertyBindConfig.nodeName = originalName.substr(Constants.property.length);
+      ownerElement.setAttribute(propertyBindConfig.nodeName, originalValue);
+      nodeToBind = ownerElement.attributes[propertyBindConfig.nodeName];
 
       // Removing the e-[?] attr
       ownerElement.removeAttribute(node.nodeName);
@@ -202,7 +215,7 @@ export default class Binder {
 
     // Property value setter
     const setter = () => {
-      let valueToSet = propertyBindConfig.value;
+      let valueToSet = propertyBindConfig.nodeValue;
       let isHtml = false;
 
       // Looping all the fields to be setted
@@ -223,6 +236,8 @@ export default class Binder {
         if (delimiter && isFunction(delimiter.action))
           valueToSet = delimiter.action!(valueToSet, node, data);
       });
+
+      propertyBindConfig.value = valueToSet;
 
       if (!isHtml)
         nodeToBind.nodeValue = valueToSet;
@@ -248,7 +263,7 @@ export default class Binder {
       setter();
     });
 
-    propertyBindConfig.boundNode = nodeToBind;
+    propertyBindConfig.node = nodeToBind;
     return propertyBindConfig;
   }
 

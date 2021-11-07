@@ -17,6 +17,7 @@ import {
   urlCombine
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
+import customDirective from "../../types/customDirective";
 import dynamic from "../../types/dynamic";
 import Binder from "../binder/Binder";
 import Watch from "../binder/Watch";
@@ -34,18 +35,19 @@ import DataStore from "../store/DataStore";
 import Compiler from "./Compiler";
 
 export default class Directive {
-  private bouer: Bouer;
-  private binder: Binder;
-  private evaluator: Evaluator;
-  private delimiter: DelimiterHandler;
-  private comment: CommentHandler;
-  private compiler: Compiler;
-  private eventHandler: EventHandler;
+  bouer: Bouer;
+  binder: Binder;
+  evaluator: Evaluator;
+  delimiter: DelimiterHandler;
+  comment: CommentHandler;
+  compiler: Compiler;
+  eventHandler: EventHandler;
+  $custom: customDirective = {};
 
-  constructor(bouer: Bouer, compiler: Compiler) {
-    this.bouer = bouer;
+  constructor(customDirective: customDirective, compiler: Compiler) {
     this.compiler = compiler;
-
+    this.bouer = compiler.bouer;
+    this.$custom = customDirective;
     this.evaluator = IoC.Resolve('Evaluator')!;
     this.delimiter = IoC.Resolve('DelimiterHandler')!;
     this.comment = IoC.Resolve('CommentHandler')!;
@@ -193,7 +195,7 @@ export default class Directive {
 
     exec(ownerElement);
 
-    ownerElement.removeAttribute(bindResult.boundNode.nodeName);
+    ownerElement.removeAttribute(bindResult.node.nodeName);
   }
 
   for(node: Node, data: object) {
@@ -220,7 +222,7 @@ export default class Directive {
       this.binder.create({
         data: data,
         fields: delimiters,
-        eReplace: true,
+        replaceProperty: true,
         node: node,
         onChange: () => exec()
       });
@@ -359,7 +361,7 @@ export default class Directive {
       this.evaluator.exec({
         data: data,
         isReturn: false,
-        expression: "_for(" + iterable + ", ($$itm, $$idx) => { _each($$itm, $$idx); })",
+        expression: "_for(_filters(" + iterable + "), ($$itm, $$idx) => { _each($$itm, $$idx); })",
         aditional: {
           _for: forEach,
           _each: (item: any, index: any) => {
@@ -380,7 +382,7 @@ export default class Directive {
 
             listedItems.push(clonedItem);
           },
-          _flt: (list: any[]) => {
+          _filters: (list: any[]) => {
             let listCopy = Extend.array(list);
 
             const findFilter = (fName: string) =>
@@ -501,7 +503,7 @@ export default class Directive {
     this.binder.create({
       data: data,
       node: connectNode(node, ownerElement),
-      eReplace: false,
+      replaceProperty: false,
       fields: [{ expression: nodeValue, field: nodeValue }],
       onChange: () => exec(this.evaluator.exec({
         data: data,
@@ -694,7 +696,7 @@ export default class Directive {
         data: data,
         node: node,
         fields: delimiters,
-        eReplace: false,
+        replaceProperty: false,
         onChange: () => exec()
       });
 
@@ -718,10 +720,10 @@ export default class Directive {
     }
 
     const interceptor = IoC.Resolve<Interceptor>('Interceptor')!;
-    const requestEvent = subcribeEvent(Constants.events.request);
-    const responseEvent = subcribeEvent(Constants.events.response);
-    const failEvent = subcribeEvent(Constants.events.fail);
-    const doneEvent = subcribeEvent(Constants.events.done);
+    const requestEvent = subcribeEvent(Constants.builtInEvents.request);
+    const responseEvent = subcribeEvent(Constants.builtInEvents.response);
+    const failEvent = subcribeEvent(Constants.builtInEvents.fail);
+    const doneEvent = subcribeEvent(Constants.builtInEvents.done);
 
     (exec = () => {
       nodeValue = trim(node.nodeValue || "");
@@ -787,7 +789,7 @@ export default class Directive {
                 el: ownerElement,
                 data: Extend.obj({ [variable]: response.data }, data),
                 onDone: (_, inData) => {
-                  subcribeEvent(Constants.events.compile)
+                  subcribeEvent(Constants.builtInEvents.compile)
                     .emit({
                       data: inData
                     });
@@ -801,7 +803,7 @@ export default class Directive {
                 el: ownerElement,
                 data: Extend.obj({ _response_: response.data }, data),
                 onDone: (_, inData) => {
-                  subcribeEvent(Constants.events.compile)
+                  subcribeEvent(Constants.builtInEvents.compile)
                     .emit({
                       data: inData
                     });
@@ -847,6 +849,40 @@ export default class Directive {
     }
 
     return dataStore.wait[nodeValue] = { nodes: [ownerElement] };
+  }
+
+  custom(node: Node, data: object): boolean {
+    const ownerElement = this.toOwnerNode(node);
+    const nodeName = node.nodeName;
+    const nodeValue = trim(node.nodeValue ?? '');
+    const delimiters = this.delimiter.run(nodeValue);
+    const $directiveConfig = this.$custom[nodeName];
+    const bindConfig = this.binder.create({
+      data: data,
+      node: connectNode(node, ownerElement),
+      fields: delimiters,
+      replaceProperty: false,
+      onChange: () => {
+        if (typeof $directiveConfig.updated === 'function')
+          $directiveConfig.updated(node, bindConfig);
+      }
+    });
+
+    if ($directiveConfig.removable ?? true)
+      ownerElement.removeAttribute(nodeName);
+
+    const modifiers = nodeName.split('.');
+    modifiers.shift();
+    // my-custom-dir:arg.mod1.mod2
+    const argument = (nodeName.split(':')[1] || '').split('.')[0];
+
+    bindConfig.modifiers = modifiers;
+    bindConfig.argument = argument;
+
+    if (typeof $directiveConfig.bind === 'function')
+      return $directiveConfig.bind(node, bindConfig) ?? false;
+
+    return false;
   }
 
   skeleton(node: Node, data: object) {

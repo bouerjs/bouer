@@ -1,6 +1,6 @@
 import Component from "../core/component/Component";
 import Bouer from "../core/instance/Bouer";
-import delimiter from "./delimiter";
+import customDirective from "./customDirective";
 import dynamic from "./dynamic";
 import IBouerConfig from "./IBouerConfig";
 import IComponent from "./IComponent";
@@ -19,10 +19,13 @@ export default interface IBouer {
   /** The compoment the will be loaded to the instance */
   components?: (IComponent | Component)[];
 
+  /** The custum directives for this instance */
+  directives?: customDirective,
+
   /** The dependencies of the instance */
   dependencies?: dynamic,
 
-  // /** Apeends delimiters to the instance */
+  // /** Appends delimiters to the instance */
   // delimiters?: delimiter[],
 
   /** Middlewares that will be used in the application */
@@ -34,18 +37,12 @@ export default interface IBouer {
     app: Bouer
   ) => void;
 
-  /** The hook that will be called before the component is mounted */
-  beforeMount?(element: Element, bouer: Bouer): void;
-
-  /** The hook that will be called after the component is mounted */
-  mounted?(element: Element, bouer: Bouer): void;
-
   /** The hook that will be called before the component is loaded */
-  beforeLoad?(element: Element, bouer: Bouer): void;
+  beforeLoad?(event: CustomEvent): void;
 
   /** The hook that will be called after the component is loaded (Compiled) */
-  loaded?(element: Element, bouer: Bouer): void;
+  loaded?(event: CustomEvent): void;
 
   /** The hook that will be called after the component is destroyed */
-  destroyed?(element: Element, bouer: Bouer): void;
+  destroyed?(event: CustomEvent): void;
 }

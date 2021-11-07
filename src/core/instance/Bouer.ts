@@ -33,6 +33,7 @@ import {
 } from "../../shared/helpers/Utils";
 import Interceptor from "../interceptor/Interceptor";
 import IInterceptor from "../../types/IInterceptor";
+import Directive from "../compiler/Directive";
 
 export default class Bouer implements IBouer {
   el: Element;
@@ -138,9 +139,6 @@ export default class Bouer implements IBouer {
     this.dependencies = options.dependencies || {};
     this.interceptor = options.interceptor;
 
-
-    Object.assign(this, options);
-
     if (isNull(selector) || trim(selector) === '')
       throw Logger.error(('Invalid selector provided to the instance.'));
 
@@ -148,15 +146,13 @@ export default class Bouer implements IBouer {
     const el = DOM.querySelector(selector);
 
     if (!el) throw Logger.error(("Element with selector “" + selector + "” not found."));
+    this.el = el;
 
     const dataStore = new DataStore();
     new Evaluator(this);
     new CommentHandler(this);
     const interceptor = new Interceptor();
     IoC.Register(this);
-
-    app.beforeMount(el, app);
-    this.el = el;
 
     // Register the interceptor
     if (typeof this.interceptor === 'function')
@@ -165,8 +161,6 @@ export default class Bouer implements IBouer {
     // Transform the data properties into a reative
     this.data = Reactive.transform(options!.data || {});
     this.globalData = Reactive.transform(options!.globalData || {});
-
-    app.mounted(app.el, app);
 
     const delimiter = new DelimiterHandler([
       { name: 'bouer', delimiter: { open: '-e-', close: '-' } },
@@ -178,7 +172,7 @@ export default class Bouer implements IBouer {
     const binder = new Binder(this);
     this.routing = new Routing(this);
     const component = new ComponentHandler(this, options!.components);
-    const compiler = new Compiler(this);
+    const compiler = new Compiler(this, options);
     const converter = new Converter(this);
     const comment = new CommentHandler(this);
 
@@ -188,7 +182,6 @@ export default class Bouer implements IBouer {
       remove: delimiter.remove,
       get: () => delimiter.delimiters.slice()
     };
-
     this.$data = {
       get: key => key ? dataStore.data[key] : dataStore.data,
       set: (key, data, toReactive) => {
@@ -201,7 +194,6 @@ export default class Bouer implements IBouer {
       },
       unset: key => delete dataStore.data[key]
     };
-
     this.$req = {
       get: key => key ? dataStore.req[key] : dataStore.req,
       unset: key => delete dataStore.req[key],
@@ -226,20 +218,33 @@ export default class Bouer implements IBouer {
       unset: key => delete dataStore.wait[key],
     };
 
-    app.beforeLoad(app.el, app);
+    forEach([options.beforeLoad, options.loaded, options.destroyed], evt => {
+      if (typeof evt !== 'function') return;
+      eventHandler.on(evt.name, evt as any, el, { once: true });
+    });
+
+    eventHandler.emit({
+      eventName: 'beforeLoad',
+      attachedNode: el
+    });
     // compile the app
     compiler.compile({
       el: this.el,
       data: this.data,
-      onDone: () => app.loaded(app.el, app)
+      onDone: () => eventHandler.emit({
+        eventName: 'loaded',
+        attachedNode: el
+      })
     });
 
     Observer.observe(this.el, (options) => {
       const { mutation, element } = options;
-      if (element.isConnected === false) {
-        app.destroyed(app.el, app);
-        mutation.disconnect();
-      }
+      if (element.isConnected === true) return;
+      eventHandler.emit({
+        eventName: 'destroyed',
+        attachedNode: el
+      })
+      mutation.disconnect();
     });
 
     // Initializing Routing
@@ -350,22 +355,15 @@ export default class Bouer implements IBouer {
     let immediate = arguments[2];
 
     return function executable() {
-        const args = arguments;
-        const later = function () {
-            timeout = null;
-            if (!immediate) callback.call(_this, args);
-        };
-        const callNow = immediate && !timeout;
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-        if (callNow) callback.call(_this, args);
+      const args = arguments;
+      const later = function () {
+        timeout = null;
+        if (!immediate) callback.call(_this, args);
+      };
+      const callNow = immediate && !timeout;
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+      if (callNow) callback.call(_this, args);
     };
-}
-
-  // Lifecycle Hooks
-  beforeMount(element: Element, bouer: Bouer) { }
-  mounted(element: Element, bouer: Bouer) { }
-  beforeLoad(element: Element, bouer: Bouer) { }
-  loaded(element: Element, bouer: Bouer) { }
-  destroyed(element: Element, bouer: Bouer) { }
+  }
 }

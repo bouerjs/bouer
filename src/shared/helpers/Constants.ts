@@ -47,7 +47,8 @@ export const Constants = {
 
   connector: 'connector',
 
-  events: {
+  builtInEvents: {
+    add: 'add',
     compile: 'compile',
     request: 'request',
     response: 'response',

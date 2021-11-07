@@ -258,7 +258,8 @@
         ref: 'ref',
         put: 'put',
         connector: 'connector',
-        events: {
+        builtInEvents: {
+            add: 'add',
             compile: 'compile',
             request: 'request',
             response: 'response',
@@ -445,17 +446,20 @@
         Binder.prototype.create = function (options) {
             var _this = this;
             var _a;
-            var node = options.node, data = options.data, fields = options.fields, eReplace = options.eReplace;
+            var node = options.node, data = options.data, fields = options.fields, replaceProperty = options.replaceProperty;
             var originalValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
             var originalName = node.nodeName;
             var ownerElement = node.ownerElement || node.parentNode;
             var onChange = options.onChange || (function (value, node) { });
             // Clousure cache property settings
             var propertyBindConfig = {
-                name: originalName,
-                value: originalValue,
-                bindOptions: options,
-                boundNode: node
+                node: node,
+                data: data,
+                nodeName: originalName,
+                nodeValue: originalValue,
+                fields: options.fields,
+                parent: ownerElement,
+                value: ''
             };
             // Two-Way Data Binding: e-bind:[?]="..."
             if (originalName.substr(0, Constants.bind.length) === Constants.bind) {
@@ -571,16 +575,16 @@
             // One-Way Data Binding
             var nodeToBind = node;
             // If definable property e-[?]="..."
-            if (originalName.substr(0, Constants.property.length) === Constants.property && isNull(eReplace)) {
-                propertyBindConfig.name = originalName.substr(Constants.property.length);
-                ownerElement.setAttribute(propertyBindConfig.name, originalValue);
-                nodeToBind = ownerElement.attributes[propertyBindConfig.name];
+            if (originalName.substr(0, Constants.property.length) === Constants.property && isNull(replaceProperty)) {
+                propertyBindConfig.nodeName = originalName.substr(Constants.property.length);
+                ownerElement.setAttribute(propertyBindConfig.nodeName, originalValue);
+                nodeToBind = ownerElement.attributes[propertyBindConfig.nodeName];
                 // Removing the e-[?] attr
                 ownerElement.removeAttribute(node.nodeName);
             }
             // Property value setter
             var setter = function () {
-                var valueToSet = propertyBindConfig.value;
+                var valueToSet = propertyBindConfig.nodeValue;
                 var isHtml = false;
                 // Looping all the fields to be setted
                 forEach(fields, function (field) {
@@ -596,6 +600,7 @@
                     if (delimiter && isFunction(delimiter.action))
                         valueToSet = delimiter.action(valueToSet, node, data);
                 });
+                propertyBindConfig.value = valueToSet;
                 if (!isHtml)
                     nodeToBind.nodeValue = valueToSet;
                 else {
@@ -618,7 +623,7 @@
                 };
                 setter();
             });
-            propertyBindConfig.boundNode = nodeToBind;
+            propertyBindConfig.node = nodeToBind;
             return propertyBindConfig;
         };
         Binder.prototype.watch = function (propertyName, callback, targetObject) {
@@ -938,7 +943,8 @@
     }());
 
     var Directive = /** @class */ (function () {
-        function Directive(bouer, compiler) {
+        function Directive(customDirective, compiler) {
+            this.$custom = {};
             this.errorMsgEmptyNode = function (node) { return ("Expected an expression in “" + node.nodeName +
                 "” and got an <empty string>."); };
             this.errorMsgNodeValue = function (node) {
@@ -946,8 +952,9 @@
                 return ("Expected an expression in “" + node.nodeName +
                     "” and got “" + ((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '') + "”.");
             };
-            this.bouer = bouer;
             this.compiler = compiler;
+            this.bouer = compiler.bouer;
+            this.$custom = customDirective;
             this.evaluator = IoC.Resolve('Evaluator');
             this.delimiter = IoC.Resolve('DelimiterHandler');
             this.comment = IoC.Resolve('CommentHandler');
@@ -1079,7 +1086,7 @@
                 onChange: function () { return exec(ownerElement); }
             });
             exec(ownerElement);
-            ownerElement.removeAttribute(bindResult.boundNode.nodeName);
+            ownerElement.removeAttribute(bindResult.node.nodeName);
         };
         Directive.prototype.for = function (node, data) {
             var _this = this;
@@ -1104,7 +1111,7 @@
                 this.binder.create({
                     data: data,
                     fields: delimiters,
-                    eReplace: true,
+                    replaceProperty: true,
                     node: node,
                     onChange: function () { return exec(); }
                 });
@@ -1216,7 +1223,7 @@
                 _this.evaluator.exec({
                     data: data,
                     isReturn: false,
-                    expression: "_for(" + iterable + ", ($$itm, $$idx) => { _each($$itm, $$idx); })",
+                    expression: "_for(_filters(" + iterable + "), ($$itm, $$idx) => { _each($$itm, $$idx); })",
                     aditional: {
                         _for: forEach,
                         _each: function (item, index) {
@@ -1234,7 +1241,7 @@
                             });
                             listedItems.push(clonedItem);
                         },
-                        _flt: function (list) {
+                        _filters: function (list) {
                             var listCopy = Extend.array(list);
                             var findFilter = function (fName) {
                                 return filters.find(function (item) { return item.substr(0, fName.length) === fName; });
@@ -1339,7 +1346,7 @@
             this.binder.create({
                 data: data,
                 node: connectNode(node, ownerElement),
-                eReplace: false,
+                replaceProperty: false,
                 fields: [{ expression: nodeValue, field: nodeValue }],
                 onChange: function () { return exec(_this.evaluator.exec({
                     data: data,
@@ -1501,7 +1508,7 @@
                     data: data,
                     node: node,
                     fields: delimiters,
-                    eReplace: false,
+                    replaceProperty: false,
                     onChange: function () { return exec(); }
                 });
             ownerElement.removeAttribute(node.nodeName);
@@ -1522,10 +1529,10 @@
                 };
             };
             var interceptor = IoC.Resolve('Interceptor');
-            var requestEvent = subcribeEvent(Constants.events.request);
-            var responseEvent = subcribeEvent(Constants.events.response);
-            var failEvent = subcribeEvent(Constants.events.fail);
-            var doneEvent = subcribeEvent(Constants.events.done);
+            var requestEvent = subcribeEvent(Constants.builtInEvents.request);
+            var responseEvent = subcribeEvent(Constants.builtInEvents.response);
+            var failEvent = subcribeEvent(Constants.builtInEvents.fail);
+            var doneEvent = subcribeEvent(Constants.builtInEvents.done);
             (exec = function () {
                 nodeValue = trim(node.nodeValue || "");
                 var filters = nodeValue.split('|').map(function (item) { return trim(item); });
@@ -1581,7 +1588,7 @@
                                     el: ownerElement,
                                     data: Extend.obj((_a = {}, _a[variable] = response.data, _a), data),
                                     onDone: function (_, inData) {
-                                        subcribeEvent(Constants.events.compile)
+                                        subcribeEvent(Constants.builtInEvents.compile)
                                             .emit({
                                             data: inData
                                         });
@@ -1594,7 +1601,7 @@
                                     el: ownerElement,
                                     data: Extend.obj({ _response_: response.data }, data),
                                     onDone: function (_, inData) {
-                                        subcribeEvent(Constants.events.compile)
+                                        subcribeEvent(Constants.builtInEvents.compile)
                                             .emit({
                                             data: inData
                                         });
@@ -1637,6 +1644,35 @@
             }
             return dataStore.wait[nodeValue] = { nodes: [ownerElement] };
         };
+        Directive.prototype.custom = function (node, data) {
+            var _a, _b, _c;
+            var ownerElement = this.toOwnerNode(node);
+            var nodeName = node.nodeName;
+            var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
+            var delimiters = this.delimiter.run(nodeValue);
+            var $directiveConfig = this.$custom[nodeName];
+            var bindConfig = this.binder.create({
+                data: data,
+                node: connectNode(node, ownerElement),
+                fields: delimiters,
+                replaceProperty: false,
+                onChange: function () {
+                    if (typeof $directiveConfig.updated === 'function')
+                        $directiveConfig.updated(node, bindConfig);
+                }
+            });
+            if ((_b = $directiveConfig.removable) !== null && _b !== void 0 ? _b : true)
+                ownerElement.removeAttribute(nodeName);
+            var modifiers = nodeName.split('.');
+            modifiers.shift();
+            // my-custom-dir:arg.mod1.mod2
+            var argument = (nodeName.split(':')[1] || '').split('.')[0];
+            bindConfig.modifiers = modifiers;
+            bindConfig.argument = argument;
+            if (typeof $directiveConfig.bind === 'function')
+                return (_c = $directiveConfig.bind(node, bindConfig)) !== null && _c !== void 0 ? _c : false;
+            return false;
+        };
         Directive.prototype.skeleton = function (node, data) {
             Logger.warn('e-skeleton not implemented yet.');
         };
@@ -1644,7 +1680,7 @@
     }());
 
     var Compiler = /** @class */ (function () {
-        function Compiler(bouer) {
+        function Compiler(bouer, options) {
             this.NODES_TO_IGNORE_IN_COMPILATION = {
                 'SCRIPT': 1,
                 '#comment': 8
@@ -1655,7 +1691,7 @@
             this.delimiter = IoC.Resolve('DelimiterHandler');
             this.eventHandler = IoC.Resolve('EventHandler');
             this.component = IoC.Resolve('ComponentHandler');
-            this.directive = new Directive(bouer, this);
+            this.directive = new Directive(options.directives || {}, this);
         }
         Compiler.prototype.compile = function (options) {
             var _this = this;
@@ -1751,6 +1787,10 @@
                 // e-bind:[?]="..." directive
                 if (Constants.check(node, Constants.bind))
                     return _this.directive.bind(node, data);
+                // Custom directive
+                if (Object.keys(_this.directive.$custom).find(function (name) { return Constants.check(node, name); }))
+                    if (_this.directive.custom(node, data))
+                        return;
                 // e-[?]="..." directive
                 if (Constants.check(node, Constants.property) && !Constants.isConstant(node.nodeName))
                     _this.directive.property(node, data);
@@ -2327,10 +2367,12 @@
                             component.emit('loaded');
                         }
                     });
-                    Observer.observe(container, function () {
+                    Observer.observe(container, function (options) {
                         if (rootElement.isConnected)
                             return;
+                        var mutation = options.mutation, element = options.element;
                         component.destroy();
+                        mutation.disconnect();
                     });
                 }
                 catch (error) {
@@ -2782,37 +2824,33 @@
             this.components = options.components || [];
             this.dependencies = options.dependencies || {};
             this.interceptor = options.interceptor;
-            Object.assign(this, options);
             if (isNull(selector) || trim(selector) === '')
                 throw Logger.error(('Invalid selector provided to the instance.'));
-            var app = this;
             var el = DOM.querySelector(selector);
             if (!el)
                 throw Logger.error(("Element with selector “" + selector + "” not found."));
+            this.el = el;
             var dataStore = new DataStore();
             new Evaluator(this);
             new CommentHandler(this);
             var interceptor = new Interceptor();
             IoC.Register(this);
-            app.beforeMount(el, app);
-            this.el = el;
             // Register the interceptor
             if (typeof this.interceptor === 'function')
                 this.interceptor(interceptor.register, this);
             // Transform the data properties into a reative
             this.data = Reactive.transform(options.data || {});
             this.globalData = Reactive.transform(options.globalData || {});
-            app.mounted(app.el, app);
             var delimiter = new DelimiterHandler([
                 { name: 'bouer', delimiter: { open: '-e-', close: '-' } },
                 { name: 'common', delimiter: { open: '{{', close: '}}' } },
                 { name: 'html', delimiter: { open: '{{:html ', close: '}}' } },
             ]);
-            new EventHandler(this);
+            var eventHandler = new EventHandler(this);
             new Binder(this);
             this.routing = new Routing(this);
             new ComponentHandler(this, options.components);
-            var compiler = new Compiler(this);
+            var compiler = new Compiler(this, options);
             new Converter(this);
             new CommentHandler(this);
             // Assing the two methods available
@@ -2854,19 +2892,33 @@
                 },
                 unset: function (key) { return delete dataStore.wait[key]; },
             };
-            app.beforeLoad(app.el, app);
+            forEach([options.beforeLoad, options.loaded, options.destroyed], function (evt) {
+                if (typeof evt !== 'function')
+                    return;
+                eventHandler.on(evt.name, evt, el, { once: true });
+            });
+            eventHandler.emit({
+                eventName: 'beforeLoad',
+                attachedNode: el
+            });
             // compile the app
             compiler.compile({
                 el: this.el,
                 data: this.data,
-                onDone: function () { return app.loaded(app.el, app); }
+                onDone: function () { return eventHandler.emit({
+                    eventName: 'loaded',
+                    attachedNode: el
+                }); }
             });
             Observer.observe(this.el, function (options) {
                 var mutation = options.mutation, element = options.element;
-                if (element.isConnected === false) {
-                    app.destroyed(app.el, app);
-                    mutation.disconnect();
-                }
+                if (element.isConnected === true)
+                    return;
+                eventHandler.emit({
+                    eventName: 'destroyed',
+                    attachedNode: el
+                });
+                mutation.disconnect();
             });
             // Initializing Routing
             this.routing.init();
@@ -2961,12 +3013,6 @@
                     callback.call(_this, args);
             };
         };
-        // Lifecycle Hooks
-        Bouer.prototype.beforeMount = function (element, bouer) { };
-        Bouer.prototype.mounted = function (element, bouer) { };
-        Bouer.prototype.beforeLoad = function (element, bouer) { };
-        Bouer.prototype.loaded = function (element, bouer) { };
-        Bouer.prototype.destroyed = function (element, bouer) { };
         return Bouer;
     }());
 

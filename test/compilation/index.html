@@ -30,6 +30,59 @@
         value: ''
       }
     });
+
+    // const input =
+    //   [
+    //     [1, 0, 0, 0, 0, 0],
+    //     [0, 1, 0, 1, 1, 1],
+    //     [0, 0, 1, 0, 1, 0],
+    //     [1, 1, 0, 0, 1, 0],
+    //     [1, 0, 1, 1, 0, 0],
+    //     [1, 0, 0, 0, 0, 1],
+    //   ]
+
+    // console.log(`${input.map(x => JSON.stringify(x)).join('\n')}`);
+    // function removeIsIslands(matrix) {
+    //   function lookUp(matrix, row, col) {
+
+    //     const up = (matrix[row - 1] || [])[col];
+    //     const down = (matrix[row + 1] || [])[col];
+    //     const left = (matrix[row] || [])[col - 1];
+    //     const right = (matrix[row] || [])[col + 1];
+
+    //     const current = matrix[row][col];
+    //     const isEdge = left == null ||
+    //                   right == null ||
+    //                      up == null ||
+    //                    down == null  ;
+
+    //     if (current == null) return current;
+    //     if (current == 0) return 0;
+    //     if (isEdge) return current;
+
+    //     let isBound = (up == 1 && lookUp(matrix, --row, col) !== 0);
+    //     if (isBound) return 0;
+
+    //     isBound = (down == 1 && lookUp(matrix, ++row, col) !== 0);
+    //     if (isBound) return 0;
+
+    //     isBound = (left == 1 && lookUp(matrix, row, --col) !== 0);
+    //     if (isBound) return 0;
+
+    //     isBound = (right == 1 && lookUp(matrix, row, ++col) !== 0);
+    //     if (isBound) return 0;
+
+    //     return 0;
+    //   }
+
+    //   for (let _row = 0; _row < matrix.length; _row++)
+    //     for (let _col = 0; _col < matrix[_row].length; _col++)
+    //       matrix[_col][_row] = lookUp(matrix, _row, _col);
+    // }
+
+    // //removeIsIslands(input);
+    // console.log(`${input.map(x => JSON.stringify(x)).join('\n')}`);
+
   </script>
 </body>
 
