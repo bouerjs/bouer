@@ -34,7 +34,7 @@ export default class Compiler {
     '#comment': 8
   }
 
-  constructor(bouer: Bouer, options: IBouer) {
+  constructor(bouer: Bouer, appOptions: IBouer) {
     IoC.Register(this);
 
     this.bouer = bouer;
@@ -42,7 +42,7 @@ export default class Compiler {
     this.delimiter = IoC.Resolve('DelimiterHandler')!;
     this.eventHandler = IoC.Resolve('EventHandler')!;
     this.component = IoC.Resolve('ComponentHandler')!;
-    this.directive = new Directive(options.directives || {}, this);
+    this.directive = new Directive(appOptions.directives || {}, this);
   }
 
   compile(options: {
@@ -180,6 +180,10 @@ export default class Compiler {
       // e-[?]="..." directive
       if (Constants.check(node, Constants.property) && !Constants.isConstant(node.nodeName))
         this.directive.property(node, data);
+
+      // e-skeleton directive
+      if (Constants.check(node, Constants.skeleton))
+        this.directive.skeleton(node);
 
       // Event handler
       // on:[?]="..." directive

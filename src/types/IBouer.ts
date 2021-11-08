@@ -1,6 +1,7 @@
 import Component from "../core/component/Component";
 import Bouer from "../core/instance/Bouer";
 import customDirective from "./customDirective";
+import delimiter from "./delimiter";
 import dynamic from "./dynamic";
 import IBouerConfig from "./IBouerConfig";
 import IComponent from "./IComponent";
@@ -26,7 +27,7 @@ export default interface IBouer {
   dependencies?: dynamic,
 
   // /** Appends delimiters to the instance */
-  // delimiters?: delimiter[],
+  delimiters?: delimiter[],
 
   /** Middlewares that will be used in the application */
   interceptor?: (

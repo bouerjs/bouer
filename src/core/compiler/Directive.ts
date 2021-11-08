@@ -73,12 +73,13 @@ export default class Directive {
   if(node: Node, data: object) {
     const ownerElement = this.toOwnerNode(node) as Element;
     const container = ownerElement.parentElement;
+
+    if (!container) return;
+
     const conditions: { node: Attr, element: Element }[] = [];
     const comment = this.comment.create();
     const nodeName = node.nodeName;
     let exec = () => { };
-
-    if (!container) return;
 
     if (nodeName === Constants.elseif || nodeName === Constants.else) return;
 
@@ -168,12 +169,11 @@ export default class Directive {
   show(node: Node, data: object) {
     const ownerElement = this.toOwnerNode(node);
     const nodeValue = trim(node.nodeValue ?? '');
-    const hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
 
     if (nodeValue === '')
       return Logger.error(this.errorMsgEmptyNode(node));
 
-    if (hasDelimiter)
+    if (this.delimiter.run(nodeValue).length !== 0)
       return Logger.error(this.errorMsgNodeValue(node));
 
     const exec = (element: HTMLElement) => {
@@ -201,13 +201,14 @@ export default class Directive {
   for(node: Node, data: object) {
     const ownerElement = this.toOwnerNode(node) as Element;
     const container = ownerElement.parentElement;
+
+    if (!container) return;
+
     const comment = this.comment.create();
     const nodeName = node.nodeName;
     let nodeValue = trim(node.nodeValue ?? '');
     let listedItems: Element[] = [];
     let exec = () => { };
-
-    if (!container) return;
 
     if (nodeValue === '')
       return Logger.error(this.errorMsgEmptyNode(node));
@@ -367,8 +368,8 @@ export default class Directive {
           _each: (item: any, index: any) => {
             const forData: any = Extend.obj(data);
             const _item_key = leftHandParts[0];
-            const _index_or_value = leftHandParts[1] || 'index_or_value';
-            const _index = leftHandParts[2] || 'for_in_index';
+            const _index_or_value = leftHandParts[1] || '_index_or_value';
+            const _index = leftHandParts[2] || '_for_in_index';
 
             forData[_item_key] = item;
             forData[_index_or_value] = isForOf ? index : sourceValue[item];
@@ -377,7 +378,12 @@ export default class Directive {
             const clonedItem = container.insertBefore(forItem.cloneNode(true) as Element, comment);
             this.compiler.compile({
               el: clonedItem,
-              data: forData
+              data: forData,
+              onDone: el => this.eventHandler.emit({
+                eventName: 'add',
+                attachedNode: el,
+                once: true
+              })
             });
 
             listedItems.push(clonedItem);
@@ -425,12 +431,11 @@ export default class Directive {
   def(node: Node, data: object) {
     const ownerElement = this.toOwnerNode(node);
     const nodeValue = trim(node.nodeValue ?? '');
-    const hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
 
     if (nodeValue === '')
       return Logger.error(this.errorMsgEmptyNode(node));
 
-    if (hasDelimiter)
+    if (this.delimiter.run(nodeValue).length !== 0)
       return Logger.error(this.errorMsgNodeValue(node));
 
     let inputData = this.evaluator.exec({
@@ -460,12 +465,11 @@ export default class Directive {
   bind(node: Node, data: object) {
     const ownerElement = this.toOwnerNode(node);
     const nodeValue = trim(node.nodeValue ?? '');
-    const hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
 
     if (nodeValue === '')
       return Logger.error(this.errorMsgEmptyNode(node));
 
-    if (hasDelimiter)
+    if (this.delimiter.run(nodeValue).length !== 0)
       return Logger.error(this.errorMsgNodeValue(node));
 
     this.binder.create({
@@ -480,7 +484,6 @@ export default class Directive {
   property(node: Node, data: object) {
     const ownerElement = this.toOwnerNode(node) as Element;
     const nodeValue = trim(node.nodeValue ?? '');
-    const hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
     let exec = (obj: object) => { };
 
     const errorInvalidValue = (node: Node) =>
@@ -490,7 +493,7 @@ export default class Directive {
     if (nodeValue === '')
       return Logger.error(errorInvalidValue(node));
 
-    if (hasDelimiter) return;
+    if (this.delimiter.run(nodeValue).length !== 0) return;
 
     let inputData = this.evaluator.exec({
       data: data,
@@ -535,14 +538,13 @@ export default class Directive {
   data(node: Node, data: object) {
     const ownerElement = this.toOwnerNode(node);
     const nodeValue = trim(node.nodeValue ?? '');
-    const hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
-    let inputData: dynamic = {};
 
-    if (hasDelimiter)
+    if (this.delimiter.run(nodeValue).length !== 0)
       return Logger.error(("The “data” attribute cannot contain delimiter."));
 
     ownerElement.removeAttribute(node.nodeName);
 
+    let inputData: dynamic = {};
     const mData = Extend.obj(data, { $this: data });
     const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
       inputData[reactive.propertyName] = undefined;
@@ -620,12 +622,11 @@ export default class Directive {
   entry(node: Node, data: object) {
     const ownerElement = this.toOwnerNode(node) as Element;
     const nodeValue = trim(node.nodeValue ?? '');
-    const hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
 
     if (nodeValue === '')
       return Logger.error(this.errorMsgEmptyNode(node));
 
-    if (hasDelimiter)
+    if (this.delimiter.run(nodeValue).length !== 0)
       return Logger.error(this.errorMsgNodeValue(node));
 
     ownerElement.removeAttribute(node.nodeName);
@@ -646,7 +647,7 @@ export default class Directive {
 
     if (nodeValue === '')
       return Logger.error(this.errorMsgEmptyNode(node),
-        "Direct <empty string> injection value is allowed, only with a delimiter.");
+        "Direct <empty string> injection value is allowed only with a delimiter.");
 
     const delimiters = this.delimiter.run(nodeValue);
     ownerElement.removeAttribute(node.nodeName);
@@ -676,9 +677,7 @@ export default class Directive {
   req(node: Node, data: object) {
     const ownerElement = this.toOwnerNode(node) as Element;
     const nodeName = node.nodeName;
-    const localDataStore: dynamic = {};
     let nodeValue = trim(node.nodeValue ?? '');
-    let exec = () => { };
 
     if (!nodeValue.includes(' of ') && !nodeValue.includes(' as '))
       return Logger.error(("Expected a valid “for” expression in “" + nodeName
@@ -689,7 +688,10 @@ export default class Directive {
       connectNode(ownerElement, ownerElement.parentNode!);
 
     connectNode(node, ownerElement);
+
     const delimiters = this.delimiter.run(nodeValue);
+    const localDataStore: dynamic = {};
+    let exec = () => { };
 
     if (delimiters.length !== 0)
       this.binder.create({
@@ -822,16 +824,15 @@ export default class Directive {
   wait(node: Node) {
     const ownerElement = this.toOwnerNode(node);
     const nodeValue = trim(node.nodeValue ?? '');
-    const hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
-    const dataStore = IoC.Resolve<DataStore>('DataStore')!;
 
     if (nodeValue === '')
       return Logger.error(this.errorMsgEmptyNode(node));
 
-    if (hasDelimiter)
+    if (this.delimiter.run(nodeValue).length !== 0)
       return Logger.error(this.errorMsgNodeValue(node));
 
     ownerElement.removeAttribute(node.nodeName);
+    const dataStore = IoC.Resolve<DataStore>('DataStore')!;
     const mWait = dataStore.wait[nodeValue];
 
     if (mWait) {
@@ -885,7 +886,12 @@ export default class Directive {
     return false;
   }
 
-  skeleton(node: Node, data: object) {
-    Logger.warn('e-skeleton not implemented yet.');
+  skeleton(node: Node) {
+    const nodeValue = trim(node.nodeValue ?? '');
+
+    if (nodeValue !== '')  return;
+
+    const ownerElement = this.toOwnerNode(node);
+    ownerElement.removeAttribute(node.nodeName);
   }
 }

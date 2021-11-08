@@ -34,6 +34,7 @@ import {
 import Interceptor from "../interceptor/Interceptor";
 import IInterceptor from "../../types/IInterceptor";
 import Directive from "../compiler/Directive";
+import Skeleton from "../Skeleton";
 
 export default class Bouer implements IBouer {
   el: Element;
@@ -53,16 +54,6 @@ export default class Bouer implements IBouer {
     ) => void,
     app: Bouer
   ) => void;
-
-  /** Delimiters handler */
-  delimiters: {
-    /** Adds a delimiter into the instance */
-    add: (item: delimiter) => void
-    /** Removes a delimiter from the instance */
-    remove: (name: string) => void;
-    /** Retrieve all the delimiters */
-    get: () => delimiter[];
-  };
 
   /** Data Exposition and Injection handler*/
   $data: {
@@ -125,6 +116,24 @@ export default class Bouer implements IBouer {
     unset: (key: string) => boolean,
   }
 
+  /** Delimiters handler */
+  $delimiters: {
+    /** Adds a delimiter into the instance */
+    add: (item: delimiter) => void
+    /** Removes a delimiter from the instance */
+    remove: (name: string) => void;
+    /** Retrieve all the delimiters */
+    get: () => delimiter[];
+  };
+
+  /** Skeleton handler */
+  $skeleton: {
+    /** Removes skeletons havining the `id` provided */
+    clear: (id?: string) => void,
+    /** Set Color of the Wave and/or the Background */
+    set: (color?: { wave?: string, background?: string }) => void
+  }
+
   /**
    * Default constructor
    * @param selector the selector of the element to be controlled by the instance
@@ -142,7 +151,6 @@ export default class Bouer implements IBouer {
     if (isNull(selector) || trim(selector) === '')
       throw Logger.error(('Invalid selector provided to the instance.'));
 
-    const app = this;
     const el = DOM.querySelector(selector);
 
     if (!el) throw Logger.error(("Element with selector “" + selector + "” not found."));
@@ -162,22 +170,25 @@ export default class Bouer implements IBouer {
     this.data = Reactive.transform(options!.data || {});
     this.globalData = Reactive.transform(options!.globalData || {});
 
-    const delimiter = new DelimiterHandler([
+    const delimiters =  options.delimiters || [];
+    delimiters.push.apply(delimiters, [
       { name: 'bouer', delimiter: { open: '-e-', close: '-' } },
       { name: 'common', delimiter: { open: '{{', close: '}}' } },
       { name: 'html', delimiter: { open: '{{:html ', close: '}}' } },
     ]);
 
+    new Binder(this);
+    const delimiter = new DelimiterHandler(delimiters);
     const eventHandler = new EventHandler(this);
-    const binder = new Binder(this);
     this.routing = new Routing(this);
-    const component = new ComponentHandler(this, options!.components);
+    new ComponentHandler(this, options);
     const compiler = new Compiler(this, options);
-    const converter = new Converter(this);
-    const comment = new CommentHandler(this);
-
+    new Converter(this);
+    new CommentHandler(this);
+    const skeleton = new Skeleton(this);
+    skeleton.init();
     // Assing the two methods available
-    this.delimiters = {
+    this.$delimiters = {
       add: delimiter.add,
       remove: delimiter.remove,
       get: () => delimiter.delimiters.slice()
@@ -217,6 +228,10 @@ export default class Bouer implements IBouer {
       },
       unset: key => delete dataStore.wait[key],
     };
+    this.$skeleton = {
+      clear: id => skeleton.clear(id),
+      set: color => skeleton.init(color)
+    }
 
     forEach([options.beforeLoad, options.loaded, options.destroyed], evt => {
       if (typeof evt !== 'function') return;
@@ -227,6 +242,7 @@ export default class Bouer implements IBouer {
       eventName: 'beforeLoad',
       attachedNode: el
     });
+
     // compile the app
     compiler.compile({
       el: this.el,

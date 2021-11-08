@@ -31,6 +31,7 @@ import {
 import ReactiveEvent from "../event/ReactiveEvent";
 import Reactive from "../reactive/Reactive";
 import EventHandler from "../event/EventHandler";
+import IBouer from "../../types/IBouer";
 
 
 export default class ComponentHandler {
@@ -41,20 +42,15 @@ export default class ComponentHandler {
   delimiter: DelimiterHandler;
   eventHandler: EventHandler;
 
-  constructor(bouer: Bouer, components?: IComponent[]) {
+  constructor(bouer: Bouer, appOptions: IBouer) {
     IoC.Register(this)!;
 
     this.bouer = bouer;
     this.delimiter = IoC.Resolve('DelimiterHandler')!;
     this.eventHandler = IoC.Resolve('EventHandler')!;
 
-    if (components) {
-      if (!DOM.head.querySelector('base'))
-        Logger.warn("“<base href=\"/\" />” element not found, we advise to set it " +
-          "as first element of “<head></head>” to avoid errors when url have extension (.html)." +
-          "\n@see: https://www.w3schools.com/tags/tag_base.asp");
-
-      this.prepare(components);
+    if (appOptions.components) {
+      this.prepare(appOptions.components);
     }
   }
 
@@ -70,7 +66,13 @@ export default class ComponentHandler {
       return this.requests[url].push(response);
 
     this.requests[url] = [response];
-    const urlPath = urlCombine(urlResolver(anchor.baseURI).baseURI, url);
+    const hasBase = DOM.head.querySelector('base') != null;
+    const resolver = urlResolver(anchor.baseURI);
+    let baseURI = resolver.baseURI;
+
+    if (!hasBase) baseURI = resolver.origin;
+    const urlPath = urlCombine(baseURI, url);
+
     http(urlPath, { headers: { 'Content-Type': 'text/plain' } })
       .then(response => {
         if (!response.ok) throw ((response.statusText));
@@ -82,6 +84,8 @@ export default class ComponentHandler {
         });
       })
       .catch(error => {
+        if (!hasBase) Logger.warn("It seems like you are not using the “<base href=\"/\" />” element, " +
+            "try to add as the first child into “<head></head>” element.")
         forEach(this.requests[url], (request: dynamic) => {
           request.fail(error, url);
         });
@@ -223,8 +227,9 @@ export default class ComponentHandler {
       componentElement.innerHTML = "";
     }).build();
 
+    const isKeepAlive = componentElement.hasAttribute('keep-alive') || (component.keepAlive ?? false);
     // Component Creation
-    if ((component.keepAlive ?? false) === false || isNull(component.el)) {
+    if (isKeepAlive === false || isNull(component.el)) {
       createEl('body', htmlSnippet => {
         htmlSnippet.innerHTML = component.template!;
         forEach([].slice.apply(htmlSnippet.querySelectorAll('script')), script => {
@@ -232,17 +237,15 @@ export default class ComponentHandler {
           htmlSnippet.removeChild(script);
         });
 
-        forEach([].slice.apply(htmlSnippet.querySelectorAll('link[rel="stylesheet"]')),
-          style => {
-            component.styles.push(style);
-            htmlSnippet.removeChild(style);
-          });
+        forEach([].slice.apply(htmlSnippet.querySelectorAll('link[rel="stylesheet"]')), style => {
+          component.styles.push(style);
+          htmlSnippet.removeChild(style);
+        });
 
-        forEach([].slice.apply(htmlSnippet.querySelectorAll('style')),
-          style => {
-            component.styles.push(style);
-            htmlSnippet.removeChild(style);
-          });
+        forEach([].slice.apply(htmlSnippet.querySelectorAll('style')), style => {
+          component.styles.push(style);
+          htmlSnippet.removeChild(style);
+        });
 
         if (htmlSnippet.children.length === 0)
           return Logger.error(("The component <" + $name + "></" + $name + "> " +

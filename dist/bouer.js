@@ -974,12 +974,12 @@
             var _a, _b;
             var ownerElement = this.toOwnerNode(node);
             var container = ownerElement.parentElement;
+            if (!container)
+                return;
             var conditions = [];
             var comment = this.comment.create();
             var nodeName = node.nodeName;
             var exec = function () { };
-            if (!container)
-                return;
             if (nodeName === Constants.elseif || nodeName === Constants.else)
                 return;
             var currentEl = ownerElement;
@@ -1066,10 +1066,9 @@
             var _a;
             var ownerElement = this.toOwnerNode(node);
             var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
-            var hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
             if (nodeValue === '')
                 return Logger.error(this.errorMsgEmptyNode(node));
-            if (hasDelimiter)
+            if (this.delimiter.run(nodeValue).length !== 0)
                 return Logger.error(this.errorMsgNodeValue(node));
             var exec = function (element) {
                 var value = _this.evaluator.exec({
@@ -1093,13 +1092,13 @@
             var _a;
             var ownerElement = this.toOwnerNode(node);
             var container = ownerElement.parentElement;
+            if (!container)
+                return;
             var comment = this.comment.create();
             var nodeName = node.nodeName;
             var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
             var listedItems = [];
             var exec = function () { };
-            if (!container)
-                return;
             if (nodeValue === '')
                 return Logger.error(this.errorMsgEmptyNode(node));
             if (!nodeValue.includes(' of ') && !nodeValue.includes(' in '))
@@ -1229,15 +1228,20 @@
                         _each: function (item, index) {
                             var forData = Extend.obj(data);
                             var _item_key = leftHandParts[0];
-                            var _index_or_value = leftHandParts[1] || 'index_or_value';
-                            var _index = leftHandParts[2] || 'for_in_index';
+                            var _index_or_value = leftHandParts[1] || '_index_or_value';
+                            var _index = leftHandParts[2] || '_for_in_index';
                             forData[_item_key] = item;
                             forData[_index_or_value] = isForOf ? index : sourceValue[item];
                             forData[_index] = index;
                             var clonedItem = container.insertBefore(forItem.cloneNode(true), comment);
                             _this.compiler.compile({
                                 el: clonedItem,
-                                data: forData
+                                data: forData,
+                                onDone: function (el) { return _this.eventHandler.emit({
+                                    eventName: 'add',
+                                    attachedNode: el,
+                                    once: true
+                                }); }
                             });
                             listedItems.push(clonedItem);
                         },
@@ -1281,10 +1285,9 @@
             var _a;
             var ownerElement = this.toOwnerNode(node);
             var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
-            var hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
             if (nodeValue === '')
                 return Logger.error(this.errorMsgEmptyNode(node));
-            if (hasDelimiter)
+            if (this.delimiter.run(nodeValue).length !== 0)
                 return Logger.error(this.errorMsgNodeValue(node));
             var inputData = this.evaluator.exec({
                 data: data,
@@ -1309,10 +1312,9 @@
             var _a;
             var ownerElement = this.toOwnerNode(node);
             var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
-            var hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
             if (nodeValue === '')
                 return Logger.error(this.errorMsgEmptyNode(node));
-            if (hasDelimiter)
+            if (this.delimiter.run(nodeValue).length !== 0)
                 return Logger.error(this.errorMsgNodeValue(node));
             this.binder.create({
                 node: connectNode(node, ownerElement),
@@ -1326,7 +1328,6 @@
             var _a;
             var ownerElement = this.toOwnerNode(node);
             var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
-            var hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
             var exec = function (obj) { };
             var errorInvalidValue = function (node) {
                 var _a;
@@ -1335,7 +1336,7 @@
             };
             if (nodeValue === '')
                 return Logger.error(errorInvalidValue(node));
-            if (hasDelimiter)
+            if (this.delimiter.run(nodeValue).length !== 0)
                 return;
             var inputData = this.evaluator.exec({
                 data: data,
@@ -1375,11 +1376,10 @@
             var _a;
             var ownerElement = this.toOwnerNode(node);
             var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
-            var hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
-            var inputData = {};
-            if (hasDelimiter)
+            if (this.delimiter.run(nodeValue).length !== 0)
                 return Logger.error(("The “data” attribute cannot contain delimiter."));
             ownerElement.removeAttribute(node.nodeName);
+            var inputData = {};
             var mData = Extend.obj(data, { $this: data });
             var reactiveEvent = ReactiveEvent.on('AfterGet', function (reactive) {
                 inputData[reactive.propertyName] = undefined;
@@ -1443,10 +1443,9 @@
             var _a;
             var ownerElement = this.toOwnerNode(node);
             var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
-            var hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
             if (nodeValue === '')
                 return Logger.error(this.errorMsgEmptyNode(node));
-            if (hasDelimiter)
+            if (this.delimiter.run(nodeValue).length !== 0)
                 return Logger.error(this.errorMsgNodeValue(node));
             ownerElement.removeAttribute(node.nodeName);
             IoC.Resolve('ComponentHandler')
@@ -1464,7 +1463,7 @@
             var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
             var exec = function () { };
             if (nodeValue === '')
-                return Logger.error(this.errorMsgEmptyNode(node), "Direct <empty string> injection value is allowed, only with a delimiter.");
+                return Logger.error(this.errorMsgEmptyNode(node), "Direct <empty string> injection value is allowed only with a delimiter.");
             var delimiters = this.delimiter.run(nodeValue);
             ownerElement.removeAttribute(node.nodeName);
             if (delimiters.length !== 0)
@@ -1492,9 +1491,7 @@
             var _a;
             var ownerElement = this.toOwnerNode(node);
             var nodeName = node.nodeName;
-            var localDataStore = {};
             var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
-            var exec = function () { };
             if (!nodeValue.includes(' of ') && !nodeValue.includes(' as '))
                 return Logger.error(("Expected a valid “for” expression in “" + nodeName
                     + "” and got “" + nodeValue + "”." + "\nValid: e-req=\"item of [url]\"."));
@@ -1503,6 +1500,8 @@
                 connectNode(ownerElement, ownerElement.parentNode);
             connectNode(node, ownerElement);
             var delimiters = this.delimiter.run(nodeValue);
+            var localDataStore = {};
+            var exec = function () { };
             if (delimiters.length !== 0)
                 this.binder.create({
                     data: data,
@@ -1621,13 +1620,12 @@
             var _a;
             var ownerElement = this.toOwnerNode(node);
             var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
-            var hasDelimiter = this.delimiter.run(nodeValue).length !== 0;
-            var dataStore = IoC.Resolve('DataStore');
             if (nodeValue === '')
                 return Logger.error(this.errorMsgEmptyNode(node));
-            if (hasDelimiter)
+            if (this.delimiter.run(nodeValue).length !== 0)
                 return Logger.error(this.errorMsgNodeValue(node));
             ownerElement.removeAttribute(node.nodeName);
+            var dataStore = IoC.Resolve('DataStore');
             var mWait = dataStore.wait[nodeValue];
             if (mWait) {
                 mWait.nodes.push(ownerElement);
@@ -1673,14 +1671,19 @@
                 return (_c = $directiveConfig.bind(node, bindConfig)) !== null && _c !== void 0 ? _c : false;
             return false;
         };
-        Directive.prototype.skeleton = function (node, data) {
-            Logger.warn('e-skeleton not implemented yet.');
+        Directive.prototype.skeleton = function (node) {
+            var _a;
+            var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
+            if (nodeValue !== '')
+                return;
+            var ownerElement = this.toOwnerNode(node);
+            ownerElement.removeAttribute(node.nodeName);
         };
         return Directive;
     }());
 
     var Compiler = /** @class */ (function () {
-        function Compiler(bouer, options) {
+        function Compiler(bouer, appOptions) {
             this.NODES_TO_IGNORE_IN_COMPILATION = {
                 'SCRIPT': 1,
                 '#comment': 8
@@ -1691,7 +1694,7 @@
             this.delimiter = IoC.Resolve('DelimiterHandler');
             this.eventHandler = IoC.Resolve('EventHandler');
             this.component = IoC.Resolve('ComponentHandler');
-            this.directive = new Directive(options.directives || {}, this);
+            this.directive = new Directive(appOptions.directives || {}, this);
         }
         Compiler.prototype.compile = function (options) {
             var _this = this;
@@ -1794,6 +1797,9 @@
                 // e-[?]="..." directive
                 if (Constants.check(node, Constants.property) && !Constants.isConstant(node.nodeName))
                     _this.directive.property(node, data);
+                // e-skeleton directive
+                if (Constants.check(node, Constants.skeleton))
+                    _this.directive.skeleton(node);
                 // Event handler
                 // on:[?]="..." directive
                 if (Constants.check(node, Constants.on))
@@ -2080,7 +2086,7 @@
     }());
 
     var ComponentHandler = /** @class */ (function () {
-        function ComponentHandler(bouer, components) {
+        function ComponentHandler(bouer, appOptions) {
             this.components = {};
             // Handle all the components web requests to avoid multiple requests
             this.requests = {};
@@ -2088,12 +2094,8 @@
             this.bouer = bouer;
             this.delimiter = IoC.Resolve('DelimiterHandler');
             this.eventHandler = IoC.Resolve('EventHandler');
-            if (components) {
-                if (!DOM.head.querySelector('base'))
-                    Logger.warn("“<base href=\"/\" />” element not found, we advise to set it " +
-                        "as first element of “<head></head>” to avoid errors when url have extension (.html)." +
-                        "\n@see: https://www.w3schools.com/tags/tag_base.asp");
-                this.prepare(components);
+            if (appOptions.components) {
+                this.prepare(appOptions.components);
             }
         }
         ComponentHandler.prototype.check = function (nodeName) {
@@ -2104,7 +2106,12 @@
             if (!isNull(this.requests[url]))
                 return this.requests[url].push(response);
             this.requests[url] = [response];
-            var urlPath = urlCombine(urlResolver(anchor.baseURI).baseURI, url);
+            var hasBase = DOM.head.querySelector('base') != null;
+            var resolver = urlResolver(anchor.baseURI);
+            var baseURI = resolver.baseURI;
+            if (!hasBase)
+                baseURI = resolver.origin;
+            var urlPath = urlCombine(baseURI, url);
             http(urlPath, { headers: { 'Content-Type': 'text/plain' } })
                 .then(function (response) {
                 if (!response.ok)
@@ -2117,6 +2124,9 @@
                 });
             })
                 .catch(function (error) {
+                if (!hasBase)
+                    Logger.warn("It seems like you are not using the “<base href=\"/\" />” element, " +
+                        "try to add as the first child into “<head></head>” element.");
                 forEach(_this.requests[url], function (request) {
                     request.fail(error, url);
                 });
@@ -2237,8 +2247,9 @@
                 el.innerHTML = componentElement.innerHTML;
                 componentElement.innerHTML = "";
             }).build();
+            var isKeepAlive = componentElement.hasAttribute('keep-alive') || ((_a = component.keepAlive) !== null && _a !== void 0 ? _a : false);
             // Component Creation
-            if (((_a = component.keepAlive) !== null && _a !== void 0 ? _a : false) === false || isNull(component.el)) {
+            if (isKeepAlive === false || isNull(component.el)) {
                 createEl('body', function (htmlSnippet) {
                     htmlSnippet.innerHTML = component.template;
                     forEach([].slice.apply(htmlSnippet.querySelectorAll('script')), function (script) {
@@ -2683,10 +2694,15 @@
             // Listening to the page navigation
             GLOBAL.addEventListener('popstate', function (evt) {
                 evt.preventDefault();
-                _this.navigate((evt.state || {}).url || DOM.location.href);
+                _this.navigate((evt.state || location.href), false);
             });
         };
-        Routing.prototype.navigate = function (url) {
+        /**
+         * Navigates to a certain page without reloading all the page
+         * @param url the route to navigate to
+         * @param changeUrl allow to change the url after the navigation, default value is `true`
+         */
+        Routing.prototype.navigate = function (url, changeUrl) {
             var _this = this;
             var _a;
             if (isNull(url))
@@ -2717,11 +2733,12 @@
             });
             // Document info configuration
             DOM.title = page.title || DOM.title;
-            this.pushState(resolver.href, DOM.title);
+            if ((changeUrl !== null && changeUrl !== void 0 ? changeUrl : true))
+                this.pushState(resolver.href, DOM.title);
         };
         Routing.prototype.pushState = function (url, title) {
             url = urlResolver(url).href;
-            GLOBAL.history.pushState({ url: url }, (title || ''), url);
+            GLOBAL.history.pushState(url, (title || ''), url);
         };
         Routing.prototype.popState = function (times) {
             if (isNull(times))
@@ -2807,6 +2824,60 @@
         return Interceptor;
     }());
 
+    var Skeleton = /** @class */ (function () {
+        function Skeleton(bouer) {
+            var _this = this;
+            this.backgroudColor = '';
+            this.waveColor = '';
+            this.defaultBackgroudColor = '#E2E2E2';
+            this.defaultWaveColor = '#ffffff5d';
+            this.identifier = "bouer";
+            IoC.Register(this);
+            this.reset();
+            this.bouer = bouer;
+            this.style = createEl('style', function (el) { return el.id = _this.identifier; }).build();
+        }
+        Skeleton.prototype.reset = function () {
+            this.backgroudColor = this.defaultBackgroudColor;
+            this.waveColor = this.defaultWaveColor;
+        };
+        Skeleton.prototype.init = function (color) {
+            var _this = this;
+            var _a;
+            if (!this.style)
+                return;
+            var dir = Constants.skeleton;
+            if (!DOM.getElementById(this.identifier))
+                DOM.head.appendChild(this.style);
+            for (var i = 0; i < this.style.sheet.cssRules.length; i++)
+                (_a = this.style.sheet) === null || _a === void 0 ? void 0 : _a.deleteRule(i);
+            if (color) {
+                this.backgroudColor = color.background || this.defaultBackgroudColor;
+                this.waveColor = color.wave || this.defaultWaveColor;
+            }
+            else {
+                this.reset();
+            }
+            var rules = [
+                '[' + dir + '] { background-color: ' + this.backgroudColor + '!important; position: relative!important; overflow: hidden; }',
+                '[' + dir + '],[' + dir + '] * { color: transparent!important; }',
+                '[' + dir + ']::before, [' + dir + ']::after { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: block; }',
+                '[' + dir + ']::before { background-color: ' + this.backgroudColor + '!important; z-index: 1;}',
+                '[' + dir + ']::after { transform: translateX(-100%); background: linear-gradient(90deg, transparent, ' + this.waveColor
+                    + ', transparent); animation: loading 1.5s infinite; z-index: 2; }',
+                '@keyframes loading { 100% { transform: translateX(100%); } }',
+                '@-webkit-keyframes loading { 100% { transform: translateX(100%); } }'
+            ];
+            forEach(rules, function (rule) { return _this.style.sheet.insertRule(rule); });
+        };
+        Skeleton.prototype.clear = function (id) {
+            id = (id ? ('="' + id + '"') : '');
+            var skeletons = toArray(this.bouer.el.querySelectorAll("[" + Constants.skeleton + id + "]"));
+            forEach(skeletons, function (el) { return el.removeAttribute(Constants.skeleton); });
+        };
+        return Skeleton;
+    }());
+
     var Bouer = /** @class */ (function () {
         /**
          * Default constructor
@@ -2841,20 +2912,24 @@
             // Transform the data properties into a reative
             this.data = Reactive.transform(options.data || {});
             this.globalData = Reactive.transform(options.globalData || {});
-            var delimiter = new DelimiterHandler([
+            var delimiters = options.delimiters || [];
+            delimiters.push.apply(delimiters, [
                 { name: 'bouer', delimiter: { open: '-e-', close: '-' } },
                 { name: 'common', delimiter: { open: '{{', close: '}}' } },
                 { name: 'html', delimiter: { open: '{{:html ', close: '}}' } },
             ]);
-            var eventHandler = new EventHandler(this);
             new Binder(this);
+            var delimiter = new DelimiterHandler(delimiters);
+            var eventHandler = new EventHandler(this);
             this.routing = new Routing(this);
-            new ComponentHandler(this, options.components);
+            new ComponentHandler(this, options);
             var compiler = new Compiler(this, options);
             new Converter(this);
             new CommentHandler(this);
+            var skeleton = new Skeleton(this);
+            skeleton.init();
             // Assing the two methods available
-            this.delimiters = {
+            this.$delimiters = {
                 add: delimiter.add,
                 remove: delimiter.remove,
                 get: function () { return delimiter.delimiters.slice(); }
@@ -2891,6 +2966,10 @@
                     });
                 },
                 unset: function (key) { return delete dataStore.wait[key]; },
+            };
+            this.$skeleton = {
+                clear: function (id) { return skeleton.clear(id); },
+                set: function (color) { return skeleton.init(color); }
             };
             forEach([options.beforeLoad, options.loaded, options.destroyed], function (evt) {
                 if (typeof evt !== 'function')
