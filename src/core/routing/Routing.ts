@@ -40,11 +40,16 @@ export default class Routing {
     // Listening to the page navigation
     GLOBAL.addEventListener('popstate', evt => {
       evt.preventDefault();
-      this.navigate((evt.state || {}).url || DOM.location.href);
+      this.navigate((evt.state || location.href), false);
     });
   }
 
-  navigate(url: string) {
+  /**
+   * Navigates to a certain page without reloading all the page
+   * @param url the route to navigate to
+   * @param changeUrl allow to change the url after the navigation, default value is `true`
+   */
+  navigate(url: string, changeUrl?: boolean) {
     if (isNull(url))
       return Logger.log("Invalid url provided to the navigation method.");
 
@@ -81,15 +86,16 @@ export default class Routing {
     // Document info configuration
     DOM.title = page.title || DOM.title;
 
-    this.pushState(resolver.href, DOM.title);
+    if ((changeUrl ?? true))
+      this.pushState(resolver.href, DOM.title);
   }
 
   pushState(url: string, title?: string) {
     url = urlResolver(url).href;
-    GLOBAL.history.pushState({ url: url }, (title || ''), url);
+    GLOBAL.history.pushState(url, (title || ''), url);
   }
 
-  popState(times: number) {
+  popState(times?: number) {
     if (isNull(times)) times = -1;
     GLOBAL.history.go(times);
   }
