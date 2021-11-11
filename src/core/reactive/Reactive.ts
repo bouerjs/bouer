@@ -1,3 +1,4 @@
+import Bouer from "../../instance/Bouer";
 import IoC from "../../shared/helpers/IoC";
 import {
   defineProperty,
@@ -15,6 +16,7 @@ import Logger from "../../shared/logger/Logger";
 import dynamic from "../../types/dynamic";
 import watchCallback from "../../types/watchCallback";
 import Watch from "../binder/Watch";
+import Component from "../component/Component";
 import ReactiveEvent from "../event/ReactiveEvent";
 
 export default class Reactive<TValue, TObject> implements PropertyDescriptor {
@@ -154,14 +156,19 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
       if (isNull(getDescriptor(inputObject, key)!.value))
         return;
 
+      const propertyValue = mInputObject[key];
+
+      if(propertyValue && (propertyValue instanceof Bouer) ||
+         (propertyValue instanceof Component) ||
+         (propertyValue instanceof Node))
+          return;
+
       const reactive = new Reactive({
         propertyName: key,
         sourceObject: inputObject
       });
 
       defineProperty(inputObject, key, reactive);
-
-      const propertyValue = mInputObject[key];
 
       if (isObject(propertyValue))
         this.transform(propertyValue);
@@ -176,10 +183,10 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 
   static setData(inputData: object, targetObject?: object) {
     if (!isObject(inputData))
-      return Logger.error(('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".'));
+      return Logger.error('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".');
 
     if (isObject(targetObject) && targetObject !== null)
-      return Logger.error(('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".'));
+      return Logger.error('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".');
 
     // Transforming the input
     Reactive.transform(inputData);
