@@ -1,6 +1,7 @@
 const rollupConfigs = require('path');
 const version = require('../package.json').version;
 const typescript = require('@rollup/plugin-typescript');
+const buble = require('@rollup/plugin-buble');
 const cleanup = require('rollup-plugin-cleanup');
 const babel = require('@rollup/plugin-babel').babel;
 
@@ -22,6 +23,9 @@ const banner =
 
 const builds = {
   'umd-browser': {
+    extra: {
+      transpile: false
+    },
     input: resolve('src', 'browser.ts'),
     output: {
       file: outputName('bouer.js'),
@@ -51,6 +55,9 @@ const rollupConfigBuilder = (key, config) => {
   config.output.banner = banner;
   config.output.indent = false;
 
+  const extra = config.extra;
+  delete config.extra;
+
   const rollupConfig = {
     input: config.input,
     output: config.output,
@@ -74,6 +81,9 @@ const rollupConfigBuilder = (key, config) => {
       }
     }
   };
+
+  if (extra && extra.transpile !== false)
+    rollupConfig.plugins.push(buble());
 
   return rollupConfig;
 }

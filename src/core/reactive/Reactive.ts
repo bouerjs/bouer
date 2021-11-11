@@ -5,7 +5,6 @@ import {
   forEach,
   getDescriptor,
   isFunction,
-  isNode,
   isNull,
   isObject,
   mapper,
@@ -39,7 +38,7 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
     this.propertyValue = this.propertyDescriptor!.value as TValue;
     this.isComputed = typeof this.propertyValue === 'function' && this.propertyValue.name === '$computed';
     if (this.isComputed) {
-    const computedResult = (this.propertyValue as any).call(IoC.Resolve('Bouer'));
+      const computedResult = (this.propertyValue as any).call(IoC.Resolve('Bouer'));
 
       if ('get' in computedResult || isFunction(computedResult)) {
         this.computedGetter = computedResult.get || computedResult;
@@ -78,10 +77,11 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
       if (Array.isArray(value)) {
         Reactive.transform(value, this);
         const propValueAsAny = this.propertyValue as any;
+
         propValueAsAny.splice(0, propValueAsAny.length);
         propValueAsAny.push.apply(propValueAsAny, (value as any));
       } else if (isObject(value)) {
-        if (isNode(value)) // If some html element
+        if ((value instanceof Node)) // If some html element
           this.propertyValue = value;
         else {
           Reactive.transform(value);
@@ -158,10 +158,10 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 
       const propertyValue = mInputObject[key];
 
-      if(propertyValue && (propertyValue instanceof Bouer) ||
-         (propertyValue instanceof Component) ||
-         (propertyValue instanceof Node))
-          return;
+      if (propertyValue && (propertyValue instanceof Bouer) ||
+        (propertyValue instanceof Component) ||
+        (propertyValue instanceof Node))
+        return;
 
       const reactive = new Reactive({
         propertyName: key,

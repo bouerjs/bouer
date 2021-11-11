@@ -1,7 +1,7 @@
 import { Constants } from "../../shared/helpers/Constants";
 import IoC from "../../shared/helpers/IoC";
 import Logger from "../../shared/logger/Logger";
-import { delimiterResponse } from "../../types/delimiterResponse";
+import delimiterResponse from "../../types/delimiterResponse";
 import Binder from "../binder/Binder";
 import ComponentHandler from "../component/ComponentHandler";
 import DelimiterHandler from "../DelimiterHandler";

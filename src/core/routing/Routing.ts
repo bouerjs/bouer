@@ -7,8 +7,8 @@ import ComponentHandler from "../component/ComponentHandler";
 
 export default class Routing {
   bouer: Bouer;
-  defaultPage: IComponent | null = null;
-  notFoundPage: IComponent | null = null;
+  defaultPage?: IComponent = undefined;
+  notFoundPage?: IComponent = undefined;
   routeView: Element | null = null;
   activeAnchors: HTMLAnchorElement[] = [];
 

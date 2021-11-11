@@ -6,12 +6,13 @@ import {
   isObject,
   taskRunner,
   toArray,
+  toLower,
   toStr,
   trim,
   where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
-import { delimiterResponse } from "../../types/delimiterResponse";
+import delimiterResponse from "../../types/delimiterResponse";
 import dynamic from "../../types/dynamic";
 import watchCallback from "../../types/watchCallback";
 import Compiler from "../compiler/Compiler";
@@ -184,7 +185,7 @@ export default class Binder {
 
       callback(this.BindingDirection.fromDataToInput, result);
 
-      const listeners = [ownerElement.nodeName.toLowerCase(), 'propertychange', 'change'];
+      const listeners = [toLower(ownerElement.nodeName), 'propertychange', 'change'];
       const callbackEvent = () => {
         callback(this.BindingDirection.fromInputToData, ownerElement[propertyNameToBind]);
       };

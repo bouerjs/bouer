@@ -11,6 +11,7 @@ import {
   isFunction,
   isNull,
   isObject,
+  toLower,
   toStr,
   transferProperty,
   trim,
@@ -279,7 +280,7 @@ export default class Directive {
       return list.sort(function (a, b) {
         const comparison = function (asc: boolean | null, desc: boolean | null) {
           if (isNull(asc) || isNull(desc)) return 0;
-          switch (type.toLowerCase()) {
+          switch (toLower(type)) {
             case 'asc': return asc ? 1 : -1;
             case 'desc': return desc ? -1 : 1;
             default: Logger.log("The “" + type + "” order type is invalid: “" + nodeValue +

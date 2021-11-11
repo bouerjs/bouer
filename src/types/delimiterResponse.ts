@@ -1,7 +1,9 @@
 import delimiter from "./delimiter";
 
-export type delimiterResponse = {
+type delimiterResponse = {
   field: string,
   expression: string,
   delimiter?: delimiter
 }
+
+export default delimiterResponse;

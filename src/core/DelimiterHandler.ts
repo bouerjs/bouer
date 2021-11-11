@@ -1,7 +1,7 @@
 import IoC from "../shared/helpers/IoC";
 import { isNull, trim } from "../shared/helpers/Utils";
 import delimiter from "../types/delimiter";
-import { delimiterResponse } from "../types/delimiterResponse";
+import delimiterResponse from "../types/delimiterResponse";
 
 export default class DelimiterHandler {
   delimiters: Array<delimiter> = [];

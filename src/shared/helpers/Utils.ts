@@ -10,7 +10,7 @@ export function code(len?: number, prefix?: string, sufix?: string) {
   let lowerAlt = false, out = '';
   for (let i = 0; i < (len || 8); i++) {
     let pos = Math.floor(Math.random() * alpha.length);
-    out += lowerAlt ? alpha[pos].toLowerCase() : alpha[pos];
+    out += lowerAlt ? toLower(alpha[pos]) : alpha[pos];
     lowerAlt = !lowerAlt;
   }
   return ((prefix || "") + out + (sufix || ""));
@@ -22,10 +22,6 @@ export function isNull(input: any) {
 
 export function isObject(input: any) {
   return (typeof input === 'object') && (String(input) === '[object Object]');
-}
-
-export function isNode(input: any) {
-  return (input instanceof Node);
 }
 
 export function isFilledObj(input: any) {
@@ -76,10 +72,6 @@ export function startWith(value: string, pattern: string) {
 
 export function toLower(str: string) {
   return str.toLowerCase();
-}
-
-export function toUpper(str: string) {
-  return str.toUpperCase;
 }
 
 export function toStr(input: any) {

@@ -26,7 +26,8 @@ import {
   isFunction,
   defineProperty,
   isObject,
-  toArray
+  toArray,
+  toLower
 } from "../../shared/helpers/Utils";
 import ReactiveEvent from "../event/ReactiveEvent";
 import Reactive from "../reactive/Reactive";
@@ -103,9 +104,9 @@ export default class ComponentHandler {
 
       if (isNull(component.name)) {
         if (isBuitInClass)
-          component.name = code(9, 'component-').toLowerCase();
+          component.name = toLower(code(9, 'component-'));
         else
-          component.name = component.constructor.name.toLowerCase();
+          component.name = toLower(component.constructor.name);
       }
 
       if (isNull(component.path) && isNull(component.template))
@@ -148,7 +149,7 @@ export default class ComponentHandler {
   }
 
   order(componentElement: Element, data: object, callback?: (component: Component) => void) {
-    const $name = componentElement.nodeName.toLowerCase();
+    const $name = toLower(componentElement.nodeName);
     const mComponents = this.components as dynamic;
     let hasComponent = mComponents[$name];
     if (!hasComponent)
@@ -264,7 +265,7 @@ export default class ComponentHandler {
   }
 
   private insert(componentElement: Element, component: Component, data: object) {
-    const $name = componentElement.nodeName.toLowerCase();
+    const $name = toLower(componentElement.nodeName);
     const container = componentElement.parentElement;
     if (!componentElement.isConnected || !container)
       return; //Logger.warn("Insert location of component <" + $name + "></" + $name + "> not found.");

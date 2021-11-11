@@ -22,23 +22,6 @@ export default class Extend {
     return out as object;
   }
 
-  /** Add properties to the first object extracting from the next arguments */
-  static addToObj(destination: object, ...args: object[]) {
-    forEach(args, arg => {
-      if (isNull(arg)) return;
-
-      forEach(Object.keys(arg), key => {
-        const propValue = (arg as any)[key];
-
-        if (isNull(propValue))
-          return;
-
-        transferProperty(destination, arg, key);
-      })
-    });
-    return destination;
-  }
-
   /** join arrays into one */
   static array(...args: Array<any>) {
     const out: any[] = [];

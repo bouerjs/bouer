@@ -9,7 +9,7 @@ function code(len, prefix, sufix) {
     var lowerAlt = false, out = '';
     for (var i = 0; i < (len || 8); i++) {
         var pos = Math.floor(Math.random() * alpha.length);
-        out += lowerAlt ? alpha[pos].toLowerCase() : alpha[pos];
+        out += lowerAlt ? toLower(alpha[pos]) : alpha[pos];
         lowerAlt = !lowerAlt;
     }
     return ((prefix || "") + out + (sufix || ""));
@@ -19,9 +19,6 @@ function isNull(input) {
 }
 function isObject(input) {
     return (typeof input === 'object') && (String(input) === '[object Object]');
-}
-function isNode(input) {
-    return (input instanceof Node);
 }
 function isFilledObj(input) {
     if (isEmptyObject(input))
@@ -282,7 +279,7 @@ var IoC = /** @class */ (function () {
      * @param instance the instance to be store
      */
     IoC.Register = function (instance) {
-        this.container[instance.__proto__.constructor.name] = instance;
+        this.container[instance.constructor.name] = instance;
     };
     /**
      * Resolve and Retrieve the instance registered
@@ -552,7 +549,7 @@ var Binder = /** @class */ (function () {
             });
             reactiveEvent.off();
             callback_1(this.BindingDirection.fromDataToInput, result);
-            var listeners = [ownerElement.nodeName.toLowerCase(), 'propertychange', 'change'];
+            var listeners = [toLower(ownerElement.nodeName), 'propertychange', 'change'];
             var callbackEvent_1 = function () {
                 callback_1(_this.BindingDirection.fromInputToData, ownerElement[propertyNameToBind_1]);
             };
@@ -656,27 +653,6 @@ var CommentHandler = /** @class */ (function () {
         comment.id = id || code(8);
         return comment;
     };
-    // Gets a comment from an element
-    CommentHandler.prototype.get = function (id, element) {
-        if (isNull(id))
-            return;
-        element = element || this.bouer.el;
-        return this.retrieve(element).find(function (comment) { return comment.id === id; });
-    };
-    CommentHandler.prototype.retrieve = function (elem) {
-        if (!elem)
-            return [];
-        var filterNone = function () { return NodeFilter.FILTER_ACCEPT; };
-        var iterator = DOM.createNodeIterator(elem, NodeFilter.SHOW_COMMENT, filterNone);
-        var nodes = [];
-        var node;
-        while (node = iterator.nextNode()) {
-            // Only adds easy nodes
-            if ('id' in node)
-                nodes.push(node);
-        }
-        return nodes;
-    };
     return CommentHandler;
 }());
 
@@ -701,24 +677,6 @@ var Extend = /** @class */ (function () {
             });
         });
         return out;
-    };
-    /** Add properties to the first object extracting from the next arguments */
-    Extend.addToObj = function (destination) {
-        var args = [];
-        for (var _i = 1; _i < arguments.length; _i++) {
-            args[_i - 1] = arguments[_i];
-        }
-        forEach(args, function (arg) {
-            if (isNull(arg))
-                return;
-            forEach(Object.keys(arg), function (key) {
-                var propValue = arg[key];
-                if (isNull(propValue))
-                    return;
-                transferProperty(destination, arg, key);
-            });
-        });
-        return destination;
     };
     /** join arrays into one */
     Extend.array = function () {
@@ -926,7 +884,7 @@ var Reactive = /** @class */ (function () {
                     propValueAsAny.push.apply(propValueAsAny, value);
                 }
                 else if (isObject(value)) {
-                    if (isNode(value)) // If some html element
+                    if ((value instanceof Node)) // If some html element
                         _this.propertyValue = value;
                     else {
                         Reactive.transform(value);
@@ -1289,7 +1247,7 @@ var Directive = /** @class */ (function () {
                 var comparison = function (asc, desc) {
                     if (isNull(asc) || isNull(desc))
                         return 0;
-                    switch (type.toLowerCase()) {
+                    switch (toLower(type)) {
                         case 'asc': return asc ? 1 : -1;
                         case 'desc': return desc ? -1 : 1;
                         default:
@@ -2154,9 +2112,9 @@ var ComponentHandler = /** @class */ (function () {
             var isBuitInClass = _name === "IComponent" || _name === "Component" || _name === "Object";
             if (isNull(component.name)) {
                 if (isBuitInClass)
-                    component.name = code(9, 'component-').toLowerCase();
+                    component.name = toLower(code(9, 'component-'));
                 else
-                    component.name = component.constructor.name.toLowerCase();
+                    component.name = toLower(component.constructor.name);
             }
             if (isNull(component.path) && isNull(component.template))
                 return Logger.warn("The component with name “" + component.name + "”" +
@@ -2188,7 +2146,7 @@ var ComponentHandler = /** @class */ (function () {
     };
     ComponentHandler.prototype.order = function (componentElement, data, callback) {
         var _this = this;
-        var $name = componentElement.nodeName.toLowerCase();
+        var $name = toLower(componentElement.nodeName);
         var mComponents = this.components;
         var hasComponent = mComponents[$name];
         if (!hasComponent)
@@ -2291,7 +2249,7 @@ var ComponentHandler = /** @class */ (function () {
     ComponentHandler.prototype.insert = function (componentElement, component, data) {
         var _this = this;
         var _a;
-        var $name = componentElement.nodeName.toLowerCase();
+        var $name = toLower(componentElement.nodeName);
         var container = componentElement.parentElement;
         if (!componentElement.isConnected || !container)
             return; //Logger.warn("Insert location of component <" + $name + "></" + $name + "> not found.");
@@ -2760,8 +2718,8 @@ var EventHandler = /** @class */ (function () {
 
 var Routing = /** @class */ (function () {
     function Routing(bouer) {
-        this.defaultPage = null;
-        this.notFoundPage = null;
+        this.defaultPage = undefined;
+        this.notFoundPage = undefined;
         this.routeView = null;
         this.activeAnchors = [];
         // Store `href` value of the <base /> tag

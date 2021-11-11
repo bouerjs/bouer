@@ -9,14 +9,6 @@ import Logger from "../shared/logger/Logger";
 import dynamic from "../types/dynamic";
 import IoC from "../shared/helpers/IoC";
 
-type EvaluatorOptions = {
-  data: object,
-  expression: string,
-  isReturn?: boolean,
-  aditional?: object,
-  args?: any[],
-}
-
 export default class Evaluator {
   private global: Window & typeof globalThis | null;
   private bouer: Bouer;
@@ -28,7 +20,7 @@ export default class Evaluator {
     this.global = this.createWindow() as any;
   }
 
-  private createWindow(){
+  private createWindow() {
     let mWindow: Window | null;
 
     createEl('iframe', (frame, dom) => {
@@ -51,7 +43,13 @@ export default class Evaluator {
     }
   }
 
-  exec(options: EvaluatorOptions) {
+  exec(options: {
+    data: object,
+    expression: string,
+    isReturn?: boolean,
+    aditional?: object,
+    args?: any[],
+  }) {
     let { data, args, expression, isReturn, aditional } = options;
     const mGlobal = this.global as dynamic;
     const noConfigurableProperties: dynamic = {};

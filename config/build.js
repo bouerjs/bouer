@@ -44,7 +44,7 @@ Object.keys(builds).filter(key => {
 function writeFile(dest, code, zip) {
   return new Promise((resolve, reject) => {
     function report(extra) {
-      const colored = `'\x1b[1m\x1b[34m'${(path.relative(process.cwd(), dest)) + ' ' + getSize(code) + (extra || '')}'\x1b[39m\x1b[22m'`;
+      const colored = `\x1b[1m\x1b[34m${(path.relative(process.cwd(), dest)) + ' ' + getSize(code) + (extra || '')}\x1b[39m\x1b[22m`;
       console.log(colored);
       resolve()
     }

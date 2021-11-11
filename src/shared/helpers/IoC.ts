@@ -14,7 +14,7 @@ export default class IoC {
    */
   static Register<T>(instance: T) {
     this.container[
-      (instance as any).__proto__.constructor.name
+      (instance as any).constructor.name
     ] = instance;
   }
 
