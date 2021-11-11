@@ -1,4 +1,4 @@
-import Bouer from "../..";
+import Bouer from "../../instance/Bouer";
 import IoC from "../../shared/helpers/IoC";
 import { createAnyEl, createEl, DOM, forEach, GLOBAL, isNull, toArray, trim, urlCombine, urlResolver } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
@@ -30,7 +30,7 @@ export default class Routing {
     if (!base) return;
     const baseHref = (base.attributes as any)['href'];
     if (!baseHref)
-      return Logger.error(("The href=\"/\" attribute is required in base element."));
+      return Logger.error("The href=\"/\" attribute is required in base element.");
 
     this.base = baseHref.value;
 
@@ -92,6 +92,7 @@ export default class Routing {
 
   pushState(url: string, title?: string) {
     url = urlResolver(url).href;
+    if (DOM.location.href === url) return;
     GLOBAL.history.pushState(url, (title || ''), url);
   }
 
