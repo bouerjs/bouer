@@ -37,11 +37,11 @@ export const Constants = {
   ihref: '!href',
 
   entry: 'e-entry',
-  component: ':name',
 
   on: 'on:',
 
-  tagContent: 'content',
+  silent: 'silent',
+  slot: 'slot',
   ref: 'ref',
   put: 'put',
 
