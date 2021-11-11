@@ -6,7 +6,7 @@ import Binder from "../binder/Binder";
 import ComponentHandler from "../component/ComponentHandler";
 import DelimiterHandler from "../DelimiterHandler";
 import EventHandler from "../event/EventHandler";
-import Bouer from "../instance/Bouer";
+import Bouer from "../../instance/Bouer";
 import Directive from "./Directive";
 import {
   DOM,
@@ -55,7 +55,7 @@ export default class Compiler {
      * a wrapper (Example: <div>) with the content need to be provided
      * in `componentContent` property in order to be replaced on the compilation.
      */
-    componentContent?: Element
+    componentSlot?: Element
     /** The function that will be fired when the compilation is done */
     onDone?: (element: Element, data?: object) => void
   }) {
@@ -75,9 +75,9 @@ export default class Compiler {
         if (Constants.ignore in node.attributes)
           return this.directive.ignore(node);
 
-        if (node.localName === Constants.tagContent && options.componentContent) {
-          const insertContent = (content: Element, reference: Node) => {
-            forEach(toArray(content.childNodes), (child: Node) => {
+        if (node.localName === Constants.slot && options.componentSlot) {
+          const insertSlot = (slot: Element, reference: Node) => {
+            forEach(toArray(slot.childNodes), (child: Node) => {
               const cloned = child.cloneNode(true);
               rootElement.insertBefore(cloned, reference);
               walker(cloned, data);
@@ -86,16 +86,16 @@ export default class Compiler {
           }
 
           if (node.hasAttribute('default')) {
-            // In case of default content insertion
-            return insertContent(options.componentContent!, node);
-          } else if (node.hasAttribute('target')) {
-            // In case of target content insertion
-            const target = (node.attributes as any)['target'] as Attr;
-            return forEach(toArray(options.componentContent!.children), (child: Element) => {
-              if (child.localName === Constants.tagContent && child.getAttribute('target') !== target.value)
+            // In case of default slot insertion
+            return insertSlot(options.componentSlot!, node);
+          } else if (node.hasAttribute('name')) {
+            // In case of target slot insertion
+            const target = (node.attributes as any)['name'] as Attr;
+            return forEach(toArray(options.componentSlot!.children), (child: Element) => {
+              if (child.localName === Constants.slot && child.getAttribute('name') !== target.value)
                 return;
 
-              insertContent(child, node);
+              insertSlot(child, node);
             });
           }
         }
@@ -205,6 +205,9 @@ export default class Compiler {
     }
 
     walker(rootElement, data);
+
+    if (rootElement.hasAttribute(Constants.silent))
+      rootElement.removeAttribute(Constants.silent)
 
     if (isFunction(options.onDone))
       options.onDone!.call(this.bouer, rootElement);
