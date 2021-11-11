@@ -2,7 +2,7 @@ import { Constants } from "../../shared/helpers/Constants";
 import Extend from "../../shared/helpers/Extend";
 import IoC from "../../shared/helpers/IoC";
 import Logger from "../../shared/logger/Logger";
-import Bouer from "../instance/Bouer";
+import Bouer from "../../instance/Bouer";
 import {
   findAttribute,
   forEach,
@@ -50,7 +50,7 @@ export default class Converter {
 
     // If the element is not
     if (isNull(element))
-      throw Logger.error(("Invalid element passed in app.toJsObj(...)."));
+      throw Logger.error("Invalid element passed in app.toJsObj(...).");
 
     options = options || {};
 

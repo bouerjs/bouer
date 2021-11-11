@@ -27,7 +27,7 @@ import DelimiterHandler from "../DelimiterHandler";
 import Evaluator from "../Evaluator";
 import EventHandler from "../event/EventHandler";
 import ReactiveEvent from "../event/ReactiveEvent";
-import Bouer from "../instance/Bouer";
+import Bouer from "../../instance/Bouer";
 import Interceptor from "../interceptor/Interceptor";
 import Reactive from "../reactive/Reactive";
 import Routing from "../routing/Routing";
@@ -214,8 +214,8 @@ export default class Directive {
       return Logger.error(this.errorMsgEmptyNode(node));
 
     if (!nodeValue.includes(' of ') && !nodeValue.includes(' in '))
-      return Logger.error(("Expected a valid “for” expression in “" + nodeName + "” and got “" + nodeValue + "”."
-        + "\nValid: e-for=\"item of items\"."));
+      return Logger.error("Expected a valid “for” expression in “" + nodeName + "” and got “" + nodeValue + "”."
+        + "\nValid: e-for=\"item of items\".");
 
     // Binding the e-for if got delimiters
     const delimiters = this.delimiter.run(nodeValue);
@@ -240,7 +240,7 @@ export default class Directive {
       let filterKeys = filterConfigParts[2];
 
       if (isNull(filterValue) || filterValue === '') {
-        Logger.error(("Invalid filter-value in “" + nodeName + "” with “" + nodeValue + "” expression."));
+        Logger.error("Invalid filter-value in “" + nodeName + "” with “" + nodeValue + "” expression.");
         return list;
       }
 
@@ -540,12 +540,12 @@ export default class Directive {
     const nodeValue = trim(node.nodeValue ?? '');
 
     if (this.delimiter.run(nodeValue).length !== 0)
-      return Logger.error(("The “data” attribute cannot contain delimiter."));
+      return Logger.error("The “data” attribute cannot contain delimiter.");
 
     ownerElement.removeAttribute(node.nodeName);
 
     let inputData: dynamic = {};
-    const mData = Extend.obj(data, { $this: data });
+    const mData = Extend.obj(data, { $data: data });
     const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
       inputData[reactive.propertyName] = undefined;
       defineProperty(inputData, reactive.propertyName, reactive);
