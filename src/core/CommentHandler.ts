@@ -1,4 +1,4 @@
-import Bouer from "./instance/Bouer";
+import Bouer from "../instance/Bouer";
 import { code, DOM, isNull } from "../shared/helpers/Utils";
 import IoC from "../shared/helpers/IoC";
 

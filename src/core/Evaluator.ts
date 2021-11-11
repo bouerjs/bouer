@@ -1,4 +1,4 @@
-import Bouer from "./instance/Bouer";
+import Bouer from "../instance/Bouer";
 import Extend from "../shared/helpers/Extend";
 import {
   buildError,

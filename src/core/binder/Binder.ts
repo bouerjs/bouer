@@ -17,7 +17,7 @@ import watchCallback from "../../types/watchCallback";
 import Compiler from "../compiler/Compiler";
 import Evaluator from "../Evaluator";
 import ReactiveEvent from "../event/ReactiveEvent";
-import Bouer from "../instance/Bouer";
+import Bouer from "../../instance/Bouer";
 import Watch from "./Watch";
 export interface BinderConfig {
   node: Node,

@@ -1,4 +1,4 @@
-import Bouer from "..";
+import Bouer from "../instance/Bouer";
 import { Constants } from "../shared/helpers/Constants";
 import IoC from "../shared/helpers/IoC";
 import { createEl, DOM, forEach, toArray } from "../shared/helpers/Utils";
@@ -43,6 +43,7 @@ export default class Skeleton {
     }
 
     const rules = [
+      '[silent]{ display: none!important; }',
       '[' + dir + '] { background-color: ' + this.backgroudColor + '!important; position: relative!important; overflow: hidden; }',
       '[' + dir + '],[' + dir + '] * { color: transparent!important; }',
       '[' + dir + ']::before, [' + dir + ']::after { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: block; }',
