@@ -1,4 +1,7 @@
 export default interface ILifeCycleHooks {
+  /** The hook that will be called when the component was blocked by restrictions */
+  blocked?: (event: CustomEvent) => void;
+
   /** The hook that will be called when the component is requested */
   requested?: (event: CustomEvent) => void;
 
