@@ -24,10 +24,10 @@ export default interface IComponent extends ILifeCycleHooks {
   keepAlive?: boolean;
 
   /** The children of the component that will inherit the `route` of the father */
-  children?: Array<IComponent>;
+  children?: (Component | IComponent)[];
 
   /** restrictions of this component */
-  restrictions?: Array<(compoment: Component) => boolean>;
+  restrictions?: Array<((compoment: (Component | IComponent)) => boolean)>;
 
   /** Allow to set this component as the `default page` when the application loads */
   isDefault?: boolean;

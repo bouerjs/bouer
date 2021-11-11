@@ -4,7 +4,7 @@ import { buildError, connectNode, forEach, isFunction, isNull, taskRunner, toLow
 import Logger from "../../shared/logger/Logger";
 import dynamic from "../../types/dynamic";
 import Evaluator from "../Evaluator";
-import Bouer from "../instance/Bouer";
+import Bouer from "../../instance/Bouer";
 
 export type EventEmitterOptions = {
   eventName: string
@@ -17,7 +17,7 @@ export type EventSubscription = {
   eventName: string
   attachedNode?: Node,
   callback: (evt: Event | CustomEvent, ...args: any[]) => void,
-  emit: (options: EventEmitterOptions) => void
+  emit: (options?: { init?: CustomEventInit, once?: boolean, }) => void
 }
 export default class EventHandler {
   private bouer: Bouer;
@@ -37,7 +37,7 @@ export default class EventHandler {
     const nodeName = node.nodeName;
 
     if (isNull(ownerElement))
-      return Logger.error(("Invalid ParentElement of “" + nodeName + "”"));
+      return Logger.error("Invalid ParentElement of “" + nodeName + "”");
 
     // <button on:submit.once.stopPropagation="times++"></button>
     const nodeValue = trim(node.nodeValue ?? '');
@@ -48,7 +48,7 @@ export default class EventHandler {
     modifiersList.shift();
 
     if (nodeValue === '')
-      return Logger.error(("Expected an expression in the “" + nodeName + "” and got an <empty string>."));
+      return Logger.error("Expected an expression in the “" + nodeName + "” and got an <empty string>.");
 
     connectNode(node, ownerElement);
     ownerElement.removeAttribute(nodeName);
@@ -104,7 +104,12 @@ export default class EventHandler {
       eventName: eventName,
       callback: evt => callback.apply(this.bouer, [evt]),
       attachedNode: attachedNode,
-      emit: this.emit
+      emit: options => this.emit({
+        eventName: eventName,
+        attachedNode: attachedNode,
+        init: (options || {}).init,
+        once: (options || {}).once
+      })
     };
 
     if (attachedNode)
@@ -148,7 +153,6 @@ export default class EventHandler {
 
   private cleanup() {
     taskRunner(() => {
-      const availableEvents: EventSubscription[] = [];
       this.events = where(this.events, event => {
         if (!event.attachedNode) return true;
         if (event.attachedNode.isConnected) return true;

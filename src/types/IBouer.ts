@@ -1,5 +1,5 @@
 import Component from "../core/component/Component";
-import Bouer from "../core/instance/Bouer";
+import Bouer from "../instance/Bouer";
 import customDirective from "./customDirective";
 import delimiter from "./delimiter";
 import dynamic from "./dynamic";
