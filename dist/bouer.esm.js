@@ -3,12 +3,6 @@
  * Copyright Easy.js 2018-2020 | 2021-2021 Afonso Matumona
  * Released under the MIT License.
  */
-(function (global, factory) {
-typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
-typeof define === 'function' && define.amd ? define(factory) :
-(global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.Bouer = factory());
-})(this, (function () { 'use strict';
-
 function http(input, init) { return fetch(input, init); }
 function code(len, prefix, sufix) {
     var alpha = '01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -3225,6 +3219,4 @@ var Bouer = /** @class */ (function () {
     return Bouer;
 }());
 
-return Bouer;
-
-}));
+export { Component, Bouer as default };
