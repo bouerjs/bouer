@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <base href="/examples/component/example1/">
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Component Test</title>
+  <link rel="stylesheet" href="../../shared.css">
+</head>
+
+<body>
+  <div id="app">
+    <div class="center">
+
+      <!-- Injecting the header -->
+      <app:header></app:header>
+
+      <!-- Addition form -->
+      <div class="form">
+        <input ref type="text" name="name" placeholder="Social Network Name"> <br>
+        <input ref type="text" name="url" placeholder="Social Network Link">
+
+        <button on:click="add">Add to List</button>
+      </div>
+
+      <hr>
+
+      <div class="main">
+        <social:item data="$data" e-for="social of socials" />
+      </div>
+
+      <!-- Injecting the footer -->
+      <app:footer></app:footer>
+
+    </div>
+  </div>
+
+  <script src="../../../dist/bouer.js"></script>
+  <script>
+    var app = new Bouer('#app', {
+      data: {
+        // Props
+        version: '3.0.0',
+        socials: [
+          {
+            name: 'Twitter',
+            url: 'www.twitter.com/bouerjs'
+          },
+          {
+            name: 'Reddit',
+            url: 'www.reddit.com/bouerjs'
+          }
+        ],
+
+        // Methods
+        add: function () {
+          const obj = this.toJsObj('.form');
+
+          if (!obj.name || !obj.url)
+            return alert('Both of the fields are required.');
+
+          this.data.socials.push(obj);
+
+          this.refs.name.value = ''
+          this.refs.url.value = ''
+        }
+      },
+      components: [
+        {
+          name: 'app:header',
+          path: '/components/header.html'
+        },
+        {
+          name: 'social:item',
+          path: '/components/social-item.html',
+        },
+        {
+          name: 'app:footer',
+          path: '/components/footer.html'
+        }
+      ]
+    });
+  </script>
+</body>
+
+</html>
