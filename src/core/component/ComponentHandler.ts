@@ -385,7 +385,7 @@ export default class ComponentHandler {
 		rootElement.classList.forEach(key => rootClassList[key] = true);
 
 		// Changing each selector to avoid conflits
-		const changeSelector = (style: HTMLStyleElement | HTMLLinkElement, id: string) => {
+		const changeSelector = (style: HTMLStyleElement | HTMLLinkElement, styleId: string) => {
 			const isStyle = (style.nodeName === 'STYLE'), rules: string[] = [];
 			if (!style.sheet) return;
 
@@ -396,8 +396,15 @@ export default class ComponentHandler {
 				const mRule = rule as dynamic;
 				const selector = (mRule.selectorText as string).substr(1);
 				const separation = rootClassList[selector] ? "" : " ";
+				const uniqueIdentifier = "." + styleId;
+				const selectorTextSplitted = mRule.selectorText.split(' ');
 
-				mRule.selectorText = "." + id + separation + mRule.selectorText;
+				if (selectorTextSplitted[0] === toLower(rootElement.tagName))
+					selectorTextSplitted.shift();
+				else
+					selectorTextSplitted.unshift(uniqueIdentifier);
+
+				mRule.selectorText = uniqueIdentifier + separation + selectorTextSplitted.join(' ');
 				if (isStyle) rules.push(mRule.cssText);
 			}
 			if (isStyle) style.innerText = rules.join(' ');
