@@ -2356,7 +2356,7 @@ var ComponentHandler = /** @class */ (function () {
         // Retrieving all the classes of the retu elements
         rootElement.classList.forEach(function (key) { return rootClassList[key] = true; });
         // Changing each selector to avoid conflits
-        var changeSelector = function (style, id) {
+        var changeSelector = function (style, styleId) {
             var isStyle = (style.nodeName === 'STYLE'), rules = [];
             if (!style.sheet)
                 return;
@@ -2368,7 +2368,13 @@ var ComponentHandler = /** @class */ (function () {
                 var mRule = rule;
                 var selector = mRule.selectorText.substr(1);
                 var separation = rootClassList[selector] ? "" : " ";
-                mRule.selectorText = "." + id + separation + mRule.selectorText;
+                var uniqueIdentifier = "." + styleId;
+                var selectorTextSplitted = mRule.selectorText.split(' ');
+                if (selectorTextSplitted[0] === toLower(rootElement.tagName))
+                    selectorTextSplitted.shift();
+                else
+                    selectorTextSplitted.unshift(uniqueIdentifier);
+                mRule.selectorText = uniqueIdentifier + separation + selectorTextSplitted.join(' ');
                 if (isStyle)
                     rules.push(mRule.cssText);
             }
