@@ -1,38 +1,27 @@
 import Bouer from "../../instance/Bouer";
-import Logger from "../../shared/logger/Logger";
-import Component from "./Component";
-import IComponent from "../../types/IComponent";
 import Extend from "../../shared/helpers/Extend";
-import dynamic from "../../types/dynamic";
-import Routing from "../routing/Routing";
 import IoC from "../../shared/helpers/IoC";
-import Evaluator from "../Evaluator";
-import Compiler from "../compiler/Compiler";
 import Observer from "../../shared/helpers/Observer";
-import DelimiterHandler from "../DelimiterHandler";
 import {
-  DOM,
-  code,
-  http,
-  trim,
-  isNull,
-  anchor,
-  forEach,
-  createEl,
-  buildError,
-  transferProperty,
-  urlCombine,
-  urlResolver,
-  isFunction,
-  defineProperty,
-  isObject,
-  toArray,
-  toLower
+	anchor, buildError, code, createEl, defineProperty, DOM, forEach, http, isFunction, isNull, isObject,
+	startWith,
+	toArray,
+	toLower, transferProperty,
+	urlCombine,
+	urlResolver
 } from "../../shared/helpers/Utils";
+import Logger from "../../shared/logger/Logger";
+import dynamic from "../../types/dynamic";
+import IBouer from "../../types/IBouer";
+import IComponent from "../../types/IComponent";
+import Compiler from "../compiler/Compiler";
+import DelimiterHandler from "../DelimiterHandler";
+import Evaluator from "../Evaluator";
+import EventHandler from "../event/EventHandler";
 import ReactiveEvent from "../event/ReactiveEvent";
 import Reactive from "../reactive/Reactive";
-import EventHandler from "../event/EventHandler";
-import IBouer from "../../types/IBouer";
+import Routing from "../routing/Routing";
+import Component from "./Component";
 
 
 export default class ComponentHandler {
@@ -99,8 +88,8 @@ export default class ComponentHandler {
 
   prepare(components: (Component | IComponent)[], parent?: (Component | IComponent)) {
     forEach(components, component => {
-      const _name = component.constructor.name;
-      const isBuitInClass = _name === "IComponent" || _name === "Component" || _name === "Object";
+      const ctorName = component.constructor.name;
+      const isBuitInClass = ctorName === "IComponent" || ctorName === "Component" || ctorName === "Object";
 
       if (isNull(component.name)) {
         if (isBuitInClass)
@@ -136,6 +125,9 @@ export default class ComponentHandler {
       if (!preload) return;
 
       if (!isNull(component.path)) {
+
+				// isBuitInClass
+
         this.request(component.path!, {
           success: content => {
             component.template = content;
@@ -222,7 +214,8 @@ export default class ComponentHandler {
       const blockedEvent = this.$addEvent('blocked', componentElement, component);
       const emitter = () => blockedEvent.emit({
         detail: {
-          message: "Component blocked by restriction(s)",
+					component: component.name,
+          message: "Component “"+ component.name +"” blocked by restriction(s)",
           blocks: blockedRestrictions
         }
       });
@@ -250,11 +243,11 @@ export default class ComponentHandler {
   }
 
   /** Subscribe the hooks of the instance */
-  $addEvent(eventName: string, element: Element, callbackSource: any) {
-    const callback = callbackSource[eventName];
+  $addEvent(eventName: string, element: Element, component: any) {
+    const callback = component[eventName];
     if (typeof callback !== 'function') return { emit: (() => { }) }
 
-    const emitter = this.eventHandler.on(eventName, evt => callback.call(this.bouer, evt), element, {
+    const emitter = this.eventHandler.on(eventName, evt => callback.call(component, evt), element, {
       once: true
     }).emit;
     return {
@@ -284,12 +277,12 @@ export default class ComponentHandler {
       createEl('body', htmlSnippet => {
         htmlSnippet.innerHTML = component.template!;
         forEach([].slice.apply(htmlSnippet.querySelectorAll('script')), script => {
-          component.scripts.push(script);
+					component.scripts.push(script);
           htmlSnippet.removeChild(script);
         });
 
         forEach([].slice.apply(htmlSnippet.querySelectorAll('link[rel="stylesheet"]')), style => {
-          component.styles.push(style);
+					component.styles.push(style);
           htmlSnippet.removeChild(style);
         });
 
@@ -405,6 +398,19 @@ export default class ComponentHandler {
     forEach(component.styles, style => {
       const mStyle = style.cloneNode(true) as Element;
 
+			if (mStyle instanceof HTMLLinkElement) {
+				let href = mStyle.getAttribute('href') || '';
+				if (startWith(href, './')) {
+					const componentPathSplitted = component.path.split('/');
+					componentPathSplitted.pop();
+
+					const hrefLinkSplitted = href.split('/');
+					hrefLinkSplitted.shift();
+
+					mStyle.href = urlCombine('', componentPathSplitted.join('/'), hrefLinkSplitted.join('/'));
+				}
+			}
+
       //Checking if this component already have styles added
       if (this.stylesController[$name]) {
 
@@ -506,8 +512,19 @@ export default class ComponentHandler {
     forEach(component.scripts, function (script) {
       if (script.src == '' || script.innerHTML)
         localScriptsContent.push(script.innerHTML);
-      else
+      else {
+				const src = script.getAttribute('src') || '';
+				if (startWith(src, './')) {
+					const componentPathSplitted = component.path.split('/');
+					componentPathSplitted.pop();
+
+					const scriptSrcSplitted = src.split('/');
+					scriptSrcSplitted.shift();
+
+					script.src = urlCombine('', componentPathSplitted.join('/'), scriptSrcSplitted.join('/'));
+				}
         onlineScriptsUrls.push(script.src);
+			}
     });
 
     // No online scripts detected
