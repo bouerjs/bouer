@@ -1,7 +1,6 @@
 
 // Quotes “"+  +"”
 import dynamic from "../../types/dynamic";
-import Logger from "../logger/Logger";
 
 export function http(input: RequestInfo, init?: RequestInit) { return fetch(input, init) }
 
