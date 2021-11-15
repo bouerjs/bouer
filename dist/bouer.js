@@ -2437,9 +2437,9 @@ var ComponentHandler = /** @class */ (function () {
                     }
                 });
                 Observer.observe(container, function (options) {
-                    if (rootElement.isConnected)
-                        return;
                     var mutation = options.mutation, element = options.element;
+                    if (element.isConnected)
+                        return;
                     component.destroy();
                     mutation.disconnect();
                     var stylesController = _this.stylesController[component.name];
