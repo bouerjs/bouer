@@ -787,10 +787,12 @@ var Component = /** @class */ (function () {
         this.route = undefined;
         this.isDefault = undefined;
         this.isNotFound = undefined;
-        this.bouer = undefined;
         this.el = undefined;
+        this.bouer = undefined;
         this.scripts = [];
+        this.children = [];
         this.styles = [];
+        this.restrictions = [];
         // Store temporarily this component UI orders
         this.events = [];
         var _name = undefined;
@@ -807,6 +809,14 @@ var Component = /** @class */ (function () {
         this.path = _path;
         this.data = Reactive.transform(this.data || {});
     }
+    // Events
+    Component.prototype.beforeMount = function (event) { };
+    Component.prototype.mounted = function (event) { };
+    Component.prototype.beforeLoad = function (event) { };
+    Component.prototype.loaded = function (event) { };
+    Component.prototype.beforeDestroy = function (event) { };
+    Component.prototype.destroyed = function (event) { };
+    Component.prototype.blocked = function (event) { };
     Component.prototype.export = function (options) {
         var _this = this;
         if (!isObject(options))
@@ -848,14 +858,14 @@ var Component = /** @class */ (function () {
         IoC.Resolve('EventHandler').off(eventName, callback, this.el);
         this.events = where(this.events, function (evt) { return !(evt.eventName == eventName && evt.callback == callback); });
     };
-    Component.prototype.addStyle = function (styles) {
+    Component.prototype.addCSS = function (styles) {
         var $styles = styles.map(function (item) {
             return createEl('link', function (el) {
                 var _a;
                 if ((_a = item.scoped) !== null && _a !== void 0 ? _a : true)
                     el.setAttribute('scoped', 'true');
+                el.setAttribute('href', item.href);
                 el.rel = "stylesheet";
-                el.href = item.href;
             }).build();
         });
         this.styles.push.apply(this.styles, $styles);
@@ -2114,8 +2124,8 @@ var ComponentHandler = /** @class */ (function () {
         var _this = this;
         forEach(components, function (component) {
             var _a;
-            var _name = component.constructor.name;
-            var isBuitInClass = _name === "IComponent" || _name === "Component" || _name === "Object";
+            var ctorName = component.constructor.name;
+            var isBuitInClass = ctorName === "IComponent" || ctorName === "Component" || ctorName === "Object";
             if (isNull(component.name)) {
                 if (isBuitInClass)
                     component.name = toLower(code(9, 'component-'));
@@ -2139,6 +2149,7 @@ var ComponentHandler = /** @class */ (function () {
             if (!preload)
                 return;
             if (!isNull(component.path)) {
+                // isBuitInClass
                 _this.request(component.path, {
                     success: function (content) {
                         component.template = content;
@@ -2213,7 +2224,8 @@ var ComponentHandler = /** @class */ (function () {
             var blockedEvent_1 = this.$addEvent('blocked', componentElement, component);
             var emitter_1 = function () { return blockedEvent_1.emit({
                 detail: {
-                    message: "Component blocked by restriction(s)",
+                    component: component.name,
+                    message: "Component “" + component.name + "” blocked by restriction(s)",
                     blocks: blockedRestrictions_1
                 }
             }); };
@@ -2238,12 +2250,11 @@ var ComponentHandler = /** @class */ (function () {
         return null;
     };
     /** Subscribe the hooks of the instance */
-    ComponentHandler.prototype.$addEvent = function (eventName, element, callbackSource) {
-        var _this = this;
-        var callback = callbackSource[eventName];
+    ComponentHandler.prototype.$addEvent = function (eventName, element, component) {
+        var callback = component[eventName];
         if (typeof callback !== 'function')
             return { emit: (function () { }) };
-        var emitter = this.eventHandler.on(eventName, function (evt) { return callback.call(_this.bouer, evt); }, element, {
+        var emitter = this.eventHandler.on(eventName, function (evt) { return callback.call(component, evt); }, element, {
             once: true
         }).emit;
         return {
@@ -2370,6 +2381,16 @@ var ComponentHandler = /** @class */ (function () {
         // Configuring the styles
         forEach(component.styles, function (style) {
             var mStyle = style.cloneNode(true);
+            if (mStyle instanceof HTMLLinkElement) {
+                var href = mStyle.getAttribute('href') || '';
+                if (startWith(href, './')) {
+                    var componentPathSplitted = component.path.split('/');
+                    componentPathSplitted.pop();
+                    var hrefLinkSplitted = href.split('/');
+                    hrefLinkSplitted.shift();
+                    mStyle.href = urlCombine('', componentPathSplitted.join('/'), hrefLinkSplitted.join('/'));
+                }
+            }
             //Checking if this component already have styles added
             if (_this.stylesController[$name]) {
                 var controller = _this.stylesController[$name];
@@ -2451,8 +2472,17 @@ var ComponentHandler = /** @class */ (function () {
         forEach(component.scripts, function (script) {
             if (script.src == '' || script.innerHTML)
                 localScriptsContent.push(script.innerHTML);
-            else
+            else {
+                var src = script.getAttribute('src') || '';
+                if (startWith(src, './')) {
+                    var componentPathSplitted = component.path.split('/');
+                    componentPathSplitted.pop();
+                    var scriptSrcSplitted = src.split('/');
+                    scriptSrcSplitted.shift();
+                    script.src = urlCombine('', componentPathSplitted.join('/'), scriptSrcSplitted.join('/'));
+                }
                 onlineScriptsUrls.push(script.src);
+            }
         });
         // No online scripts detected
         if (onlineScriptsUrls.length == 0)
@@ -3180,6 +3210,9 @@ var Bouer = /** @class */ (function () {
     Bouer.import = function () {
         new ComponentHandler({}, {});
     };
+    Bouer.prototype.beforeLoad = function (event) { };
+    Bouer.prototype.loaded = function (event) { };
+    Bouer.prototype.destroyed = function (event) { };
     return Bouer;
 }());
 

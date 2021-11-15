@@ -6,7 +6,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "rollup --config rollup.config.js --configPlugin typescript --w",
     "publish": "rollup --config rollup.config.js --configPlugin typescript",
-    "release": "node config/build.js --prod"
+    "release": "node scripts/build.js --prod"
   },
   "keywords": [
     "Bouer"
