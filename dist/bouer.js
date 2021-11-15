@@ -2374,8 +2374,6 @@ var ComponentHandler = /** @class */ (function () {
                 var selectorTextSplitted = mRule.selectorText.split(' ');
                 if (selectorTextSplitted[0] === toLower(rootElement.tagName))
                     selectorTextSplitted.shift();
-                else
-                    selectorTextSplitted.unshift(uniqueIdentifier);
                 mRule.selectorText = uniqueIdentifier + separation + selectorTextSplitted.join(' ');
                 if (isStyle)
                     rules.push(mRule.cssText);
