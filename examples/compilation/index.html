@@ -2,34 +2,36 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Compilation Test</title>
-  <link rel="stylesheet" href="../shared.css">
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Compilation Test</title>
+	<link rel="stylesheet" href="../shared.css">
 </head>
 
 <body>
-  <div id="app">
-    <div class="center">
-      <h3>Bouer.js v{{ version }}</h3>
+	<div id="app">
+		<div class="center">
+			<h3>Bouer.js v{{ version }}</h3>
 
-      <div>
-        <input type="text" e-bind="value" placeholder="Type Something...">
-        <label>Your Typed: {{ value }}</label>
-      </div>
+			<div>
+				<input type="text" e-bind="value" placeholder="Type Something...">
+				<label>Your Typed: {{ value }}</label>
+			</div>
 
-    </div>
-  </div>
+		</div>
 
-  <script src="../../dist/bouer.js"></script>
-  <script>
-    var app = new Bouer('#app', {
-      data: {
-        version: '3.0.0',
-        value: ''
-      }
-    });
+		<div>
+	</div>
+
+	<script src="../../dist/bouer.js"></script>
+	<script>
+		var app = new Bouer('#app', {
+			data: {
+				version: '3.0.0',
+				value: ''
+			}
+		});
 
     // const input =
     //   [
@@ -83,7 +85,7 @@
     // //removeIsIslands(input);
     // console.log(`${input.map(x => JSON.stringify(x)).join('\n')}`);
 
-  </script>
+	</script>
 </body>
 
 </html>
