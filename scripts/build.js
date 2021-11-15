@@ -3,7 +3,7 @@ const zlib = require('zlib');
 const path = require('path');
 const rollup = require('rollup');
 const terser = require('terser');
-const builds = require('./configs').builds;
+const builds = require('./config').builds;
 
 
 Object.keys(builds).filter(key => {

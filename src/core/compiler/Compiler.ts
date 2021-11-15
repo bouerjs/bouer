@@ -18,7 +18,6 @@ import {
   isNull,
   toArray
 } from "../../shared/helpers/Utils";
-import customDirective from "../../types/customDirective";
 import IBouer from "../../types/IBouer";
 
 export default class Compiler {
@@ -28,6 +27,7 @@ export default class Compiler {
   delimiter: DelimiterHandler;
   eventHandler: EventHandler;
   component: ComponentHandler;
+
 
   private NODES_TO_IGNORE_IN_COMPILATION = {
     'SCRIPT': 1,
@@ -214,7 +214,7 @@ export default class Compiler {
   }
 
   analize(htmlSnippet: string): boolean {
-    return true;
+		return true;
 
     const parser = new DOMParser();
     const htmlForParser = `<xml>${htmlSnippet}</xml>`
