@@ -16,9 +16,9 @@ import {
 	isObject,
 	startWith,
 	toArray,
-	toLower, transferProperty,
-	urlCombine,
-	urlResolver
+	toLower, transferProperty, urlCombine,
+	urlResolver,
+	where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import dynamic from "../../types/dynamic";
@@ -175,7 +175,7 @@ export default class ComponentHandler {
 				return;
 			}
 
-			const requestedEvent = this.$addEvent('requested', componentElement, component);
+			const requestedEvent = this.addEvent('requested', componentElement, component);
 			if (requestedEvent) requestedEvent.emit();
 			// Make or Add request
 			this.request(component.path!, {
@@ -221,7 +221,7 @@ export default class ComponentHandler {
 				return restrictionResult;
 			});
 
-			const blockedEvent = this.$addEvent('blocked', componentElement, component);
+			const blockedEvent = this.addEvent('blocked', componentElement, component);
 			const emitter = () => blockedEvent.emit({
 				detail: {
 					component: component.name,
@@ -253,7 +253,7 @@ export default class ComponentHandler {
 	}
 
 	/** Subscribe the hooks of the instance */
-	$addEvent(eventName: string, element: Element, component: any) {
+	addEvent(eventName: string, element: Element, component: any) {
 		const callback = component[eventName];
 		if (typeof callback !== 'function') return { emit: (() => { }) }
 
@@ -286,19 +286,10 @@ export default class ComponentHandler {
 		if (isKeepAlive === false || isNull(component.el)) {
 			createEl('body', htmlSnippet => {
 				htmlSnippet.innerHTML = component.template!;
-				forEach([].slice.apply(htmlSnippet.querySelectorAll('script')), script => {
-					component.scripts.push(script);
-					htmlSnippet.removeChild(script);
-				});
 
-				forEach([].slice.apply(htmlSnippet.querySelectorAll('link[rel="stylesheet"]')), style => {
-					component.styles.push(style);
-					htmlSnippet.removeChild(style);
-				});
-
-				forEach([].slice.apply(htmlSnippet.querySelectorAll('style')), style => {
-					component.styles.push(style);
-					htmlSnippet.removeChild(style);
+				forEach([].slice.apply(htmlSnippet.querySelectorAll('script,link[rel="stylesheet"],style')), asset => {
+					component.assets.push(asset);
+					htmlSnippet.removeChild(asset);
 				});
 
 				if (htmlSnippet.children.length === 0)
@@ -311,7 +302,7 @@ export default class ComponentHandler {
 
 				component.el = htmlSnippet.children[0];
 
-				this.$addEvent('created', component.el!, component)
+				this.addEvent('created', component.el!, component)
 				component.emit('created');
 			});
 		}
@@ -375,7 +366,7 @@ export default class ComponentHandler {
 		if (isFunction(initializer))
 			initializer.call(component);
 
-		this.$addEvent('beforeMount', component.el!, component)
+		this.addEvent('beforeMount', component.el!, component)
 		component.emit('beforeMount');
 
 		container.replaceChild(rootElement, componentElement);
@@ -408,10 +399,13 @@ export default class ComponentHandler {
 			if (isStyle) style.innerText = rules.join(' ');
 		}
 
+		const scriptsAssets = where(component.assets, asset => toLower(asset.nodeName) === 'script');
+		const stylesAssets = where(component.assets, asset => toLower(asset.nodeName) !== 'script');
+
 		const styleAttrName = 'component-style';
 		// Configuring the styles
-		forEach(component.styles, style => {
-			const mStyle = style.cloneNode(true) as Element;
+		forEach(stylesAssets, asset => {
+			const mStyle = asset.cloneNode(true) as Element;
 
 			if (mStyle instanceof HTMLLinkElement) {
 				let href = mStyle.getAttribute('href') || '';
@@ -464,12 +458,12 @@ export default class ComponentHandler {
 				IoC.Resolve<Evaluator>('Evaluator')!
 					.execRaw((scriptContent || ''), component);
 
-				this.$addEvent('mounted', component.el!, component);
+				this.addEvent('mounted', component.el!, component);
 				component.emit('mounted');
 
 				// TODO: Something between this two events
 
-				this.$addEvent('beforeLoad', component.el!, component)
+				this.addEvent('beforeLoad', component.el!, component)
 				component.emit('beforeLoad');
 
 				IoC.Resolve<Compiler>('Compiler')!
@@ -478,7 +472,7 @@ export default class ComponentHandler {
 						el: rootElement,
 						componentSlot: elementSlots,
 						onDone: () => {
-							this.$addEvent('loaded', component.el!, component);
+							this.addEvent('loaded', component.el!, component);
 							component.emit('loaded');
 						}
 					});
@@ -514,7 +508,7 @@ export default class ComponentHandler {
 			}
 		}
 
-		if (component.scripts.length === 0)
+		if (scriptsAssets.length === 0)
 			return compile();
 
 		// Mixing all the scripts
@@ -524,7 +518,7 @@ export default class ComponentHandler {
 			webRequestChecker: any = {};
 
 		// Grouping the online scripts and collecting the online url
-		forEach(component.scripts, function (script) {
+		forEach(scriptsAssets as any, (script: HTMLScriptElement) => {
 			if (script.src == '' || script.innerHTML)
 				localScriptsContent.push(script.innerHTML);
 			else {
@@ -569,7 +563,7 @@ export default class ComponentHandler {
 					"<" + $name + "></" + $name + "> component, remove it in order to be compiled."));
 				Logger.log(error);
 
-				this.$addEvent('failed', componentElement, component)
+				this.addEvent('failed', componentElement, component)
 					.emit();
 			});
 		});
