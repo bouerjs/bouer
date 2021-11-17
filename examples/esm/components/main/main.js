@@ -18,9 +18,6 @@ export default class AppMain extends Component {
   }
 
   add() {
-
-		console.log(this);
-
     const bouer = this.bouer;
     const obj = bouer.toJsObj('.form');
 
@@ -34,8 +31,8 @@ export default class AppMain extends Component {
   }
 
   init() {
-    this.addCSS([{
-      href: "./main.css"
+    this.addAssets([{
+      src: "./main.css"
     }]);
   }
 }

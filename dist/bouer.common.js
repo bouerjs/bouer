@@ -787,9 +787,10 @@ var Component = /** @class */ (function () {
         this.isNotFound = undefined;
         this.el = undefined;
         this.bouer = undefined;
-        this.scripts = [];
         this.children = [];
-        this.styles = [];
+        //scripts: Array<HTMLScriptElement> = [];
+        //styles: Array<HTMLStyleElement | HTMLLinkElement> = [];
+        this.assets = [];
         this.restrictions = [];
         // Store temporarily this component UI orders
         this.events = [];
@@ -856,17 +857,48 @@ var Component = /** @class */ (function () {
         IoC.Resolve('EventHandler').off(eventName, callback, this.el);
         this.events = where(this.events, function (evt) { return !(evt.eventName == eventName && evt.callback == callback); });
     };
-    Component.prototype.addCSS = function (styles) {
-        var $styles = styles.map(function (item) {
-            return createEl('link', function (el) {
+    Component.prototype.addAssets = function (assets) {
+        var $assets = [];
+        var assetsTypeMapper = {
+            'css': 'link',
+            'js': 'script',
+            'style': 'link'
+        };
+        forEach(assets, function (asset, index) {
+            if (!asset.src || !trim(asset.src))
+                return Logger.error('Invalid asset “src”, in assets[' + index + '].src');
+            var type = '';
+            if (!asset.type) {
+                var srcSplitted = asset.src.split('.');
+                type = assetsTypeMapper[toLower(srcSplitted[srcSplitted.length - 1])];
+                if (!type)
+                    return Logger.error("Couldn't find out what type of asset it is, provide " +
+                        "the “type” explicitly at assets[" + index + "].type");
+            }
+            else {
+                asset.type = toLower(asset.type);
+                type = assetsTypeMapper[asset.type] || asset.type;
+            }
+            var $asset = createAnyEl(type, function (el) {
                 var _a;
-                if ((_a = item.scoped) !== null && _a !== void 0 ? _a : true)
+                if ((_a = asset.scoped) !== null && _a !== void 0 ? _a : true)
                     el.setAttribute('scoped', 'true');
-                el.setAttribute('href', item.href);
-                el.rel = "stylesheet";
+                switch (toLower(type)) {
+                    case 'script':
+                        el.setAttribute('src', asset.src);
+                        break;
+                    case 'link':
+                        el.setAttribute('href', asset.src);
+                        el.setAttribute('rel', 'stylesheet');
+                        break;
+                    default:
+                        el.setAttribute('src', asset.src);
+                        break;
+                }
             }).build();
+            $assets.push($asset);
         });
-        this.styles.push.apply(this.styles, $styles);
+        this.assets.push.apply(this.assets, $assets);
     };
     return Component;
 }());
@@ -2179,7 +2211,7 @@ var ComponentHandler = /** @class */ (function () {
                     mComponents[$name] = component;
                 return;
             }
-            var requestedEvent = _this.$addEvent('requested', componentElement, component);
+            var requestedEvent = _this.addEvent('requested', componentElement, component);
             if (requestedEvent)
                 requestedEvent.emit();
             // Make or Add request
@@ -2219,7 +2251,7 @@ var ComponentHandler = /** @class */ (function () {
                         .catch(function () { return blockedRestrictions_1.push(restriction); });
                 return restrictionResult;
             });
-            var blockedEvent_1 = this.$addEvent('blocked', componentElement, component);
+            var blockedEvent_1 = this.addEvent('blocked', componentElement, component);
             var emitter_1 = function () { return blockedEvent_1.emit({
                 detail: {
                     component: component.name,
@@ -2248,7 +2280,7 @@ var ComponentHandler = /** @class */ (function () {
         return null;
     };
     /** Subscribe the hooks of the instance */
-    ComponentHandler.prototype.$addEvent = function (eventName, element, component) {
+    ComponentHandler.prototype.addEvent = function (eventName, element, component) {
         var callback = component[eventName];
         if (typeof callback !== 'function')
             return { emit: (function () { }) };
@@ -2279,17 +2311,9 @@ var ComponentHandler = /** @class */ (function () {
         if (isKeepAlive === false || isNull(component.el)) {
             createEl('body', function (htmlSnippet) {
                 htmlSnippet.innerHTML = component.template;
-                forEach([].slice.apply(htmlSnippet.querySelectorAll('script')), function (script) {
-                    component.scripts.push(script);
-                    htmlSnippet.removeChild(script);
-                });
-                forEach([].slice.apply(htmlSnippet.querySelectorAll('link[rel="stylesheet"]')), function (style) {
-                    component.styles.push(style);
-                    htmlSnippet.removeChild(style);
-                });
-                forEach([].slice.apply(htmlSnippet.querySelectorAll('style')), function (style) {
-                    component.styles.push(style);
-                    htmlSnippet.removeChild(style);
+                forEach([].slice.apply(htmlSnippet.querySelectorAll('script,link[rel="stylesheet"],style')), function (asset) {
+                    component.assets.push(asset);
+                    htmlSnippet.removeChild(asset);
                 });
                 if (htmlSnippet.children.length === 0)
                     return Logger.error(("The component <" + $name + "></" + $name + "> " +
@@ -2298,7 +2322,7 @@ var ComponentHandler = /** @class */ (function () {
                     return Logger.error(("The component <" + $name + "></" + $name + "> " +
                         "seems to have multiple root element, it must have only one root."));
                 component.el = htmlSnippet.children[0];
-                _this.$addEvent('created', component.el, component);
+                _this.addEvent('created', component.el, component);
                 component.emit('created');
             });
         }
@@ -2349,7 +2373,7 @@ var ComponentHandler = /** @class */ (function () {
         var initializer = component.init;
         if (isFunction(initializer))
             initializer.call(component);
-        this.$addEvent('beforeMount', component.el, component);
+        this.addEvent('beforeMount', component.el, component);
         component.emit('beforeMount');
         container.replaceChild(rootElement, componentElement);
         var rootClassList = {};
@@ -2379,10 +2403,12 @@ var ComponentHandler = /** @class */ (function () {
             if (isStyle)
                 style.innerText = rules.join(' ');
         };
+        var scriptsAssets = where(component.assets, function (asset) { return toLower(asset.nodeName) === 'script'; });
+        var stylesAssets = where(component.assets, function (asset) { return toLower(asset.nodeName) !== 'script'; });
         var styleAttrName = 'component-style';
         // Configuring the styles
-        forEach(component.styles, function (style) {
-            var mStyle = style.cloneNode(true);
+        forEach(stylesAssets, function (asset) {
+            var mStyle = asset.cloneNode(true);
             if (mStyle instanceof HTMLLinkElement) {
                 var href = mStyle.getAttribute('href') || '';
                 if (startWith(href, './')) {
@@ -2423,10 +2449,10 @@ var ComponentHandler = /** @class */ (function () {
                 // Executing the mixed scripts
                 IoC.Resolve('Evaluator')
                     .execRaw((scriptContent || ''), component);
-                _this.$addEvent('mounted', component.el, component);
+                _this.addEvent('mounted', component.el, component);
                 component.emit('mounted');
                 // TODO: Something between this two events
-                _this.$addEvent('beforeLoad', component.el, component);
+                _this.addEvent('beforeLoad', component.el, component);
                 component.emit('beforeLoad');
                 IoC.Resolve('Compiler')
                     .compile({
@@ -2434,7 +2460,7 @@ var ComponentHandler = /** @class */ (function () {
                     el: rootElement,
                     componentSlot: elementSlots,
                     onDone: function () {
-                        _this.$addEvent('loaded', component.el, component);
+                        _this.addEvent('loaded', component.el, component);
                         component.emit('loaded');
                     }
                 });
@@ -2466,12 +2492,12 @@ var ComponentHandler = /** @class */ (function () {
                 Logger.error(buildError(error));
             }
         };
-        if (component.scripts.length === 0)
+        if (scriptsAssets.length === 0)
             return compile();
         // Mixing all the scripts
         var localScriptsContent = [], onlineScriptsContent = [], onlineScriptsUrls = [], webRequestChecker = {};
         // Grouping the online scripts and collecting the online url
-        forEach(component.scripts, function (script) {
+        forEach(scriptsAssets, function (script) {
             if (script.src == '' || script.innerHTML)
                 localScriptsContent.push(script.innerHTML);
             else {
@@ -2511,7 +2537,7 @@ var ComponentHandler = /** @class */ (function () {
                 Logger.error(("Error loading the <script src=\"" + url + "\"></script> in " +
                     "<" + $name + "></" + $name + "> component, remove it in order to be compiled."));
                 Logger.log(error);
-                _this.$addEvent('failed', componentElement, component)
+                _this.addEvent('failed', componentElement, component)
                     .emit();
             });
         });
