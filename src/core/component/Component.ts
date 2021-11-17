@@ -2,12 +2,10 @@ import Bouer from "../../instance/Bouer";
 import IoC from "../../shared/helpers/IoC";
 import UriHandler from "../../shared/helpers/UriHandler";
 import {
-	createEl,
-	defineProperty,
-	DOM,
-	forEach, isObject, isString, transferProperty, where
+	createAnyEl, forEach, isObject, isString, toLower, transferProperty, trim, where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
+import dynamic from "../../types/dynamic";
 import IComponent from "../../types/IComponent";
 import ILifeCycleHooks from "../../types/ILifeCycleHooks";
 import EventHandler, { EventSubscription } from "../event/EventHandler";
@@ -25,9 +23,10 @@ export default class Component implements IComponent {
 
 	el?: Element = undefined;
 	bouer?: Bouer = undefined;
-	scripts: Array<HTMLScriptElement> = [];
 	children?: (Component | IComponent)[] = [];
-	styles: Array<HTMLStyleElement | HTMLLinkElement> = [];
+	//scripts: Array<HTMLScriptElement> = [];
+	//styles: Array<HTMLStyleElement | HTMLLinkElement> = [];
+	assets: Array<HTMLScriptElement | HTMLStyleElement | HTMLLinkElement> = [];
 	restrictions?: Array<((compoment: (Component | IComponent)) => boolean)> = [];
 
 	// Store temporarily this component UI orders
@@ -106,15 +105,51 @@ export default class Component implements IComponent {
 		this.events = where(this.events, evt => !(evt.eventName == eventName && evt.callback == callback));
 	}
 
-	addCSS(styles: { href: string, scoped: boolean }[]) {
-		const $styles = styles.map(item => {
-			return createEl('link', el => {
-				if (item.scoped ?? true)
+	addAssets(assets: {
+		type: string,
+		src: string,
+		scoped: boolean
+	}[]) {
+
+		const $assets: any[] = [];
+		const assetsTypeMapper: dynamic = {
+			'css': 'link',
+			'js': 'script',
+			'style': 'link'
+		}
+		forEach(assets, (asset, index) => {
+			if (!asset.src || !trim(asset.src))
+				return Logger.error('Invalid asset “src”, in assets[' + index + '].src');
+			let type = '';
+
+			if (!asset.type) {
+				const srcSplitted = asset.src.split('.');
+				type = assetsTypeMapper[toLower(srcSplitted[srcSplitted.length - 1])];
+
+				if (!type) return Logger.error("Couldn't find out what type of asset it is, provide " +
+					"the “type” explicitly at assets[" + index + "].type");
+			} else {
+				asset.type = toLower(asset.type);
+				type = assetsTypeMapper[asset.type] || asset.type;
+			}
+
+			const $asset = createAnyEl(type, el => {
+				if (asset.scoped ?? true)
 					el.setAttribute('scoped', 'true');
-				el.setAttribute('href', item.href);
-				el.rel = "stylesheet";
+
+				switch (toLower(type)) {
+					case 'script': el.setAttribute('src', asset.src); break;
+					case 'link':
+						el.setAttribute('href', asset.src);
+						el.setAttribute('rel', 'stylesheet');
+						break;
+					default: el.setAttribute('src', asset.src); break;
+				}
 			}).build();
+
+			$assets.push($asset);
 		});
-		this.styles.push.apply(this.styles, $styles);
+
+		this.assets.push.apply(this.assets, $assets);
 	}
 }
