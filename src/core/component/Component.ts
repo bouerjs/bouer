@@ -24,8 +24,6 @@ export default class Component implements IComponent {
 	el?: Element = undefined;
 	bouer?: Bouer = undefined;
 	children?: (Component | IComponent)[] = [];
-	//scripts: Array<HTMLScriptElement> = [];
-	//styles: Array<HTMLStyleElement | HTMLLinkElement> = [];
 	assets: Array<HTMLScriptElement | HTMLStyleElement | HTMLLinkElement> = [];
 	restrictions?: Array<((compoment: (Component | IComponent)) => boolean)> = [];
 

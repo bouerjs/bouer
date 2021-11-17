@@ -784,8 +784,6 @@ var Component = /** @class */ (function () {
         this.el = undefined;
         this.bouer = undefined;
         this.children = [];
-        //scripts: Array<HTMLScriptElement> = [];
-        //styles: Array<HTMLStyleElement | HTMLLinkElement> = [];
         this.assets = [];
         this.restrictions = [];
         // Store temporarily this component UI orders
