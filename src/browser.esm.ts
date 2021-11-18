@@ -1,5 +1,7 @@
 import { Component } from "./common";
 import Bouer from "./instance/Bouer";
 
-export { Component };
-export default Bouer;
+export {
+	Bouer as default,
+	Component
+};
