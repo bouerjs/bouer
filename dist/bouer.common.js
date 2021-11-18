@@ -304,29 +304,6 @@ var IoC = /** @class */ (function () {
     return IoC;
 }());
 
-var Observer = /** @class */ (function () {
-    function Observer() {
-    }
-    /**
-     * Element Observer
-     * @param element the target element to be observe
-     * @param callback the callback that will fired when the element changes
-     */
-    Observer.observe = function (element, callback) {
-        var mutation = new MutationObserver(function (records) {
-            callback({
-                element: element,
-                mutation: mutation,
-                records: records
-            });
-        });
-        mutation.observe(element, {
-            childList: true
-        });
-    };
-    return Observer;
-}());
-
 function __spreadArray(to, from, pack) {
     if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
         if (ar || !(i in from)) {
@@ -2098,6 +2075,29 @@ var Converter = /** @class */ (function () {
     return Converter;
 }());
 
+var Observer = /** @class */ (function () {
+    function Observer() {
+    }
+    /**
+     * Element Observer
+     * @param element the target element to be observe
+     * @param callback the callback that will fired when the element changes
+     */
+    Observer.observe = function (element, callback) {
+        var mutation = new MutationObserver(function (records) {
+            callback({
+                element: element,
+                mutation: mutation,
+                records: records
+            });
+        });
+        mutation.observe(element, {
+            childList: true
+        });
+    };
+    return Observer;
+}());
+
 var ComponentHandler = /** @class */ (function () {
     function ComponentHandler(bouer, appOptions) {
         // Handle all the components web requests to avoid multiple requests
@@ -2778,6 +2778,31 @@ var EventHandler = /** @class */ (function () {
     return EventHandler;
 }());
 
+var Interceptor = /** @class */ (function () {
+    function Interceptor() {
+        var _this = this;
+        this.container = {};
+        this.run = function (action, options) {
+            var mInterceptors = _this.container[action];
+            if (!mInterceptors)
+                return Logger.log("There is not interceptor for “" + action + "”.");
+            for (var index = 0; index < mInterceptors.length; index++) {
+                var interceptor = mInterceptors[index];
+                interceptor(options);
+            }
+        };
+        this.register = function (action, callback) {
+            var mMiddlewares = _this.container[action];
+            if (!mMiddlewares) {
+                return _this.container[action] = [callback];
+            }
+            mMiddlewares.push(callback);
+        };
+        IoC.Register(this);
+    }
+    return Interceptor;
+}());
+
 var Routing = /** @class */ (function () {
     function Routing(bouer) {
         this.defaultPage = undefined;
@@ -2914,31 +2939,6 @@ var Routing = /** @class */ (function () {
     return Routing;
 }());
 
-var Interceptor = /** @class */ (function () {
-    function Interceptor() {
-        var _this = this;
-        this.container = {};
-        this.run = function (action, options) {
-            var mInterceptors = _this.container[action];
-            if (!mInterceptors)
-                return Logger.log("There is not interceptor for “" + action + "”.");
-            for (var index = 0; index < mInterceptors.length; index++) {
-                var interceptor = mInterceptors[index];
-                interceptor(options);
-            }
-        };
-        this.register = function (action, callback) {
-            var mMiddlewares = _this.container[action];
-            if (!mMiddlewares) {
-                return _this.container[action] = [callback];
-            }
-            mMiddlewares.push(callback);
-        };
-        IoC.Register(this);
-    }
-    return Interceptor;
-}());
-
 var Skeleton = /** @class */ (function () {
     function Skeleton(bouer) {
         var _this = this;
@@ -3001,9 +3001,15 @@ var Bouer = /** @class */ (function () {
      * @param options the options to the instance
      */
     function Bouer(selector, options) {
+        var _this_1 = this;
         this.name = 'Bouer';
         this.version = '3.0.0';
         this.dependencies = {};
+        /**
+         * Gets all the elemens having the `ref` attribute
+         * @returns an object having all the elements with the `ref attribute value` defined as the key.
+         */
+        this.refs = {};
         options = options || {};
         // Applying all the options defined
         this.config = options.config;
@@ -3088,6 +3094,23 @@ var Bouer = /** @class */ (function () {
             add: function (component) { return componentHandler.prepare([component]); },
             get: function (name) { return componentHandler.components[name]; }
         };
+        defineProperty(this, 'refs', {
+            get: function () {
+                var mRefs = {};
+                forEach(toArray(_this_1.el.querySelectorAll("[" + Constants.ref + "]")), function (ref) {
+                    var mRef = ref.attributes[Constants.ref];
+                    var value = trim(mRef.value) || ref.name || '';
+                    if (value === '') {
+                        return Logger.error("Expected an expression in “" + ref.name +
+                            "” or at least “name” attribute to combine with “" + ref.name + "”.");
+                    }
+                    if (value in mRefs)
+                        return Logger.warn("The key “" + value + "” in “" + ref.name + "” is taken, choose another key.", ref);
+                    mRefs[value] = ref;
+                });
+                return mRefs;
+            }
+        });
         forEach([options.beforeLoad, options.loaded, options.destroyed], function (evt) {
             if (typeof evt !== 'function')
                 return;
@@ -3126,29 +3149,6 @@ var Bouer = /** @class */ (function () {
             }).appendTo(DOM.head);
         }
     }
-    Object.defineProperty(Bouer.prototype, "refs", {
-        /**
-         * Gets all the elemens having the `ref` attribute
-         * @returns an object having all the elements with the `ref attribute value` defined as the key.
-         */
-        get: function () {
-            var mRefs = {};
-            forEach(toArray(this.el.querySelectorAll("[" + Constants.ref + "]")), function (ref) {
-                var mRef = ref.attributes[Constants.ref];
-                var value = trim(mRef.value) || ref.name || '';
-                if (value === '') {
-                    return Logger.error("Expected an expression in “" + ref.name +
-                        "” or at least “name” attribute to combine with “" + ref.name + "”.");
-                }
-                if (value in mRefs)
-                    return Logger.warn("The key “" + value + "” in “" + ref.name + "” is taken, choose another key.", ref);
-                mRefs[value] = ref;
-            });
-            return mRefs;
-        },
-        enumerable: false,
-        configurable: true
-    });
     /**
      * Compiles a `HTML snippet` to a `Object Literal`
      * @param input the input element
@@ -3232,9 +3232,6 @@ var Bouer = /** @class */ (function () {
             if (callNow)
                 callback.call(_this, args);
         };
-    };
-    Bouer.import = function () {
-        new ComponentHandler({}, {});
     };
     Bouer.prototype.beforeLoad = function (event) { };
     Bouer.prototype.loaded = function (event) { };

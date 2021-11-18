@@ -1,13 +1,3 @@
-import { Constants } from "../shared/helpers/Constants";
-import IoC from "../shared/helpers/IoC";
-import Observer from "../shared/helpers/Observer";
-import Logger from "../shared/logger/Logger";
-import delimiter from "../types/delimiter";
-import dynamic from "../types/dynamic";
-import IBouer from "../types/IBouer";
-import IBouerConfig from "../types/IBouerConfig";
-import IComponent from "../types/IComponent";
-import watchCallback from "../types/watchCallback";
 import Binder from "../core/binder/Binder";
 import CommentHandler from "../core/CommentHandler";
 import Compiler from "../core/compiler/Compiler";
@@ -17,24 +7,25 @@ import ComponentHandler from "../core/component/ComponentHandler";
 import DelimiterHandler from "../core/DelimiterHandler";
 import Evaluator from "../core/Evaluator";
 import EventHandler, { EventEmitterOptions } from "../core/event/EventHandler";
+import Interceptor from "../core/interceptor/Interceptor";
 import Reactive from "../core/reactive/Reactive";
 import Routing from "../core/routing/Routing";
-import DataStore from "../core/store/DataStore";
-import {
-	transferProperty,
-	isObject,
-	createEl,
-	forEach,
-	isNull,
-	DOM,
-	trim,
-	isFunction,
-	toArray
-} from "../shared/helpers/Utils";
-import Interceptor from "../core/interceptor/Interceptor";
-import IInterceptor from "../types/IInterceptor";
-import Directive from "../core/compiler/Directive";
 import Skeleton from "../core/Skeleton";
+import DataStore from "../core/store/DataStore";
+import { Constants } from "../shared/helpers/Constants";
+import IoC from "../shared/helpers/IoC";
+import Observer from "../shared/helpers/Observer";
+import {
+	createEl, defineProperty, DOM, forEach,
+	isNull, toArray, trim
+} from "../shared/helpers/Utils";
+import Logger from "../shared/logger/Logger";
+import delimiter from "../types/delimiter";
+import dynamic from "../types/dynamic";
+import IBouer from "../types/IBouer";
+import IBouerConfig from "../types/IBouerConfig";
+import IComponent from "../types/IComponent";
+import watchCallback from "../types/watchCallback";
 
 export default class Bouer implements IBouer {
 	el: Element;
@@ -130,6 +121,12 @@ export default class Bouer implements IBouer {
 		add: (component: IComponent) => void
 		get: (name: string) => (Component | IComponent)
 	}
+
+	/**
+	 * Gets all the elemens having the `ref` attribute
+	 * @returns an object having all the elements with the `ref attribute value` defined as the key.
+	 */
+	refs: dynamic = {};
 
 	/**
 	 * Default constructor
@@ -232,6 +229,28 @@ export default class Bouer implements IBouer {
 			get: name => componentHandler.components[name]
 		}
 
+		defineProperty(this, 'refs', {
+			get: () => {
+				const mRefs: dynamic = {};
+				forEach(toArray(this.el.querySelectorAll("[" + Constants.ref + "]")), (ref: any) => {
+					const mRef = ref.attributes[Constants.ref] as Attr;
+					let value = trim(mRef.value) || ref.name || '';
+
+					if (value === '') {
+						return Logger.error("Expected an expression in “" + ref.name +
+							"” or at least “name” attribute to combine with “" + ref.name + "”.");
+					}
+
+					if (value in mRefs)
+						return Logger.warn("The key “" + value + "” in “" + ref.name + "” is taken, choose another key.", ref);
+
+					mRefs[value] = ref;
+				});
+
+				return mRefs;
+			}
+		});
+
 		forEach([options.beforeLoad, options.loaded, options.destroyed], evt => {
 			if (typeof evt !== 'function') return;
 			eventHandler.on(evt.name, evt as any, el, { once: true });
@@ -272,30 +291,6 @@ export default class Bouer implements IBouer {
 				favicon.href = 'https://afonsomatelias.github.io/assets/bouer/img/short.png';
 			}).appendTo(DOM.head);
 		}
-	}
-
-	/**
-	 * Gets all the elemens having the `ref` attribute
-	 * @returns an object having all the elements with the `ref attribute value` defined as the key.
-	 */
-	get refs(): dynamic {
-		const mRefs: dynamic = {};
-		forEach(toArray(this.el.querySelectorAll("[" + Constants.ref + "]")), (ref: any) => {
-			const mRef = ref.attributes[Constants.ref] as Attr;
-			let value = trim(mRef.value) || ref.name || '';
-
-			if (value === '') {
-				return Logger.error("Expected an expression in “" + ref.name +
-					"” or at least “name” attribute to combine with “" + ref.name + "”.");
-			}
-
-			if (value in mRefs)
-				return Logger.warn("The key “" + value + "” in “" + ref.name + "” is taken, choose another key.", ref);
-
-			mRefs[value] = ref;
-		});
-
-		return mRefs;
 	}
 
 	/**
@@ -406,11 +401,7 @@ export default class Bouer implements IBouer {
 		};
 	}
 
-	static import() {
-		new ComponentHandler(({} as Bouer), {})
-	}
-
-	beforeLoad?(event: CustomEvent){}
-	loaded?(event: CustomEvent){}
-	destroyed?(event: CustomEvent){}
+	beforeLoad?(event: CustomEvent) { }
+	loaded?(event: CustomEvent) { }
+	destroyed?(event: CustomEvent) { }
 }
