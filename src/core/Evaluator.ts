@@ -49,10 +49,12 @@ export default class Evaluator {
     isReturn?: boolean,
     aditional?: object,
     args?: any[],
+		context: object
   }) {
-    let { data, args, expression, isReturn, aditional } = options;
+    let { data, args, expression, isReturn, aditional, context } = options;
     const mGlobal = this.global as dynamic;
     const noConfigurableProperties: dynamic = {};
+		context = context || this.bouer;
 
     let dataToUse: dynamic = Extend.obj(aditional || {});
     // Defining the scope data
@@ -88,7 +90,7 @@ export default class Evaluator {
     try {
       const mExpression = 'return(function(){"use strict"; ' +
         (isReturn === false ? '' : 'return') + ' ' + expression + ' }).apply(this, arguments)';
-      returnedValue = this.global!.Function(mExpression).apply(this.bouer, args);
+      returnedValue = this.global!.Function(mExpression).apply(context, args);
     } catch (error) {
       Logger.error(buildError(error));
     }

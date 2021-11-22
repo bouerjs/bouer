@@ -9,230 +9,239 @@ import EventHandler from "../event/EventHandler";
 import Bouer from "../../instance/Bouer";
 import Directive from "./Directive";
 import {
-  DOM,
-  forEach,
-  connectNode,
-  isFunction,
-  isString,
-  startWith,
-  isNull,
-  toArray
+	DOM,
+	forEach,
+	connectNode,
+	isFunction,
+	isString,
+	startWith,
+	isNull,
+	toArray
 } from "../../shared/helpers/Utils";
 import IBouer from "../../types/IBouer";
+import Component from "../component/Component";
 
 export default class Compiler {
-  bouer: Bouer;
-  binder: Binder;
-  directive: Directive;
-  delimiter: DelimiterHandler;
-  eventHandler: EventHandler;
-  component: ComponentHandler;
+	bouer: Bouer;
+	binder: Binder;
+	bouerOptions: IBouer;
+	delimiter: DelimiterHandler;
+	eventHandler: EventHandler;
+	component: ComponentHandler;
 
 
-  private NODES_TO_IGNORE_IN_COMPILATION = {
-    'SCRIPT': 1,
-    '#comment': 8
-  }
+	private NODES_TO_IGNORE_IN_COMPILATION = {
+		'SCRIPT': 1,
+		'#comment': 8
+	}
 
-  constructor(bouer: Bouer, appOptions: IBouer) {
-    IoC.Register(this);
+	constructor(bouer: Bouer, appOptions: IBouer) {
+		IoC.Register(this);
 
-    this.bouer = bouer;
-    this.binder = IoC.Resolve('Binder')!;
-    this.delimiter = IoC.Resolve('DelimiterHandler')!;
-    this.eventHandler = IoC.Resolve('EventHandler')!;
-    this.component = IoC.Resolve('ComponentHandler')!;
-    this.directive = new Directive(appOptions.directives || {}, this);
-  }
+		this.bouer = bouer;
+		this.bouerOptions = appOptions;
 
-  compile(options: {
-    /** The element that wil be compiled */
-    el: Element,
-    /** The data that will be injected in the compilation */
-    data?: object,
-    /**
-     * In case of components having content inside of the definition,
-     * a wrapper (Example: <div>) with the content need to be provided
-     * in `componentContent` property in order to be replaced on the compilation.
-     */
-    componentSlot?: Element
-    /** The function that will be fired when the compilation is done */
-    onDone?: (element: Element, data?: object) => void
-  }) {
-    const rootElement = options.el;
-    const data = (options.data || this.bouer.data!);
+		this.binder = IoC.Resolve('Binder')!;
+		this.delimiter = IoC.Resolve('DelimiterHandler')!;
+		this.eventHandler = IoC.Resolve('EventHandler')!;
+		this.component = IoC.Resolve('ComponentHandler')!;
+	}
 
-    if (!this.analize(rootElement.outerHTML))
-      return;
+	compile(options: {
+		/** The element that wil be compiled */
+		el: Element,
+		/** The data that will be injected in the compilation */
+		data?: object,
+		/**
+		 * In case of components having content inside of the definition,
+		 * a wrapper (Example: <div>) with the content need to be provided
+		 * in `componentSlot` property in order to be replaced on the compilation.
+		 */
+		componentSlot?: Element
+		/** The function that will be fired when the compilation is done */
+		onDone?: (element: Element, data?: object) => void,
 
-    const walker = (node: Node, data: object) => {
-      if (node.nodeName in this.NODES_TO_IGNORE_IN_COMPILATION)
-        return;
+		/** The context of the functions that will be called in this compilation process */
+		context: object
+	}) {
+		const rootElement = options.el;
+		const context = options.context || this.bouer;
+		const data = (options.data || this.bouer.data!);
 
-      // First Element Attributes compilation
-      if (node instanceof Element) {
-        // e-ignore" directive
-        if (Constants.ignore in node.attributes)
-          return this.directive.ignore(node);
+		if (!this.analize(rootElement.outerHTML))
+			return;
 
-        if (node.localName === Constants.slot && options.componentSlot) {
-          const insertSlot = (slot: Element, reference: Node) => {
-            forEach(toArray(slot.childNodes), (child: Node) => {
-              const cloned = child.cloneNode(true);
-              rootElement.insertBefore(cloned, reference);
-              walker(cloned, data);
-            });
-            rootElement.removeChild(reference);
-          }
+		const directive = new Directive(this.bouerOptions.directives || {}, this, context);
 
-          if (node.hasAttribute('default')) {
-            // In case of default slot insertion
-            return insertSlot(options.componentSlot!, node);
-          } else if (node.hasAttribute('name')) {
-            // In case of target slot insertion
-            const target = (node.attributes as any)['name'] as Attr;
-            return forEach(toArray(options.componentSlot!.children), (child: Element) => {
-              if (child.localName === Constants.slot && child.getAttribute('name') !== target.value)
-                return;
+		const walker = (node: Node, data: object) => {
+			if (node.nodeName in this.NODES_TO_IGNORE_IN_COMPILATION)
+				return;
 
-              insertSlot(child, node);
-            });
-          }
-        }
+			// First Element Attributes compilation
+			if (node instanceof Element) {
+				// e-ignore" directive
+				if (Constants.ignore in node.attributes)
+					return directive.ignore(node);
 
-        // e-def="{...}" directive
-        if (Constants.def in node.attributes)
-          this.directive.def((node.attributes as any)[Constants.def], data);
+				if (node.localName === Constants.slot && options.componentSlot) {
+					const insertSlot = (slot: Element, reference: Node) => {
+						forEach(toArray(slot.childNodes), (child: Node) => {
+							const cloned = child.cloneNode(true);
+							rootElement.insertBefore(cloned, reference);
+							walker(cloned, data);
+						});
+						rootElement.removeChild(reference);
+					}
 
-        // e-entry="..." directive
-        if (Constants.entry in node.attributes)
-          this.directive.entry((node.attributes as any)[Constants.entry], data);
+					if (node.hasAttribute('default')) {
+						// In case of default slot insertion
+						return insertSlot(options.componentSlot!, node);
+					} else if (node.hasAttribute('name')) {
+						// In case of target slot insertion
+						const target = (node.attributes as any)['name'] as Attr;
+						return forEach(toArray(options.componentSlot!.children), (child: Element) => {
+							if (child.localName === Constants.slot && child.getAttribute('name') !== target.value)
+								return;
 
-        // wait-data="..." directive
-        if (Constants.wait in node.attributes)
-          return this.directive.wait((node.attributes as any)[Constants.wait]);
+							insertSlot(child, node);
+						});
+					}
+				}
 
-        // <component></component>
-        if (this.component.check(node.localName))
-          return this.component.order(node, data);
+				// e-def="{...}" directive
+				if (Constants.def in node.attributes)
+					directive.def((node.attributes as any)[Constants.def], data);
 
-        // e-for="..." directive
-        if (Constants.for in node.attributes)
-          return this.directive.for((node.attributes as any)[Constants.for], data);
+				// e-entry="..." directive
+				if (Constants.entry in node.attributes)
+					directive.entry((node.attributes as any)[Constants.entry], data);
 
-        // e-if="..." directive
-        if (Constants.if in node.attributes)
-          return this.directive.if((node.attributes as any)[Constants.if], data);
+				// wait-data="..." directive
+				if (Constants.wait in node.attributes)
+					return directive.wait((node.attributes as any)[Constants.wait]);
 
-        // e-else-if="..." or e-else directive
-        if ((Constants.elseif in node.attributes) || (Constants.else in node.attributes))
-          Logger.warn('The "' + Constants.elseif + '" or "' + Constants.else + '" requires an element with "' + Constants.if + '" above.');
+				// <component></component>
+				if (this.component.check(node.localName))
+					return this.component.order(node, data);
 
-        // e-show="..." directive
-        if (Constants.show in node.attributes)
-          this.directive.show((node.attributes as any)[Constants.show], data);
+				// e-for="..." directive
+				if (Constants.for in node.attributes)
+					return directive.for((node.attributes as any)[Constants.for], data);
 
-        // e-req="..." | e-req:[id]="..."  directive
-        let reqNode: any = null;
-        if ((reqNode = (node.attributes as any)[Constants.req]) ||
-          (reqNode = toArray(node.attributes).find(attr => Constants.check(attr, Constants.req))))
-          return this.directive.req(reqNode, data);
+				// e-if="..." directive
+				if (Constants.if in node.attributes)
+					return directive.if((node.attributes as any)[Constants.if], data);
 
-        // data="..." | data:[id]="..." directive
-        let dataNode: any = null;
-        if (dataNode = toArray(node.attributes).find((attr: Attr) => {
-          const attrName = attr.name;
-          // In case of data="..."
-          if (attrName === Constants.data) return true;
+				// e-else-if="..." or e-else directive
+				if ((Constants.elseif in node.attributes) || (Constants.else in node.attributes))
+					Logger.warn('The "' + Constants.elseif + '" or "' + Constants.else + '" requires an element with "' + Constants.if + '" above.');
 
-          // In case of data:[data-id]="..."
-          return startWith(attrName, Constants.data + ':');
-        }))
-          return this.directive.data(dataNode, data);
+				// e-show="..." directive
+				if (Constants.show in node.attributes)
+					directive.show((node.attributes as any)[Constants.show], data);
 
-        // put="..." directive
-        if (Constants.put in node.attributes)
-          return this.directive.put((node.attributes as any)[Constants.put], data);
+				// e-req="..." | e-req:[id]="..."  directive
+				let reqNode: any = null;
+				if ((reqNode = (node.attributes as any)[Constants.req]) ||
+					(reqNode = toArray(node.attributes).find(attr => Constants.check(attr, Constants.req))))
+					return directive.req(reqNode, data);
 
-        // Looping the attributes
-        forEach(toArray(node.attributes), (attr: Attr) => {
-          walker(attr, data);
-        });
-      }
+				// data="..." | data:[id]="..." directive
+				let dataNode: any = null;
+				if (dataNode = toArray(node.attributes).find((attr: Attr) => {
+					const attrName = attr.name;
+					// In case of data="..."
+					if (attrName === Constants.data) return true;
 
-      // :href="..." or !href="..." directive
-      if (Constants.check(node, Constants.href) || Constants.check(node, Constants.ihref))
-        return this.directive.href(node, data);
+					// In case of data:[data-id]="..."
+					return startWith(attrName, Constants.data + ':');
+				}))
+					return directive.data(dataNode, data);
 
-      // e-content="..." directive
-      if (Constants.check(node, Constants.content))
-        return this.directive.content(node);
+				// put="..." directive
+				if (Constants.put in node.attributes)
+					return directive.put((node.attributes as any)[Constants.put], data);
 
-      // e-bind:[?]="..." directive
-      if (Constants.check(node, Constants.bind))
-        return this.directive.bind(node, data);
+				// Looping the attributes
+				forEach(toArray(node.attributes), (attr: Attr) => {
+					walker(attr, data);
+				});
+			}
 
-      // Custom directive
-      if (Object.keys(this.directive.$custom).find(name => Constants.check(node, name)))
-        if (this.directive.custom(node, data))
-          return;
+			// :href="..." or !href="..." directive
+			if (Constants.check(node, Constants.href) || Constants.check(node, Constants.ihref))
+				return directive.href(node, data);
 
-      // e-[?]="..." directive
-      if (Constants.check(node, Constants.property) && !Constants.isConstant(node.nodeName))
-        this.directive.property(node, data);
+			// e-content="..." directive
+			if (Constants.check(node, Constants.content))
+				return directive.content(node);
 
-      // e-skeleton directive
-      if (Constants.check(node, Constants.skeleton))
-        this.directive.skeleton(node);
+			// e-bind:[?]="..." directive
+			if (Constants.check(node, Constants.bind))
+				return directive.bind(node, data);
 
-      // Event handler
-      // on:[?]="..." directive
-      if (Constants.check(node, Constants.on))
-        return this.eventHandler.handle(node, data);
+			// Custom directive
+			if (Object.keys(directive.$custom).find(name => Constants.check(node, name)))
+				if (directive.custom(node, data))
+					return;
 
-      // Property binding
-      let delimitersFields: delimiterResponse[];
-      if (isString(node.nodeValue) && (delimitersFields = this.delimiter.run(node.nodeValue!)) && delimitersFields.length !== 0) {
-        this.binder.create({
-          node: connectNode(node, rootElement),
-          fields: delimitersFields,
-          data: data
-        });
-      }
+			// e-[?]="..." directive
+			if (Constants.check(node, Constants.property) && !Constants.isConstant(node.nodeName))
+				directive.property(node, data);
 
-      forEach(toArray(node.childNodes), (childNode: Node) =>
-        walker(childNode, data))
-    }
+			// e-skeleton directive
+			if (Constants.check(node, Constants.skeleton))
+				directive.skeleton(node);
 
-    walker(rootElement, data);
+			// Event handler
+			// on:[?]="..." directive
+			if (Constants.check(node, Constants.on))
+				return this.eventHandler.handle(node, data, context);
 
-    if (rootElement.hasAttribute(Constants.silent))
-      rootElement.removeAttribute(Constants.silent)
+			// Property binding
+			let delimitersFields: delimiterResponse[];
+			if (isString(node.nodeValue) && (delimitersFields = this.delimiter.run(node.nodeValue!)) && delimitersFields.length !== 0) {
+				this.binder.create({
+					node: connectNode(node, rootElement),
+					fields: delimitersFields,
+					context: context,
+					data: data
+				});
+			}
 
-    if (isFunction(options.onDone))
-      options.onDone!.call(this.bouer, rootElement);
-  }
+			forEach(toArray(node.childNodes), (childNode: Node) =>
+				walker(childNode, data))
+		}
 
-  analize(htmlSnippet: string): boolean {
+		walker(rootElement, data);
+
+		if (rootElement.hasAttribute(Constants.silent))
+			rootElement.removeAttribute(Constants.silent)
+
+		if (isFunction(options.onDone))
+			options.onDone!.call(context, rootElement);
+	}
+
+	analize(htmlSnippet: string): boolean {
 		return true;
 
-    const parser = new DOMParser();
-    const htmlForParser = `<xml>${htmlSnippet}</xml>`
-      .replace(/(src|href)=".*?&.*?"/g, '$1=""')
-      .replace(/<script[sS]+?<\/script>/gm, '<script></script>')
-      .replace(/<style[sS]+?<\/style>/gm, '<style></style>')
-      .replace(/<pre[sS]+?<\/pre>/gm, '<pre></pre>')
-      .replace(/&nbsp;/g, '&#160;');
+		const parser = new DOMParser();
+		const htmlForParser = `<xml>${htmlSnippet}</xml>`
+			.replace(/(src|href)=".*?&.*?"/g, '$1=""')
+			.replace(/<script[sS]+?<\/script>/gm, '<script></script>')
+			.replace(/<style[sS]+?<\/style>/gm, '<style></style>')
+			.replace(/<pre[sS]+?<\/pre>/gm, '<pre></pre>')
+			.replace(/&nbsp;/g, '&#160;');
 
-    const doc = parser.parseFromString(htmlForParser, 'text/xml');
-    const xmlContainer = DOM.createElement('xml');
-    xmlContainer.innerHTML = doc.documentElement.outerHTML;
-    const parsererror = xmlContainer.querySelector('parsererror');
+		const doc = parser.parseFromString(htmlForParser, 'text/xml');
+		const xmlContainer = DOM.createElement('xml');
+		xmlContainer.innerHTML = doc.documentElement.outerHTML;
+		const parsererror = xmlContainer.querySelector('parsererror');
 
-    if (parsererror) {
-      Logger.error('HTML Snippet:\n' + htmlSnippet.split(/\n/).map((line, column) => `${column + 1}: ${line}`).join('\n'));
-      return false;
-    }
-    return true;
-  }
+		if (parsererror) {
+			Logger.error('HTML Snippet:\n' + htmlSnippet.split(/\n/).map((line, column) => `${column + 1}: ${line}`).join('\n'));
+			return false;
+		}
+		return true;
+	}
 }
