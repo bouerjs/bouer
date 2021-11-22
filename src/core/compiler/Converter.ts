@@ -109,7 +109,7 @@ export default class Converter {
           }
           // Calling on set function
           if (isFunction(onSet))
-            onSet!.call(instance, builtObject, propName, value, el);
+            onSet!.call(instance.bouer, builtObject, propName, value, el);
         }
 
         forEach(toArray(el.children), (child: Element) => {
@@ -164,7 +164,7 @@ export default class Converter {
               lastLayer[leadElement] = Extend.obj(objPropertyValue, builderObjValue);
           }
           if (isFunction(onSet))
-            onSet!.call(instance, lastLayer, leadElement, builderObjValue, buildElement);
+            onSet!.call(instance.bouer, lastLayer, leadElement, builderObjValue, buildElement);
 
           return;
         }

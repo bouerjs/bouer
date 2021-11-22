@@ -30,7 +30,9 @@ export default class Component implements IComponent {
 	// Store temporarily this component UI orders
 	private events: EventSubscription[] = [];
 
-	// Events
+	// Hooks
+	requested?(event: CustomEvent) { };
+	created?(event: CustomEvent) { };
 	beforeMount?(event: CustomEvent) { }
 	mounted?(event: CustomEvent) { }
 	beforeLoad?(event: CustomEvent) { }
@@ -38,6 +40,7 @@ export default class Component implements IComponent {
 	beforeDestroy?(event: CustomEvent) { }
 	destroyed?(event: CustomEvent) { }
 	blocked?(event: CustomEvent) { }
+	failed?(event: CustomEvent) { };
 
 	constructor(optionsOrPath: string | IComponent) {
 		let _name: any = undefined;
@@ -93,13 +96,29 @@ export default class Component implements IComponent {
 	}
 
 	on<TKey extends keyof ILifeCycleHooks>(eventName: TKey, callback: (event: CustomEvent) => void) {
-		const evt = IoC.Resolve<EventHandler>('EventHandler')!.on(eventName, callback as any, this.el!);
+		const context = (eventName == 'beforeDestroy' ||
+			eventName == 'beforeLoad' ||
+			eventName == 'beforeMount' ||
+			eventName == 'destroyed' ||
+			eventName == 'loaded' ||
+			eventName == 'mounted') ? this : this.bouer;
+
+		const evt = IoC.Resolve<EventHandler>('EventHandler')!.on({
+			eventName,
+			callback: callback as any,
+			attachedNode: this.el!,
+			context: context!
+		});
 		this.events.push(evt);
 		return evt;
 	}
 
 	off<TKey extends keyof ILifeCycleHooks>(eventName: TKey, callback: (event: CustomEvent) => void) {
-		IoC.Resolve<EventHandler>('EventHandler')!.off(eventName, callback as any, this.el!);
+		IoC.Resolve<EventHandler>('EventHandler')!.off({
+			eventName,
+			callback: callback as any,
+			attachedNode: this.el!
+		});
 		this.events = where(this.events, evt => !(evt.eventName == eventName && evt.callback == callback));
 	}
 

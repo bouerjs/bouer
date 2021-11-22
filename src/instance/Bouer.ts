@@ -14,9 +14,9 @@ import Skeleton from "../core/Skeleton";
 import DataStore from "../core/store/DataStore";
 import { Constants } from "../shared/helpers/Constants";
 import IoC from "../shared/helpers/IoC";
-import Observer from "../shared/helpers/Observer";
 import {
 	createEl, defineProperty, DOM, forEach,
+	GLOBAL,
 	isNull, toArray, trim
 } from "../shared/helpers/Utils";
 import Logger from "../shared/logger/Logger";
@@ -179,7 +179,7 @@ export default class Bouer implements IBouer {
 		new CommentHandler(this);
 		const skeleton = new Skeleton(this);
 		skeleton.init();
-		// Assing the two methods available
+
 		this.$delimiters = {
 			add: delimiter.add,
 			remove: delimiter.remove,
@@ -215,6 +215,7 @@ export default class Bouer implements IBouer {
 					compiler.compile({
 						el: node,
 						data: Reactive.transform(mWait.data),
+						context: this
 					})
 				});
 			},
@@ -251,10 +252,17 @@ export default class Bouer implements IBouer {
 			}
 		});
 
-		forEach([options.beforeLoad, options.loaded, options.destroyed], evt => {
-			if (typeof evt !== 'function') return;
-			eventHandler.on(evt.name, evt as any, el, { once: true });
-		});
+		forEach([options.beforeLoad, options.loaded, options.beforeDestroy, options.destroyed],
+			evt => {
+				if (typeof evt !== 'function') return;
+				eventHandler.on({
+					eventName: evt.name,
+					callback: evt as any,
+					attachedNode: el,
+					modifiers: { once: true },
+					context: this
+				});
+			});
 
 		eventHandler.emit({
 			eventName: 'beforeLoad',
@@ -265,21 +273,21 @@ export default class Bouer implements IBouer {
 		compiler.compile({
 			el: this.el,
 			data: this.data,
+			context: this,
 			onDone: () => eventHandler.emit({
 				eventName: 'loaded',
 				attachedNode: el
 			})
 		});
 
-		Observer.observe(this.el, (options) => {
-			const { mutation, element } = options;
-			if (element.isConnected === true) return;
+		GLOBAL.addEventListener('beforeunload', evt => {
 			eventHandler.emit({
-				eventName: 'destroyed',
+				eventName: 'beforeDestroy',
 				attachedNode: el
-			})
-			mutation.disconnect();
-		});
+			});
+
+			this.destroy();
+		}, { once: true });
 
 		// Initializing Routing
 		this.routing.init();
@@ -354,7 +362,13 @@ export default class Bouer implements IBouer {
 			signal?: AbortSignal;
 		}) {
 		return IoC.Resolve<EventHandler>('EventHandler')!.
-			on(eventName, callback, attachedNode, modifiers);
+			on({
+				eventName,
+				callback,
+				attachedNode,
+				modifiers,
+				context: this
+			});
 	}
 
 	/**
@@ -365,7 +379,11 @@ export default class Bouer implements IBouer {
 	 */
 	off(eventName: string, callback: (event: CustomEvent | Event) => void, attachedNode?: Node) {
 		return IoC.Resolve<EventHandler>('EventHandler')!.
-			off(eventName, callback, attachedNode);
+			off({
+				eventName,
+				callback,
+				attachedNode
+			});
 	}
 
 	/**
@@ -401,7 +419,28 @@ export default class Bouer implements IBouer {
 		};
 	}
 
+	destroy() {
+		const el = this.el!;
+		if (el.tagName == 'body')
+			el.innerHTML = '';
+		else DOM.body.removeChild(el);
+
+		forEach(toArray(
+				DOM.head.querySelectorAll('#bouer,[component-style]')
+			), (item: Element) => {
+				if (item.isConnected)
+					DOM.head.removeChild(item);
+			});
+
+		this.emit({
+			eventName: 'destroyed',
+			attachedNode: this.el!
+		})
+	}
+
+	// Hooks
 	beforeLoad?(event: CustomEvent) { }
 	loaded?(event: CustomEvent) { }
+	beforeDestroy?(event: CustomEvent) { }
 	destroyed?(event: CustomEvent) { }
 }
