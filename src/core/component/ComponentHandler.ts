@@ -175,7 +175,7 @@ export default class ComponentHandler {
 				return;
 			}
 
-			const requestedEvent = this.addEvent('requested', componentElement, component);
+			const requestedEvent = this.addEvent('requested', componentElement, component, this.bouer);
 			if (requestedEvent) requestedEvent.emit();
 			// Make or Add request
 			this.request(component.path!, {
@@ -221,7 +221,7 @@ export default class ComponentHandler {
 				return restrictionResult;
 			});
 
-			const blockedEvent = this.addEvent('blocked', componentElement, component);
+			const blockedEvent = this.addEvent('blocked', componentElement, component, this.bouer);
 			const emitter = () => blockedEvent.emit({
 				detail: {
 					component: component.name,
@@ -253,12 +253,16 @@ export default class ComponentHandler {
 	}
 
 	/** Subscribe the hooks of the instance */
-	addEvent(eventName: string, element: Element, component: any) {
+	addEvent(eventName: string, element: Element, component: any, context?: object) {
 		const callback = component[eventName];
 		if (typeof callback !== 'function') return { emit: (() => { }) }
 
-		const emitter = this.eventHandler.on(eventName, evt => callback.call(component, evt), element, {
-			once: true
+		const emitter = this.eventHandler.on({
+			eventName,
+			callback: evt => callback.call(component, evt),
+			attachedNode: element,
+			modifiers: { once: true },
+			context: context || component
 		}).emit;
 		return {
 			emit: (init?: CustomEventInit) => emitter({
@@ -287,7 +291,7 @@ export default class ComponentHandler {
 			createEl('body', htmlSnippet => {
 				htmlSnippet.innerHTML = component.template!;
 
-				forEach([].slice.apply(htmlSnippet.querySelectorAll('script,link[rel="stylesheet"],style')), asset => {
+				forEach([].slice.call(htmlSnippet.querySelectorAll('script,link[rel="stylesheet"],style')), asset => {
 					component.assets.push(asset);
 					htmlSnippet.removeChild(asset);
 				});
@@ -302,7 +306,7 @@ export default class ComponentHandler {
 
 				component.el = htmlSnippet.children[0];
 
-				this.addEvent('created', component.el!, component)
+				this.addEvent('created', component.el!, component, this.bouer);
 				component.emit('created');
 			});
 		}
@@ -338,7 +342,11 @@ export default class ComponentHandler {
 				else {
 					// Other wise, compiles the object provided
 					const mInputData = IoC.Resolve<Evaluator>('Evaluator')!
-						.exec({ data: mData, expression: attr.value });
+						.exec({
+							data: mData,
+							expression: attr.value,
+							context: this.bouer
+						});
 
 					if (!isObject(mInputData))
 						return Logger.error(("Expected a valid Object Literal expression in “"
@@ -468,9 +476,10 @@ export default class ComponentHandler {
 
 				IoC.Resolve<Compiler>('Compiler')!
 					.compile({
-						data: Extend.obj(Reactive.transform(component.data), { $this: component }),
+						data: Reactive.transform(component.data),
 						el: rootElement,
 						componentSlot: elementSlots,
+						context: component,
 						onDone: () => {
 							this.addEvent('loaded', component.el!, component);
 							component.emit('loaded');
@@ -563,7 +572,7 @@ export default class ComponentHandler {
 					"<" + $name + "></" + $name + "> component, remove it in order to be compiled."));
 				Logger.log(error);
 
-				this.addEvent('failed', componentElement, component)
+				this.addEvent('failed', componentElement, component, this.bouer)
 					.emit();
 			});
 		});

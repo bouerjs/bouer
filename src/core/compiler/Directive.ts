@@ -1,34 +1,31 @@
+import Bouer from "../../instance/Bouer";
 import { Constants } from "../../shared/helpers/Constants";
 import Extend from "../../shared/helpers/Extend";
 import IoC from "../../shared/helpers/IoC";
 import {
-  connectNode,
-  createAnyEl,
-  defineProperty,
-  findAttribute,
-  forEach,
-  http,
-  isFunction,
-  isNull,
-  isObject,
-  toLower,
-  toStr,
-  transferProperty,
-  trim,
-  urlCombine
+	connectNode,
+	createAnyEl,
+	defineProperty,
+	findAttribute,
+	forEach,
+	http, isNull,
+	isObject,
+	toLower,
+	toStr,
+	transferProperty,
+	trim,
+	urlCombine
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import customDirective from "../../types/customDirective";
 import dynamic from "../../types/dynamic";
 import Binder from "../binder/Binder";
-import Watch from "../binder/Watch";
 import CommentHandler from "../CommentHandler";
 import ComponentHandler from "../component/ComponentHandler";
 import DelimiterHandler from "../DelimiterHandler";
 import Evaluator from "../Evaluator";
 import EventHandler from "../event/EventHandler";
 import ReactiveEvent from "../event/ReactiveEvent";
-import Bouer from "../../instance/Bouer";
 import Interceptor from "../interceptor/Interceptor";
 import Reactive from "../reactive/Reactive";
 import Routing from "../routing/Routing";
@@ -44,9 +41,14 @@ export default class Directive {
   compiler: Compiler;
   eventHandler: EventHandler;
   $custom: customDirective = {};
+	context: object;
 
-  constructor(customDirective: customDirective, compiler: Compiler) {
+  constructor(
+		customDirective: customDirective,
+		compiler: Compiler,
+		compilerContext: object) {
     this.compiler = compiler;
+		this.context = compilerContext;
     this.bouer = compiler.bouer;
     this.$custom = customDirective;
     this.evaluator = IoC.Resolve('Evaluator')!;
@@ -109,7 +111,6 @@ export default class Directive {
       }
 
       // Listening to the property get only if the callback function is defined
-
       ReactiveEvent.once('AfterGet', event => {
         event.onemit = reactive => {
           // Avoiding multiple binding in the same property
@@ -121,6 +122,7 @@ export default class Directive {
         this.evaluator.exec({
           data: data,
           expression: attr.value,
+					context: this.context
         });
       });
 
@@ -153,13 +155,15 @@ export default class Directive {
         data: data,
         isReturn: false,
         expression: conditionalExpression,
+				context: this.context,
         aditional: {
           _cb: (chainIndex: number) => {
             const { element } = conditions[chainIndex];
             container.replaceChild(element, comment);
             this.compiler.compile({
               el: element,
-              data: data
+              data: data,
+							context: this.context,
             })
           }
         }
@@ -179,8 +183,9 @@ export default class Directive {
 
     const exec = (element: HTMLElement) => {
       const value = this.evaluator.exec({
+				data: data,
         expression: nodeValue,
-        data: data
+				context: this.context,
       });
 
       element.style.display = value ? '' : 'none';
@@ -191,6 +196,7 @@ export default class Directive {
       data: data,
       node: node,
       fields: [{ expression: nodeValue, field: nodeValue }],
+			context: this.context,
       onChange: () => exec(ownerElement)
     });
 
@@ -226,6 +232,7 @@ export default class Directive {
         fields: delimiters,
         replaceProperty: true,
         node: node,
+				context: this.context,
         onChange: () => exec()
       });
 
@@ -247,7 +254,8 @@ export default class Directive {
 
       filterValue = this.evaluator.exec({
         data: data,
-        expression: filterValue
+        expression: filterValue,
+				context: this.context
       });
 
       // filter:myFilter
@@ -264,7 +272,11 @@ export default class Directive {
         let newListCopy: any[] = [];
         forEach(list, item => {
           for (const prop of filterKeys.split(',').map(m => trim(m))) {
-            let propValue = this.evaluator.exec({ data: item, expression: prop });
+            let propValue = this.evaluator.exec({
+							data: item,
+							expression: prop,
+							context: this.context
+						});
             if (!toStr(propValue).includes(filterValue)) break;
             newListCopy.push(item);
           }
@@ -325,7 +337,11 @@ export default class Directive {
 
       const isForOf = trim(forSeparator) === 'of';
       const iterable = isForOf ? rightHand : "Object.keys(" + rightHand + ")";
-      const sourceValue = this.evaluator.exec({ data: data, expression: rightHand });
+      const sourceValue = this.evaluator.exec({
+				data: data,
+				expression: rightHand,
+				context: this.context
+			});
 
       return {
         filters: filters,
@@ -363,6 +379,7 @@ export default class Directive {
       this.evaluator.exec({
         data: data,
         isReturn: false,
+				context: this.context,
         expression: "_for(_filters(" + iterable + "), ($$itm, $$idx) => { _each($$itm, $$idx); })",
         aditional: {
           _for: forEach,
@@ -380,6 +397,7 @@ export default class Directive {
             this.compiler.compile({
               el: clonedItem,
               data: forData,
+							context: this.context,
               onDone: el => this.eventHandler.emit({
                 eventName: 'add',
                 attachedNode: el,
@@ -441,7 +459,8 @@ export default class Directive {
 
     let inputData = this.evaluator.exec({
       data: data,
-      expression: nodeValue
+      expression: nodeValue,
+			context: this.context
     });
 
     if (!isObject(inputData))
@@ -476,6 +495,7 @@ export default class Directive {
     this.binder.create({
       node: connectNode(node, ownerElement),
       fields: [{ field: nodeValue, expression: nodeValue }],
+			context: this.context,
       data: data
     });
 
@@ -498,7 +518,8 @@ export default class Directive {
 
     let inputData = this.evaluator.exec({
       data: data,
-      expression: nodeValue
+      expression: nodeValue,
+			context: this.context
     });
 
     if (!isObject(inputData))
@@ -509,9 +530,11 @@ export default class Directive {
       node: connectNode(node, ownerElement),
       replaceProperty: false,
       fields: [{ expression: nodeValue, field: nodeValue }],
+			context: this.context,
       onChange: () => exec(this.evaluator.exec({
         data: data,
-        expression: nodeValue
+        expression: nodeValue,
+				context: this.context
       }))
     });
 
@@ -557,7 +580,11 @@ export default class Directive {
       inputData = Extend.obj(this.bouer.data);
     else {
       // Other wise, compiles the object provided
-      const mInputData = this.evaluator.exec({ data: mData, expression: nodeValue });
+      const mInputData = this.evaluator.exec({
+				data: mData,
+				expression: nodeValue,
+				context: this.context
+			});
 
       if (!isObject(mInputData))
         return Logger.error(("Expected a valid Object Literal expression in “" + node.nodeName +
@@ -581,7 +608,8 @@ export default class Directive {
     Reactive.transform(inputData);
     return this.compiler.compile({
       data: inputData,
-      el: ownerElement
+      el: ownerElement,
+			context: this.context,
     });
   }
 
@@ -606,6 +634,7 @@ export default class Directive {
       this.binder.create({
         data: data,
         node: connectNode(href, ownerElement),
+				context: this.context,
         fields: delimiters
       });
 
@@ -658,6 +687,7 @@ export default class Directive {
         data: data,
         node: connectNode(node, ownerElement),
         fields: delimiters,
+				context: this.context,
         onChange: () => exec()
       });
 
@@ -698,6 +728,7 @@ export default class Directive {
       this.binder.create({
         data: data,
         node: node,
+				context: this.context,
         fields: delimiters,
         replaceProperty: false,
         onChange: () => exec()
@@ -707,7 +738,7 @@ export default class Directive {
 
     const subcribeEvent = (eventName: string) => {
       const attr = (ownerElement.attributes as any)[Constants.on + eventName];
-      if (attr) this.eventHandler.handle(attr, data);
+      if (attr) this.eventHandler.handle(attr, data, this.context);
 
       return {
         emit: (detailObj?: dynamic) => {
@@ -789,8 +820,9 @@ export default class Directive {
               // Removing the: “(...)”  “,”  and getting only the variable
               const variable = trim(reqParts[0].split(',')[0].replace(/\(|\)/g, ''));
               return this.compiler.compile({
-                el: ownerElement,
+								el: ownerElement,
                 data: Extend.obj({ [variable]: response.data }, data),
+								context: this.context,
                 onDone: (_, inData) => {
                   subcribeEvent(Constants.builtInEvents.compile)
                     .emit({
@@ -805,6 +837,7 @@ export default class Directive {
               return this.compiler.compile({
                 el: ownerElement,
                 data: Extend.obj({ _response_: response.data }, data),
+								context: this.context,
                 onDone: (_, inData) => {
                   subcribeEvent(Constants.builtInEvents.compile)
                     .emit({
@@ -845,7 +878,8 @@ export default class Directive {
       return forEach(mWait.nodes, nodeWaiting => {
         this.compiler.compile({
           el: nodeWaiting,
-          data: Reactive.transform(mWait.data)
+          data: Reactive.transform(mWait.data),
+					context: this.context,
         });
       });
     }
@@ -864,6 +898,7 @@ export default class Directive {
       node: connectNode(node, ownerElement),
       fields: delimiters,
       replaceProperty: false,
+			context: this.context,
       onChange: () => {
         if (typeof $directiveConfig.updated === 'function')
           $directiveConfig.updated(node, bindConfig);
