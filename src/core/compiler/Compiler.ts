@@ -1,25 +1,20 @@
+import Bouer from "../../instance/Bouer";
 import { Constants } from "../../shared/helpers/Constants";
 import IoC from "../../shared/helpers/IoC";
+import {
+	connectNode, DOM,
+	forEach, isFunction,
+	isString,
+	startWith, toArray
+} from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import delimiterResponse from "../../types/delimiterResponse";
+import IBouer from "../../types/IBouer";
 import Binder from "../binder/Binder";
 import ComponentHandler from "../component/ComponentHandler";
 import DelimiterHandler from "../DelimiterHandler";
 import EventHandler from "../event/EventHandler";
-import Bouer from "../../instance/Bouer";
 import Directive from "./Directive";
-import {
-	DOM,
-	forEach,
-	connectNode,
-	isFunction,
-	isString,
-	startWith,
-	isNull,
-	toArray
-} from "../../shared/helpers/Utils";
-import IBouer from "../../types/IBouer";
-import Component from "../component/Component";
 
 export default class Compiler {
 	bouer: Bouer;
