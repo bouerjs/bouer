@@ -62,13 +62,13 @@ export default class Binder {
 		fields: delimiterResponse[],
 		replaceProperty?: boolean,
 		context: object,
-		onChange?: (value: any, node: Node) => void,
+		onUpdate?: (value: any, node: Node) => void,
 	}) {
 		const { node, data, fields, replaceProperty, context } = options;
 		const originalValue = trim(node.nodeValue ?? '');
 		const originalName = node.nodeName;
 		const ownerElement = (node as any).ownerElement || node.parentNode;
-		const onChange = options.onChange || ((value: any, node: Node) => { });
+		const onUpdate = options.onUpdate || ((value: any, node: Node) => { });
 
 		// Clousure cache property settings
 		const propertyBindConfig: BinderConfig = {
@@ -76,7 +76,7 @@ export default class Binder {
 			data: data,
 			nodeName: originalName,
 			nodeValue: originalValue,
-			fields: options.fields,
+			fields: fields,
 			parent: ownerElement,
 			value: ''
 		};
@@ -175,9 +175,9 @@ export default class Binder {
 			}
 
 			const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
-				this.binds.push(reactive.watch(value => {
+				this.binds.push(reactive.onChange(value => {
 					callback(this.BindingDirection.fromDataToInput, value)
-					onChange(value, node);
+					onUpdate(value, node);
 				}, node));
 			});
 
@@ -264,9 +264,9 @@ export default class Binder {
 
 		ReactiveEvent.once('AfterGet', event => {
 			event.onemit = reactive => {
-				this.binds.push(reactive.watch(value => {
+				this.binds.push(reactive.onChange(value => {
 					setter();
-					onChange(value, node);
+					onUpdate(value, node);
 				}, node));
 			}
 			setter();
@@ -276,16 +276,29 @@ export default class Binder {
 		return propertyBindConfig;
 	}
 
-	watch(propertyName: string, callback: watchCallback, targetObject?: object) {
+	onPropertyChange(propertyName: string, callback: watchCallback, targetObject?: object) {
 		let mWatch: Watch<any, any> | null = null;
 		const mTargetObject = targetObject || this.bouer.data;
 
 		ReactiveEvent.once('AfterGet', event => {
-			event.onemit = reactive => mWatch = reactive.watch(callback);
+			event.onemit = reactive => mWatch = reactive.onChange(callback);
 			const _ = (mTargetObject as any)[propertyName];
 		});
 
 		return mWatch;
+	}
+
+	onPropertyInScopeChange(watchable: () => void) {
+		const watches: Watch<any, any>[] = [];
+
+		ReactiveEvent.once('AfterGet', evt => {
+			evt.onemit = reactive => {
+				watches.push(new Watch(reactive, () => watchable()));
+			}
+			watchable();
+		})
+
+		return watches;
 	}
 
 	/** Creates a process for unbind properties when it does not exists anymore in the DOM */
