@@ -1,10 +1,28 @@
+import Bouer from "../../instance/Bouer";
 import { Constants } from "../../shared/helpers/Constants";
 import IoC from "../../shared/helpers/IoC";
-import { buildError, connectNode, forEach, isFunction, isNull, taskRunner, toLower, trim, where } from "../../shared/helpers/Utils";
+import {
+	buildError,
+	connectNode,
+	createEl,
+	forEach,
+	isFunction,
+	isNull,
+	taskRunner,
+	toLower,
+	trim,
+	where
+} from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import dynamic from "../../types/dynamic";
 import Evaluator from "../Evaluator";
-import Bouer from "../../instance/Bouer";
+
+type EventModifiers = {
+	capture?: boolean;
+	once?: boolean;
+	passive?: boolean;
+	signal?: AbortSignal;
+}
 
 export type EventEmitterOptions = {
 	eventName: string
@@ -16,13 +34,16 @@ export type EventEmitterOptions = {
 export type EventSubscription = {
 	eventName: string
 	attachedNode?: Node,
+	modifiers?: EventModifiers,
 	callback: (evt: Event | CustomEvent, ...args: any[]) => void,
 	emit: (options?: { init?: CustomEventInit, once?: boolean, }) => void
 }
+
 export default class EventHandler {
 	private bouer: Bouer;
 	private evaluator: Evaluator;
-	private events: EventSubscription[] = [];
+	private $events: { [key: string]: EventSubscription[] } = {};
+	private input = createEl('input').build();
 
 	constructor(bouer: Bouer) {
 		this.bouer = bouer;
@@ -33,7 +54,7 @@ export default class EventHandler {
 	}
 
 	handle(node: Node, data: object, context: object) {
-		let ownerElement = ((node as any).ownerElement || node.parentNode) as Element;
+		const ownerElement = ((node as any).ownerElement || node.parentNode) as Element;
 		const nodeName = node.nodeName;
 
 		if (isNull(ownerElement))
@@ -89,13 +110,10 @@ export default class EventHandler {
 				modifiers[md] = true;
 		});
 
-		this.on({
-			eventName,
-			callback,
-			modifiers,
-			context,
-			attachedNode: ownerElement,
-		});
+		if (!('on' + eventName in this.input))
+			this.on({ eventName, callback, modifiers, context, attachedNode: ownerElement });
+		else
+			ownerElement.addEventListener(eventName, callback, modifiers);
 	}
 
 	on(options: {
@@ -103,19 +121,14 @@ export default class EventHandler {
 		callback: (event: CustomEvent | Event) => void,
 		attachedNode?: Node,
 		context: object,
-		modifiers?: {
-			capture?: boolean;
-			once?: boolean;
-			passive?: boolean;
-			signal?: AbortSignal;
-		}
+		modifiers?: EventModifiers
 	}) {
-
 		const { eventName, callback, context, attachedNode, modifiers } = options;
 		const event: EventSubscription = {
 			eventName: eventName,
 			callback: evt => callback.apply(context || this.bouer, [evt]),
 			attachedNode: attachedNode,
+			modifiers: modifiers,
 			emit: options => this.emit({
 				eventName: eventName,
 				attachedNode: attachedNode,
@@ -124,10 +137,10 @@ export default class EventHandler {
 			})
 		};
 
-		if (attachedNode)
-			attachedNode.addEventListener(eventName, event.callback, modifiers || false);
-		else
-			this.events.push(event);
+		if (!this.$events[eventName])
+			this.$events[eventName] = [];
+
+		this.$events[eventName].push(event);
 		return event;
 	}
 
@@ -138,40 +151,55 @@ export default class EventHandler {
 	}) {
 
 		const { eventName, callback, attachedNode } = options;
-		if (attachedNode)
-			return attachedNode.removeEventListener(eventName, callback);
+		if (!this.$events[eventName])
+			return;
 
-		let index = -1;
-		this.events.find((evt, idx) => {
-			if (evt.eventName === eventName && callback == evt.callback) {
-				index = idx;
-				return true;
-			}
+		this.$events[eventName] = where(this.$events[eventName], evt => {
+			if (attachedNode)
+				return (evt.attachedNode === attachedNode)
+
+			return !(evt.eventName === eventName && callback == evt.callback);
 		});
-
-		this.events.splice(index, 1);
 	}
 
 	emit(options: EventEmitterOptions) {
-		const { eventName, init, attachedNode } = options;
-		const customEvent = new CustomEvent(eventName, init);
+		const { eventName, init, once, attachedNode } = options;
+		const events = this.$events[eventName];
 
-		if (attachedNode)
-			return attachedNode.dispatchEvent(customEvent)
+		if (!events)
+			return;
 
-		forEach(this.events, (event, index) => {
-			if (eventName !== event.eventName) return;
-			event.callback.call(this.bouer, customEvent);
-			if ((options.once ?? false) === true)
-				this.events.splice(index, 1);
+		const emitter = (node: Node, callback: any) => {
+			node.addEventListener(eventName, callback, { once: true });
+			node.dispatchEvent(new CustomEvent(eventName, init));
+		}
+
+		forEach(events, (evt, index) => {
+			const node = evt.attachedNode;
+
+			// If a node was provided, just dispatch the events in this node
+			if (attachedNode) {
+				if (node !== attachedNode) return;
+				return emitter(node, evt.callback);
+			}
+
+			// Otherwise, if this events has a node, dispatch the node event
+			if (node) return emitter(node, evt.callback);
+
+			// Otherwise, dispatch all events
+			evt.callback.call(this.bouer, new CustomEvent(eventName, init));
+			if ((once ?? false) === true)
+				events.splice(index, 1);
 		});
 	}
 
 	private cleanup() {
 		taskRunner(() => {
-			this.events = where(this.events, event => {
-				if (!event.attachedNode) return true;
-				if (event.attachedNode.isConnected) return true;
+			forEach(Object.keys(this.$events), key => {
+				this.$events[key] = where(this.$events[key], event => {
+					if (!event.attachedNode) return true;
+					if (event.attachedNode.isConnected) return true;
+				});
 			});
 		}, 1000);
 	}
