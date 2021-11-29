@@ -26,7 +26,7 @@ import DelimiterHandler from "../DelimiterHandler";
 import Evaluator from "../Evaluator";
 import EventHandler from "../event/EventHandler";
 import ReactiveEvent from "../event/ReactiveEvent";
-import Interceptor from "../interceptor/Interceptor";
+import Middleware from "../middleware/Middleware";
 import Reactive from "../reactive/Reactive";
 import Routing from "../routing/Routing";
 import DataStore from "../store/DataStore";
@@ -95,6 +95,10 @@ export default class Directive {
       const attr = findAttribute(currentEl, ['e-if', 'e-else-if', 'e-else']);
       if (!attr) break;
 
+			const firstCondition = conditions[0]; // if it already got an if,
+			if (attr.name === 'e-if' && firstCondition && (attr.name === firstCondition.node.name))
+				break;
+
       if ((attr.nodeName !== 'e-else') && (trim(attr.nodeValue ?? '') === ''))
         return Logger.error(this.errorMsgEmptyNode(attr));
 
@@ -130,7 +134,7 @@ export default class Directive {
     } while (currentEl = currentEl.nextElementSibling);
 
     forEach(reactives, item =>
-      this.binder.binds.push(item.reactive.watch(() => exec(), item.attr)));
+      this.binder.binds.push(item.reactive.onChange(() => exec(), item.attr)));
 
     (exec = () => {
       forEach(conditions, chainItem => {
@@ -197,7 +201,7 @@ export default class Directive {
       node: node,
       fields: [{ expression: nodeValue, field: nodeValue }],
 			context: this.context,
-      onChange: () => exec(ownerElement)
+      onUpdate: () => exec(ownerElement)
     });
 
     exec(ownerElement);
@@ -233,7 +237,7 @@ export default class Directive {
         replaceProperty: true,
         node: node,
 				context: this.context,
-        onChange: () => exec()
+        onUpdate: () => exec()
       });
 
     ownerElement.removeAttribute(nodeName);
@@ -243,41 +247,41 @@ export default class Directive {
     connectNode(forItem, comment);
     connectNode(node, comment);
 
-    const filter = (list: any[], filterConfigParts: string[]) => {
-      let filterValue = filterConfigParts[1];
-      let filterKeys = filterConfigParts[2];
+    const $where = (list: any[], filterConfigParts: string[]) => {
+      let whereValue = filterConfigParts[1];
+      let whereKeys = filterConfigParts[2];
 
-      if (isNull(filterValue) || filterValue === '') {
-        Logger.error("Invalid filter-value in “" + nodeName + "” with “" + nodeValue + "” expression.");
+      if (isNull(whereValue) || whereValue === '') {
+        Logger.error("Invalid where-value in “" + nodeName + "” with “" + nodeValue + "” expression.");
         return list;
       }
 
-      filterValue = this.evaluator.exec({
+      whereValue = this.evaluator.exec({
         data: data,
-        expression: filterValue,
+        expression: whereValue,
 				context: this.context
       });
 
-      // filter:myFilter
-      if (typeof filterValue === 'function') {
-        list = (filterValue as Function)(list);
+      // where:myFilter
+      if (typeof whereValue === 'function') {
+        list = (whereValue as Function)(list);
       } else {
-        // filter:search:name
-        if (isNull(filterKeys) || filterKeys === '') {
-          Logger.error(("Invalid filter-keys in “" + nodeName + "” with “" + nodeValue + "” expression, " +
-            "at least one filter-key to be provided."));
+        // where:search:name
+        if (isNull(whereKeys) || whereKeys === '') {
+          Logger.error(("Invalid where-keys in “" + nodeName + "” with “" + nodeValue + "” expression, " +
+            "at least one where-key to be provided."));
           return list;
         }
 
         let newListCopy: any[] = [];
         forEach(list, item => {
-          for (const prop of filterKeys.split(',').map(m => trim(m))) {
+          for (const prop of whereKeys.split(',').map(m => trim(m))) {
             let propValue = this.evaluator.exec({
 							data: item,
 							expression: prop,
 							context: this.context
 						});
-            if (!toStr(propValue).includes(filterValue)) break;
+            if (!toStr(propValue).includes(whereValue)) break;
             newListCopy.push(item);
           }
         });
@@ -287,7 +291,7 @@ export default class Directive {
       return list;
     }
 
-    const order = (list: any[], type: string, prop: string | null) => {
+    const $order = (list: any[], type: string, prop: string | null) => {
       if (!type) type = 'asc';
       return list.sort(function (a, b) {
         const comparison = function (asc: boolean | null, desc: boolean | null) {
@@ -356,7 +360,7 @@ export default class Directive {
     }
 
     const reactivePropertyEvent = ReactiveEvent.on('AfterGet',
-      reactive => this.binder.binds.push(reactive.watch(() => exec(), node)));
+      reactive => this.binder.binds.push(reactive.onChange(() => exec(), node)));
     let expressionObj: ExpressionObj | null = expressionToObj(nodeValue);
     reactivePropertyEvent.off();
 
@@ -399,7 +403,7 @@ export default class Directive {
               data: forData,
 							context: this.context,
               onDone: el => this.eventHandler.emit({
-                eventName: 'add',
+                eventName: Constants.builtInEvents.add,
                 attachedNode: el,
                 once: true
               })
@@ -413,16 +417,16 @@ export default class Directive {
             const findFilter = (fName: string) =>
               filters.find(item => item.substr(0, fName.length) === fName);
 
-            // applying filter:
-            let filterConfig = findFilter('filter');
+            // applying where:
+            let filterConfig = findFilter('where');
             if (filterConfig) {
-              const filterConfigParts = filterConfig.split(':').map(item => trim(item));
+              const whereConfigParts = filterConfig.split(':').map(item => trim(item));
 
-              if (filterConfigParts.length == 1) {
-                Logger.error(("Invalid “" + nodeName + "” filter expression “" + nodeValue +
-                  "”, at least a filter-value and filter-keys, or a filter-function must be provided"));
+              if (whereConfigParts.length == 1) {
+                Logger.error(("Invalid “" + nodeName + "” where expression “" + nodeValue +
+                  "”, at least a where-value and where-keys, or a filter-function must be provided"));
               } else {
-                listCopy = filter(listCopy, filterConfigParts);
+                listCopy = $where(listCopy, whereConfigParts);
               }
             }
 
@@ -434,7 +438,7 @@ export default class Directive {
                 Logger.error(("Invalid “" + nodeName + "” order  expression “" + nodeValue +
                   "”, at least the order type must be provided"));
               } else {
-                listCopy = order(listCopy, orderConfigParts[1], orderConfigParts[2]);
+                listCopy = $order(listCopy, orderConfigParts[1], orderConfigParts[2]);
               }
             }
 
@@ -467,7 +471,7 @@ export default class Directive {
       return Logger.error(("Expected a valid Object Literal expression in “"
         + node.nodeName + "” and got “" + nodeValue + "”."));
 
-    this.bouer.setData(inputData, data);
+    this.bouer.set(inputData, data);
     ownerElement.removeAttribute(node.nodeName);
   }
 
@@ -531,7 +535,7 @@ export default class Directive {
       replaceProperty: false,
       fields: [{ expression: nodeValue, field: nodeValue }],
 			context: this.context,
-      onChange: () => exec(this.evaluator.exec({
+      onUpdate: () => exec(this.evaluator.exec({
         data: data,
         expression: nodeValue,
 				context: this.context
@@ -615,8 +619,7 @@ export default class Directive {
 
   href(node: Node, data: object) {
     const ownerElement = this.toOwnerNode(node);
-    const nodeName = node.nodeName;
-    let nodeValue = trim(node.nodeValue ?? '');
+    const nodeValue = trim(node.nodeValue ?? '');
 
     if (nodeValue === '')
       return Logger.error(this.errorMsgEmptyNode(node));
@@ -645,8 +648,6 @@ export default class Directive {
         IoC.Resolve<Routing>('Routing')!
           .navigate(href.value);
       }, false);
-
-    (href as any).markable = nodeName[0] === ':';
   }
 
   entry(node: Node, data: object) {
@@ -677,7 +678,7 @@ export default class Directive {
 
     if (nodeValue === '')
       return Logger.error(this.errorMsgEmptyNode(node),
-        "Direct <empty string> injection value is allowed only with a delimiter.");
+        "Direct <empty string> injection value is not allowed.");
 
     const delimiters = this.delimiter.run(nodeValue);
     ownerElement.removeAttribute(node.nodeName);
@@ -686,9 +687,9 @@ export default class Directive {
       this.binder.create({
         data: data,
         node: connectNode(node, ownerElement),
-        fields: delimiters,
+        fields: [ { expression: nodeValue, field: nodeValue } ],
 				context: this.context,
-        onChange: () => exec()
+        onUpdate: () => exec()
       });
 
     (exec = () => {
@@ -731,7 +732,7 @@ export default class Directive {
 				context: this.context,
         fields: delimiters,
         replaceProperty: false,
-        onChange: () => exec()
+        onUpdate: () => exec()
       });
 
     ownerElement.removeAttribute(node.nodeName);
@@ -753,7 +754,7 @@ export default class Directive {
       };
     }
 
-    const interceptor = IoC.Resolve<Interceptor>('Interceptor')!;
+    const middleware = IoC.Resolve<Middleware>('Middleware')!;
     const requestEvent = subcribeEvent(Constants.builtInEvents.request);
     const responseEvent = subcribeEvent(Constants.builtInEvents.response);
     const failEvent = subcribeEvent(Constants.builtInEvents.fail);
@@ -776,7 +777,7 @@ export default class Directive {
 
       requestEvent.emit();
 
-      interceptor.run('req', {
+      middleware.run(Constants.req, {
         http: http,
         type: mReqSeparator,
         path: reqParts[1].replace(/\[|\]/g, ''),
@@ -899,7 +900,7 @@ export default class Directive {
       fields: delimiters,
       replaceProperty: false,
 			context: this.context,
-      onChange: () => {
+      onUpdate: () => {
         if (typeof $directiveConfig.updated === 'function')
           $directiveConfig.updated(node, bindConfig);
       }
