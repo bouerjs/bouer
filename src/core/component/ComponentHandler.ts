@@ -33,7 +33,6 @@ import Reactive from "../reactive/Reactive";
 import Routing from "../routing/Routing";
 import Component from "./Component";
 
-
 export default class ComponentHandler {
 	private bouer: Bouer;
 	// Handle all the components web requests to avoid multiple requests
@@ -85,8 +84,9 @@ export default class ComponentHandler {
 				});
 			})
 			.catch(error => {
-				if (!hasBaseElement) Logger.warn("It seems like you are not using the “<base href=\"/\" />” element, " +
-					"try to add as the first child into “<head></head>” element.")
+				if (!hasBaseElement)
+					Logger.warn("It seems like you are not using the “<base href=\"/base/components/path/\" />” " +
+						"element, try to add as the first child into “<head></head>” element.");
 				forEach(this.requests[url], (request: dynamic) => {
 					request.fail(error, url);
 				});
@@ -165,10 +165,7 @@ export default class ComponentHandler {
 				const newComponent = (component instanceof Component) ? component : new Component(component);
 				newComponent.bouer = this.bouer;
 
-				if (isFunction(callback))
-					callback!(newComponent);
-
-				this.insert(componentElement, newComponent, data);
+				this.insert(componentElement, newComponent, data, callback);
 
 				if (component.keepAlive === true)
 					mComponents[$name] = component;
@@ -184,10 +181,7 @@ export default class ComponentHandler {
 					newComponent.template = content;
 					newComponent.bouer = this.bouer;
 
-					if (isFunction(callback))
-						callback!(newComponent);
-
-					this.insert(componentElement, newComponent, data);
+					this.insert(componentElement, newComponent, data, callback);
 
 					if (component.keepAlive === true)
 						mComponents[$name] = component;
@@ -271,7 +265,7 @@ export default class ComponentHandler {
 		}
 	}
 
-	private insert(componentElement: Element, component: Component, data: object) {
+	private insert(componentElement: Element, component: Component, data: object, callback?: (component: Component) => void) {
 		const $name = toLower(componentElement.nodeName);
 		const container = componentElement.parentElement;
 		if (!componentElement.isConnected || !container)
@@ -291,7 +285,10 @@ export default class ComponentHandler {
 			createEl('body', htmlSnippet => {
 				htmlSnippet.innerHTML = component.template!;
 
-				forEach([].slice.call(htmlSnippet.querySelectorAll('script,link[rel="stylesheet"],style')), asset => {
+				forEach([].slice.call(htmlSnippet.children), (asset: any) => {
+					if (['SCRIPT', 'LINK', 'STYLE'].indexOf(asset.nodeName) === -1)
+						return;
+
 					component.assets.push(asset);
 					htmlSnippet.removeChild(asset);
 				});
@@ -312,6 +309,9 @@ export default class ComponentHandler {
 		}
 
 		if (isNull(component.el)) return;
+
+		if (isFunction(callback))
+			callback!(component);
 
 		let rootElement = component.el!;
 
