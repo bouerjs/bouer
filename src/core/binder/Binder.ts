@@ -20,6 +20,7 @@ import Evaluator from "../Evaluator";
 import ReactiveEvent from "../event/ReactiveEvent";
 import Bouer from "../../instance/Bouer";
 import Watch from "./Watch";
+import Middleware from "../middleware/Middleware";
 export interface BinderConfig {
 	node: Node,
 	data: dynamic,
@@ -60,15 +61,16 @@ export default class Binder {
 		node: Node,
 		data: dynamic,
 		fields: delimiterResponse[],
-		replaceProperty?: boolean,
+		isReplaceProperty?: boolean,
 		context: object,
 		onUpdate?: (value: any, node: Node) => void,
 	}) {
-		const { node, data, fields, replaceProperty, context } = options;
+		const { node, data, fields, isReplaceProperty, context } = options;
 		const originalValue = trim(node.nodeValue ?? '');
 		const originalName = node.nodeName;
 		const ownerElement = (node as any).ownerElement || node.parentNode;
 		const onUpdate = options.onUpdate || ((value: any, node: Node) => { });
+		const middleware = IoC.Resolve<Middleware>('Middleware')!;
 
 		// Clousure cache property settings
 		const propertyBindConfig: BinderConfig = {
@@ -80,6 +82,22 @@ export default class Binder {
 			parent: ownerElement,
 			value: ''
 		};
+
+		const $middleware = (type: 'bind' | 'update') => {
+			middleware.run(originalName, {
+				type: type,
+				action: middleware => {
+					middleware({
+						binder: propertyBindConfig,
+						detail: {}
+					}, {
+						success: () => { },
+						fail: () => { },
+						done: () => { }
+					})
+				}
+			});
+		}
 
 		// Two-Way Data Binding: e-bind:[?]="..."
 		if (originalName.substr(0, Constants.bind.length) === Constants.bind) {
@@ -178,6 +196,7 @@ export default class Binder {
 				this.binds.push(reactive.onChange(value => {
 					callback(this.BindingDirection.fromDataToInput, value)
 					onUpdate(value, node);
+					$middleware('update');
 				}, node));
 			});
 
@@ -204,6 +223,7 @@ export default class Binder {
 
 			// Removing the e-bind attr
 			ownerElement.removeAttribute(node.nodeName);
+			$middleware('bind');
 			return propertyBindConfig; // Stop Two-Way Data Binding Process
 		}
 
@@ -211,7 +231,7 @@ export default class Binder {
 		let nodeToBind = node;
 
 		// If definable property e-[?]="..."
-		if (originalName.substr(0, Constants.property.length) === Constants.property && isNull(replaceProperty)) {
+		if (originalName.substr(0, Constants.property.length) === Constants.property && isNull(isReplaceProperty)) {
 			propertyBindConfig.nodeName = originalName.substr(Constants.property.length);
 			ownerElement.setAttribute(propertyBindConfig.nodeName, originalValue);
 			nodeToBind = ownerElement.attributes[propertyBindConfig.nodeName];
@@ -267,12 +287,14 @@ export default class Binder {
 				this.binds.push(reactive.onChange(value => {
 					setter();
 					onUpdate(value, node);
+					$middleware('update');
 				}, node));
 			}
 			setter();
 		});
 
 		propertyBindConfig.node = nodeToBind;
+		$middleware('bind');
 		return propertyBindConfig;
 	}
 
