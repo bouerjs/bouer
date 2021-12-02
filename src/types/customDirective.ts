@@ -5,7 +5,7 @@ type customDirective = {
     /** Allow to remove the directive after the bind */
     removable?: boolean,
     bind?: (node: Node, bindConfig: BinderConfig) => boolean | undefined,
-    updated?: (node: Node, bindConfig: BinderConfig) => void
+    update?: (node: Node, bindConfig: BinderConfig) => void
   }
 };
 
