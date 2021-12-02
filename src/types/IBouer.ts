@@ -1,11 +1,11 @@
 import Component from "../core/component/Component";
+import { MiddlewareConfig } from "../core/middleware/Middleware";
 import Bouer from "../instance/Bouer";
 import customDirective from "./customDirective";
 import delimiter from "./delimiter";
 import dynamic from "./dynamic";
 import IBouerConfig from "./IBouerConfig";
 import IComponent from "./IComponent";
-import IInterceptor from "./IInterceptor";
 
 export default interface IBouer {
 	/** The data of the instance */
@@ -17,26 +17,23 @@ export default interface IBouer {
 	/** The configuration of the instance */
 	config?: IBouerConfig
 
-	/** The compoment the will be loaded to the instance */
+	/** The components of the instance */
 	components?: (IComponent | Component)[];
 
-	/** The custum directives for this instance */
+	/** The custom directives for this instance */
 	directives?: customDirective,
 
 	/** The dependencies of the instance */
 	dependencies?: dynamic,
 
-	// /** Appends delimiters to the instance */
+	/** Appends delimiters to the instance */
 	delimiters?: delimiter[],
 
 	/** Middlewares that will be used in the application */
-	interceptor?: (
-		intercept: (
-			action: string,
-			callback: (context: IInterceptor) => void
-		) => void,
+	middleware?: (
+		configure: (directive: string, configureCallback: MiddlewareConfig) => void,
 		app: Bouer
-	) => void;
+	) => void,
 
 	/** The hook that will be called before the component is loaded */
 	beforeLoad?(event: CustomEvent): void;
