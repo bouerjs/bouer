@@ -25,7 +25,7 @@ export default class Component implements IComponent {
 	bouer?: Bouer = undefined;
 	children?: (Component | IComponent)[] = [];
 	assets: (HTMLScriptElement | HTMLStyleElement | HTMLLinkElement)[] = [];
-	restrictions?: ((compoment: (Component | IComponent)) => boolean)[] = [];
+  restrictions?: ((compoment: (Component | IComponent)) => boolean | Promise<boolean>)[];
 
 	// Store temporarily this component UI orders
 	private events: EventSubscription[] = [];

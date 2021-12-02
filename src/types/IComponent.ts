@@ -5,7 +5,7 @@ export default interface IComponent extends ILifeCycleHooks {
   /** The name of the component */
   name?: string
 
-  /** The path of the component (required) */
+  /** The path of the component (not required on e-entry directive) */
   path?: string;
 
   /** The title that will be replaced when the page is loaded */
@@ -27,7 +27,7 @@ export default interface IComponent extends ILifeCycleHooks {
   children?: (Component | IComponent)[];
 
   /** restrictions of this component */
-  restrictions?: Array<((compoment: (Component | IComponent)) => boolean)>;
+  restrictions?: ((compoment: (Component | IComponent)) => boolean | Promise<boolean>)[];
 
   /** Allow to set this component as the `default page` when the application loads */
   isDefault?: boolean;

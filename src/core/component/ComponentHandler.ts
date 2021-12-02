@@ -10,7 +10,7 @@ import {
 	defineProperty,
 	DOM,
 	forEach,
-	http,
+	webRequest,
 	isFunction,
 	isNull,
 	isObject,
@@ -73,7 +73,7 @@ export default class ComponentHandler {
 		const baseURI = hasBaseElement ? resolver.baseURI : resolver.origin;
 		const urlPath = urlCombine(baseURI, url);
 
-		http(urlPath, { headers: { 'Content-Type': 'text/plain' } })
+		webRequest(urlPath, { headers: { 'Content-Type': 'text/plain' } })
 			.then(response => {
 				if (!response.ok) throw new Error(response.statusText);
 				return response.text();
@@ -553,7 +553,7 @@ export default class ComponentHandler {
 		return forEach(onlineScriptsUrls, (url, index) => {
 			webRequestChecker[url] = true;
 			// Getting script content from a web request
-			http(url, {
+			webRequest(url, {
 				headers: { "Content-Type": 'text/plain' }
 			}).then(response => {
 				if (!response.ok) throw new Error(response.statusText);
