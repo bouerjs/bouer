@@ -5,7 +5,7 @@
 It's **easy.js** v3.0.0 upgrade with a new name, that extends for a javascript library for building user interfaces, and helps in the web applications development, providing a synchronous interaction between user interfaces and Javascript data.
 
 ## So, Why Bouer.js?
-It's a javascript library really easy to use that provides to you a simple way to interact with your HTML by using Reactive Properties, reusable components written in pure HTML, api calls using only attributes, and so on... It's very good and simple to build Single Page Application. **No Virtual DOM is used**, it uses the **Real DOM** to handle all the data changes.
+It's a javascript library really easy to use that provides to you a simple way to interact with your HTML by using Reactive Properties, reusable components written in pure HTML, api calls using only attribute, and so on... It's very good and simple to build Single Page Application. **No Virtual DOM is used**, it uses the **Real DOM** to handle all the data changes.
 
 ## Prerequisites
 

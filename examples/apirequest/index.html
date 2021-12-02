@@ -2,83 +2,81 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Api Request</title>
-  <link rel="stylesheet" href="../shared.css">
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Api Request</title>
+	<link rel="stylesheet" href="../shared.css">
 </head>
 
 <body>
-  <div id="app">
-    <div class="center">
+	<div id="app">
+		<div class="center">
 
-      <ul>
-        <li e-req:[users-data]="item of [users?_start={{ start }}&_limit={{ limit }}]"
-            on:request="requested"
-            on:response="responded"
-            on:fail="failed"
-            on:done="done"
-            e-content="{{ item.name }}">
-          Loading...
-        </li>
-      </ul>
+			<ul>
+				<li e-req:[users-data]="item of users?_start={{ start }}&_limit={{ limit }}"
+						on:request="requested"
+						on:response="responded"
+						on:fail="failed"
+						on:done="done"
+						e-content="{{ item.name }}">
+					Loading...
+				</li>
+			</ul>
 
-    </div>
-  </div>
+		</div>
+	</div>
 
-  <script src="../../dist/bouer.js"></script>
+	<script src="../../dist/bouer.js"></script>
 
-  <script>
-    var app = new Bouer('#app', {
-      data: {
-        // Props
-        userId: 1,
+	<script>
+		var app = new Bouer('#app', {
+			data: {
+				// Props
+				userId: 1,
 
-        start: 0,
-        limit: 5,
+				start: 0,
+				limit: 5,
 
-        // Methods
-        requested: function (evt) {
-          console.log(evt);
-        },
-        responded: function (evt) {
-          console.log(evt);
-        },
-        failed: function (evt) {
-          console.log(evt);
-        },
-        done: function (evt) {
-          console.log(evt);
-        },
-      },
-      interceptor: (intercep, app) => {
+				// Methods
+				requested: function (evt) {
+					console.log(evt);
+				},
+				responded: function (evt) {
+					console.log(evt);
+				},
+				failed: function (evt) {
+					console.log(evt);
+				},
+				done: function (evt) {
+					console.log(evt);
+				},
+			},
+			middleware: (configure, app) => {
 
-        intercep('req', (options, next) => {
-          const http = options.http;
-          const url = options.path;
-          const type = options.type;
-          const success = options.success;
-          const fail = options.fail;
-          const done = options.done;
-          const baseURL = "https://jsonplaceholder.typicode.com/";
+				configure('req', (bind, update) => {
+					bind(context => {
+						const path = context.detail.requestPath;
 
-          http(baseURL + url, {
-            headers: { 'Content-Type': "application/json" }
-          }).then(response => {
-            if (!response.ok)
-              throw new Error(response.statusText);
-            return response.json();
-          }).then(json => success({
-            data: json
-          })).catch(error => fail({
-            error: error
-          })).finally(() => done());
-        });
+						return fetch("https://jsonplaceholder.typicode.com/" + path, {
+							headers: { 'Content-Type': "application/json" }
+						}).then(response => {
+							if (!response.ok)
+								throw new Error("Bad Request");
+							return response.json()
+						}).then(json => {
+							return {
+								data: json
+							}
+						}).catch(error => {
+							return error
+						});
+					});
+				});
 
-      }
-    });
-  </script>
+			}
+		});
+	</script>
 </body>
 
 </html>

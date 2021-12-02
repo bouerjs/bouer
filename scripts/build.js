@@ -5,14 +5,13 @@ const rollup = require('rollup');
 const terser = require('terser');
 const builds = require('./config').builds;
 
-
 Object.keys(builds).filter(key => {
     const config = builds[key];
     const output = config.output;
 
     const fileNameDev = output.file;
     const fileNameProd = fileNameDev.replace('.js', '.min.js');
-    const isProd = process.argv[2] === '--prod'
+    const isProd = process.argv[2] === '--prod';
 
     if (!fs.existsSync('dist')) {
       fs.mkdirSync('dist')

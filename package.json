@@ -11,7 +11,11 @@
   "keywords": [
     "Bouer"
   ],
-  "author": "Afonso Matumona",
+  "author": {
+		"name": "Afonso Matumona",
+		"email": "Afonsomatumona@hotmail.com",
+		"url": "https://www.linkedin.com/in/afonsomatelias"
+	},
   "license": "MIT License",
   "devDependencies": {
     "@babel/cli": "^7.2.3",
