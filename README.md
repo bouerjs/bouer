@@ -17,11 +17,11 @@ To start using it, you need to know:
 
 ## Documentation
 
-Let's learn more about **Bouer**, checkout our [website (pending)](https://bouerjs.github.io)
+Let's learn more about **Bouer**, checkout our [website](https://bouerjs.github.io)
 
-* [Get Started](https://bouerjs.github.io/docs.html)
-* [Playground](https://bouerjs.github.io/play.html) 
-* [Tutorial](https://bouerjs.github.io/tuts.html) 
+* [Get Started](https://bouerjs.github.io/docs/introduction.html)
+* [Playground (Pending)](https://bouerjs.github.io/play.html) 
+* [Tutorial (Pending)](https://bouerjs.github.io/tutorial.html) 
 
 ## Contributing
 
