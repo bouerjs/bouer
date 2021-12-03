@@ -256,6 +256,35 @@ function urlCombine(base) {
     forEach(parts, function (part) { return forEach(part.split(/\//), function (p) { return trim(p) ? partsToJoin.push(p) : null; }); });
     return protocol + partsToJoin.join('/');
 }
+/**
+ * Relative path resolver
+ */
+function pathResolver(relative, path) {
+    var isCurrentDir = function (v) { return v.substr(0, 2) === './'; };
+    var isParentDir = function (v) { return v.substr(0, 3) === '../'; };
+    var toDirPath = function (v) {
+        var values = v.split('/');
+        if (/\.html$|\.css$|\.js$/gi.test(v))
+            values.pop();
+        return {
+            relative: values.join('/'),
+            parts: values
+        };
+    };
+    if (isCurrentDir(path))
+        return toDirPath(relative).relative + path.substr(1);
+    if (isParentDir(path)) {
+        var parts_1 = toDirPath(relative).parts;
+        parts_1.push((function pathLookUp(value) {
+            if (!isParentDir(value))
+                return value;
+            parts_1.pop();
+            return pathLookUp(value.substr(3));
+        })(path));
+        return parts_1.join('/');
+    }
+    return path;
+}
 function buildError(error, options) {
     error.stack = '';
     return error;
@@ -303,7 +332,6 @@ var Constants = {
         compile: 'compile',
         request: 'request',
         response: 'response',
-        update: 'update',
         fail: 'fail',
         done: 'done',
     },
@@ -965,6 +993,7 @@ var Component = /** @class */ (function () {
                     case 'link':
                         el.setAttribute('href', asset.src);
                         el.setAttribute('rel', 'stylesheet');
+                        el.setAttribute('type', 'text/css');
                         break;
                     default:
                         el.setAttribute('src', asset.src);
@@ -2647,14 +2676,8 @@ var ComponentHandler = /** @class */ (function () {
         forEach(stylesAssets, function (asset) {
             var mStyle = asset.cloneNode(true);
             if (mStyle instanceof HTMLLinkElement) {
-                var href = mStyle.getAttribute('href') || '';
-                if (startWith(href, './')) {
-                    var componentPathSplitted = component.path.split('/');
-                    componentPathSplitted.pop();
-                    var hrefLinkSplitted = href.split('/');
-                    hrefLinkSplitted.shift();
-                    mStyle.href = urlCombine('', componentPathSplitted.join('/'), hrefLinkSplitted.join('/'));
-                }
+                var path = component.path[0] === '/' ? component.path.substr(1) : component.path;
+                mStyle.href = pathResolver(path, mStyle.getAttribute('href') || '');
             }
             //Checking if this component already have styles added
             if (_this.stylesController[$name]) {
@@ -2739,14 +2762,8 @@ var ComponentHandler = /** @class */ (function () {
             if (script.src == '' || script.innerHTML)
                 localScriptsContent.push(script.innerHTML);
             else {
-                var src = script.getAttribute('src') || '';
-                if (startWith(src, './')) {
-                    var componentPathSplitted = component.path.split('/');
-                    componentPathSplitted.pop();
-                    var scriptSrcSplitted = src.split('/');
-                    scriptSrcSplitted.shift();
-                    script.src = urlCombine('', componentPathSplitted.join('/'), scriptSrcSplitted.join('/'));
-                }
+                var path = component.path[0] === '/' ? component.path.substr(1) : component.path;
+                script.src = pathResolver(path, script.getAttribute('src') || '');
                 onlineScriptsUrls.push(script.src);
             }
         });
@@ -3136,6 +3153,8 @@ var Routing = /** @class */ (function () {
     Routing.prototype.navigate = function (route, changeUrl) {
         var _this = this;
         var _a;
+        if (!this.routeView)
+            return;
         if (isNull(route))
             return Logger.log("Invalid url provided to the navigation method.");
         route = trim(route);
@@ -3249,14 +3268,15 @@ var Skeleton = /** @class */ (function () {
     };
     Skeleton.prototype.init = function (color) {
         var _this = this;
-        var _a;
         if (!this.style)
             return;
         var dir = Constants.skeleton;
         if (!DOM.getElementById(this.identifier))
             DOM.head.appendChild(this.style);
+        if (!this.style.sheet)
+            return;
         for (var i = 0; i < this.style.sheet.cssRules.length; i++)
-            (_a = this.style.sheet) === null || _a === void 0 ? void 0 : _a.deleteRule(i);
+            this.style.sheet.deleteRule(i);
         if (color) {
             this.backgroudColor = color.background || this.defaultBackgroudColor;
             this.waveColor = color.wave || this.defaultWaveColor;
@@ -3568,7 +3588,7 @@ var Bouer = /** @class */ (function () {
         var el = this.el;
         if (el.tagName == 'body')
             el.innerHTML = '';
-        else
+        else if (el.isConnected)
             DOM.body.removeChild(el);
         forEach(toArray(DOM.head.querySelectorAll('#bouer,[component-style]')), function (item) {
             if (item.isConnected)
