@@ -35,7 +35,7 @@ export default class Skeleton {
 		if (!this.style.sheet) return;
 
     for (let i = 0; i < this.style.sheet.cssRules.length; i++)
-      this.style.sheet?.deleteRule(i);
+      this.style.sheet!.deleteRule(i);
 
     if (color) {
       this.backgroudColor = color.background || this.defaultBackgroudColor;
