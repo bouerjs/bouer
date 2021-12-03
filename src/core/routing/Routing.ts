@@ -52,6 +52,9 @@ export default class Routing {
 	 * @param changeUrl allow to change the url after the navigation, default value is `true`
 	 */
 	navigate(route: string, changeUrl?: boolean) {
+		if (!this.routeView)
+			return;
+
 		if (isNull(route))
 			return Logger.log("Invalid url provided to the navigation method.");
 
