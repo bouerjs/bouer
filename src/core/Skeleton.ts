@@ -32,7 +32,9 @@ export default class Skeleton {
     if (!DOM.getElementById(this.identifier))
       DOM.head.appendChild(this.style);
 
-    for (let i = 0; i < this.style.sheet!.cssRules!.length; i++)
+		if (!this.style.sheet) return;
+
+    for (let i = 0; i < this.style.sheet.cssRules.length; i++)
       this.style.sheet?.deleteRule(i);
 
     if (color) {
