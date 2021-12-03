@@ -9,16 +9,11 @@ import {
 	createEl,
 	defineProperty,
 	DOM,
-	forEach,
-	webRequest,
-	isFunction,
+	forEach, isFunction,
 	isNull,
-	isObject,
-	startWith,
-	toArray,
+	isObject, pathResolver, toArray,
 	toLower, transferProperty, urlCombine,
-	urlResolver,
-	where
+	urlResolver, webRequest, where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import dynamic from "../../types/dynamic";
@@ -416,16 +411,8 @@ export default class ComponentHandler {
 			const mStyle = asset.cloneNode(true) as Element;
 
 			if (mStyle instanceof HTMLLinkElement) {
-				let href = mStyle.getAttribute('href') || '';
-				if (startWith(href, './')) {
-					const componentPathSplitted = component.path.split('/');
-					componentPathSplitted.pop();
-
-					const hrefLinkSplitted = href.split('/');
-					hrefLinkSplitted.shift();
-
-					mStyle.href = urlCombine('', componentPathSplitted.join('/'), hrefLinkSplitted.join('/'));
-				}
+				const path = component.path[0] === '/' ? component.path.substr(1) : component.path;
+				mStyle.href = pathResolver(path, mStyle.getAttribute('href') || '');
 			}
 
 			//Checking if this component already have styles added
@@ -531,16 +518,8 @@ export default class ComponentHandler {
 			if (script.src == '' || script.innerHTML)
 				localScriptsContent.push(script.innerHTML);
 			else {
-				const src = script.getAttribute('src') || '';
-				if (startWith(src, './')) {
-					const componentPathSplitted = component.path.split('/');
-					componentPathSplitted.pop();
-
-					const scriptSrcSplitted = src.split('/');
-					scriptSrcSplitted.shift();
-
-					script.src = urlCombine('', componentPathSplitted.join('/'), scriptSrcSplitted.join('/'));
-				}
+				const path = component.path[0] === '/' ? component.path.substr(1) : component.path;
+				script.src = pathResolver(path, script.getAttribute('src') || '');
 				onlineScriptsUrls.push(script.src);
 			}
 		});
