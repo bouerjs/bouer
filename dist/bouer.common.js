@@ -2076,11 +2076,15 @@ var Compiler = /** @class */ (function () {
                     return directive.ignore(node);
                 if (node.localName === Constants.slot && options.componentSlot) {
                     var insertSlot_1 = function (slot, reference) {
-                        forEach(toArray(slot.childNodes), function (child) {
+                        var $walker = function (child) {
                             var cloned = child.cloneNode(true);
                             rootElement.insertBefore(cloned, reference);
                             walker(cloned, data);
-                        });
+                        };
+                        if (slot.nodeName === 'SLOTCONTAINER')
+                            forEach(toArray(slot.childNodes), function (child) { return $walker(child); });
+                        else
+                            $walker(slot);
                         rootElement.removeChild(reference);
                     };
                     if (node.hasAttribute('default')) {
@@ -2090,11 +2094,18 @@ var Compiler = /** @class */ (function () {
                     else if (node.hasAttribute('name')) {
                         // In case of target slot insertion
                         var target_1 = node.attributes['name'];
-                        return forEach(toArray(options.componentSlot.children), function (child) {
-                            if (child.localName === Constants.slot && child.getAttribute('name') !== target_1.value)
-                                return;
-                            insertSlot_1(child, node);
-                        });
+                        return (function innerWalker(element) {
+                            var slotValue = element.getAttribute(Constants.slot);
+                            if (slotValue && slotValue === target_1.value) {
+                                element.removeAttribute(Constants.slot);
+                                return insertSlot_1(element, node);
+                            }
+                            if (element.children.length === 0)
+                                return null;
+                            forEach(toArray(element.children), function (child) {
+                                innerWalker(child);
+                            });
+                        })(options.componentSlot);
                     }
                 }
                 // e-def="{...}" directive
@@ -2560,7 +2571,7 @@ var ComponentHandler = /** @class */ (function () {
             return; //Logger.warn("Insert location of component <" + $name + "></" + $name + "> not found.");
         if (isNull(component.template))
             return Logger.error("The <" + $name + "></" + $name + "> component is not ready yet to be inserted.");
-        var elementSlots = createEl('div', function (el) {
+        var elementSlots = createAnyEl('SlotContainer', function (el) {
             el.innerHTML = componentElement.innerHTML;
             componentElement.innerHTML = "";
         }).build();
