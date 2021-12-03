@@ -6,6 +6,7 @@ import {
 	anchor,
 	buildError,
 	code,
+	createAnyEl,
 	createEl,
 	defineProperty,
 	DOM,
@@ -269,7 +270,7 @@ export default class ComponentHandler {
 		if (isNull(component.template))
 			return Logger.error("The <" + $name + "></" + $name + "> component is not ready yet to be inserted.");
 
-		const elementSlots = createEl('div', el => {
+		const elementSlots = createAnyEl('SlotContainer', el => {
 			el.innerHTML = componentElement.innerHTML
 			componentElement.innerHTML = "";
 		}).build();

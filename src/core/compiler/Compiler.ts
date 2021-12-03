@@ -80,11 +80,17 @@ export default class Compiler {
 
         if (node.localName === Constants.slot && options.componentSlot) {
           const insertSlot = (slot: Element, reference: Node) => {
-            forEach(toArray(slot.childNodes), (child: Node) => {
-              const cloned = child.cloneNode(true);
-              rootElement.insertBefore(cloned, reference);
-              walker(cloned, data);
-            });
+						const $walker = (child: Node) => {
+							const cloned = child.cloneNode(true);
+							rootElement.insertBefore(cloned, reference);
+							walker(cloned, data);
+						}
+
+						if (slot.nodeName === 'SLOTCONTAINER')
+							forEach(toArray(slot.childNodes), (child: Node) => $walker(child));
+						else
+							$walker(slot);
+
             rootElement.removeChild(reference);
           }
 
@@ -94,12 +100,21 @@ export default class Compiler {
           } else if (node.hasAttribute('name')) {
             // In case of target slot insertion
             const target = (node.attributes as any)['name'] as Attr;
-            return forEach(toArray(options.componentSlot!.children), (child: Element) => {
-              if (child.localName === Constants.slot && child.getAttribute('name') !== target.value)
-                return;
 
-              insertSlot(child, node);
-            });
+						return (function innerWalker(element: Element) {
+							const slotValue = element.getAttribute(Constants.slot);
+							if (slotValue && slotValue === target.value) {
+								element.removeAttribute(Constants.slot);
+								return insertSlot(element, node);
+							}
+
+							if (element.children.length === 0)
+								return null;
+
+							forEach(toArray(element.children), (child: Element) => {
+								innerWalker(child);
+							});
+						})(options.componentSlot!);
           }
         }
 
