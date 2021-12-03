@@ -159,6 +159,7 @@ export default class Component implements IComponent {
 					case 'link':
 						el.setAttribute('href', asset.src);
 						el.setAttribute('rel', 'stylesheet');
+						el.setAttribute('type', 'text/css');
 						break;
 					default: el.setAttribute('src', asset.src); break;
 				}
