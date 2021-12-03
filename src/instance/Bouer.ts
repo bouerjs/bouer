@@ -495,7 +495,8 @@ export default class Bouer implements IBouer {
 		const el = this.el!;
 		if (el.tagName == 'body')
 			el.innerHTML = '';
-		else DOM.body.removeChild(el);
+		else if (el.isConnected)
+			DOM.body.removeChild(el);
 
 		forEach(toArray(
 			DOM.head.querySelectorAll('#bouer,[component-style]')
