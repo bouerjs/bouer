@@ -309,6 +309,45 @@ export function urlCombine(base: string, ...parts: string[]) {
 
 	return protocol + partsToJoin.join('/')
 }
+/**
+ * Relative path resolver
+ */
+export function pathResolver(relative: string, path: string) {
+	const isCurrentDir = (v: string) => v.substr(0, 2) === './';
+	const isParentDir = (v: string) => v.substr(0, 3) === '../';
+
+	const toDirPath = (v: string) => {
+		const values = v.split('/');
+
+		if (/\.html$|\.css$|\.js$/gi.test(v))
+			values.pop();
+		return {
+			relative: values.join('/'),
+			parts: values
+		};
+	}
+
+	if (isCurrentDir(path))
+		return toDirPath(relative).relative + path.substr(1);
+
+	if (isParentDir(path)) {
+		const parts = toDirPath(relative).parts;
+
+		parts.push(
+			(function pathLookUp(value: string): string {
+				if (!isParentDir(value))
+					return value;
+
+				parts.pop();
+				return pathLookUp(value.substr(3));
+			})(path)
+		);
+
+		return parts.join('/');
+	}
+
+	return path;
+}
 
 export function buildError(error: any, options?: dynamic) {
 	error.stack = '';
