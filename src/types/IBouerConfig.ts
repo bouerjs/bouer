@@ -5,8 +5,8 @@ export default interface IBouerConfig {
   /** Allow to keep the data modified during the component lifecycle */
   activeClassName?: string;
 
-  /** Allow to preload the component content when the application is ready, by default is `true` */
-  preload?: boolean;
+  /** Allow to prefetch the component content when the application is ready, by default is `true` */
+  prefetch?: boolean;
 
   /** Defines the default color of the skeleton */
   skeleton?: { background: string, wave: string }

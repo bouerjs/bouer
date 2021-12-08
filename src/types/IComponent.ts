@@ -8,7 +8,7 @@ export default interface IComponent extends ILifeCycleHooks {
   /** The path of the component (not required on e-entry directive) */
   path?: string;
 
-  /** The title that will be replaced when the page is loaded */
+  /** The title that should be replaced when the page is loaded */
   title?: string;
 
   /** The navigation url */
@@ -17,17 +17,23 @@ export default interface IComponent extends ILifeCycleHooks {
   /** The component html template [hard code component] */
   template?: string;
 
-  /** The default data that will be injected in the component */
+  /** The default data that should be injected in the component */
   data?: object;
 
   /** Allow the component the keep the last state */
   keepAlive?: boolean;
 
-  /** The children of the component that will inherit the `route` of the father */
+  /**
+	 * Allow to prefetch the component content when the application is ready.
+	 * Note: it overrides the global prefetch value
+	 */
+	prefetch?: boolean;
+
+  /** The children of the component that should inherit the `route` of the father */
   children?: (Component | IComponent)[];
 
   /** restrictions of this component */
-  restrictions?: ((compoment: (Component | IComponent)) => boolean | Promise<boolean>)[];
+  restrictions?: ((component: (Component | IComponent)) => boolean | Promise<boolean>)[];
 
   /** Allow to set this component as the `default page` when the application loads */
   isDefault?: boolean;

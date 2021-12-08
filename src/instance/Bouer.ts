@@ -13,10 +13,11 @@ import Skeleton from "../core/Skeleton";
 import DataStore from "../core/store/DataStore";
 import { Constants } from "../shared/helpers/Constants";
 import IoC from "../shared/helpers/IoC";
+import Task from "../shared/helpers/Task";
 import {
 	createEl, defineProperty, DOM, forEach,
 	GLOBAL,
-	isNull, toArray, trim
+	isNull, isObject, toArray, transferProperty, trim
 } from "../shared/helpers/Utils";
 import Logger from "../shared/logger/Logger";
 import delimiter from "../types/delimiter";
@@ -34,6 +35,7 @@ export default class Bouer implements IBouer {
 	globalData: object;
 	config?: IBouerConfig;
 	dependencies: dynamic = {};
+	__id__: number = IoC.GetId();
 
 	/** Data Exposition and Injection handler*/
 	$data: {
@@ -176,18 +178,23 @@ export default class Bouer implements IBouer {
 
 		this.el = el;
 
-		IoC.Register(this);
-		const dataStore = new DataStore();
-		new Evaluator(this);
-		const middleware = new Middleware();
+		const dataStore = new DataStore(this);
+		const evaluator = new Evaluator(this);
+		const middleware = new Middleware(this);
 
 		// Register the middleware
 		if (typeof options.middleware === 'function')
 			options.middleware.call(this, middleware.register, this);
 
 		// Transform the data properties into a reative
-		this.data = Reactive.transform(options!.data || {});
-		this.globalData = Reactive.transform(options!.globalData || {});
+		this.data = Reactive.transform({
+			inputObject: options.data || {},
+			context: this
+		});
+		this.globalData = Reactive.transform({
+			inputObject: options.globalData || {},
+			context: this
+		});
 
 		const delimiters = options.delimiters || [];
 		delimiters.push.apply(delimiters, [
@@ -196,10 +203,10 @@ export default class Bouer implements IBouer {
 		]);
 
 		const binder = new Binder(this);
-		const delimiter = new DelimiterHandler(delimiters);
+		const delimiter = new DelimiterHandler(delimiters, this);
 		const eventHandler = new EventHandler(this);
 		const routing = new Routing(this);
-		const componentHandler = new ComponentHandler(this, options);
+		const componentHandler = new ComponentHandler(this);
 		const compiler = new Compiler(this, options);
 		const converter = new Converter(this);
 		const skeleton = new Skeleton(this);
@@ -217,8 +224,11 @@ export default class Bouer implements IBouer {
 					return Logger.log("There is already a data stored with this key “" + key + "”.");
 
 				if ((toReactive ?? false) === true)
-					Reactive.transform(data);
-				return DataStore.set('data', key, data);
+					Reactive.transform({
+						context: this,
+						inputObject: data
+					});
+				return IoC.Resolve<DataStore>(this, DataStore)!.set('data', key, data);
 			},
 			unset: key => delete dataStore.data[key]
 		};
@@ -239,7 +249,10 @@ export default class Bouer implements IBouer {
 					if (!node) return;
 					compiler.compile({
 						el: node,
-						data: Reactive.transform(mWait.data),
+						data: Reactive.transform({
+							context: this,
+							inputObject: mWait.data
+						}),
 						context: this
 					})
 				});
@@ -296,6 +309,9 @@ export default class Bouer implements IBouer {
 			attachedNode: el
 		});
 
+		// Registering all the components
+		componentHandler.prepare(options.components || []);
+
 		// compile the app
 		compiler.compile({
 			el: this.el,
@@ -307,14 +323,32 @@ export default class Bouer implements IBouer {
 			})
 		});
 
-		GLOBAL.addEventListener('beforeunload', evt => {
+		let isDestroyed = false;
+		GLOBAL.addEventListener('beforeunload', () => {
+			if (isDestroyed) return stop();
+
 			eventHandler.emit({
 				eventName: 'beforeDestroy',
 				attachedNode: el
 			});
 
 			this.destroy();
+			isDestroyed = true;
 		}, { once: true });
+
+		Task.run(stopTask => {
+			if (isDestroyed) return stopTask();
+			if (this.el.isConnected) return;
+
+			eventHandler.emit({
+				eventName: 'beforeDestroy',
+				attachedNode: this.el
+			});
+
+			this.destroy();
+			stopTask();
+			isDestroyed = true;
+		});
 
 		// Initializing Routing
 		routing.init();
@@ -330,19 +364,40 @@ export default class Bouer implements IBouer {
 
 	/**
 	 * Sets data into a target object, by default is the `app.data`
-	 * @param inputData the data the will be setted
+	 * @param inputData the data the should be setted
 	 * @param targetObject the target were the inputData
 	 * @returns the object with the data setted
 	 */
 	set(inputData: object, targetObject?: object) {
-		return Reactive.set(inputData, (targetObject || this.data));
+
+		if (!isObject(inputData)) {
+			Logger.error('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".');
+			return {};
+		}
+
+		if (isObject(targetObject) && targetObject == null) {
+			Logger.error('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".');
+			return inputData;
+		}
+
+		targetObject = targetObject || this.data;
+
+		// Transforming the input
+		Reactive.transform({
+			inputObject: inputData,
+			context: this
+		});
+
+		// Transfering the properties
+		forEach(Object.keys(inputData), key => transferProperty(targetObject, inputData, key));
+		return targetObject;
 	}
 
 	/**
 	 * Compiles a `HTML snippet` to a `Object Literal`
 	 * @param input the input element
 	 * @param options the options of the compilation
-	 * @param onSet a function that will be fired when a value is setted
+	 * @param onSet a function that should be fired when a value is setted
 	 * @returns the Object Compiled from the HTML
 	 */
 	toJsObj(input: any, options?: {
@@ -357,33 +412,33 @@ export default class Bouer implements IBouer {
 		 */
 		values?: string
 	}, onSet?: (builtObject: object, propName: string, value: any, element: Element) => void) {
-		return IoC.Resolve<Converter>('Converter')!.htmlToJsObj(input, options, onSet);
+		return IoC.Resolve<Converter>(this, Converter)!.htmlToJsObj(input, options, onSet);
 	}
 
 	/**
 	 * Provides the possibility to watch a property change
 	 * @param propertyName the property to watch
-	 * @param callback the function that will be called when the property change
+	 * @param callback the function that should be called when the property change
 	 * @param targetObject the target object having the property to watch
 	 * @returns the watch object having the method to destroy the watch
 	 */
 	watch(propertyName: string, callback: watchCallback, targetObject?: object) {
-		return IoC.Resolve<Binder>('Binder')!.onPropertyChange(propertyName, callback, targetObject);
+		return IoC.Resolve<Binder>(this, Binder)!.onPropertyChange(propertyName, callback, targetObject);
 	}
 
 	/**
 	 * Watch all reactive properties in the provided scope.
-	 * @param watchableScope the function that will be called when the any reactive property change
+	 * @param watchableScope the function that should be called when the any reactive property change
 	 * @returns an object having all the watches and the method to destroy watches at once
 	 */
 	react(watchableScope: () => void) {
-		return IoC.Resolve<Binder>('Binder')!.onPropertyInScopeChange(watchableScope);
+		return IoC.Resolve<Binder>(this, Binder)!.onPropertyInScopeChange(watchableScope);
 	}
 
 	/**
 	 * Add an Event Listener to the instance or to an object
 	 * @param eventName the event name to be listening
-	 * @param callback the callback that will be fired
+	 * @param callback the callback that should be fired
 	 * @param attachedNode A node to attach the event
 	 * @param modifiers An object having all the event modifier
 	 * @returns The event added
@@ -399,7 +454,7 @@ export default class Bouer implements IBouer {
 				signal?: AbortSignal;
 			}
 		}) {
-		return IoC.Resolve<EventHandler>('EventHandler')!.
+		return IoC.Resolve<EventHandler>(this, EventHandler)!.
 			on({
 				eventName,
 				callback,
@@ -412,11 +467,11 @@ export default class Bouer implements IBouer {
 	/**
 	 * Removes an Event Listener from the instance or from object
 	 * @param eventName the event name to be listening
-	 * @param callback the callback that will be fired
+	 * @param callback the callback that should be fired
 	 * @param attachedNode A node to attach the event
 	 */
 	off(eventName: string, callback: (event: CustomEvent | Event) => void, attachedNode?: Node) {
-		return IoC.Resolve<EventHandler>('EventHandler')!.
+		return IoC.Resolve<EventHandler>(this, EventHandler)!.
 			off({
 				eventName,
 				callback,
@@ -434,7 +489,7 @@ export default class Bouer implements IBouer {
 		once?: boolean
 	}) {
 		var mOptions = (options || {});
-		return IoC.Resolve<EventHandler>('EventHandler')!.
+		return IoC.Resolve<EventHandler>(this, EventHandler)!.
 			emit({
 				eventName: eventName,
 				attachedNode: mOptions.element,
@@ -445,7 +500,7 @@ export default class Bouer implements IBouer {
 
 	/**
 	 * Limits sequential execution to a single one acording to the milliseconds provided
-	 * @param callback the callback that will be performed the execution
+	 * @param callback the callback that should be performed the execution
 	 * @param wait milliseconds to the be waited before the single execution
 	 * @returns executable function
 	 */
@@ -477,12 +532,12 @@ export default class Bouer implements IBouer {
 		el: Element,
 		/** The context of this compilation process */
 		context: object,
-		/** The data that will be injected in the compilation */
+		/** The data that should be injected in the compilation */
 		data?: object,
-		/** The function that will be fired when the compilation is done */
+		/** The function that should be fired when the compilation is done */
 		onDone?: (element: Element, data?: object | undefined) => void
 	}) {
-		return IoC.Resolve<Compiler>('Compiler')!.
+		return IoC.Resolve<Compiler>(this, Compiler)!.
 			compile({
 				el: options.el,
 				data: options.data,
@@ -493,21 +548,16 @@ export default class Bouer implements IBouer {
 
 	destroy() {
 		const el = this.el!;
-		if (el.tagName == 'body')
-			el.innerHTML = '';
-		else if (el.isConnected)
-			DOM.body.removeChild(el);
-
-		forEach(toArray(
-			DOM.head.querySelectorAll('#bouer,[component-style]')
-		), (item: Element) => {
-			if (item.isConnected)
-				DOM.head.removeChild(item);
-		});
-
 		this.emit('destroyed', {
 			element: this.el!
-		})
+		});
+
+		if (el.tagName == 'body')
+			el.innerHTML = '';
+		else if (DOM.contains(el))
+			DOM.body.removeChild(el);
+
+		IoC.Dispose(this);
 	}
 
 	// Hooks

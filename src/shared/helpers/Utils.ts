@@ -349,7 +349,8 @@ export function pathResolver(relative: string, path: string) {
 	return path;
 }
 
-export function buildError(error: any, options?: dynamic) {
+export function buildError(error: any) {
+	if (!error) return 'Unknown Error';
 	error.stack = '';
 	return error;
 }
@@ -366,4 +367,3 @@ export function connectNode(node: Node, nodeToConnectWith: Node) {
 export const DOM = document;
 export const GLOBAL = globalThis;
 export const anchor = createEl('a').build();
-export const taskRunner = setInterval;

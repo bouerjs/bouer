@@ -287,7 +287,9 @@ function pathResolver(relative, path) {
     }
     return path;
 }
-function buildError(error, options) {
+function buildError(error) {
+    if (!error)
+        return 'Unknown Error';
     error.stack = '';
     return error;
 }
@@ -302,7 +304,6 @@ function connectNode(node, nodeToConnectWith) {
 var DOM = document;
 var GLOBAL = globalThis;
 var anchor = createEl('a').build();
-var taskRunner = setInterval;
 
 var Constants = {
     skip: 'e-skip',
@@ -356,26 +357,41 @@ var IoC = /** @class */ (function () {
     }
     /**
      * Register an instance into the DI container
-     * @param instance the instance to be store
+     * @param obj the instance to be store
      */
-    IoC.Register = function (instance) {
-        this.container[instance.constructor.name] = instance;
+    IoC.Register = function (obj) {
+        var objAsAny = obj;
+        if (!this.container[objAsAny.bouer.__id__])
+            this.container[objAsAny.bouer.__id__] = {};
+        this.container[objAsAny.bouer.__id__][objAsAny.constructor.name] = {
+            app: objAsAny.bouer,
+            ClassInstance: obj
+        };
     };
     /**
      * Resolve and Retrieve the instance registered
-     * @param key the name of the class registered
+     * @param app the application
+     * @param $class the class registered
      * @returns the instance of the class
      */
-    IoC.Resolve = function (key) {
-        return this.container[key];
+    IoC.Resolve = function (app, $class) {
+        var appContainer = this.container[app.__id__];
+        if (!appContainer)
+            throw new Error("Application already disposed.");
+        var mContainer = appContainer[$class.name];
+        return mContainer.ClassInstance;
     };
     /**
      * Destroy an instance registered
      * @param key the name of the class registered
      */
-    IoC.Dispose = function (key) {
-        delete this.container[key];
+    IoC.Dispose = function (bouer) {
+        delete this.container[bouer.__id__];
     };
+    IoC.GetId = function () {
+        return IoC.identifierController++;
+    };
+    IoC.identifierController = 1;
     IoC.container = {};
     return IoC;
 }());
@@ -423,6 +439,326 @@ var Logger = /** @class */ (function () {
     };
     Logger.prefix = '[Bouer]';
     return Logger;
+}());
+
+var Extend = /** @class */ (function () {
+    function Extend() {
+    }
+    // join objects into one
+    Extend.obj = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        var out = {};
+        forEach(args, function (arg) {
+            if (isNull(arg))
+                return;
+            forEach(Object.keys(arg), function (key) {
+                var propValue = arg[key];
+                if (isNull(propValue))
+                    return;
+                transferProperty(out, arg, key);
+            });
+        });
+        return out;
+    };
+    /** join arrays into one */
+    Extend.array = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        var out = [];
+        forEach(args, function (arg) {
+            if (isNull(arg))
+                return;
+            if (!Array.isArray(arg))
+                return out.push(arg);
+            forEach(Object.keys(arg), function (key) {
+                var value = arg[key];
+                if (isNull(value))
+                    return;
+                if (Array.isArray(value)) {
+                    [].push.apply(out, value);
+                }
+                else {
+                    out.push(value);
+                }
+            });
+        });
+        return out;
+    };
+    return Extend;
+}());
+
+var Task = /** @class */ (function () {
+    function Task() {
+    }
+    Task.run = function (callback, milliseconds) {
+        var t_id = setInterval(function () {
+            callback(function () { return clearInterval(t_id); });
+        }, milliseconds || 1000);
+    };
+    return Task;
+}());
+
+var DelimiterHandler = /** @class */ (function () {
+    function DelimiterHandler(delimiters, bouer) {
+        this.delimiters = [];
+        this.bouer = bouer;
+        this.delimiters = delimiters;
+        IoC.Register(this);
+    }
+    DelimiterHandler.prototype.add = function (item) {
+        this.delimiters.push(item);
+    };
+    DelimiterHandler.prototype.remove = function (name) {
+        var index = this.delimiters.findIndex(function (item) { return item.name === name; });
+        this.delimiters.splice(index, 1);
+    };
+    DelimiterHandler.prototype.run = function (content) {
+        var _this = this;
+        if (isNull(content) || trim(content) === '')
+            return [];
+        var mDelimiter = null;
+        var checkContent = function (text, flag) {
+            var center = '([\\S\\s]*?)';
+            for (var i = 0; i < _this.delimiters.length; i++) {
+                var delimiter = _this.delimiters[i];
+                var result_1 = text.match(RegExp(delimiter.delimiter.open + center + delimiter.delimiter.close, flag || ''));
+                if (result_1) {
+                    mDelimiter = delimiter;
+                    return result_1;
+                }
+            }
+        };
+        var result = checkContent(content, 'g');
+        if (!result)
+            return [];
+        return result.map(function (item) {
+            var matches = checkContent(item);
+            return {
+                field: matches[0],
+                expression: trim(matches[1]),
+                delimiter: mDelimiter
+            };
+        });
+    };
+    return DelimiterHandler;
+}());
+
+var Evaluator = /** @class */ (function () {
+    function Evaluator(bouer) {
+        this.bouer = bouer;
+        this.global = this.createWindow();
+        IoC.Register(this);
+    }
+    Evaluator.prototype.createWindow = function () {
+        var mWindow;
+        createEl('iframe', function (frame, dom) {
+            frame.style.display = 'none!important';
+            dom.body.appendChild(frame);
+            mWindow = frame.contentWindow;
+            dom.body.removeChild(frame);
+        });
+        delete mWindow.name;
+        return mWindow;
+    };
+    Evaluator.prototype.execRaw = function (expression, context) {
+        // Executing the expression
+        try {
+            var mExpression = "(function(){ " + expression + " }).apply(this, arguments)";
+            GLOBAL.Function(mExpression).apply(context || this.bouer);
+        }
+        catch (error) {
+            Logger.error(buildError(error));
+        }
+    };
+    Evaluator.prototype.exec = function (options) {
+        var _this = this;
+        var data = options.data, args = options.args, expression = options.expression, isReturn = options.isReturn, aditional = options.aditional, context = options.context;
+        var mGlobal = this.global;
+        var noConfigurableProperties = {};
+        context = context || this.bouer;
+        var dataToUse = Extend.obj(aditional || {});
+        // Defining the scope data
+        forEach(Object.keys(data), function (key) {
+            transferProperty(dataToUse, data, key);
+        });
+        // Applying the global data to the dataToUse variable
+        forEach(Object.keys(this.bouer.globalData), function (key) {
+            if (key in dataToUse)
+                return Logger.warn('It was not possible to use the globalData property "' + key +
+                    '" because it already defined in the current scope.');
+            transferProperty(dataToUse, _this.bouer.globalData, key);
+        });
+        var keys = Object.keys(dataToUse);
+        var returnedValue;
+        // Spreading all the properties
+        forEach(keys, function (key) {
+            delete mGlobal[key];
+            // In case of non-configurable property store them to be handled
+            if (key in mGlobal && getDescriptor(mGlobal, key).configurable === true)
+                noConfigurableProperties[key] = mGlobal[key];
+            if (key in noConfigurableProperties)
+                mGlobal[key] = dataToUse[key];
+            transferProperty(mGlobal, dataToUse, key);
+        });
+        // Executing the expression
+        try {
+            var mExpression = 'return(function(){"use strict"; ' +
+                (isReturn === false ? '' : 'return') + ' ' + expression + ' }).apply(this, arguments)';
+            returnedValue = this.global.Function(mExpression).apply(context, args);
+        }
+        catch (error) {
+            Logger.error(buildError(error));
+        }
+        // Removing the properties
+        forEach(keys, function (key) { return delete mGlobal[key]; });
+        return returnedValue;
+    };
+    return Evaluator;
+}());
+
+var EventHandler = /** @class */ (function () {
+    function EventHandler(bouer) {
+        this.$events = {};
+        this.input = createEl('input').build();
+        this.bouer = bouer;
+        this.evaluator = IoC.Resolve(this.bouer, Evaluator);
+        IoC.Register(this);
+        this.cleanup();
+    }
+    EventHandler.prototype.handle = function (node, data, context) {
+        var _this = this;
+        var _a;
+        var ownerElement = (node.ownerElement || node.parentNode);
+        var nodeName = node.nodeName;
+        if (isNull(ownerElement))
+            return Logger.error("Invalid ParentElement of “" + nodeName + "”");
+        // <button on:submit.once.stopPropagation="times++"></button>
+        var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
+        var eventNameWithModifiers = nodeName.substr(Constants.on.length);
+        var allModifiers = eventNameWithModifiers.split('.');
+        var eventName = allModifiers[0];
+        allModifiers.shift();
+        if (nodeValue === '')
+            return Logger.error("Expected an expression in the “" + nodeName + "” and got an <empty string>.");
+        connectNode(node, ownerElement);
+        ownerElement.removeAttribute(nodeName);
+        var callback = function (evt) {
+            // Calling the modifiers
+            var availableModifiersFunction = {
+                'prevent': 'preventDefault',
+                'stop': 'stopPropagation'
+            };
+            forEach(allModifiers, function (modifier) {
+                var modifierFunctionName = availableModifiersFunction[modifier];
+                if (evt[modifierFunctionName])
+                    evt[modifierFunctionName]();
+            });
+            var mArguments = [evt];
+            var isResultFunction = _this.evaluator.exec({
+                data: data,
+                expression: nodeValue,
+                args: mArguments,
+                aditional: { event: evt },
+                context: context
+            });
+            if (isFunction(isResultFunction)) {
+                try {
+                    isResultFunction.apply(context, mArguments);
+                }
+                catch (error) {
+                    Logger.error(buildError(error));
+                }
+            }
+        };
+        var modifiersObject = {};
+        var addEventListenerOptions = ['capture', 'once', 'passive'];
+        forEach(allModifiers, function (md) {
+            md = md.toLocaleLowerCase();
+            if (addEventListenerOptions.indexOf(md) !== -1) {
+                modifiersObject[md] = true;
+            }
+        });
+        if (!('on' + eventName in this.input))
+            this.on({ eventName: eventName, callback: callback, modifiers: modifiersObject, context: context, attachedNode: ownerElement });
+        else
+            ownerElement.addEventListener(eventName, callback, modifiersObject);
+    };
+    EventHandler.prototype.on = function (options) {
+        var _this = this;
+        var eventName = options.eventName, callback = options.callback, context = options.context, attachedNode = options.attachedNode, modifiers = options.modifiers;
+        var event = {
+            eventName: eventName,
+            callback: function (evt) { return callback.apply(context || _this.bouer, [evt]); },
+            attachedNode: attachedNode,
+            modifiers: modifiers,
+            emit: function (options) { return _this.emit({
+                eventName: eventName,
+                attachedNode: attachedNode,
+                init: (options || {}).init,
+                once: (options || {}).once,
+            }); }
+        };
+        if (!this.$events[eventName])
+            this.$events[eventName] = [];
+        this.$events[eventName].push(event);
+        return event;
+    };
+    EventHandler.prototype.off = function (options) {
+        var eventName = options.eventName, callback = options.callback, attachedNode = options.attachedNode;
+        if (!this.$events[eventName])
+            return;
+        this.$events[eventName] = where(this.$events[eventName], function (evt) {
+            if (attachedNode)
+                return (evt.attachedNode === attachedNode);
+            return !(evt.eventName === eventName && callback == evt.callback);
+        });
+    };
+    EventHandler.prototype.emit = function (options) {
+        var _this = this;
+        var eventName = options.eventName, init = options.init, once = options.once, attachedNode = options.attachedNode;
+        var events = this.$events[eventName];
+        if (!events)
+            return;
+        var emitter = function (node, callback) {
+            node.addEventListener(eventName, callback, { once: true });
+            node.dispatchEvent(new CustomEvent(eventName, init));
+        };
+        forEach(events, function (evt, index) {
+            var node = evt.attachedNode;
+            // If a node was provided, just dispatch the events in this node
+            if (attachedNode) {
+                if (node !== attachedNode)
+                    return;
+                return emitter(node, evt.callback);
+            }
+            // Otherwise, if this events has a node, dispatch the node event
+            if (node)
+                return emitter(node, evt.callback);
+            // Otherwise, dispatch all events
+            evt.callback.call(_this.bouer, new CustomEvent(eventName, init));
+            if ((once !== null && once !== void 0 ? once : false) === true)
+                events.splice(index, 1);
+        });
+    };
+    EventHandler.prototype.cleanup = function () {
+        var _this = this;
+        Task.run(function () {
+            forEach(Object.keys(_this.$events), function (key) {
+                _this.$events[key] = where(_this.$events[key], function (event) {
+                    if (!event.attachedNode)
+                        return true;
+                    if (event.attachedNode.isConnected)
+                        return true;
+                });
+            });
+        });
+    };
+    return EventHandler;
 }());
 
 var ReactiveEvent = /** @class */ (function () {
@@ -494,334 +830,6 @@ var Watch = /** @class */ (function () {
     return Watch;
 }());
 
-var Binder = /** @class */ (function () {
-    function Binder(bouer) {
-        this.binds = [];
-        this.DEFAULT_BINDER_PROPERTIES = {
-            'text': 'value',
-            'number': 'valueAsNumber',
-            'checkbox': 'checked',
-            'radio': 'checked',
-        };
-        this.BindingDirection = {
-            fromInputToData: 'to-data-property',
-            fromDataToInput: 'to-input'
-        };
-        IoC.Register(this);
-        this.evaluator = IoC.Resolve('Evaluator');
-        this.bouer = bouer;
-        this.cleanup();
-    }
-    Binder.prototype.create = function (options) {
-        var _this = this;
-        var _a;
-        var node = options.node, data = options.data, fields = options.fields, isReplaceProperty = options.isReplaceProperty, context = options.context;
-        var originalValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
-        var originalName = node.nodeName;
-        var ownerElement = node.ownerElement || node.parentNode;
-        var onUpdate = options.onUpdate || (function (value, node) { });
-        var middleware = IoC.Resolve('Middleware');
-        // Clousure cache property settings
-        var propertyBindConfig = {
-            node: node,
-            data: data,
-            nodeName: originalName,
-            nodeValue: originalValue,
-            fields: fields,
-            parent: ownerElement,
-            value: ''
-        };
-        var $middleware = function (type) {
-            middleware.run(originalName, {
-                type: type,
-                action: function (middleware) {
-                    middleware({
-                        binder: propertyBindConfig,
-                        detail: {}
-                    }, {
-                        success: function () { },
-                        fail: function () { },
-                        done: function () { }
-                    });
-                }
-            });
-        };
-        // Two-Way Data Binding: e-bind:[?]="..."
-        if (originalName.substr(0, Constants.bind.length) === Constants.bind) {
-            var propertyNameToBind_1 = '';
-            if (Constants.bind === originalName) {
-                var key = ownerElement.type || ownerElement.localName;
-                propertyNameToBind_1 = this.DEFAULT_BINDER_PROPERTIES[key] || 'value';
-            }
-            else {
-                propertyNameToBind_1 = originalName.split(':')[1]; // e-bind:value -> value
-            }
-            var isSelect_1 = (ownerElement instanceof HTMLSelectElement);
-            var isSelectMultiple_1 = isSelect_1 && ownerElement.multiple === true;
-            var bindConfig_1 = originalValue.split('|').map(function (x) { return trim(x); });
-            var bindProperty_1 = bindConfig_1[0];
-            var boundPropertyValue_1;
-            var bindModelValue_1;
-            var bindModel_1;
-            var callback_1 = function (direction, value) {
-                if (!(bindModel_1 = bindConfig_1[1])) {
-                    var attrValue = trim(ownerElement.getAttribute('value'));
-                    if (attrValue)
-                        bindModel_1 = "'" + attrValue + "'";
-                }
-                if (isSelect_1 && !isSelectMultiple_1 && Array.isArray(boundPropertyValue_1) && !bindModel_1) {
-                    return Logger.error("Since it's a <select> array binding, it expects the “multiple” attribute in" +
-                        " order to bind the multi values.");
-                }
-                // Array Binding
-                if (!isSelectMultiple_1 && (Array.isArray(boundPropertyValue_1) && !bindModel_1)) {
-                    return Logger.error("Since it's an array binding it expects a model but it has not been defined" +
-                        ", provide a model as it follows " +
-                        originalName + "=\"" + bindProperty_1 + " | Model\" or value=\"String-Model\".");
-                }
-                switch (direction) {
-                    case _this.BindingDirection.fromDataToInput: {
-                        if (Array.isArray(boundPropertyValue_1)) {
-                            // select-multiple handling
-                            if (isSelectMultiple_1) {
-                                return forEach(toArray(ownerElement.options), function (option) {
-                                    option.selected = boundPropertyValue_1.indexOf(trim(option.value)) !== -1;
-                                });
-                            }
-                            // checkboxes, radio, etc
-                            if (boundPropertyValue_1.indexOf(bindModelValue_1) === -1) {
-                                switch (typeof ownerElement[propertyNameToBind_1]) {
-                                    case 'boolean':
-                                        ownerElement[propertyNameToBind_1] = false;
-                                        break;
-                                    case 'number':
-                                        ownerElement[propertyNameToBind_1] = 0;
-                                        break;
-                                    default:
-                                        ownerElement[propertyNameToBind_1] = "";
-                                        break;
-                                }
-                            }
-                            return;
-                        }
-                        // Default Binding
-                        return ownerElement[propertyNameToBind_1] = (isObject(value) ? toStr(value) : (isNull(value) ? '' : value));
-                    }
-                    case _this.BindingDirection.fromInputToData: {
-                        if (Array.isArray(boundPropertyValue_1)) {
-                            // select-multiple handling
-                            if (isSelectMultiple_1) {
-                                var optionCollection_1 = [];
-                                forEach(toArray(ownerElement.options), function (option) {
-                                    if (option.selected === true)
-                                        optionCollection_1.push(trim(option.value));
-                                });
-                                boundPropertyValue_1.splice(0, boundPropertyValue_1.length);
-                                return boundPropertyValue_1.push.apply(boundPropertyValue_1, optionCollection_1);
-                            }
-                            bindModelValue_1 = bindModelValue_1 || _this.evaluator.exec({
-                                data: data,
-                                expression: bindModel_1,
-                                context: context
-                            });
-                            if (value)
-                                boundPropertyValue_1.push(bindModelValue_1);
-                            else
-                                boundPropertyValue_1.splice(boundPropertyValue_1.indexOf(bindModelValue_1), 1);
-                            return;
-                        }
-                        // Default Binding
-                        return data[bindProperty_1] = value;
-                    }
-                }
-            };
-            var reactiveEvent = ReactiveEvent.on('AfterGet', function (reactive) {
-                _this.binds.push(reactive.onChange(function (value) {
-                    callback_1(_this.BindingDirection.fromDataToInput, value);
-                    onUpdate(value, node);
-                    $middleware('update');
-                }, node));
-            });
-            var result = boundPropertyValue_1 = this.evaluator.exec({
-                data: data,
-                expression: bindProperty_1,
-                context: context
-            });
-            reactiveEvent.off();
-            callback_1(this.BindingDirection.fromDataToInput, result);
-            var listeners = [toLower(ownerElement.nodeName), 'propertychange', 'change'];
-            var callbackEvent_1 = function () {
-                callback_1(_this.BindingDirection.fromInputToData, ownerElement[propertyNameToBind_1]);
-            };
-            // Applying the events
-            forEach(listeners, function (listener) {
-                if (listener === 'change' && ownerElement.localName !== 'select')
-                    return;
-                ownerElement.addEventListener(listener, callbackEvent_1, false);
-            });
-            // Removing the e-bind attr
-            ownerElement.removeAttribute(node.nodeName);
-            $middleware('bind');
-            return propertyBindConfig; // Stop Two-Way Data Binding Process
-        }
-        // One-Way Data Binding
-        var nodeToBind = node;
-        // If definable property e-[?]="..."
-        if (originalName.substr(0, Constants.property.length) === Constants.property && isNull(isReplaceProperty)) {
-            propertyBindConfig.nodeName = originalName.substr(Constants.property.length);
-            ownerElement.setAttribute(propertyBindConfig.nodeName, originalValue);
-            nodeToBind = ownerElement.attributes[propertyBindConfig.nodeName];
-            // Removing the e-[?] attr
-            ownerElement.removeAttribute(node.nodeName);
-        }
-        // Property value setter
-        var setter = function () {
-            var valueToSet = propertyBindConfig.nodeValue;
-            var isHtml = false;
-            // Looping all the fields to be setted
-            forEach(fields, function (field) {
-                var delimiter = field.delimiter;
-                if (delimiter && delimiter.name === 'html')
-                    isHtml = true;
-                var result = _this.evaluator.exec({
-                    data: data,
-                    expression: field.expression,
-                    context: context
-                });
-                result = isNull(result) ? '' : result;
-                valueToSet = valueToSet.replace(field.field, toStr(result));
-                if (delimiter && isFunction(delimiter.action))
-                    valueToSet = delimiter.action(valueToSet, node, data);
-            });
-            propertyBindConfig.value = valueToSet;
-            if (!isHtml)
-                nodeToBind.nodeValue = valueToSet;
-            else {
-                var htmlSnippet = createEl('div', function (el) {
-                    el.innerHTML = valueToSet;
-                }).build().children[0];
-                ownerElement.appendChild(htmlSnippet);
-                IoC.Resolve('Compiler').compile({
-                    el: htmlSnippet,
-                    data: data,
-                    context: context
-                });
-            }
-        };
-        ReactiveEvent.once('AfterGet', function (event) {
-            event.onemit = function (reactive) {
-                _this.binds.push(reactive.onChange(function (value) {
-                    setter();
-                    onUpdate(value, node);
-                    $middleware('update');
-                }, node));
-            };
-            setter();
-        });
-        propertyBindConfig.node = nodeToBind;
-        $middleware('bind');
-        return propertyBindConfig;
-    };
-    Binder.prototype.onPropertyChange = function (propertyName, callback, targetObject) {
-        var mWatch = null;
-        var mTargetObject = targetObject || this.bouer.data;
-        ReactiveEvent.once('AfterGet', function (event) {
-            event.onemit = function (reactive) { return mWatch = reactive.onChange(callback); };
-            mTargetObject[propertyName];
-        });
-        return mWatch;
-    };
-    Binder.prototype.onPropertyInScopeChange = function (watchable) {
-        var watches = [];
-        ReactiveEvent.once('AfterGet', function (evt) {
-            evt.onemit = function (reactive) {
-                watches.push(new Watch(reactive, function () { return watchable(); }));
-            };
-            watchable();
-        });
-        return watches;
-    };
-    /** Creates a process for unbind properties when it does not exists anymore in the DOM */
-    Binder.prototype.cleanup = function () {
-        var _this = this;
-        taskRunner(function () {
-            _this.binds = where(_this.binds, function (bind) {
-                if (!bind.node)
-                    return true;
-                if (bind.node.isConnected)
-                    return true;
-                bind.destroy();
-            });
-        }, 1000);
-    };
-    return Binder;
-}());
-
-var Extend = /** @class */ (function () {
-    function Extend() {
-    }
-    // join objects into one
-    Extend.obj = function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i] = arguments[_i];
-        }
-        var out = {};
-        forEach(args, function (arg) {
-            if (isNull(arg))
-                return;
-            forEach(Object.keys(arg), function (key) {
-                var propValue = arg[key];
-                if (isNull(propValue))
-                    return;
-                transferProperty(out, arg, key);
-            });
-        });
-        return out;
-    };
-    /** join arrays into one */
-    Extend.array = function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i] = arguments[_i];
-        }
-        var out = [];
-        forEach(args, function (arg) {
-            if (isNull(arg))
-                return;
-            if (!Array.isArray(arg))
-                return out.push(arg);
-            forEach(Object.keys(arg), function (key) {
-                var value = arg[key];
-                if (isNull(value))
-                    return;
-                if (Array.isArray(value)) {
-                    [].push.apply(out, value);
-                }
-                else {
-                    out.push(value);
-                }
-            });
-        });
-        return out;
-    };
-    return Extend;
-}());
-
-var CommentHandler = /** @class */ (function () {
-    function CommentHandler(bouer) {
-        IoC.Register(this);
-        this.bouer = bouer;
-    }
-    /** Creates a comment with some identifier */
-    CommentHandler.prototype.create = function (id) {
-        var comment = DOM.createComment('e');
-        comment.id = id || code(8);
-        return comment;
-    };
-    return CommentHandler;
-}());
-
 var UriHandler = /** @class */ (function () {
     function UriHandler(url) {
         this.url = url || DOM.location.href;
@@ -871,6 +879,7 @@ var UriHandler = /** @class */ (function () {
 
 var Component = /** @class */ (function () {
     function Component(optionsOrPath) {
+        this.prefetch = false;
         this.title = undefined;
         this.route = undefined;
         this.isDefault = undefined;
@@ -893,7 +902,10 @@ var Component = /** @class */ (function () {
         }
         this.name = _name;
         this.path = _path;
-        this.data = Reactive.transform(this.data || {});
+        this.data = Reactive.transform({
+            context: this,
+            inputObject: this.data || {}
+        });
     }
     // Hooks
     Component.prototype.requested = function (event) { };
@@ -932,7 +944,7 @@ var Component = /** @class */ (function () {
         return new UriHandler().params(this.route);
     };
     Component.prototype.emit = function (eventName, init) {
-        IoC.Resolve('EventHandler').emit({
+        IoC.Resolve(this.bouer, EventHandler).emit({
             eventName: eventName,
             attachedNode: this.el,
             init: init
@@ -945,7 +957,7 @@ var Component = /** @class */ (function () {
             eventName == 'destroyed' ||
             eventName == 'loaded' ||
             eventName == 'mounted') ? this : this.bouer;
-        var evt = IoC.Resolve('EventHandler').on({
+        var evt = IoC.Resolve(this.bouer, EventHandler).on({
             eventName: eventName,
             callback: callback,
             attachedNode: this.el,
@@ -955,7 +967,7 @@ var Component = /** @class */ (function () {
         return evt;
     };
     Component.prototype.off = function (eventName, callback) {
-        IoC.Resolve('EventHandler').off({
+        IoC.Resolve(this.bouer, EventHandler).off({
             eventName: eventName,
             callback: callback,
             attachedNode: this.el
@@ -1030,7 +1042,11 @@ var Reactive = /** @class */ (function () {
                     return Logger.error(("Cannot set “" + (typeof value) + "” in “" +
                         _this.propertyName + "” property."));
                 if (Array.isArray(value)) {
-                    Reactive.transform(value, _this);
+                    Reactive.transform({
+                        inputObject: value,
+                        reactiveObj: _this,
+                        context: _this.context
+                    });
                     var propValueAsAny = _this.propertyValue;
                     propValueAsAny.splice(0, propValueAsAny.length);
                     propValueAsAny.push.apply(propValueAsAny, value);
@@ -1039,7 +1055,10 @@ var Reactive = /** @class */ (function () {
                     if ((value instanceof Node)) // If some html element
                         _this.propertyValue = value;
                     else {
-                        Reactive.transform(value);
+                        Reactive.transform({
+                            inputObject: value,
+                            context: _this.context
+                        });
                         if (!isNull(_this.propertyValue))
                             mapper(value, _this.propertyValue);
                         else
@@ -1058,12 +1077,13 @@ var Reactive = /** @class */ (function () {
         };
         this.propertyName = options.propertyName;
         this.propertySource = options.sourceObject;
+        this.context = options.context;
         // Setting the value of the property
         this.propertyDescriptor = getDescriptor(this.propertySource, this.propertyName);
         this.propertyValue = this.propertyDescriptor.value;
         this.isComputed = typeof this.propertyValue === 'function' && this.propertyValue.name === '$computed';
         if (this.isComputed) {
-            var computedResult = this.propertyValue.call(IoC.Resolve('Bouer'));
+            var computedResult = this.propertyValue.call(this.context);
             if ('get' in computedResult || isFunction(computedResult)) {
                 this.computedGetter = computedResult.get || computedResult;
             }
@@ -1075,26 +1095,16 @@ var Reactive = /** @class */ (function () {
                     "that returns a function for “getter only” or an object with a “get” and/or “set” function");
             this.propertyValue = undefined;
         }
+        if (typeof this.propertyValue === 'function' && !this.isComputed)
+            this.propertyValue = this.propertyValue.bind(this.context);
     }
     Reactive.prototype.onChange = function (callback, node) {
         var w = new Watch(this, callback, { node: node });
         this.watches.push(w);
         return w;
     };
-    Reactive.set = function (inputData, targetObject) {
-        if (!isObject(inputData))
-            return Logger.error('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".');
-        if (isObject(targetObject) && targetObject == null)
-            return Logger.error('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".');
-        // Transforming the input
-        Reactive.transform(inputData);
-        // Transfering the properties
-        forEach(Object.keys(inputData), function (key) { return transferProperty(targetObject, inputData, key); });
-        return targetObject;
-    };
-    var _a;
-    _a = Reactive;
-    Reactive.transform = function (inputObject, reactiveObj) {
+    Reactive.transform = function (options) {
+        var context = options.context;
         var executer = function (inputObject, reactiveObj, visiting, visited) {
             if (Array.isArray(inputObject)) {
                 if (reactiveObj == null) {
@@ -1120,7 +1130,7 @@ var Reactive = /** @class */ (function () {
                                 forEach(toArray(arguments), function (arg) {
                                     if (!isObject(arg) && !Array.isArray(arg))
                                         return;
-                                    Reactive.transform(arg);
+                                    executer(arg);
                                 });
                         }
                         var result = reference_1[method].apply(inputArray_1, arguments);
@@ -1147,45 +1157,711 @@ var Reactive = /** @class */ (function () {
                     return;
                 var reactive = new Reactive({
                     propertyName: key,
-                    sourceObject: inputObject
+                    sourceObject: inputObject,
+                    context: context
                 });
                 defineProperty(inputObject, key, reactive);
                 if (isObject(propertyValue))
-                    _a.transform(propertyValue);
+                    executer(propertyValue);
                 else if (Array.isArray(propertyValue)) {
-                    _a.transform(propertyValue, reactive); // Transform the array to a reactive one
-                    forEach(propertyValue, function (item) { return _a.transform(item); });
+                    executer(propertyValue, reactive); // Transform the array to a reactive one
+                    forEach(propertyValue, function (item) { return executer(item); });
                 }
             });
             visiting === null || visiting === void 0 ? void 0 : visiting.splice(visiting.indexOf(inputObject), 1);
             visited === null || visited === void 0 ? void 0 : visited.push(inputObject);
             return inputObject;
         };
-        return executer(inputObject, reactiveObj, [], []);
+        return executer(options.inputObject, options.reactiveObj, [], []);
     };
     return Reactive;
 }());
 
+var Routing = /** @class */ (function () {
+    function Routing(bouer) {
+        this.defaultPage = undefined;
+        this.notFoundPage = undefined;
+        this.routeView = null;
+        this.activeAnchors = [];
+        // Store `href` value of the <base /> tag
+        this.base = null;
+        this.bouer = bouer;
+        this.routeView = this.bouer.el.querySelector('[route-view]');
+        IoC.Register(this);
+    }
+    Routing.prototype.init = function () {
+        var _this = this;
+        if (isNull(this.routeView))
+            return;
+        this.routeView.removeAttribute('route-view');
+        this.base = "/";
+        var base = DOM.head.querySelector('base');
+        if (base) {
+            var baseHref = base.attributes['href'];
+            if (!baseHref)
+                return Logger.error("The href=\"/\" attribute is required in base element.");
+            this.base = baseHref.value;
+        }
+        if (this.defaultPage)
+            this.navigate(DOM.location.href);
+        // Listening to the page navigation
+        GLOBAL.addEventListener('popstate', function (evt) {
+            evt.preventDefault();
+            _this.navigate((evt.state || location.href), false);
+        });
+    };
+    /**
+     * Navigates to a certain page without reloading all the page
+     * @param route the route to navigate to
+     * @param changeUrl allow to change the url after the navigation, default value is `true`
+     */
+    Routing.prototype.navigate = function (route, changeUrl) {
+        var _this = this;
+        var _a;
+        if (!this.routeView)
+            return;
+        if (isNull(route))
+            return Logger.log("Invalid url provided to the navigation method.");
+        route = trim(route);
+        var resolver = urlResolver(route);
+        var usehash = (_a = (this.bouer.config || {}).usehash) !== null && _a !== void 0 ? _a : true;
+        var navigatoTo = (usehash ? resolver.hash : resolver.pathname).split('?')[0];
+        // In case of: /about/me/, remove the last forward slash
+        if (navigatoTo[navigatoTo.length - 1] === '/')
+            navigatoTo = navigatoTo.substr(0, navigatoTo.length - 1);
+        var page = this.toPage(navigatoTo);
+        this.clear();
+        if (!page)
+            return; // Page Not Found and NotFound Page Not Defined
+        // If it's not found and the url matches .html do nothing
+        if (!page && route.endsWith('.html'))
+            return;
+        var componentElement = createAnyEl(page.name)
+            .appendTo(this.routeView)
+            .build();
+        // Document info configuration
+        DOM.title = page.title || DOM.title;
+        if ((changeUrl !== null && changeUrl !== void 0 ? changeUrl : true))
+            this.pushState(resolver.href, DOM.title);
+        var routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route);
+        IoC.Resolve(this.bouer, ComponentHandler)
+            .order(componentElement, {}, function (component) {
+            component.on('loaded', function () {
+                _this.markActiveAnchors(routeToSet);
+            });
+        });
+    };
+    Routing.prototype.pushState = function (url, title) {
+        url = urlResolver(url).href;
+        if (DOM.location.href === url)
+            return;
+        GLOBAL.history.pushState(url, (title || ''), url);
+    };
+    Routing.prototype.popState = function (times) {
+        if (isNull(times))
+            times = -1;
+        GLOBAL.history.go(times);
+    };
+    Routing.prototype.toPage = function (url) {
+        // Default Page
+        if (url === '' || url === '/' ||
+            url === "/" + urlCombine((this.base, "index.html"))) {
+            return this.defaultPage;
+        }
+        // Search for the right page
+        return IoC.Resolve(this.bouer, ComponentHandler)
+            .find(function (component) {
+            if (!component.route)
+                return false;
+            var routeRegExp = component.route.replace(/{(.*?)}/gi, '[\\S\\s]{1,}');
+            if (Array.isArray(new RegExp("^" + routeRegExp + "$").exec(url)))
+                return true;
+            return false;
+        }) || this.notFoundPage;
+    };
+    Routing.prototype.markActiveAnchors = function (route) {
+        var _this = this;
+        var className = (this.bouer.config || {}).activeClassName || 'active-link';
+        var anchors = this.bouer.el.querySelectorAll('a');
+        forEach(this.activeAnchors, function (anchor) {
+            return anchor.classList.remove(className);
+        });
+        forEach([].slice.call(this.bouer.el.querySelectorAll('a.' + className)), function (anchor) {
+            return anchor.classList.remove(className);
+        });
+        this.activeAnchors = [];
+        forEach(toArray(anchors), function (anchor) {
+            if (anchor.href.split('?')[0] !== route.split('?')[0])
+                return;
+            anchor.classList.add(className);
+            _this.activeAnchors.push(anchor);
+        });
+    };
+    Routing.prototype.clear = function () {
+        this.routeView.innerHTML = '';
+    };
+    /**
+     * Allow to configure the `Default Page` and `NotFound Page`
+     * @param component the component to be checked
+     */
+    Routing.prototype.configure = function (component) {
+        if (component.isDefault === true && !isNull(this.defaultPage))
+            return Logger.warn("There are multiple “Default Page” provided, check the “" + component.route + "” route.");
+        if (component.isNotFound === true && !isNull(this.notFoundPage))
+            return Logger.warn("There are multiple “NotFound Page” provided, check the “" + component.route + "” route.");
+        if (component.isDefault === true)
+            this.defaultPage = component;
+        if (component.isNotFound === true)
+            this.notFoundPage = component;
+    };
+    return Routing;
+}());
+
+var ComponentHandler = /** @class */ (function () {
+    function ComponentHandler(bouer) {
+        // Handle all the components web requests to avoid multiple requests
+        this.requests = {};
+        this.components = {};
+        // Avoids to add multiple styles of the same component if it's already in use
+        this.stylesController = {};
+        this.bouer = bouer;
+        this.delimiter = IoC.Resolve(this.bouer, DelimiterHandler);
+        this.eventHandler = IoC.Resolve(this.bouer, EventHandler);
+        IoC.Register(this);
+    }
+    ComponentHandler.prototype.check = function (nodeName) {
+        return (nodeName in this.components);
+    };
+    ComponentHandler.prototype.request = function (url, response) {
+        var _this = this;
+        if (!isNull(this.requests[url]))
+            return this.requests[url].push(response);
+        this.requests[url] = [response];
+        var resolver = urlResolver(anchor.baseURI);
+        var hasBaseElement = DOM.head.querySelector('base') != null;
+        var baseURI = hasBaseElement ? resolver.baseURI : resolver.origin;
+        var urlPath = urlCombine(baseURI, url);
+        webRequest(urlPath, { headers: { 'Content-Type': 'text/plain' } })
+            .then(function (response) {
+            if (!response.ok)
+                throw new Error(response.statusText);
+            return response.text();
+        })
+            .then(function (content) {
+            forEach(_this.requests[url], function (request) {
+                request.success(content, url);
+            });
+        })
+            .catch(function (error) {
+            if (!hasBaseElement)
+                Logger.warn("It seems like you are not using the “<base href=\"/base/components/path/\" />” " +
+                    "element, try to add as the first child into “<head></head>” element.");
+            forEach(_this.requests[url], function (request) {
+                request.fail(error, url);
+            });
+        })
+            .finally(function () {
+            delete _this.requests[url];
+        });
+    };
+    ComponentHandler.prototype.prepare = function (components, parent) {
+        var _this = this;
+        forEach(components, function (component) {
+            var _a;
+            var ctorName = component.constructor.name;
+            var isBuitInClass = ctorName === "IComponent" || ctorName === "Component" || ctorName === "Object";
+            if (isNull(component.name)) {
+                if (isBuitInClass)
+                    component.name = toLower(code(9, 'component-'));
+                else
+                    component.name = toLower(component.constructor.name);
+            }
+            if (isNull(component.path) && isNull(component.template))
+                return Logger.warn("The component with name “" + component.name + "”" +
+                    component.route ? (" and the route “" + component.route + "”") : "" +
+                    " has not “path” or “template” property defined, " +
+                    "then it was ignored.");
+            if (!isNull(_this.components[component.name]))
+                return Logger.warn("The component name “" + component.name + "” is already define, try changing the name.");
+            if (Array.isArray(component.children))
+                _this.prepare(component.children, component);
+            if (!isNull(component.route)) { // Completing the API
+                component.route = "/" + urlCombine((isNull(parent) ? "" : parent.route), component.route);
+            }
+            IoC.Resolve(_this.bouer, Routing)
+                .configure(_this.components[component.name] = component);
+            var getContent = function (path) {
+                if (!path)
+                    return;
+                _this.request(component.path, {
+                    success: function (content) {
+                        component.template = content;
+                    },
+                    fail: function (error) {
+                        Logger.error(buildError(error));
+                    }
+                });
+            };
+            if (!isNull(component.prefetch)) {
+                if (component.prefetch === true)
+                    return getContent(component.path);
+                return;
+            }
+            var prefetch = (_a = (_this.bouer.config || {}).prefetch) !== null && _a !== void 0 ? _a : true;
+            if (!prefetch)
+                return;
+            return getContent(component.path);
+        });
+    };
+    ComponentHandler.prototype.order = function (componentElement, data, callback) {
+        var _this = this;
+        var $name = toLower(componentElement.nodeName);
+        var mComponents = this.components;
+        var hasComponent = mComponents[$name];
+        if (!hasComponent)
+            return Logger.error("No component with name “" + $name + "” registered.");
+        var component = hasComponent;
+        var icomponent = component;
+        var mainExecutionWrapper = function () {
+            if (component.template) {
+                var newComponent = (component instanceof Component) ? component : new Component(component);
+                newComponent.bouer = _this.bouer;
+                _this.insert(componentElement, newComponent, data, callback);
+                if (component.keepAlive === true)
+                    mComponents[$name] = component;
+                return;
+            }
+            var requestedEvent = _this.addComponentEventAndEmitGlobalEvent('requested', componentElement, component, _this.bouer);
+            if (requestedEvent)
+                requestedEvent.emit();
+            // Make or Add request
+            _this.request(component.path, {
+                success: function (content) {
+                    var newComponent = (component instanceof Component) ? component : new Component(component);
+                    icomponent.template = newComponent.template = content;
+                    newComponent.bouer = _this.bouer;
+                    _this.insert(componentElement, newComponent, data, callback);
+                    if (component.keepAlive === true)
+                        mComponents[$name] = component;
+                },
+                fail: function (error) {
+                    Logger.error("Failed to request <" + $name + "></" + $name + "> component with path “" + component.path + "”.");
+                    Logger.error(buildError(error));
+                    if (typeof icomponent.failed !== 'function')
+                        return;
+                    icomponent.failed(new CustomEvent('failed'));
+                }
+            });
+        };
+        // Checking the restrictions
+        if (icomponent.restrictions && icomponent.restrictions.length > 0) {
+            var blockedRestrictions_1 = [];
+            var restrictions = icomponent.restrictions.map(function (restriction) {
+                var restrictionResult = restriction.call(_this.bouer, component);
+                if (restrictionResult === false)
+                    blockedRestrictions_1.push(restriction);
+                else if (restrictionResult instanceof Promise)
+                    restrictionResult
+                        .then(function (value) {
+                        if (value === false)
+                            blockedRestrictions_1.push(restriction);
+                    })
+                        .catch(function () { return blockedRestrictions_1.push(restriction); });
+                return restrictionResult;
+            });
+            var blockedEvent_1 = this.addComponentEventAndEmitGlobalEvent('blocked', componentElement, component, this.bouer);
+            var emitter_1 = function () { return blockedEvent_1.emit({
+                detail: {
+                    component: component.name,
+                    message: "Component “" + component.name + "” blocked by restriction(s)",
+                    blocks: blockedRestrictions_1
+                }
+            }); };
+            return Promise.all(restrictions)
+                .then(function (restrictionValues) {
+                if (restrictionValues.every(function (value) { return value == true; }))
+                    mainExecutionWrapper();
+                else
+                    emitter_1();
+            })
+                .catch(function () { return emitter_1(); });
+        }
+        return mainExecutionWrapper();
+    };
+    ComponentHandler.prototype.find = function (callback) {
+        var keys = Object.keys(this.components);
+        for (var i = 0; i < keys.length; i++) {
+            var component = this.components[keys[i]];
+            if (callback(component))
+                return component;
+        }
+        return null;
+    };
+    /** Subscribe the hooks of the instance */
+    ComponentHandler.prototype.addComponentEventAndEmitGlobalEvent = function (eventName, element, component, context) {
+        var callback = component[eventName];
+        this.eventHandler.emit({
+            eventName: 'component:' + eventName,
+            init: {
+                detail: { component: component }
+            }
+        });
+        if (typeof callback !== 'function')
+            return { emit: (function () { }) };
+        var emitter = this.eventHandler.on({
+            eventName: eventName,
+            callback: function (evt) { return callback.call(component, evt); },
+            attachedNode: element,
+            modifiers: { once: true },
+            context: context || component
+        }).emit;
+        return {
+            emit: function (init) { return emitter({
+                init: init
+            }); }
+        };
+    };
+    ComponentHandler.prototype.insert = function (componentElement, component, data, callback) {
+        var _this = this;
+        var _a;
+        var $name = toLower(componentElement.nodeName);
+        var container = componentElement.parentElement;
+        if (!componentElement.isConnected || !container)
+            return; //Logger.warn("Insert location of component <" + $name + "></" + $name + "> not found.");
+        if (isNull(component.template))
+            return Logger.error("The <" + $name + "></" + $name + "> component is not ready yet to be inserted.");
+        var elementSlots = createAnyEl('SlotContainer', function (el) {
+            el.innerHTML = componentElement.innerHTML;
+            componentElement.innerHTML = "";
+        }).build();
+        var isKeepAlive = componentElement.hasAttribute('keep-alive') || ((_a = component.keepAlive) !== null && _a !== void 0 ? _a : false);
+        // Component Creation
+        if (isKeepAlive === false || isNull(component.el)) {
+            createEl('body', function (htmlSnippet) {
+                htmlSnippet.innerHTML = component.template;
+                forEach([].slice.call(htmlSnippet.children), function (asset) {
+                    if (['SCRIPT', 'LINK', 'STYLE'].indexOf(asset.nodeName) === -1)
+                        return;
+                    component.assets.push(asset);
+                    htmlSnippet.removeChild(asset);
+                });
+                if (htmlSnippet.children.length === 0)
+                    return Logger.error(("The component <" + $name + "></" + $name + "> " +
+                        "seems to be empty or it has not a root element. Example: <div></div>, to be included."));
+                if (htmlSnippet.children.length > 1)
+                    return Logger.error(("The component <" + $name + "></" + $name + "> " +
+                        "seems to have multiple root element, it must have only one root."));
+                component.el = htmlSnippet.children[0];
+                _this.addComponentEventAndEmitGlobalEvent('created', component.el, component, _this.bouer);
+                component.emit('created');
+            });
+        }
+        if (isNull(component.el))
+            return;
+        if (isFunction(callback))
+            callback(component);
+        var rootElement = component.el;
+        // tranfering the attributes
+        forEach(toArray(componentElement.attributes), function (attr) {
+            componentElement.removeAttribute(attr.name);
+            if (attr.nodeName === 'class')
+                return componentElement.classList.forEach(function (cls) {
+                    rootElement.classList.add(cls);
+                });
+            if (attr.nodeName === 'data') {
+                if (_this.delimiter.run(attr.value).length !== 0)
+                    return Logger.error(("The “data” attribute cannot contain delimiter, " +
+                        "source element: <" + $name + "></" + $name + ">."));
+                var inputData_1 = {};
+                var mData = Extend.obj(data, { $data: data });
+                var reactiveEvent = ReactiveEvent.on('AfterGet', function (reactive) {
+                    inputData_1[reactive.propertyName] = undefined;
+                    defineProperty(inputData_1, reactive.propertyName, reactive);
+                });
+                // If data value is empty gets the main scope value
+                if (attr.value === '')
+                    inputData_1 = Extend.obj(_this.bouer.data);
+                else {
+                    // Other wise, compiles the object provided
+                    var mInputData_1 = IoC.Resolve(_this.bouer, Evaluator)
+                        .exec({
+                        data: mData,
+                        expression: attr.value,
+                        context: _this.bouer
+                    });
+                    if (!isObject(mInputData_1))
+                        return Logger.error(("Expected a valid Object Literal expression in “"
+                            + attr.nodeName + "” and got “" + attr.value + "”."));
+                    // Adding all non-existing properties
+                    forEach(Object.keys(mInputData_1), function (key) {
+                        if (!(key in inputData_1))
+                            inputData_1[key] = mInputData_1[key];
+                    });
+                }
+                reactiveEvent.off();
+                Reactive.transform({
+                    context: component,
+                    inputObject: inputData_1
+                });
+                return forEach(Object.keys(inputData_1), function (key) {
+                    transferProperty(component.data, inputData_1, key);
+                });
+            }
+            rootElement.attributes.setNamedItem(attr);
+        });
+        var initializer = component.init;
+        if (isFunction(initializer))
+            initializer.call(component);
+        this.addComponentEventAndEmitGlobalEvent('beforeMount', component.el, component);
+        component.emit('beforeMount');
+        container.replaceChild(rootElement, componentElement);
+        var rootClassList = {};
+        // Retrieving all the classes of the retu elements
+        rootElement.classList.forEach(function (key) { return rootClassList[key] = true; });
+        // Changing each selector to avoid conflits
+        var changeSelector = function (style, styleId) {
+            var isStyle = (style.nodeName === 'STYLE'), rules = [];
+            if (!style.sheet)
+                return;
+            var cssRules = style.sheet.cssRules;
+            for (var i = 0; i < cssRules.length; i++) {
+                var rule = cssRules.item(i);
+                if (!rule)
+                    continue;
+                var mRule = rule;
+                if (mRule.selectorText) {
+                    var selector = mRule.selectorText.substr(1);
+                    var separation = rootClassList[selector] ? "" : " ";
+                    var uniqueIdentifier = "." + styleId;
+                    var selectorTextSplitted = mRule.selectorText.split(' ');
+                    if (selectorTextSplitted[0] === toLower(rootElement.tagName))
+                        selectorTextSplitted.shift();
+                    mRule.selectorText = uniqueIdentifier + separation + selectorTextSplitted.join(' ');
+                }
+                if (isStyle)
+                    rules.push(mRule.cssText);
+            }
+            if (isStyle)
+                style.innerText = rules.join(' ');
+        };
+        var scriptsAssets = where(component.assets, function (asset) { return toLower(asset.nodeName) === 'script'; });
+        var stylesAssets = where(component.assets, function (asset) { return toLower(asset.nodeName) !== 'script'; });
+        var styleAttrName = 'component-style';
+        // Configuring the styles
+        forEach(stylesAssets, function (asset) {
+            var mStyle = asset.cloneNode(true);
+            if (mStyle instanceof HTMLLinkElement) {
+                var path = component.path[0] === '/' ? component.path.substr(1) : component.path;
+                mStyle.href = pathResolver(path, mStyle.getAttribute('href') || '');
+            }
+            //Checking if this component already have styles added
+            if (_this.stylesController[$name]) {
+                var controller = _this.stylesController[$name];
+                if (controller.elements.indexOf(rootElement) === -1) {
+                    controller.elements.push(rootElement);
+                    forEach(controller.styles, function ($style) {
+                        rootElement.classList.add($style.getAttribute(styleAttrName));
+                    });
+                }
+                return;
+            }
+            var styleId = code(7, 'bouer-s');
+            mStyle.setAttribute(styleAttrName, styleId);
+            if ((mStyle instanceof HTMLLinkElement) && mStyle.hasAttribute('scoped'))
+                mStyle.onload = function (evt) { return changeSelector(evt.target, styleId); };
+            _this.stylesController[$name] = {
+                styles: [DOM.head.appendChild(mStyle)],
+                elements: [rootElement]
+            };
+            if (!mStyle.hasAttribute('scoped'))
+                return;
+            rootElement.classList.add(styleId);
+            if (mStyle instanceof HTMLStyleElement)
+                return changeSelector(mStyle, styleId);
+        });
+        var compile = function (scriptContent) {
+            try {
+                // Executing the mixed scripts
+                IoC.Resolve(_this.bouer, Evaluator)
+                    .execRaw((scriptContent || ''), component);
+                _this.addComponentEventAndEmitGlobalEvent('mounted', component.el, component);
+                component.emit('mounted');
+                // TODO: Something between this two events
+                _this.addComponentEventAndEmitGlobalEvent('beforeLoad', component.el, component);
+                component.emit('beforeLoad');
+                IoC.Resolve(_this.bouer, Compiler)
+                    .compile({
+                    data: Reactive.transform({
+                        context: component,
+                        inputObject: component.data
+                    }),
+                    el: rootElement,
+                    componentSlot: elementSlots,
+                    context: component,
+                    onDone: function () {
+                        _this.addComponentEventAndEmitGlobalEvent('loaded', component.el, component);
+                        component.emit('loaded');
+                    }
+                });
+                Task.run(function (stopTask) {
+                    if (component.el.isConnected)
+                        return;
+                    component.destroy();
+                    stopTask();
+                    var stylesController = _this.stylesController[component.name];
+                    if (!stylesController)
+                        return;
+                    var index = stylesController.elements.indexOf(component.el);
+                    stylesController.elements.splice(index, 1);
+                    // No elements using the style
+                    if (stylesController.elements.length > 0)
+                        return;
+                    forEach(stylesController.styles, function (style) {
+                        return forEach(toArray(DOM.head.children), function (item) {
+                            if (item === style)
+                                return DOM.head.removeChild(style);
+                        });
+                    });
+                    delete _this.stylesController[component.name];
+                });
+            }
+            catch (error) {
+                Logger.error("Error in <" + $name + "></" + $name + "> component.");
+                Logger.error(buildError(error));
+            }
+        };
+        if (scriptsAssets.length === 0)
+            return compile();
+        // Mixing all the scripts
+        var localScriptsContent = [], onlineScriptsContent = [], onlineScriptsUrls = [], webRequestChecker = {};
+        // Grouping the online scripts and collecting the online url
+        forEach(scriptsAssets, function (script) {
+            if (script.src == '' || script.innerHTML)
+                localScriptsContent.push(script.innerHTML);
+            else {
+                var path = component.path[0] === '/' ? component.path.substr(1) : component.path;
+                script.src = pathResolver(path, script.getAttribute('src') || '');
+                onlineScriptsUrls.push(script.src);
+            }
+        });
+        // No online scripts detected
+        if (onlineScriptsUrls.length == 0)
+            return compile(localScriptsContent.join('\n\n'));
+        // Load the online scripts and run it
+        return forEach(onlineScriptsUrls, function (url, index) {
+            webRequestChecker[url] = true;
+            // Getting script content from a web request
+            webRequest(url, {
+                headers: { "Content-Type": 'text/plain' }
+            }).then(function (response) {
+                if (!response.ok)
+                    throw new Error(response.statusText);
+                return response.text();
+            }).then(function (text) {
+                delete webRequestChecker[url];
+                // Adding the scripts according to the defined order
+                onlineScriptsContent[index] = text;
+                // if there are not web requests compile the element
+                if (Object.keys(webRequestChecker).length === 0)
+                    return compile(Extend.array(onlineScriptsContent, localScriptsContent).join('\n\n'));
+            }).catch(function (error) {
+                error.stack = "";
+                Logger.error(("Error loading the <script src=\"" + url + "\"></script> in " +
+                    "<" + $name + "></" + $name + "> component, remove it in order to be compiled."));
+                Logger.log(error);
+                _this.addComponentEventAndEmitGlobalEvent('failed', componentElement, component, _this.bouer)
+                    .emit();
+            });
+        });
+    };
+    return ComponentHandler;
+}());
+
+var CommentHandler = /** @class */ (function () {
+    function CommentHandler(bouer) {
+        this.bouer = bouer;
+        IoC.Register(this);
+    }
+    /** Creates a comment with some identifier */
+    CommentHandler.prototype.create = function (id) {
+        var comment = DOM.createComment('e');
+        comment.id = id || code(8);
+        return comment;
+    };
+    return CommentHandler;
+}());
+
+var Middleware = /** @class */ (function () {
+    function Middleware(bouer) {
+        var _this = this;
+        this.middlewareConfigContainer = {};
+        this.run = function (directive, runnable) {
+            var middlewares = _this.middlewareConfigContainer[directive];
+            if (!middlewares) {
+                return (runnable.default || (function () { }))();
+            }
+            var index = 0;
+            var middleware = middlewares[index];
+            var _loop_1 = function () {
+                var isNext = false;
+                var middlewareAction = middleware[runnable.type];
+                if (middlewareAction) {
+                    runnable.action(function (config, cbs) {
+                        Promise.resolve(middlewareAction(config, function () {
+                            isNext = true;
+                        }))
+                            .then(function (value) { return isNext ? null : cbs.success(value); })
+                            .catch(function (error) { return isNext ? null : cbs.fail(error); })
+                            .finally(function () { return isNext ? null : cbs.done(); });
+                    });
+                }
+                else {
+                    (runnable.default || (function () { }))();
+                }
+                if (isNext == false)
+                    return "break";
+                middleware = middlewares[++index];
+            };
+            while (middleware != null) {
+                var state_1 = _loop_1();
+                if (state_1 === "break")
+                    break;
+            }
+        };
+        this.register = function (directive, actions) {
+            if (!_this.middlewareConfigContainer[directive])
+                _this.middlewareConfigContainer[directive] = [];
+            var middleware = {};
+            actions(function (bind) { return middleware.bind = bind; }, function (update) { return middleware.update = update; });
+            _this.middlewareConfigContainer[directive].push(middleware);
+        };
+        this.bouer = bouer;
+        IoC.Register(this);
+    }
+    return Middleware;
+}());
+
 var DataStore = /** @class */ (function () {
-    function DataStore() {
+    function DataStore(bouer) {
         this.wait = {};
         this.data = {};
         this.req = {};
+        this.bouer = bouer;
         IoC.Register(this);
     }
-    DataStore.set = function (key, dataKey, data) {
+    DataStore.prototype.set = function (key, dataKey, data) {
         if (key === 'wait')
             return Logger.warn("Only “get” is allowed for type of data");
-        IoC.Resolve(DataStore.name)[key][dataKey] = data;
+        IoC.Resolve(this.bouer, DataStore)[key][dataKey] = data;
     };
-    DataStore.get = function (key, dataKey, once) {
-        var result = IoC.Resolve(DataStore.name)[key][dataKey];
+    DataStore.prototype.get = function (key, dataKey, once) {
+        var result = IoC.Resolve(this.bouer, DataStore)[key][dataKey];
         if (once === true)
-            DataStore.unset(key, dataKey);
+            this.unset(key, dataKey);
         return result;
     };
-    DataStore.unset = function (key, dataKey) {
-        delete IoC.Resolve(DataStore.name)[key][dataKey];
+    DataStore.prototype.unset = function (key, dataKey) {
+        delete IoC.Resolve(this.bouer, DataStore)[key][dataKey];
     };
     return DataStore;
 }());
@@ -1204,18 +1880,18 @@ var Directive = /** @class */ (function () {
         this.context = compilerContext;
         this.bouer = compiler.bouer;
         this.$custom = customDirective;
-        this.evaluator = IoC.Resolve('Evaluator');
-        this.delimiter = IoC.Resolve('DelimiterHandler');
+        this.evaluator = IoC.Resolve(this.bouer, Evaluator);
+        this.delimiter = IoC.Resolve(this.bouer, DelimiterHandler);
+        this.binder = IoC.Resolve(this.bouer, Binder);
+        this.eventHandler = IoC.Resolve(this.bouer, EventHandler);
         this.comment = new CommentHandler(this.bouer);
-        this.binder = IoC.Resolve('Binder');
-        this.eventHandler = IoC.Resolve('EventHandler');
     }
     // Helper functions
     Directive.prototype.toOwnerNode = function (node) {
         return node.ownerElement || node.parentNode;
     };
     // Directives
-    Directive.prototype.ignore = function (node) {
+    Directive.prototype.skip = function (node) {
         node.nodeValue = 'true';
     };
     Directive.prototype.if = function (node, data) {
@@ -1683,9 +2359,12 @@ var Directive = /** @class */ (function () {
         var dataKey = node.nodeName.split(':')[1];
         if (dataKey) {
             dataKey = dataKey.replace(/\[|\]/g, '');
-            DataStore.set('data', dataKey, inputData);
+            IoC.Resolve(this.bouer, DataStore).set('data', dataKey, inputData);
         }
-        Reactive.transform(inputData);
+        Reactive.transform({
+            context: this.context,
+            inputObject: inputData
+        });
         return this.compiler.compile({
             data: inputData,
             el: ownerElement,
@@ -1693,6 +2372,7 @@ var Directive = /** @class */ (function () {
         });
     };
     Directive.prototype.href = function (node, data) {
+        var _this = this;
         var _a, _b;
         var ownerElement = this.toOwnerNode(node);
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
@@ -1714,7 +2394,7 @@ var Directive = /** @class */ (function () {
         ownerElement
             .addEventListener('click', function (event) {
             event.preventDefault();
-            IoC.Resolve('Routing')
+            IoC.Resolve(_this.bouer, Routing)
                 .navigate(href.value);
         }, false);
     };
@@ -1727,7 +2407,7 @@ var Directive = /** @class */ (function () {
         if (this.delimiter.run(nodeValue).length !== 0)
             return Logger.error(this.errorMsgNodeValue(node));
         ownerElement.removeAttribute(node.nodeName);
-        IoC.Resolve('ComponentHandler')
+        IoC.Resolve(this.bouer, ComponentHandler)
             .prepare([
             {
                 name: nodeValue,
@@ -1737,6 +2417,7 @@ var Directive = /** @class */ (function () {
         ]);
     };
     Directive.prototype.put = function (node, data) {
+        var _this = this;
         var _a, _b;
         var ownerElement = this.toOwnerNode(node);
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
@@ -1764,7 +2445,7 @@ var Directive = /** @class */ (function () {
             var componentElement = createAnyEl(nodeValue)
                 .appendTo(ownerElement)
                 .build();
-            IoC.Resolve('ComponentHandler')
+            IoC.Resolve(_this.bouer, ComponentHandler)
                 .order(componentElement, data);
         })();
     };
@@ -1859,7 +2540,7 @@ var Directive = /** @class */ (function () {
             }
             return true;
         };
-        var middleware = IoC.Resolve('Middleware');
+        var middleware = IoC.Resolve(this.bouer, Middleware);
         var requestEvent = subcribeEvent(Constants.builtInEvents.request);
         var responseEvent = subcribeEvent(Constants.builtInEvents.response);
         var failEvent = subcribeEvent(Constants.builtInEvents.fail);
@@ -1871,7 +2552,10 @@ var Directive = /** @class */ (function () {
                 var _a;
                 if (!isValidResponse(response, expObject.type))
                     return;
-                Reactive.transform(response);
+                Reactive.transform({
+                    context: _this.context,
+                    inputObject: response
+                });
                 responseEvent.emit({
                     response: response
                 });
@@ -1886,7 +2570,7 @@ var Directive = /** @class */ (function () {
                     return localDataStore.data = response.data;
                 }
                 if (dataKey)
-                    DataStore.set('req', dataKey, response);
+                    IoC.Resolve(_this.bouer, DataStore).set('req', dataKey, response);
                 if (expObject.type === 'as') {
                     // Removing the: “(...)”  “,”  and getting only the variable
                     var variable = trim(expObject.variables.split(',')[0].replace(/\(|\)/g, ''));
@@ -1987,7 +2671,7 @@ var Directive = /** @class */ (function () {
         if (this.delimiter.run(nodeValue).length !== 0)
             return Logger.error(this.errorMsgNodeValue(node));
         ownerElement.removeAttribute(node.nodeName);
-        var dataStore = IoC.Resolve('DataStore');
+        var dataStore = IoC.Resolve(this.bouer, DataStore);
         var mWait = dataStore.wait[nodeValue];
         if (mWait) {
             mWait.nodes.push(ownerElement);
@@ -1998,7 +2682,10 @@ var Directive = /** @class */ (function () {
             return forEach(mWait.nodes, function (nodeWaiting) {
                 _this.compiler.compile({
                     el: nodeWaiting,
-                    data: Reactive.transform(mWait.data),
+                    data: Reactive.transform({
+                        context: _this.context,
+                        inputObject: mWait.data
+                    }),
                     context: _this.context,
                 });
             });
@@ -2052,13 +2739,13 @@ var Compiler = /** @class */ (function () {
             'SCRIPT': 1,
             '#comment': 8
         };
-        IoC.Register(this);
         this.bouer = bouer;
         this.bouerOptions = appOptions;
-        this.binder = IoC.Resolve('Binder');
-        this.delimiter = IoC.Resolve('DelimiterHandler');
-        this.eventHandler = IoC.Resolve('EventHandler');
-        this.component = IoC.Resolve('ComponentHandler');
+        this.binder = IoC.Resolve(this.bouer, Binder);
+        this.delimiter = IoC.Resolve(this.bouer, DelimiterHandler);
+        this.eventHandler = IoC.Resolve(this.bouer, EventHandler);
+        this.component = IoC.Resolve(this.bouer, ComponentHandler);
+        IoC.Register(this);
     }
     Compiler.prototype.compile = function (options) {
         var _this = this;
@@ -2075,7 +2762,7 @@ var Compiler = /** @class */ (function () {
             if (node instanceof Element) {
                 // e-skip" directive
                 if (Constants.skip in node.attributes)
-                    return directive.ignore(node);
+                    return directive.skip(node);
                 if (node.localName === Constants.slot && options.componentSlot) {
                     var insertSlot_1 = function (slot, reference) {
                         var $walker = function (child) {
@@ -2208,10 +2895,273 @@ var Compiler = /** @class */ (function () {
     return Compiler;
 }());
 
+var Binder = /** @class */ (function () {
+    function Binder(bouer) {
+        this.binds = [];
+        this.DEFAULT_BINDER_PROPERTIES = {
+            'text': 'value',
+            'number': 'valueAsNumber',
+            'checkbox': 'checked',
+            'radio': 'checked',
+        };
+        this.BindingDirection = {
+            fromInputToData: 'to-data-property',
+            fromDataToInput: 'to-input'
+        };
+        this.bouer = bouer;
+        this.evaluator = IoC.Resolve(this.bouer, Evaluator);
+        IoC.Register(this);
+        this.cleanup();
+    }
+    Binder.prototype.create = function (options) {
+        var _this = this;
+        var _a;
+        var node = options.node, data = options.data, fields = options.fields, isReplaceProperty = options.isReplaceProperty, context = options.context;
+        var originalValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
+        var originalName = node.nodeName;
+        var ownerElement = node.ownerElement || node.parentNode;
+        var onUpdate = options.onUpdate || (function (v, n) { });
+        var middleware = IoC.Resolve(this.bouer, Middleware);
+        // Clousure cache property settings
+        var propertyBindConfig = {
+            node: node,
+            data: data,
+            nodeName: originalName,
+            nodeValue: originalValue,
+            fields: fields,
+            parent: ownerElement,
+            value: ''
+        };
+        var $middleware = function (type) {
+            middleware.run(originalName, {
+                type: type,
+                action: function (middleware) {
+                    middleware({
+                        binder: propertyBindConfig,
+                        detail: {}
+                    }, {
+                        success: function () { },
+                        fail: function () { },
+                        done: function () { }
+                    });
+                }
+            });
+        };
+        // Two-Way Data Binding: e-bind:[?]="..."
+        if (originalName.substr(0, Constants.bind.length) === Constants.bind) {
+            var propertyNameToBind_1 = '';
+            if (Constants.bind === originalName) {
+                var key = ownerElement.type || ownerElement.localName;
+                propertyNameToBind_1 = this.DEFAULT_BINDER_PROPERTIES[key] || 'value';
+            }
+            else {
+                propertyNameToBind_1 = originalName.split(':')[1]; // e-bind:value -> value
+            }
+            var isSelect_1 = (ownerElement instanceof HTMLSelectElement);
+            var isSelectMultiple_1 = isSelect_1 && ownerElement.multiple === true;
+            var bindConfig_1 = originalValue.split('|').map(function (x) { return trim(x); });
+            var bindProperty_1 = bindConfig_1[0];
+            var boundPropertyValue_1;
+            var bindModelValue_1;
+            var bindModel_1;
+            var callback_1 = function (direction, value) {
+                if (!(bindModel_1 = bindConfig_1[1])) {
+                    var attrValue = trim(ownerElement.getAttribute('value'));
+                    if (attrValue)
+                        bindModel_1 = "'" + attrValue + "'";
+                }
+                if (isSelect_1 && !isSelectMultiple_1 && Array.isArray(boundPropertyValue_1) && !bindModel_1) {
+                    return Logger.error("Since it's a <select> array binding, it expects the “multiple” attribute in" +
+                        " order to bind the multi values.");
+                }
+                // Array Binding
+                if (!isSelectMultiple_1 && (Array.isArray(boundPropertyValue_1) && !bindModel_1)) {
+                    return Logger.error("Since it's an array binding it expects a model but it has not been defined" +
+                        ", provide a model as it follows " +
+                        originalName + "=\"" + bindProperty_1 + " | Model\" or value=\"String-Model\".");
+                }
+                switch (direction) {
+                    case _this.BindingDirection.fromDataToInput: {
+                        if (Array.isArray(boundPropertyValue_1)) {
+                            // select-multiple handling
+                            if (isSelectMultiple_1) {
+                                return forEach(toArray(ownerElement.options), function (option) {
+                                    option.selected = boundPropertyValue_1.indexOf(trim(option.value)) !== -1;
+                                });
+                            }
+                            // checkboxes, radio, etc
+                            if (boundPropertyValue_1.indexOf(bindModelValue_1) === -1) {
+                                switch (typeof ownerElement[propertyNameToBind_1]) {
+                                    case 'boolean':
+                                        ownerElement[propertyNameToBind_1] = false;
+                                        break;
+                                    case 'number':
+                                        ownerElement[propertyNameToBind_1] = 0;
+                                        break;
+                                    default:
+                                        ownerElement[propertyNameToBind_1] = "";
+                                        break;
+                                }
+                            }
+                            return;
+                        }
+                        // Default Binding
+                        return ownerElement[propertyNameToBind_1] = (isObject(value) ? toStr(value) : (isNull(value) ? '' : value));
+                    }
+                    case _this.BindingDirection.fromInputToData: {
+                        if (Array.isArray(boundPropertyValue_1)) {
+                            // select-multiple handling
+                            if (isSelectMultiple_1) {
+                                var optionCollection_1 = [];
+                                forEach(toArray(ownerElement.options), function (option) {
+                                    if (option.selected === true)
+                                        optionCollection_1.push(trim(option.value));
+                                });
+                                boundPropertyValue_1.splice(0, boundPropertyValue_1.length);
+                                return boundPropertyValue_1.push.apply(boundPropertyValue_1, optionCollection_1);
+                            }
+                            bindModelValue_1 = bindModelValue_1 || _this.evaluator.exec({
+                                data: data,
+                                expression: bindModel_1,
+                                context: context
+                            });
+                            if (value)
+                                boundPropertyValue_1.push(bindModelValue_1);
+                            else
+                                boundPropertyValue_1.splice(boundPropertyValue_1.indexOf(bindModelValue_1), 1);
+                            return;
+                        }
+                        // Default Binding
+                        return data[bindProperty_1] = value;
+                    }
+                }
+            };
+            var reactiveEvent = ReactiveEvent.on('AfterGet', function (reactive) {
+                _this.binds.push(reactive.onChange(function (value) {
+                    callback_1(_this.BindingDirection.fromDataToInput, value);
+                    onUpdate(value, node);
+                    $middleware('update');
+                }, node));
+            });
+            var result = boundPropertyValue_1 = this.evaluator.exec({
+                data: data,
+                expression: bindProperty_1,
+                context: context
+            });
+            reactiveEvent.off();
+            callback_1(this.BindingDirection.fromDataToInput, result);
+            var listeners = [toLower(ownerElement.nodeName), 'propertychange', 'change'];
+            var callbackEvent_1 = function () {
+                callback_1(_this.BindingDirection.fromInputToData, ownerElement[propertyNameToBind_1]);
+            };
+            // Applying the events
+            forEach(listeners, function (listener) {
+                if (listener === 'change' && ownerElement.localName !== 'select')
+                    return;
+                ownerElement.addEventListener(listener, callbackEvent_1, false);
+            });
+            // Removing the e-bind attr
+            ownerElement.removeAttribute(node.nodeName);
+            $middleware('bind');
+            return propertyBindConfig; // Stop Two-Way Data Binding Process
+        }
+        // One-Way Data Binding
+        var nodeToBind = node;
+        // If definable property e-[?]="..."
+        if (originalName.substr(0, Constants.property.length) === Constants.property && isNull(isReplaceProperty)) {
+            propertyBindConfig.nodeName = originalName.substr(Constants.property.length);
+            ownerElement.setAttribute(propertyBindConfig.nodeName, originalValue);
+            nodeToBind = ownerElement.attributes[propertyBindConfig.nodeName];
+            // Removing the e-[?] attr
+            ownerElement.removeAttribute(node.nodeName);
+        }
+        // Property value setter
+        var setter = function () {
+            var valueToSet = propertyBindConfig.nodeValue;
+            var isHtml = false;
+            // Looping all the fields to be setted
+            forEach(fields, function (field) {
+                var delimiter = field.delimiter;
+                if (delimiter && delimiter.name === 'html')
+                    isHtml = true;
+                var result = _this.evaluator.exec({
+                    data: data,
+                    expression: field.expression,
+                    context: context
+                });
+                result = isNull(result) ? '' : result;
+                valueToSet = valueToSet.replace(field.field, toStr(result));
+                if (delimiter && isFunction(delimiter.action))
+                    valueToSet = delimiter.action(valueToSet, node, data);
+            });
+            propertyBindConfig.value = valueToSet;
+            if (!isHtml)
+                nodeToBind.nodeValue = valueToSet;
+            else {
+                var htmlSnippet = createEl('div', function (el) {
+                    el.innerHTML = valueToSet;
+                }).build().children[0];
+                ownerElement.appendChild(htmlSnippet);
+                IoC.Resolve(_this.bouer, Compiler).compile({
+                    el: htmlSnippet,
+                    data: data,
+                    context: context
+                });
+            }
+        };
+        ReactiveEvent.once('AfterGet', function (event) {
+            event.onemit = function (reactive) {
+                _this.binds.push(reactive.onChange(function (value) {
+                    setter();
+                    onUpdate(value, node);
+                    $middleware('update');
+                }, node));
+            };
+            setter();
+        });
+        propertyBindConfig.node = nodeToBind;
+        $middleware('bind');
+        return propertyBindConfig;
+    };
+    Binder.prototype.onPropertyChange = function (propertyName, callback, targetObject) {
+        var mWatch = null;
+        var mTargetObject = targetObject || this.bouer.data;
+        ReactiveEvent.once('AfterGet', function (event) {
+            event.onemit = function (reactive) { return mWatch = reactive.onChange(callback); };
+            mTargetObject[propertyName];
+        });
+        return mWatch;
+    };
+    Binder.prototype.onPropertyInScopeChange = function (watchable) {
+        var watches = [];
+        ReactiveEvent.once('AfterGet', function (evt) {
+            evt.onemit = function (reactive) {
+                watches.push(new Watch(reactive, function () { return watchable(); }));
+            };
+            watchable();
+        });
+        return watches;
+    };
+    /** Creates a process for unbind properties when it does not exists anymore in the DOM */
+    Binder.prototype.cleanup = function () {
+        var _this = this;
+        Task.run(function () {
+            _this.binds = where(_this.binds, function (bind) {
+                if (!bind.node)
+                    return true;
+                if (bind.node.isConnected)
+                    return true;
+                bind.destroy();
+            });
+        });
+    };
+    return Binder;
+}());
+
 var Converter = /** @class */ (function () {
     function Converter(bouer) {
-        IoC.Register(this);
         this.bouer = bouer;
+        IoC.Register(this);
     }
     Converter.prototype.htmlToJsObj = function (input, options, onSet) {
         var element = undefined;
@@ -2348,920 +3298,6 @@ var Converter = /** @class */ (function () {
     return Converter;
 }());
 
-var Observer = /** @class */ (function () {
-    function Observer() {
-    }
-    /**
-     * Element Observer
-     * @param element the target element to be observe
-     * @param callback the callback that will fired when the element changes
-     */
-    Observer.observe = function (element, callback) {
-        var mutation = new MutationObserver(function (records) {
-            callback({
-                element: element,
-                mutation: mutation,
-                records: records
-            });
-        });
-        mutation.observe(element, {
-            childList: true
-        });
-    };
-    return Observer;
-}());
-
-var ComponentHandler = /** @class */ (function () {
-    function ComponentHandler(bouer, appOptions) {
-        // Handle all the components web requests to avoid multiple requests
-        this.requests = {};
-        this.components = {};
-        // Avoids to add multiple styles of the same component if it's already in use
-        this.stylesController = {};
-        IoC.Register(this);
-        this.bouer = bouer;
-        this.delimiter = IoC.Resolve('DelimiterHandler');
-        this.eventHandler = IoC.Resolve('EventHandler');
-        if (appOptions.components) {
-            this.prepare(appOptions.components);
-        }
-    }
-    ComponentHandler.prototype.check = function (nodeName) {
-        return (nodeName in this.components);
-    };
-    ComponentHandler.prototype.request = function (url, response) {
-        var _this = this;
-        if (!isNull(this.requests[url]))
-            return this.requests[url].push(response);
-        this.requests[url] = [response];
-        var resolver = urlResolver(anchor.baseURI);
-        var hasBaseElement = DOM.head.querySelector('base') != null;
-        var baseURI = hasBaseElement ? resolver.baseURI : resolver.origin;
-        var urlPath = urlCombine(baseURI, url);
-        webRequest(urlPath, { headers: { 'Content-Type': 'text/plain' } })
-            .then(function (response) {
-            if (!response.ok)
-                throw new Error(response.statusText);
-            return response.text();
-        })
-            .then(function (content) {
-            forEach(_this.requests[url], function (request) {
-                request.success(content, url);
-            });
-        })
-            .catch(function (error) {
-            if (!hasBaseElement)
-                Logger.warn("It seems like you are not using the “<base href=\"/base/components/path/\" />” " +
-                    "element, try to add as the first child into “<head></head>” element.");
-            forEach(_this.requests[url], function (request) {
-                request.fail(error, url);
-            });
-        })
-            .finally(function () {
-            delete _this.requests[url];
-        });
-    };
-    ComponentHandler.prototype.prepare = function (components, parent) {
-        var _this = this;
-        forEach(components, function (component) {
-            var _a;
-            var ctorName = component.constructor.name;
-            var isBuitInClass = ctorName === "IComponent" || ctorName === "Component" || ctorName === "Object";
-            if (isNull(component.name)) {
-                if (isBuitInClass)
-                    component.name = toLower(code(9, 'component-'));
-                else
-                    component.name = toLower(component.constructor.name);
-            }
-            if (isNull(component.path) && isNull(component.template))
-                return Logger.warn("The component with name “" + component.name + "”" +
-                    component.route ? (" and the route “" + component.route + "”") : "" +
-                    " has not “path” or “template” property defined, " +
-                    "then it was ignored.");
-            if (!isNull(_this.components[component.name]))
-                return Logger.warn("The component name “" + component.name + "” is already define, try changing the name.");
-            if (Array.isArray(component.children))
-                _this.prepare(component.children, component);
-            if (!isNull(component.route)) { // Completing the API
-                component.route = "/" + urlCombine((isNull(parent) ? "" : parent.route), component.route);
-            }
-            IoC.Resolve('Routing').configure(_this.components[component.name] = component);
-            var preload = (_a = (_this.bouer.config || {}).preload) !== null && _a !== void 0 ? _a : true;
-            if (!preload)
-                return;
-            if (!isNull(component.path)) {
-                // isBuitInClass
-                _this.request(component.path, {
-                    success: function (content) {
-                        component.template = content;
-                    },
-                    fail: function (error) {
-                        Logger.error(buildError(error));
-                    }
-                });
-            }
-        });
-    };
-    ComponentHandler.prototype.order = function (componentElement, data, callback) {
-        var _this = this;
-        var $name = toLower(componentElement.nodeName);
-        var mComponents = this.components;
-        var hasComponent = mComponents[$name];
-        if (!hasComponent)
-            return Logger.error("No component with name “" + $name + "” registered.");
-        var component = hasComponent;
-        var icomponent = component;
-        var mainExecutionWrapper = function () {
-            if (component.template) {
-                var newComponent = (component instanceof Component) ? component : new Component(component);
-                newComponent.bouer = _this.bouer;
-                _this.insert(componentElement, newComponent, data, callback);
-                if (component.keepAlive === true)
-                    mComponents[$name] = component;
-                return;
-            }
-            var requestedEvent = _this.addEvent('requested', componentElement, component, _this.bouer);
-            if (requestedEvent)
-                requestedEvent.emit();
-            // Make or Add request
-            _this.request(component.path, {
-                success: function (content) {
-                    var newComponent = (component instanceof Component) ? component : new Component(component);
-                    newComponent.template = content;
-                    newComponent.bouer = _this.bouer;
-                    _this.insert(componentElement, newComponent, data, callback);
-                    if (component.keepAlive === true)
-                        mComponents[$name] = component;
-                },
-                fail: function (error) {
-                    Logger.error("Failed to request <" + $name + "></" + $name + "> component with path “" + component.path + "”.");
-                    Logger.error(buildError(error));
-                    if (typeof icomponent.failed !== 'function')
-                        return;
-                    icomponent.failed(new CustomEvent('failed'));
-                }
-            });
-        };
-        // Checking the restrictions
-        if (icomponent.restrictions && icomponent.restrictions.length > 0) {
-            var blockedRestrictions_1 = [];
-            var restrictions = icomponent.restrictions.map(function (restriction) {
-                var restrictionResult = restriction.call(_this.bouer, component);
-                if (restrictionResult === false)
-                    blockedRestrictions_1.push(restriction);
-                else if (restrictionResult instanceof Promise)
-                    restrictionResult
-                        .then(function (value) {
-                        if (value === false)
-                            blockedRestrictions_1.push(restriction);
-                    })
-                        .catch(function () { return blockedRestrictions_1.push(restriction); });
-                return restrictionResult;
-            });
-            var blockedEvent_1 = this.addEvent('blocked', componentElement, component, this.bouer);
-            var emitter_1 = function () { return blockedEvent_1.emit({
-                detail: {
-                    component: component.name,
-                    message: "Component “" + component.name + "” blocked by restriction(s)",
-                    blocks: blockedRestrictions_1
-                }
-            }); };
-            return Promise.all(restrictions)
-                .then(function (restrictionValues) {
-                if (restrictionValues.every(function (value) { return value == true; }))
-                    mainExecutionWrapper();
-                else
-                    emitter_1();
-            })
-                .catch(function () { return emitter_1(); });
-        }
-        return mainExecutionWrapper();
-    };
-    ComponentHandler.prototype.find = function (callback) {
-        var keys = Object.keys(this.components);
-        for (var i = 0; i < keys.length; i++) {
-            var component = this.components[keys[i]];
-            if (callback(component))
-                return component;
-        }
-        return null;
-    };
-    /** Subscribe the hooks of the instance */
-    ComponentHandler.prototype.addEvent = function (eventName, element, component, context) {
-        var callback = component[eventName];
-        if (typeof callback !== 'function')
-            return { emit: (function () { }) };
-        var emitter = this.eventHandler.on({
-            eventName: eventName,
-            callback: function (evt) { return callback.call(component, evt); },
-            attachedNode: element,
-            modifiers: { once: true },
-            context: context || component
-        }).emit;
-        return {
-            emit: function (init) { return emitter({
-                init: init
-            }); }
-        };
-    };
-    ComponentHandler.prototype.insert = function (componentElement, component, data, callback) {
-        var _this = this;
-        var _a;
-        var $name = toLower(componentElement.nodeName);
-        var container = componentElement.parentElement;
-        if (!componentElement.isConnected || !container)
-            return; //Logger.warn("Insert location of component <" + $name + "></" + $name + "> not found.");
-        if (isNull(component.template))
-            return Logger.error("The <" + $name + "></" + $name + "> component is not ready yet to be inserted.");
-        var elementSlots = createAnyEl('SlotContainer', function (el) {
-            el.innerHTML = componentElement.innerHTML;
-            componentElement.innerHTML = "";
-        }).build();
-        var isKeepAlive = componentElement.hasAttribute('keep-alive') || ((_a = component.keepAlive) !== null && _a !== void 0 ? _a : false);
-        // Component Creation
-        if (isKeepAlive === false || isNull(component.el)) {
-            createEl('body', function (htmlSnippet) {
-                htmlSnippet.innerHTML = component.template;
-                forEach([].slice.call(htmlSnippet.children), function (asset) {
-                    if (['SCRIPT', 'LINK', 'STYLE'].indexOf(asset.nodeName) === -1)
-                        return;
-                    component.assets.push(asset);
-                    htmlSnippet.removeChild(asset);
-                });
-                if (htmlSnippet.children.length === 0)
-                    return Logger.error(("The component <" + $name + "></" + $name + "> " +
-                        "seems to be empty or it has not a root element. Example: <div></div>, to be included."));
-                if (htmlSnippet.children.length > 1)
-                    return Logger.error(("The component <" + $name + "></" + $name + "> " +
-                        "seems to have multiple root element, it must have only one root."));
-                component.el = htmlSnippet.children[0];
-                _this.addEvent('created', component.el, component, _this.bouer);
-                component.emit('created');
-            });
-        }
-        if (isNull(component.el))
-            return;
-        if (isFunction(callback))
-            callback(component);
-        var rootElement = component.el;
-        // tranfering the attributes
-        forEach(toArray(componentElement.attributes), function (attr) {
-            componentElement.removeAttribute(attr.name);
-            if (attr.nodeName === 'class')
-                return componentElement.classList.forEach(function (cls) {
-                    rootElement.classList.add(cls);
-                });
-            if (attr.nodeName === 'data') {
-                if (_this.delimiter.run(attr.value).length !== 0)
-                    return Logger.error(("The “data” attribute cannot contain delimiter, " +
-                        "source element: <" + $name + "></" + $name + ">."));
-                var inputData_1 = {};
-                var mData = Extend.obj(data, { $data: data });
-                var reactiveEvent = ReactiveEvent.on('AfterGet', function (reactive) {
-                    inputData_1[reactive.propertyName] = undefined;
-                    defineProperty(inputData_1, reactive.propertyName, reactive);
-                });
-                // If data value is empty gets the main scope value
-                if (attr.value === '')
-                    inputData_1 = Extend.obj(_this.bouer.data);
-                else {
-                    // Other wise, compiles the object provided
-                    var mInputData_1 = IoC.Resolve('Evaluator')
-                        .exec({
-                        data: mData,
-                        expression: attr.value,
-                        context: _this.bouer
-                    });
-                    if (!isObject(mInputData_1))
-                        return Logger.error(("Expected a valid Object Literal expression in “"
-                            + attr.nodeName + "” and got “" + attr.value + "”."));
-                    // Adding all non-existing properties
-                    forEach(Object.keys(mInputData_1), function (key) {
-                        if (!(key in inputData_1))
-                            inputData_1[key] = mInputData_1[key];
-                    });
-                }
-                reactiveEvent.off();
-                Reactive.transform(inputData_1);
-                return forEach(Object.keys(inputData_1), function (key) {
-                    transferProperty(component.data, inputData_1, key);
-                });
-            }
-            rootElement.attributes.setNamedItem(attr);
-        });
-        var initializer = component.init;
-        if (isFunction(initializer))
-            initializer.call(component);
-        this.addEvent('beforeMount', component.el, component);
-        component.emit('beforeMount');
-        container.replaceChild(rootElement, componentElement);
-        var rootClassList = {};
-        // Retrieving all the classes of the retu elements
-        rootElement.classList.forEach(function (key) { return rootClassList[key] = true; });
-        // Changing each selector to avoid conflits
-        var changeSelector = function (style, styleId) {
-            var isStyle = (style.nodeName === 'STYLE'), rules = [];
-            if (!style.sheet)
-                return;
-            var cssRules = style.sheet.cssRules;
-            for (var i = 0; i < cssRules.length; i++) {
-                var rule = cssRules.item(i);
-                if (!rule)
-                    continue;
-                var mRule = rule;
-                var selector = mRule.selectorText.substr(1);
-                var separation = rootClassList[selector] ? "" : " ";
-                var uniqueIdentifier = "." + styleId;
-                var selectorTextSplitted = mRule.selectorText.split(' ');
-                if (selectorTextSplitted[0] === toLower(rootElement.tagName))
-                    selectorTextSplitted.shift();
-                mRule.selectorText = uniqueIdentifier + separation + selectorTextSplitted.join(' ');
-                if (isStyle)
-                    rules.push(mRule.cssText);
-            }
-            if (isStyle)
-                style.innerText = rules.join(' ');
-        };
-        var scriptsAssets = where(component.assets, function (asset) { return toLower(asset.nodeName) === 'script'; });
-        var stylesAssets = where(component.assets, function (asset) { return toLower(asset.nodeName) !== 'script'; });
-        var styleAttrName = 'component-style';
-        // Configuring the styles
-        forEach(stylesAssets, function (asset) {
-            var mStyle = asset.cloneNode(true);
-            if (mStyle instanceof HTMLLinkElement) {
-                var path = component.path[0] === '/' ? component.path.substr(1) : component.path;
-                mStyle.href = pathResolver(path, mStyle.getAttribute('href') || '');
-            }
-            //Checking if this component already have styles added
-            if (_this.stylesController[$name]) {
-                var controller = _this.stylesController[$name];
-                if (controller.elements.indexOf(rootElement) === -1) {
-                    controller.elements.push(rootElement);
-                    forEach(controller.styles, function ($style) {
-                        rootElement.classList.add($style.getAttribute(styleAttrName));
-                    });
-                }
-                return;
-            }
-            var styleId = code(7, 'bouer-s');
-            mStyle.setAttribute(styleAttrName, styleId);
-            if ((mStyle instanceof HTMLLinkElement) && mStyle.hasAttribute('scoped'))
-                mStyle.onload = function (evt) { return changeSelector(evt.target, styleId); };
-            _this.stylesController[$name] = {
-                styles: [DOM.head.appendChild(mStyle)],
-                elements: [rootElement]
-            };
-            if (!mStyle.hasAttribute('scoped'))
-                return;
-            rootElement.classList.add(styleId);
-            if (mStyle instanceof HTMLStyleElement)
-                return changeSelector(mStyle, styleId);
-        });
-        var compile = function (scriptContent) {
-            try {
-                // Executing the mixed scripts
-                IoC.Resolve('Evaluator')
-                    .execRaw((scriptContent || ''), component);
-                _this.addEvent('mounted', component.el, component);
-                component.emit('mounted');
-                // TODO: Something between this two events
-                _this.addEvent('beforeLoad', component.el, component);
-                component.emit('beforeLoad');
-                IoC.Resolve('Compiler')
-                    .compile({
-                    data: Reactive.transform(component.data),
-                    el: rootElement,
-                    componentSlot: elementSlots,
-                    context: component,
-                    onDone: function () {
-                        _this.addEvent('loaded', component.el, component);
-                        component.emit('loaded');
-                    }
-                });
-                Observer.observe(container, function (options) {
-                    var mutation = options.mutation, element = options.element;
-                    if (element.isConnected)
-                        return;
-                    component.destroy();
-                    mutation.disconnect();
-                    var stylesController = _this.stylesController[component.name];
-                    if (!stylesController)
-                        return;
-                    var index = stylesController.elements.indexOf(component.el);
-                    stylesController.elements.splice(index, 1);
-                    // No elements using the style
-                    if (stylesController.elements.length > 0)
-                        return;
-                    forEach(stylesController.styles, function (style) {
-                        return forEach(toArray(DOM.head.children), function (item) {
-                            if (item === style)
-                                return DOM.head.removeChild(style);
-                        });
-                    });
-                    delete _this.stylesController[component.name];
-                });
-            }
-            catch (error) {
-                Logger.error("Error in <" + $name + "></" + $name + "> component.");
-                Logger.error(buildError(error));
-            }
-        };
-        if (scriptsAssets.length === 0)
-            return compile();
-        // Mixing all the scripts
-        var localScriptsContent = [], onlineScriptsContent = [], onlineScriptsUrls = [], webRequestChecker = {};
-        // Grouping the online scripts and collecting the online url
-        forEach(scriptsAssets, function (script) {
-            if (script.src == '' || script.innerHTML)
-                localScriptsContent.push(script.innerHTML);
-            else {
-                var path = component.path[0] === '/' ? component.path.substr(1) : component.path;
-                script.src = pathResolver(path, script.getAttribute('src') || '');
-                onlineScriptsUrls.push(script.src);
-            }
-        });
-        // No online scripts detected
-        if (onlineScriptsUrls.length == 0)
-            return compile(localScriptsContent.join('\n\n'));
-        // Load the online scripts and run it
-        return forEach(onlineScriptsUrls, function (url, index) {
-            webRequestChecker[url] = true;
-            // Getting script content from a web request
-            webRequest(url, {
-                headers: { "Content-Type": 'text/plain' }
-            }).then(function (response) {
-                if (!response.ok)
-                    throw new Error(response.statusText);
-                return response.text();
-            }).then(function (text) {
-                delete webRequestChecker[url];
-                // Adding the scripts according to the defined order
-                onlineScriptsContent[index] = text;
-                // if there are not web requests compile the element
-                if (Object.keys(webRequestChecker).length === 0)
-                    return compile(Extend.array(onlineScriptsContent, localScriptsContent).join('\n\n'));
-            }).catch(function (error) {
-                error.stack = "";
-                Logger.error(("Error loading the <script src=\"" + url + "\"></script> in " +
-                    "<" + $name + "></" + $name + "> component, remove it in order to be compiled."));
-                Logger.log(error);
-                _this.addEvent('failed', componentElement, component, _this.bouer)
-                    .emit();
-            });
-        });
-    };
-    return ComponentHandler;
-}());
-
-var DelimiterHandler = /** @class */ (function () {
-    function DelimiterHandler(delimiters) {
-        this.delimiters = [];
-        IoC.Register(this);
-        this.delimiters = delimiters;
-    }
-    DelimiterHandler.prototype.add = function (item) {
-        this.delimiters.push(item);
-    };
-    DelimiterHandler.prototype.remove = function (name) {
-        var index = this.delimiters.findIndex(function (item) { return item.name === name; });
-        this.delimiters.splice(index, 1);
-    };
-    DelimiterHandler.prototype.run = function (content) {
-        var _this = this;
-        if (isNull(content) || trim(content) === '')
-            return [];
-        var mDelimiter = null;
-        var checkContent = function (text, flag) {
-            var center = '([\\S\\s]*?)';
-            for (var i = 0; i < _this.delimiters.length; i++) {
-                var delimiter = _this.delimiters[i];
-                var result_1 = text.match(RegExp(delimiter.delimiter.open + center + delimiter.delimiter.close, flag || ''));
-                if (result_1) {
-                    mDelimiter = delimiter;
-                    return result_1;
-                }
-            }
-        };
-        var result = checkContent(content, 'g');
-        if (!result)
-            return [];
-        return result.map(function (item) {
-            var matches = checkContent(item);
-            return {
-                field: matches[0],
-                expression: trim(matches[1]),
-                delimiter: mDelimiter
-            };
-        });
-    };
-    return DelimiterHandler;
-}());
-
-var Evaluator = /** @class */ (function () {
-    function Evaluator(bouer) {
-        IoC.Register(this);
-        this.bouer = bouer;
-        this.global = this.createWindow();
-    }
-    Evaluator.prototype.createWindow = function () {
-        var mWindow;
-        createEl('iframe', function (frame, dom) {
-            frame.style.display = 'none!important';
-            dom.body.appendChild(frame);
-            mWindow = frame.contentWindow;
-            dom.body.removeChild(frame);
-        });
-        delete mWindow.name;
-        return mWindow;
-    };
-    Evaluator.prototype.execRaw = function (expression, context) {
-        // Executing the expression
-        try {
-            var mExpression = "(function(){ " + expression + " }).apply(this, arguments)";
-            GLOBAL.Function(mExpression).apply(context || this.bouer);
-        }
-        catch (error) {
-            Logger.error(buildError(error));
-        }
-    };
-    Evaluator.prototype.exec = function (options) {
-        var _this = this;
-        var data = options.data, args = options.args, expression = options.expression, isReturn = options.isReturn, aditional = options.aditional, context = options.context;
-        var mGlobal = this.global;
-        var noConfigurableProperties = {};
-        context = context || this.bouer;
-        var dataToUse = Extend.obj(aditional || {});
-        // Defining the scope data
-        forEach(Object.keys(data), function (key) {
-            transferProperty(dataToUse, data, key);
-        });
-        // Applying the global data to the dataToUse variable
-        forEach(Object.keys(this.bouer.globalData), function (key) {
-            if (key in dataToUse)
-                return Logger.warn('It was not possible to use the globalData property "' + key +
-                    '" because it already defined in the current scope.');
-            transferProperty(dataToUse, _this.bouer.globalData, key);
-        });
-        var keys = Object.keys(dataToUse);
-        var returnedValue;
-        // Spreading all the properties
-        forEach(keys, function (key) {
-            delete mGlobal[key];
-            // In case of non-configurable property store them to be handled
-            if (key in mGlobal && getDescriptor(mGlobal, key).configurable === true)
-                noConfigurableProperties[key] = mGlobal[key];
-            if (key in noConfigurableProperties)
-                mGlobal[key] = dataToUse[key];
-            transferProperty(mGlobal, dataToUse, key);
-        });
-        // Executing the expression
-        try {
-            var mExpression = 'return(function(){"use strict"; ' +
-                (isReturn === false ? '' : 'return') + ' ' + expression + ' }).apply(this, arguments)';
-            returnedValue = this.global.Function(mExpression).apply(context, args);
-        }
-        catch (error) {
-            Logger.error(buildError(error));
-        }
-        // Removing the properties
-        forEach(keys, function (key) { return delete mGlobal[key]; });
-        return returnedValue;
-    };
-    return Evaluator;
-}());
-
-var EventHandler = /** @class */ (function () {
-    function EventHandler(bouer) {
-        this.$events = {};
-        this.input = createEl('input').build();
-        this.bouer = bouer;
-        this.evaluator = IoC.Resolve('Evaluator');
-        IoC.Register(this);
-        this.cleanup();
-    }
-    EventHandler.prototype.handle = function (node, data, context) {
-        var _this = this;
-        var _a;
-        var ownerElement = (node.ownerElement || node.parentNode);
-        var nodeName = node.nodeName;
-        if (isNull(ownerElement))
-            return Logger.error("Invalid ParentElement of “" + nodeName + "”");
-        // <button on:submit.once.stopPropagation="times++"></button>
-        var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
-        var eventNameWithModifiers = nodeName.substr(Constants.on.length);
-        var modifiersList = eventNameWithModifiers.split('.');
-        var eventName = modifiersList[0];
-        modifiersList.shift();
-        if (nodeValue === '')
-            return Logger.error("Expected an expression in the “" + nodeName + "” and got an <empty string>.");
-        connectNode(node, ownerElement);
-        ownerElement.removeAttribute(nodeName);
-        var callback = function (evt) {
-            // Calling the modifiers
-            forEach(modifiersList, function (modifier) {
-                forEach(Object.keys(evt), function (key) {
-                    var fnModifier;
-                    if (fnModifier = evt[key] && isFunction(fnModifier) && toLower(key) === toLower(modifier))
-                        fnModifier();
-                });
-            });
-            var mArguments = [evt];
-            var isResultFunction = _this.evaluator.exec({
-                data: data,
-                expression: nodeValue,
-                args: mArguments,
-                aditional: { event: evt },
-                context: context
-            });
-            if (isFunction(isResultFunction)) {
-                try {
-                    isResultFunction.apply(context, mArguments);
-                }
-                catch (error) {
-                    Logger.error(buildError(error));
-                }
-            }
-        };
-        var modifiers = {};
-        var addEventListenerOptions = ['capture', 'once', 'passive'];
-        forEach(modifiersList, function (md) {
-            md = md.toLocaleLowerCase();
-            if (addEventListenerOptions.indexOf(md) !== -1)
-                modifiers[md] = true;
-        });
-        if (!('on' + eventName in this.input))
-            this.on({ eventName: eventName, callback: callback, modifiers: modifiers, context: context, attachedNode: ownerElement });
-        else
-            ownerElement.addEventListener(eventName, callback, modifiers);
-    };
-    EventHandler.prototype.on = function (options) {
-        var _this = this;
-        var eventName = options.eventName, callback = options.callback, context = options.context, attachedNode = options.attachedNode, modifiers = options.modifiers;
-        var event = {
-            eventName: eventName,
-            callback: function (evt) { return callback.apply(context || _this.bouer, [evt]); },
-            attachedNode: attachedNode,
-            modifiers: modifiers,
-            emit: function (options) { return _this.emit({
-                eventName: eventName,
-                attachedNode: attachedNode,
-                init: (options || {}).init,
-                once: (options || {}).once,
-            }); }
-        };
-        if (!this.$events[eventName])
-            this.$events[eventName] = [];
-        this.$events[eventName].push(event);
-        return event;
-    };
-    EventHandler.prototype.off = function (options) {
-        var eventName = options.eventName, callback = options.callback, attachedNode = options.attachedNode;
-        if (!this.$events[eventName])
-            return;
-        this.$events[eventName] = where(this.$events[eventName], function (evt) {
-            if (attachedNode)
-                return (evt.attachedNode === attachedNode);
-            return !(evt.eventName === eventName && callback == evt.callback);
-        });
-    };
-    EventHandler.prototype.emit = function (options) {
-        var _this = this;
-        var eventName = options.eventName, init = options.init, once = options.once, attachedNode = options.attachedNode;
-        var events = this.$events[eventName];
-        if (!events)
-            return;
-        var emitter = function (node, callback) {
-            node.addEventListener(eventName, callback, { once: true });
-            node.dispatchEvent(new CustomEvent(eventName, init));
-        };
-        forEach(events, function (evt, index) {
-            var node = evt.attachedNode;
-            // If a node was provided, just dispatch the events in this node
-            if (attachedNode) {
-                if (node !== attachedNode)
-                    return;
-                return emitter(node, evt.callback);
-            }
-            // Otherwise, if this events has a node, dispatch the node event
-            if (node)
-                return emitter(node, evt.callback);
-            // Otherwise, dispatch all events
-            evt.callback.call(_this.bouer, new CustomEvent(eventName, init));
-            if ((once !== null && once !== void 0 ? once : false) === true)
-                events.splice(index, 1);
-        });
-    };
-    EventHandler.prototype.cleanup = function () {
-        var _this = this;
-        taskRunner(function () {
-            forEach(Object.keys(_this.$events), function (key) {
-                _this.$events[key] = where(_this.$events[key], function (event) {
-                    if (!event.attachedNode)
-                        return true;
-                    if (event.attachedNode.isConnected)
-                        return true;
-                });
-            });
-        }, 1000);
-    };
-    return EventHandler;
-}());
-
-var Middleware = /** @class */ (function () {
-    function Middleware() {
-        var _this = this;
-        this.middlewareConfigContainer = {};
-        this.run = function (directive, runnable) {
-            var middlewares = _this.middlewareConfigContainer[directive];
-            if (!middlewares) {
-                return (runnable.default || (function () { }))();
-            }
-            var index = 0;
-            var middleware = middlewares[index];
-            var _loop_1 = function () {
-                var isNext = false;
-                var middlewareAction = middleware[runnable.type];
-                if (middlewareAction) {
-                    runnable.action(function (config, cbs) {
-                        Promise.resolve(middlewareAction(config, function () {
-                            isNext = true;
-                        })).then(function (value) {
-                            if (isNext)
-                                return;
-                            cbs.success(value);
-                        }).catch(function (error) {
-                            if (isNext)
-                                return;
-                            cbs.fail(error);
-                        }).finally(function () {
-                            if (isNext)
-                                return;
-                            cbs.done();
-                        });
-                    });
-                }
-                else {
-                    (runnable.default || (function () { }))();
-                }
-                if (isNext == false)
-                    return "break";
-                middleware = middlewares[++index];
-            };
-            while (middleware != null) {
-                var state_1 = _loop_1();
-                if (state_1 === "break")
-                    break;
-            }
-        };
-        this.register = function (directive, configureCallback) {
-            if (!_this.middlewareConfigContainer[directive])
-                _this.middlewareConfigContainer[directive] = [];
-            var middleware = {};
-            configureCallback(function (bind) { return middleware.bind = bind; }, function (update) { return middleware.update = update; });
-            _this.middlewareConfigContainer[directive].push(middleware);
-        };
-        IoC.Register(this);
-    }
-    return Middleware;
-}());
-
-var Routing = /** @class */ (function () {
-    function Routing(bouer) {
-        this.defaultPage = undefined;
-        this.notFoundPage = undefined;
-        this.routeView = null;
-        this.activeAnchors = [];
-        // Store `href` value of the <base /> tag
-        this.base = null;
-        IoC.Register(this);
-        this.bouer = bouer;
-        this.routeView = this.bouer.el.querySelector('[route-view]');
-    }
-    Routing.prototype.init = function () {
-        var _this = this;
-        if (isNull(this.routeView))
-            return;
-        this.routeView.removeAttribute('route-view');
-        this.base = "/";
-        var base = DOM.head.querySelector('base');
-        if (base) {
-            var baseHref = base.attributes['href'];
-            if (!baseHref)
-                return Logger.error("The href=\"/\" attribute is required in base element.");
-            this.base = baseHref.value;
-        }
-        if (this.defaultPage)
-            this.navigate(DOM.location.href);
-        // Listening to the page navigation
-        GLOBAL.addEventListener('popstate', function (evt) {
-            evt.preventDefault();
-            _this.navigate((evt.state || location.href), false);
-        });
-    };
-    /**
-     * Navigates to a certain page without reloading all the page
-     * @param route the route to navigate to
-     * @param changeUrl allow to change the url after the navigation, default value is `true`
-     */
-    Routing.prototype.navigate = function (route, changeUrl) {
-        var _this = this;
-        var _a;
-        if (!this.routeView)
-            return;
-        if (isNull(route))
-            return Logger.log("Invalid url provided to the navigation method.");
-        route = trim(route);
-        var resolver = urlResolver(route);
-        var usehash = (_a = (this.bouer.config || {}).usehash) !== null && _a !== void 0 ? _a : true;
-        var navigatoTo = (usehash ? resolver.hash : resolver.pathname).split('?')[0];
-        // In case of: /about/me/, remove the last forward slash
-        if (navigatoTo[navigatoTo.length - 1] === '/')
-            navigatoTo = navigatoTo.substr(0, navigatoTo.length - 1);
-        var page = this.toPage(navigatoTo);
-        this.clear();
-        if (!page)
-            return; // Page Not Found and NotFound Page Not Defined
-        // If it's not found and the url matches .html do nothing
-        if (!page && route.endsWith('.html'))
-            return;
-        var componentElement = createAnyEl(page.name)
-            .appendTo(this.routeView)
-            .build();
-        // Document info configuration
-        DOM.title = page.title || DOM.title;
-        if ((changeUrl !== null && changeUrl !== void 0 ? changeUrl : true))
-            this.pushState(resolver.href, DOM.title);
-        var routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route);
-        IoC.Resolve('ComponentHandler')
-            .order(componentElement, {}, function (component) {
-            component.on('loaded', function () {
-                _this.markActiveAnchors(routeToSet);
-            });
-        });
-    };
-    Routing.prototype.pushState = function (url, title) {
-        url = urlResolver(url).href;
-        if (DOM.location.href === url)
-            return;
-        GLOBAL.history.pushState(url, (title || ''), url);
-    };
-    Routing.prototype.popState = function (times) {
-        if (isNull(times))
-            times = -1;
-        GLOBAL.history.go(times);
-    };
-    Routing.prototype.toPage = function (url) {
-        // Default Page
-        if (url === '' || url === '/' ||
-            url === "/" + urlCombine((this.base, "index.html"))) {
-            return this.defaultPage;
-        }
-        // Search for the right page
-        return IoC.Resolve('ComponentHandler')
-            .find(function (component) {
-            if (!component.route)
-                return false;
-            var routeRegExp = component.route.replace(/{(.*?)}/gi, '[\\S\\s]{1,}');
-            if (Array.isArray(new RegExp("^" + routeRegExp + "$").exec(url)))
-                return true;
-            return false;
-        }) || this.notFoundPage;
-    };
-    Routing.prototype.markActiveAnchors = function (route) {
-        var _this = this;
-        var className = (this.bouer.config || {}).activeClassName || 'active-link';
-        var anchors = this.bouer.el.querySelectorAll('a');
-        forEach(this.activeAnchors, function (anchor) {
-            return anchor.classList.remove(className);
-        });
-        this.activeAnchors = [];
-        forEach(toArray(anchors), function (anchor) {
-            if (anchor.href.split('?')[0] !== route.split('?')[0])
-                return;
-            anchor.classList.add(className);
-            _this.activeAnchors.push(anchor);
-        });
-    };
-    Routing.prototype.clear = function () {
-        this.routeView.innerHTML = '';
-    };
-    /**
-     * Allow to configure the `Default Page` and `NotFound Page`
-     * @param component the component to be checked
-     */
-    Routing.prototype.configure = function (component) {
-        if (component.isDefault === true && !isNull(this.defaultPage))
-            return Logger.warn("There are multiple “Default Page” provided, check the “" + component.route + "” route.");
-        if (component.isNotFound === true && !isNull(this.notFoundPage))
-            return Logger.warn("There are multiple “NotFound Page” provided, check the “" + component.route + "” route.");
-        if (component.isDefault === true)
-            this.defaultPage = component;
-        if (component.isNotFound === true)
-            this.notFoundPage = component;
-    };
-    return Routing;
-}());
-
 var Skeleton = /** @class */ (function () {
     function Skeleton(bouer) {
         var _this = this;
@@ -3270,10 +3306,10 @@ var Skeleton = /** @class */ (function () {
         this.defaultBackgroudColor = '#E2E2E2';
         this.defaultWaveColor = '#ffffff5d';
         this.identifier = "bouer";
-        IoC.Register(this);
         this.reset();
         this.bouer = bouer;
         this.style = createEl('style', function (el) { return el.id = _this.identifier; }).build();
+        IoC.Register(this);
     }
     Skeleton.prototype.reset = function () {
         this.backgroudColor = this.defaultBackgroudColor;
@@ -3329,6 +3365,7 @@ var Bouer = /** @class */ (function () {
         this.name = 'Bouer';
         this.version = '3.0.0';
         this.dependencies = {};
+        this.__id__ = IoC.GetId();
         /**
          * Gets all the elemens having the `ref` attribute
          * @returns an object having all the elements with the `ref attribute value` defined as the key.
@@ -3344,26 +3381,31 @@ var Bouer = /** @class */ (function () {
         if (!el)
             throw Logger.error(new SyntaxError("Element with selector “" + selector + "” not found."));
         this.el = el;
-        IoC.Register(this);
-        var dataStore = new DataStore();
+        var dataStore = new DataStore(this);
         new Evaluator(this);
-        var middleware = new Middleware();
+        var middleware = new Middleware(this);
         // Register the middleware
         if (typeof options.middleware === 'function')
             options.middleware.call(this, middleware.register, this);
         // Transform the data properties into a reative
-        this.data = Reactive.transform(options.data || {});
-        this.globalData = Reactive.transform(options.globalData || {});
+        this.data = Reactive.transform({
+            inputObject: options.data || {},
+            context: this
+        });
+        this.globalData = Reactive.transform({
+            inputObject: options.globalData || {},
+            context: this
+        });
         var delimiters = options.delimiters || [];
         delimiters.push.apply(delimiters, [
             { name: 'common', delimiter: { open: '{{', close: '}}' } },
             { name: 'html', delimiter: { open: '{{:html ', close: '}}' } },
         ]);
         new Binder(this);
-        var delimiter = new DelimiterHandler(delimiters);
+        var delimiter = new DelimiterHandler(delimiters, this);
         var eventHandler = new EventHandler(this);
         var routing = new Routing(this);
-        var componentHandler = new ComponentHandler(this, options);
+        var componentHandler = new ComponentHandler(this);
         var compiler = new Compiler(this, options);
         new Converter(this);
         var skeleton = new Skeleton(this);
@@ -3379,8 +3421,11 @@ var Bouer = /** @class */ (function () {
                 if (key in dataStore.data)
                     return Logger.log("There is already a data stored with this key “" + key + "”.");
                 if ((toReactive !== null && toReactive !== void 0 ? toReactive : false) === true)
-                    Reactive.transform(data);
-                return DataStore.set('data', key, data);
+                    Reactive.transform({
+                        context: _this_1,
+                        inputObject: data
+                    });
+                return IoC.Resolve(_this_1, DataStore).set('data', key, data);
             },
             unset: function (key) { return delete dataStore.data[key]; }
         };
@@ -3400,7 +3445,10 @@ var Bouer = /** @class */ (function () {
                         return;
                     compiler.compile({
                         el: node,
-                        data: Reactive.transform(mWait.data),
+                        data: Reactive.transform({
+                            context: _this_1,
+                            inputObject: mWait.data
+                        }),
                         context: _this_1
                     });
                 });
@@ -3448,6 +3496,8 @@ var Bouer = /** @class */ (function () {
             eventName: 'beforeLoad',
             attachedNode: el
         });
+        // Registering all the components
+        componentHandler.prepare(options.components || []);
         // compile the app
         compiler.compile({
             el: this.el,
@@ -3458,13 +3508,30 @@ var Bouer = /** @class */ (function () {
                 attachedNode: el
             }); }
         });
-        GLOBAL.addEventListener('beforeunload', function (evt) {
+        var isDestroyed = false;
+        GLOBAL.addEventListener('beforeunload', function () {
+            if (isDestroyed)
+                return stop();
             eventHandler.emit({
                 eventName: 'beforeDestroy',
                 attachedNode: el
             });
             _this_1.destroy();
+            isDestroyed = true;
         }, { once: true });
+        Task.run(function (stopTask) {
+            if (isDestroyed)
+                return stopTask();
+            if (_this_1.el.isConnected)
+                return;
+            eventHandler.emit({
+                eventName: 'beforeDestroy',
+                attachedNode: _this_1.el
+            });
+            _this_1.destroy();
+            stopTask();
+            isDestroyed = true;
+        });
         // Initializing Routing
         routing.init();
         if (!DOM.head.querySelector("link[rel~='icon']")) {
@@ -3477,51 +3544,67 @@ var Bouer = /** @class */ (function () {
     }
     /**
      * Sets data into a target object, by default is the `app.data`
-     * @param inputData the data the will be setted
+     * @param inputData the data the should be setted
      * @param targetObject the target were the inputData
      * @returns the object with the data setted
      */
     Bouer.prototype.set = function (inputData, targetObject) {
-        return Reactive.set(inputData, (targetObject || this.data));
+        if (!isObject(inputData)) {
+            Logger.error('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".');
+            return {};
+        }
+        if (isObject(targetObject) && targetObject == null) {
+            Logger.error('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".');
+            return inputData;
+        }
+        targetObject = targetObject || this.data;
+        // Transforming the input
+        Reactive.transform({
+            inputObject: inputData,
+            context: this
+        });
+        // Transfering the properties
+        forEach(Object.keys(inputData), function (key) { return transferProperty(targetObject, inputData, key); });
+        return targetObject;
     };
     /**
      * Compiles a `HTML snippet` to a `Object Literal`
      * @param input the input element
      * @param options the options of the compilation
-     * @param onSet a function that will be fired when a value is setted
+     * @param onSet a function that should be fired when a value is setted
      * @returns the Object Compiled from the HTML
      */
     Bouer.prototype.toJsObj = function (input, options, onSet) {
-        return IoC.Resolve('Converter').htmlToJsObj(input, options, onSet);
+        return IoC.Resolve(this, Converter).htmlToJsObj(input, options, onSet);
     };
     /**
      * Provides the possibility to watch a property change
      * @param propertyName the property to watch
-     * @param callback the function that will be called when the property change
+     * @param callback the function that should be called when the property change
      * @param targetObject the target object having the property to watch
      * @returns the watch object having the method to destroy the watch
      */
     Bouer.prototype.watch = function (propertyName, callback, targetObject) {
-        return IoC.Resolve('Binder').onPropertyChange(propertyName, callback, targetObject);
+        return IoC.Resolve(this, Binder).onPropertyChange(propertyName, callback, targetObject);
     };
     /**
      * Watch all reactive properties in the provided scope.
-     * @param watchableScope the function that will be called when the any reactive property change
+     * @param watchableScope the function that should be called when the any reactive property change
      * @returns an object having all the watches and the method to destroy watches at once
      */
     Bouer.prototype.react = function (watchableScope) {
-        return IoC.Resolve('Binder').onPropertyInScopeChange(watchableScope);
+        return IoC.Resolve(this, Binder).onPropertyInScopeChange(watchableScope);
     };
     /**
      * Add an Event Listener to the instance or to an object
      * @param eventName the event name to be listening
-     * @param callback the callback that will be fired
+     * @param callback the callback that should be fired
      * @param attachedNode A node to attach the event
      * @param modifiers An object having all the event modifier
      * @returns The event added
      */
     Bouer.prototype.on = function (eventName, callback, options) {
-        return IoC.Resolve('EventHandler').
+        return IoC.Resolve(this, EventHandler).
             on({
             eventName: eventName,
             callback: callback,
@@ -3533,11 +3616,11 @@ var Bouer = /** @class */ (function () {
     /**
      * Removes an Event Listener from the instance or from object
      * @param eventName the event name to be listening
-     * @param callback the callback that will be fired
+     * @param callback the callback that should be fired
      * @param attachedNode A node to attach the event
      */
     Bouer.prototype.off = function (eventName, callback, attachedNode) {
-        return IoC.Resolve('EventHandler').
+        return IoC.Resolve(this, EventHandler).
             off({
             eventName: eventName,
             callback: callback,
@@ -3550,7 +3633,7 @@ var Bouer = /** @class */ (function () {
      */
     Bouer.prototype.emit = function (eventName, options) {
         var mOptions = (options || {});
-        return IoC.Resolve('EventHandler').
+        return IoC.Resolve(this, EventHandler).
             emit({
             eventName: eventName,
             attachedNode: mOptions.element,
@@ -3560,7 +3643,7 @@ var Bouer = /** @class */ (function () {
     };
     /**
      * Limits sequential execution to a single one acording to the milliseconds provided
-     * @param callback the callback that will be performed the execution
+     * @param callback the callback that should be performed the execution
      * @param wait milliseconds to the be waited before the single execution
      * @returns executable function
      */
@@ -3589,7 +3672,7 @@ var Bouer = /** @class */ (function () {
      * @returns
      */
     Bouer.prototype.compile = function (options) {
-        return IoC.Resolve('Compiler').
+        return IoC.Resolve(this, Compiler).
             compile({
             el: options.el,
             data: options.data,
@@ -3599,17 +3682,14 @@ var Bouer = /** @class */ (function () {
     };
     Bouer.prototype.destroy = function () {
         var el = this.el;
-        if (el.tagName == 'body')
-            el.innerHTML = '';
-        else if (el.isConnected)
-            DOM.body.removeChild(el);
-        forEach(toArray(DOM.head.querySelectorAll('#bouer,[component-style]')), function (item) {
-            if (item.isConnected)
-                DOM.head.removeChild(item);
-        });
         this.emit('destroyed', {
             element: this.el
         });
+        if (el.tagName == 'body')
+            el.innerHTML = '';
+        else if (DOM.contains(el))
+            DOM.body.removeChild(el);
+        IoC.Dispose(this);
     };
     // Hooks
     Bouer.prototype.beforeLoad = function (event) { };

@@ -14,10 +14,10 @@ export default class Evaluator {
   private bouer: Bouer;
 
   constructor(bouer: Bouer) {
-    IoC.Register(this);
-
-    this.bouer = bouer;
+		this.bouer = bouer;
     this.global = this.createWindow() as any;
+
+    IoC.Register(this);
   }
 
   private createWindow() {

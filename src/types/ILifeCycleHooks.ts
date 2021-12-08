@@ -1,31 +1,31 @@
 export default interface ILifeCycleHooks {
-  /** The hook that will be called when the component was blocked by restrictions */
+  /** The hook that should be called when the component was blocked by restrictions */
   blocked?: (event: CustomEvent) => void;
 
-  /** The hook that will be called when the component is requested */
+  /** The hook that should be called when the component is requested */
   requested?: (event: CustomEvent) => void;
 
-  /** The hook that will be called when the component is created */
+  /** The hook that should be called when the component is created */
   created?: (event: CustomEvent) => void;
 
-  /** The hook that will be called before the component is mounted */
+  /** The hook that should be called before the component is mounted */
   beforeMount?: (event: CustomEvent) => void;
 
-  /** The hook that will be called after the component is mounted */
+  /** The hook that should be called after the component is mounted */
   mounted?: (event: CustomEvent) => void;
 
-  /** The hook that will be called before the component is loaded */
+  /** The hook that should be called before the component is loaded */
   beforeLoad?: (event: CustomEvent) => void;
 
-  /** The hook that will be called after the component is loaded (Compiled) */
+  /** The hook that should be called after the component is loaded (Compiled) */
   loaded?: (event: CustomEvent) => void;
 
-  /** The hook that will be called before the component is destroyed */
+  /** The hook that should be called before the component is destroyed */
   beforeDestroy?: (event: CustomEvent) => void;
 
-  /** The hook that will be called after the component is destroyed */
+  /** The hook that should be called after the component is destroyed */
   destroyed?: (event: CustomEvent) => void;
 
-  /** The hook that will be called after the component request is failed */
+  /** The hook that should be called after the component request is failed */
   failed?: (event: CustomEvent) => void;
 }

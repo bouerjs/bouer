@@ -1,3 +1,4 @@
+import Bouer from "../browser";
 import IoC from "../shared/helpers/IoC";
 import { isNull, trim } from "../shared/helpers/Utils";
 import delimiter from "../types/delimiter";
@@ -5,11 +6,13 @@ import delimiterResponse from "../types/delimiterResponse";
 
 export default class DelimiterHandler {
   delimiters: Array<delimiter> = [];
+	bouer: Bouer;
 
-  constructor(delimiters: Array<delimiter>) {
-    IoC.Register(this);
-
+  constructor(delimiters: Array<delimiter>, bouer: Bouer) {
+		this.bouer = bouer;
     this.delimiters = delimiters;
+
+    IoC.Register(this);
   }
 
   add(item: delimiter) {

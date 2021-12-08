@@ -62,7 +62,7 @@
 							headers: { 'Content-Type': "application/json" }
 						}).then(response => {
 							if (!response.ok)
-								throw new Error("Bad Request");
+								throw new Error(response.s);
 							return response.json()
 						}).then(json => {
 							return {

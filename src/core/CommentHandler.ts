@@ -6,9 +6,9 @@ export default class CommentHandler {
   bouer: Bouer;
 
   constructor(bouer: Bouer) {
-    IoC.Register(this);
-
     this.bouer = bouer;
+
+    IoC.Register(this);
   }
 
   /** Creates a comment with some identifier */

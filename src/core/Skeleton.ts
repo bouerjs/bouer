@@ -13,11 +13,11 @@ export default class Skeleton {
   identifier: string = "bouer";
 
   constructor(bouer: Bouer) {
-    IoC.Register(this);
-
-    this.reset();
+		this.reset();
     this.bouer = bouer;
     this.style = createEl('style', el => el.id = this.identifier).build();
+
+    IoC.Register(this);
   }
 
   private reset() {
