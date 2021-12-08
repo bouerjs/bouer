@@ -4,7 +4,6 @@ import {
 	createEl,
 	forEach, isFunction, isNull,
 	isObject,
-	taskRunner,
 	toArray,
 	toLower,
 	toStr,
@@ -21,6 +20,7 @@ import ReactiveEvent from "../event/ReactiveEvent";
 import Bouer from "../../instance/Bouer";
 import Watch from "./Watch";
 import Middleware from "../middleware/Middleware";
+import Task from "../../shared/helpers/Task";
 export interface BinderConfig {
 	node: Node,
 	data: dynamic,
@@ -50,10 +50,10 @@ export default class Binder {
 	}
 
 	constructor(bouer: Bouer) {
-		IoC.Register(this);
-
-		this.evaluator = IoC.Resolve('Evaluator')!;
 		this.bouer = bouer;
+		this.evaluator = IoC.Resolve(this.bouer, Evaluator)!;
+
+		IoC.Register(this);
 		this.cleanup();
 	}
 
@@ -69,8 +69,9 @@ export default class Binder {
 		const originalValue = trim(node.nodeValue ?? '');
 		const originalName = node.nodeName;
 		const ownerElement = (node as any).ownerElement || node.parentNode;
-		const onUpdate = options.onUpdate || ((value: any, node: Node) => { });
-		const middleware = IoC.Resolve<Middleware>('Middleware')!;
+		const onUpdate = options.onUpdate || ((v: any, n: Node) => { });
+
+		const middleware = IoC.Resolve<Middleware>(this.bouer, Middleware)!;
 
 		// Clousure cache property settings
 		const propertyBindConfig: BinderConfig = {
@@ -274,7 +275,7 @@ export default class Binder {
 					el.innerHTML = valueToSet;
 				}).build().children[0];
 				ownerElement.appendChild(htmlSnippet);
-				IoC.Resolve<Compiler>('Compiler')!.compile({
+				IoC.Resolve<Compiler>(this.bouer, Compiler)!.compile({
 					el: htmlSnippet,
 					data: data,
 					context: context
@@ -325,12 +326,12 @@ export default class Binder {
 
 	/** Creates a process for unbind properties when it does not exists anymore in the DOM */
 	private cleanup() {
-		taskRunner(() => {
+		Task.run(() => {
 			this.binds = where(this.binds, bind => {
 				if (!bind.node) return true;
 				if (bind.node.isConnected) return true;
 				bind.destroy();
 			});
-		}, 1000);
+		});
 	}
 }

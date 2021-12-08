@@ -16,6 +16,7 @@ export default class Component implements IComponent {
 	data?: object;
 	template?: string;
 	keepAlive?: boolean;
+	prefetch?: boolean = false;
 	title?: string = undefined;
 	route?: string = undefined;
 	isDefault?: boolean = undefined;
@@ -25,7 +26,7 @@ export default class Component implements IComponent {
 	bouer?: Bouer = undefined;
 	children?: (Component | IComponent)[] = [];
 	assets: (HTMLScriptElement | HTMLStyleElement | HTMLLinkElement)[] = [];
-  restrictions?: ((compoment: (Component | IComponent)) => boolean | Promise<boolean>)[];
+  restrictions?: ((component: (Component | IComponent)) => boolean | Promise<boolean>)[];
 
 	// Store temporarily this component UI orders
 	private events: EventSubscription[] = [];
@@ -56,7 +57,10 @@ export default class Component implements IComponent {
 
 		this.name = _name;
 		this.path = _path;
-		this.data = Reactive.transform(this.data || {});
+		this.data = Reactive.transform({
+			context: this,
+			inputObject: this.data || {}
+		});
 	}
 
 	export(options: object) {
@@ -88,7 +92,7 @@ export default class Component implements IComponent {
 	}
 
 	emit<TKey extends keyof ILifeCycleHooks>(eventName: TKey, init?: CustomEventInit) {
-		IoC.Resolve<EventHandler>('EventHandler')!.emit({
+		IoC.Resolve<EventHandler>(this.bouer!, EventHandler)!.emit({
 			eventName: eventName,
 			attachedNode: this.el!,
 			init: init
@@ -103,7 +107,7 @@ export default class Component implements IComponent {
 			eventName == 'loaded' ||
 			eventName == 'mounted') ? this : this.bouer;
 
-		const evt = IoC.Resolve<EventHandler>('EventHandler')!.on({
+		const evt = IoC.Resolve<EventHandler>(this.bouer!, EventHandler)!.on({
 			eventName,
 			callback: callback as any,
 			attachedNode: this.el!,
@@ -114,7 +118,7 @@ export default class Component implements IComponent {
 	}
 
 	off<TKey extends keyof ILifeCycleHooks>(eventName: TKey, callback: (event: CustomEvent) => void) {
-		IoC.Resolve<EventHandler>('EventHandler')!.off({
+		IoC.Resolve<EventHandler>(this.bouer!, EventHandler)!.off({
 			eventName,
 			callback: callback as any,
 			attachedNode: this.el!

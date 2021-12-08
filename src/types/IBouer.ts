@@ -1,5 +1,5 @@
 import Component from "../core/component/Component";
-import { MiddlewareConfig } from "../core/middleware/Middleware";
+import { MiddlewareConfigActions } from "../core/middleware/Middleware";
 import Bouer from "../instance/Bouer";
 import customDirective from "./customDirective";
 import delimiter from "./delimiter";
@@ -29,21 +29,21 @@ export default interface IBouer {
 	/** Appends delimiters to the instance */
 	delimiters?: delimiter[],
 
-	/** Middlewares that will be used in the application */
+	/** Middlewares that should be used in the application */
 	middleware?: (
-		configure: (directive: string, configureCallback: MiddlewareConfig) => void,
+		configure: (directive: string, actions: MiddlewareConfigActions) => void,
 		app: Bouer
 	) => void,
 
-	/** The hook that will be called before the component is loaded */
+	/** The hook that should be called before the component is loaded */
 	beforeLoad?(event: CustomEvent): void;
 
-	/** The hook that will be called after the component is loaded (Compiled) */
+	/** The hook that should be called after the component is loaded (Compiled) */
 	loaded?(event: CustomEvent): void;
 
-	/** The hook that will be called before the component is destroyed */
+	/** The hook that should be called before the component is destroyed */
 	beforeDestroy?(event: CustomEvent): void;
 
-	/** The hook that will be called after the component is destroyed */
+	/** The hook that should be called after the component is destroyed */
 	destroyed?(event: CustomEvent): void;
 }

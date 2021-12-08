@@ -1,3 +1,4 @@
+import Bouer from "../../instance/Bouer";
 import IoC from "../../shared/helpers/IoC";
 import Logger from "../../shared/logger/Logger";
 import IMiddleware from "../../types/IMiddleware";
@@ -7,15 +8,18 @@ export type MiddlewareObject = {
 	update?: (context: IMiddleware, next: () => void) => Promise<any>
 }
 
-export type MiddlewareConfig = (
+export type MiddlewareConfigActions = (
 	bind: (configure: (context: IMiddleware) => Promise<any>) => void,
 	update: (configure: (context: IMiddleware) => Promise<any>) => void
 ) => void;
 
 export default class Middleware {
 	private middlewareConfigContainer: { [key: string]: MiddlewareObject[] } = {};
+	bouer: Bouer;
 
-	constructor() {
+	constructor(bouer: Bouer) {
+		this.bouer = bouer;
+
 		IoC.Register(this);
 	}
 
@@ -45,16 +49,10 @@ export default class Middleware {
 				runnable.action((config, cbs) => {
 					Promise.resolve(middlewareAction(config, () => {
 						isNext = true;
-					})).then(value => {
-						if (isNext) return;
-						cbs.success(value);
-					}).catch(error => {
-						if (isNext) return;
-						cbs.fail(error);
-					}).finally(() => {
-						if (isNext) return;
-						cbs.done();
-					});
+					}))
+						.then(value => isNext ? null : cbs.success(value))
+						.catch(error => isNext ? null : cbs.fail(error))
+						.finally(() => isNext ? null : cbs.done());
 				});
 			} else {
 				(runnable.default || (() => { }))();
@@ -67,13 +65,13 @@ export default class Middleware {
 		}
 	}
 
-	register = (directive: string, configureCallback: MiddlewareConfig) => {
+	register = (directive: string, actions: MiddlewareConfigActions) => {
 		if (!this.middlewareConfigContainer[directive])
 			this.middlewareConfigContainer[directive] = [];
 
 		const middleware: MiddlewareObject = {};
 
-		configureCallback(
+		actions(
 			bind => middleware.bind = bind,
 			update => middleware.update = update
 		);

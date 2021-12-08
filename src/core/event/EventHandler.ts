@@ -1,6 +1,7 @@
 import Bouer from "../../instance/Bouer";
 import { Constants } from "../../shared/helpers/Constants";
 import IoC from "../../shared/helpers/IoC";
+import Task from "../../shared/helpers/Task";
 import {
 	buildError,
 	connectNode,
@@ -8,7 +9,6 @@ import {
 	forEach,
 	isFunction,
 	isNull,
-	taskRunner,
 	toLower,
 	trim,
 	where
@@ -47,7 +47,7 @@ export default class EventHandler {
 
 	constructor(bouer: Bouer) {
 		this.bouer = bouer;
-		this.evaluator = IoC.Resolve('Evaluator')!;
+		this.evaluator = IoC.Resolve(this.bouer, Evaluator)!;
 
 		IoC.Register(this);
 		this.cleanup();
@@ -64,9 +64,10 @@ export default class EventHandler {
 		const nodeValue = trim(node.nodeValue ?? '');
 
 		const eventNameWithModifiers = nodeName.substr(Constants.on.length);
-		const modifiersList = eventNameWithModifiers.split('.');
-		const eventName = modifiersList[0];
-		modifiersList.shift();
+		let allModifiers = eventNameWithModifiers.split('.');
+		const eventName = allModifiers[0];
+		allModifiers.shift();
+		const modifierFunctions = [];
 
 		if (nodeValue === '')
 			return Logger.error("Expected an expression in the “" + nodeName + "” and got an <empty string>.");
@@ -76,12 +77,14 @@ export default class EventHandler {
 
 		const callback = (evt: CustomEvent | Event) => {
 			// Calling the modifiers
-			forEach(modifiersList, modifier => {
-				forEach(Object.keys(evt), key => {
-					let fnModifier;
-					if (fnModifier = (evt as any)[key] && isFunction(fnModifier) && toLower(key) === toLower(modifier))
-						fnModifier();
-				})
+			const availableModifiersFunction: any = {
+				'prevent': 'preventDefault',
+				'stop': 'stopPropagation'
+			};
+
+			forEach(allModifiers, modifier => {
+				const modifierFunctionName = availableModifiersFunction[modifier];
+				if ((evt as any)[modifierFunctionName]) (evt as any)[modifierFunctionName]();
 			});
 
 			const mArguments = [evt];
@@ -102,18 +105,21 @@ export default class EventHandler {
 			}
 		}
 
-		const modifiers: dynamic = {};
+		const modifiersObject: dynamic = {};
 		const addEventListenerOptions = ['capture', 'once', 'passive'];
-		forEach(modifiersList, md => {
+		forEach(allModifiers, md => {
 			md = md.toLocaleLowerCase();
-			if (addEventListenerOptions.indexOf(md) !== -1)
-				modifiers[md] = true;
+			if (addEventListenerOptions.indexOf(md) !== -1) {
+				modifiersObject[md] = true;
+			} else {
+				modifierFunctions.push(md);
+			}
 		});
 
 		if (!('on' + eventName in this.input))
-			this.on({ eventName, callback, modifiers, context, attachedNode: ownerElement });
+			this.on({ eventName, callback, modifiers: modifiersObject, context, attachedNode: ownerElement });
 		else
-			ownerElement.addEventListener(eventName, callback, modifiers);
+			ownerElement.addEventListener(eventName, callback, modifiersObject);
 	}
 
 	on(options: {
@@ -194,13 +200,13 @@ export default class EventHandler {
 	}
 
 	private cleanup() {
-		taskRunner(() => {
+		Task.run(() => {
 			forEach(Object.keys(this.$events), key => {
 				this.$events[key] = where(this.$events[key], event => {
 					if (!event.attachedNode) return true;
 					if (event.attachedNode.isConnected) return true;
 				});
 			});
-		}, 1000);
+		});
 	}
 }

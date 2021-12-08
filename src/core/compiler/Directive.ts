@@ -52,11 +52,13 @@ export default class Directive {
 		this.context = compilerContext;
 		this.bouer = compiler.bouer;
 		this.$custom = customDirective;
-		this.evaluator = IoC.Resolve('Evaluator')!;
-		this.delimiter = IoC.Resolve('DelimiterHandler')!;
+
+		this.evaluator = IoC.Resolve(this.bouer, Evaluator)!;
+		this.delimiter = IoC.Resolve(this.bouer, DelimiterHandler)!;
+		this.binder = IoC.Resolve(this.bouer, Binder)!;
+		this.eventHandler = IoC.Resolve(this.bouer, EventHandler)!;
+
 		this.comment = new CommentHandler(this.bouer);
-		this.binder = IoC.Resolve('Binder')!;
-		this.eventHandler = IoC.Resolve('EventHandler')!;
 	}
 
 	// Helper functions
@@ -70,7 +72,7 @@ export default class Directive {
 		"” and got “" + (node.nodeValue ?? '') + "”.");
 
 	// Directives
-	ignore(node: Element) {
+	skip(node: Element) {
 		node.nodeValue = 'true';
 	}
 
@@ -608,10 +610,13 @@ export default class Directive {
 		let dataKey = node.nodeName.split(':')[1];
 		if (dataKey) {
 			dataKey = dataKey.replace(/\[|\]/g, '');
-			DataStore.set('data', dataKey, inputData);
+			IoC.Resolve<DataStore>(this.bouer, DataStore)!.set('data', dataKey, inputData);
 		}
 
-		Reactive.transform(inputData);
+		Reactive.transform({
+			context: this.context,
+			inputObject: inputData
+		});
 		return this.compiler.compile({
 			data: inputData,
 			el: ownerElement,
@@ -647,7 +652,7 @@ export default class Directive {
 			.addEventListener('click', event => {
 				event.preventDefault();
 
-				IoC.Resolve<Routing>('Routing')!
+				IoC.Resolve<Routing>(this.bouer, Routing)!
 					.navigate(href.value);
 			}, false);
 	}
@@ -663,7 +668,7 @@ export default class Directive {
 			return Logger.error(this.errorMsgNodeValue(node));
 
 		ownerElement.removeAttribute(node.nodeName);
-		IoC.Resolve<ComponentHandler>('ComponentHandler')!
+		IoC.Resolve<ComponentHandler>(this.bouer, ComponentHandler)!
 			.prepare([
 				{
 					name: nodeValue,
@@ -706,7 +711,7 @@ export default class Directive {
 				.appendTo(ownerElement)
 				.build();
 
-			IoC.Resolve<ComponentHandler>('ComponentHandler')!
+			IoC.Resolve<ComponentHandler>(this.bouer, ComponentHandler)!
 				.order(componentElement, data);
 		})();
 	}
@@ -826,7 +831,7 @@ export default class Directive {
 			return true;
 		}
 
-		const middleware = IoC.Resolve<Middleware>('Middleware')!;
+		const middleware = IoC.Resolve<Middleware>(this.bouer, Middleware)!;
 		const requestEvent = subcribeEvent(Constants.builtInEvents.request);
 		const responseEvent = subcribeEvent(Constants.builtInEvents.response);
 		const failEvent = subcribeEvent(Constants.builtInEvents.fail);
@@ -839,7 +844,10 @@ export default class Directive {
 				if (!isValidResponse(response, expObject.type))
 					return;
 
-				Reactive.transform(response);
+				Reactive.transform({
+					context: this.context,
+					inputObject: response
+				});
 
 				responseEvent.emit({
 					response: response
@@ -855,7 +863,7 @@ export default class Directive {
 					return localDataStore.data = response.data;
 				}
 
-				if (dataKey) DataStore.set('req', dataKey, response);
+				if (dataKey) IoC.Resolve<DataStore>(this.bouer, DataStore)!.set('req', dataKey, response);
 
 				if (expObject.type === 'as') {
 					// Removing the: “(...)”  “,”  and getting only the variable
@@ -970,7 +978,7 @@ export default class Directive {
 			return Logger.error(this.errorMsgNodeValue(node));
 
 		ownerElement.removeAttribute(node.nodeName);
-		const dataStore = IoC.Resolve<DataStore>('DataStore')!;
+		const dataStore = IoC.Resolve<DataStore>(this.bouer, DataStore)!;
 		const mWait = dataStore.wait[nodeValue];
 
 		if (mWait) {
@@ -982,7 +990,10 @@ export default class Directive {
 			return forEach(mWait.nodes, nodeWaiting => {
 				this.compiler.compile({
 					el: nodeWaiting,
-					data: Reactive.transform(mWait.data),
+					data: Reactive.transform({
+						context: this.context,
+						inputObject: mWait.data
+					}),
 					context: this.context,
 				});
 			});

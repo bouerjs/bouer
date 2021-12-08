@@ -1,5 +1,4 @@
 import Bouer from "../../instance/Bouer";
-import IoC from "../../shared/helpers/IoC";
 import {
 	defineProperty,
 	forEach,
@@ -8,8 +7,7 @@ import {
 	isNull,
 	isObject,
 	mapper,
-	toArray,
-	transferProperty
+	toArray
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import dynamic from "../../types/dynamic";
@@ -25,20 +23,22 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 	propertyDescriptor: PropertyDescriptor | undefined;
 	watches: Array<Watch<TValue, TObject>> = [];
 	isComputed: boolean;
+	context: object;
 
 	computedGetter?: () => any
 	computedSetter?: (value: TValue) => void
 
-	constructor(options: { propertyName: string, sourceObject: TObject }) {
+	constructor(options: { propertyName: string, sourceObject: TObject, context: object }) {
 		this.propertyName = options.propertyName;
 		this.propertySource = options.sourceObject;
+		this.context = options.context;
 		// Setting the value of the property
 		this.propertyDescriptor = getDescriptor(this.propertySource, this.propertyName);
 
 		this.propertyValue = this.propertyDescriptor!.value as TValue;
 		this.isComputed = typeof this.propertyValue === 'function' && this.propertyValue.name === '$computed';
 		if (this.isComputed) {
-			const computedResult = (this.propertyValue as any).call(IoC.Resolve('Bouer'));
+			const computedResult = (this.propertyValue as any).call(this.context);
 
 			if ('get' in computedResult || isFunction(computedResult)) {
 				this.computedGetter = computedResult.get || computedResult;
@@ -54,6 +54,9 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 
 			(this.propertyValue as any) = undefined;
 		}
+
+		if (typeof this.propertyValue === 'function' && !this.isComputed)
+			this.propertyValue = this.propertyValue.bind(this.context);
 	}
 
 	get = () => {
@@ -75,7 +78,11 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 					this.propertyName + "” property."));
 
 			if (Array.isArray(value)) {
-				Reactive.transform(value, this);
+				Reactive.transform({
+					inputObject: value,
+					reactiveObj: this,
+					context: this.context
+				});
 				const propValueAsAny = this.propertyValue as any;
 
 				propValueAsAny.splice(0, propValueAsAny.length);
@@ -84,7 +91,10 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 				if ((value instanceof Node)) // If some html element
 					this.propertyValue = value;
 				else {
-					Reactive.transform(value);
+					Reactive.transform({
+						inputObject :value,
+						context: this.context
+					});
 					if (!isNull(this.propertyValue))
 						mapper(value, this.propertyValue);
 					else
@@ -109,7 +119,12 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 		return w;
 	}
 
-	static transform = <TObject>(inputObject: TObject, reactiveObj?: Reactive<any, any>) => {
+	static transform = <TObject>(options: {
+		context: object,
+		inputObject: TObject,
+		reactiveObj?: Reactive<any, any>,
+	}) => {
+		const context = options.context;
 		const executer = (inputObject: TObject, reactiveObj?: Reactive<any, any>, visiting?: any[], visited?: any[]) => {
 			if (Array.isArray(inputObject)) {
 				if (reactiveObj == null) {
@@ -137,7 +152,7 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 							case 'push': case 'unshift':
 								forEach(toArray(arguments), arg => {
 									if (!isObject(arg) && !Array.isArray(arg)) return;
-									Reactive.transform(arg);
+									executer(arg);
 								});
 						}
 
@@ -174,16 +189,17 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 
 				const reactive = new Reactive({
 					propertyName: key,
-					sourceObject: inputObject
+					sourceObject: inputObject,
+					context: context
 				});
 
 				defineProperty(inputObject, key, reactive);
 
 				if (isObject(propertyValue))
-					this.transform(propertyValue);
+					executer(propertyValue);
 				else if (Array.isArray(propertyValue)) {
-					this.transform(propertyValue, reactive); // Transform the array to a reactive one
-					forEach(propertyValue, (item: object) => this.transform(item));
+					executer(propertyValue as any, reactive); // Transform the array to a reactive one
+					forEach(propertyValue, (item: object) => executer(item as any));
 				}
 			});
 
@@ -193,21 +209,6 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 			return inputObject;
 		}
 
-		return executer(inputObject, reactiveObj, [], []);
-	}
-
-	static set(inputData: object, targetObject?: object) {
-		if (!isObject(inputData))
-			return Logger.error('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".');
-
-		if (isObject(targetObject) && targetObject == null)
-			return Logger.error('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".');
-
-		// Transforming the input
-		Reactive.transform(inputData);
-
-		// Transfering the properties
-		forEach(Object.keys(inputData), key => transferProperty(targetObject, inputData, key));
-		return targetObject;
+		return executer(options.inputObject, options.reactiveObj, [], []);
 	}
 }

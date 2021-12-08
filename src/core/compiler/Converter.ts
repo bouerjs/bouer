@@ -21,8 +21,9 @@ export default class Converter {
   bouer: Bouer;
 
   constructor(bouer: Bouer) {
+		this.bouer = bouer;
+
     IoC.Register(this);
-    this.bouer = bouer;
   }
 
   htmlToJsObj(input: any,

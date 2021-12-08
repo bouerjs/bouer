@@ -1,4 +1,13 @@
-import dynamic from "../../types/dynamic";
+import Bouer from "../../instance/Bouer";
+
+type Instance = {
+	app: Bouer,
+	ClassInstance: any
+}
+
+type Container = {
+	[appId: number]: { [name: string]: Instance }
+};
 
 /**
  * Store instances of classes to provide any where of
@@ -6,32 +15,47 @@ import dynamic from "../../types/dynamic";
  * @see https://www.tutorialsteacher.com/ioc/ioc-container
  */
 export default class IoC {
-  private static container: dynamic = {}
+	private static identifierController: number = 1;
+	private static container: Container = {};
 
-  /**
-   * Register an instance into the DI container
-   * @param instance the instance to be store
-   */
-  static Register<T>(instance: T) {
-    this.container[
-      (instance as any).constructor.name
-    ] = instance;
-  }
+	/**
+	 * Register an instance into the DI container
+	 * @param obj the instance to be store
+	 */
+	static Register<T>(obj: T) {
+		const objAsAny = (obj as any);
 
-  /**
-   * Resolve and Retrieve the instance registered
-   * @param key the name of the class registered
-   * @returns the instance of the class
-   */
-  static Resolve<T>(key: string) {
-    return this.container[key] as (T | null);
-  }
+		if (!this.container[objAsAny.bouer.__id__])
+			this.container[objAsAny.bouer.__id__] = {};
 
-  /**
-   * Destroy an instance registered
-   * @param key the name of the class registered
-   */
-  static Dispose(key: string) {
-    delete this.container[key];
-  }
+		this.container[objAsAny.bouer.__id__][objAsAny.constructor.name] = {
+			app: objAsAny.bouer,
+			ClassInstance: obj
+		};
+	}
+
+	/**
+	 * Resolve and Retrieve the instance registered
+	 * @param app the application
+	 * @param $class the class registered
+	 * @returns the instance of the class
+	 */
+	static Resolve<T>(app: Bouer, $class: Function): T | null {
+		const appContainer = this.container[app.__id__];
+		if (!appContainer) throw new Error("Application already disposed.");
+		const mContainer = appContainer[$class.name];
+		return mContainer.ClassInstance;
+	}
+
+	/**
+	 * Destroy an instance registered
+	 * @param key the name of the class registered
+	 */
+	static Dispose(bouer: Bouer) {
+		delete this.container[bouer.__id__];
+	}
+
+	static GetId(): number {
+		return IoC.identifierController++;
+	}
 }

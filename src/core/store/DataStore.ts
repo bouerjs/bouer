@@ -1,3 +1,4 @@
+import Bouer from "../../instance/Bouer";
 import IoC from "../../shared/helpers/IoC";
 import Logger from "../../shared/logger/Logger";
 import dynamic from "../../types/dynamic";
@@ -6,21 +7,26 @@ export default class DataStore {
   wait: { [key: string]: { nodes: Element[], data?: object } } = {};
   data: dynamic = {};
   req: dynamic = {};
+	bouer: Bouer;
 
-  constructor() { IoC.Register(this); }
+  constructor(bouer: Bouer) {
+		this.bouer = bouer;
 
-  static set<TKey extends keyof DataStore>(key: TKey, dataKey: string, data: object) {
+		IoC.Register(this);
+	}
+
+  set<TKey extends keyof DataStore>(key: TKey, dataKey: string, data: object) {
     if (key === 'wait') return Logger.warn("Only “get” is allowed for type of data");
-    IoC.Resolve<any>(DataStore.name)[key][dataKey] = data;
+    IoC.Resolve<any>(this.bouer, DataStore)[key][dataKey] = data;
   }
 
-  static get<TKey extends keyof DataStore>(key: TKey, dataKey: string, once?: boolean) {
-    const result = IoC.Resolve<any>(DataStore.name)[key][dataKey];
-    if (once === true) DataStore.unset(key, dataKey);
+  get<TKey extends keyof DataStore>(key: TKey, dataKey: string, once?: boolean) {
+    const result = IoC.Resolve<any>(this.bouer, DataStore)[key][dataKey];
+    if (once === true) this.unset(key, dataKey);
     return result;
   }
 
-  static unset<TKey extends keyof DataStore>(key: TKey, dataKey: string) {
-    delete IoC.Resolve<any>(DataStore.name)[key][dataKey]
+  unset<TKey extends keyof DataStore>(key: TKey, dataKey: string) {
+    delete IoC.Resolve<any>(this.bouer, DataStore)[key][dataKey]
   }
 }

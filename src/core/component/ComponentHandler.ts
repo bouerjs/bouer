@@ -1,7 +1,7 @@
 import Bouer from "../../instance/Bouer";
 import Extend from "../../shared/helpers/Extend";
 import IoC from "../../shared/helpers/IoC";
-import Observer from "../../shared/helpers/Observer";
+import Task from "../../shared/helpers/Task";
 import {
 	anchor,
 	buildError,
@@ -39,16 +39,12 @@ export default class ComponentHandler {
 	// Avoids to add multiple styles of the same component if it's already in use
 	stylesController: { [key: string]: { styles: Element[], elements: Element[] }, } = {};
 
-	constructor(bouer: Bouer, appOptions: IBouer) {
-		IoC.Register(this)!;
-
+	constructor(bouer: Bouer) {
 		this.bouer = bouer;
-		this.delimiter = IoC.Resolve('DelimiterHandler')!;
-		this.eventHandler = IoC.Resolve('EventHandler')!;
+		this.delimiter = IoC.Resolve(this.bouer, DelimiterHandler)!;
+		this.eventHandler = IoC.Resolve(this.bouer, EventHandler)!;
 
-		if (appOptions.components) {
-			this.prepare(appOptions.components);
-		}
+		IoC.Register(this);
 	}
 
 	check(nodeName: string) {
@@ -125,14 +121,11 @@ export default class ComponentHandler {
 					component.route!);
 			}
 
-			IoC.Resolve<Routing>('Routing')!.configure(this.components[component.name!] = component);
+			IoC.Resolve<Routing>(this.bouer, Routing)!
+				.configure(this.components[component.name!] = component);
 
-			const preload = (this.bouer.config || {}).preload ?? true;
-			if (!preload) return;
-
-			if (!isNull(component.path)) {
-
-				// isBuitInClass
+			const getContent = (path?: string) => {
+				if (!path) return;
 
 				this.request(component.path!, {
 					success: content => {
@@ -143,6 +136,17 @@ export default class ComponentHandler {
 					}
 				});
 			}
+
+			if (!isNull(component.prefetch)) {
+				if (component.prefetch === true)
+					return getContent(component.path);
+				return;
+			}
+
+			const prefetch = (this.bouer.config || {}).prefetch ?? true;
+			if (!prefetch) return;
+
+			return getContent(component.path);
 		});
 	}
 
@@ -168,13 +172,13 @@ export default class ComponentHandler {
 				return;
 			}
 
-			const requestedEvent = this.addEvent('requested', componentElement, component, this.bouer);
+			const requestedEvent = this.addComponentEventAndEmitGlobalEvent('requested', componentElement, component, this.bouer);
 			if (requestedEvent) requestedEvent.emit();
 			// Make or Add request
 			this.request(component.path!, {
 				success: content => {
 					const newComponent = (component instanceof Component) ? component : new Component(component);
-					newComponent.template = content;
+					icomponent.template = newComponent.template = content;
 					newComponent.bouer = this.bouer;
 
 					this.insert(componentElement, newComponent, data, callback);
@@ -211,7 +215,7 @@ export default class ComponentHandler {
 				return restrictionResult;
 			});
 
-			const blockedEvent = this.addEvent('blocked', componentElement, component, this.bouer);
+			const blockedEvent = this.addComponentEventAndEmitGlobalEvent('blocked', componentElement, component, this.bouer);
 			const emitter = () => blockedEvent.emit({
 				detail: {
 					component: component.name,
@@ -243,9 +247,17 @@ export default class ComponentHandler {
 	}
 
 	/** Subscribe the hooks of the instance */
-	addEvent(eventName: string, element: Element, component: any, context?: object) {
+	addComponentEventAndEmitGlobalEvent(eventName: string, element: Element, component: any, context?: object) {
 		const callback = component[eventName];
-		if (typeof callback !== 'function') return { emit: (() => { }) }
+		this.eventHandler.emit({
+			eventName: 'component:' + eventName,
+			init: {
+				detail: { component: component }
+			}
+		});
+
+		if (typeof callback !== 'function')
+			return { emit: (() => { }) }
 
 		const emitter = this.eventHandler.on({
 			eventName,
@@ -254,6 +266,7 @@ export default class ComponentHandler {
 			modifiers: { once: true },
 			context: context || component
 		}).emit;
+
 		return {
 			emit: (init?: CustomEventInit) => emitter({
 				init: init
@@ -299,7 +312,7 @@ export default class ComponentHandler {
 
 				component.el = htmlSnippet.children[0];
 
-				this.addEvent('created', component.el!, component, this.bouer);
+				this.addComponentEventAndEmitGlobalEvent('created', component.el!, component, this.bouer);
 				component.emit('created');
 			});
 		}
@@ -337,7 +350,7 @@ export default class ComponentHandler {
 					inputData = Extend.obj(this.bouer.data);
 				else {
 					// Other wise, compiles the object provided
-					const mInputData = IoC.Resolve<Evaluator>('Evaluator')!
+					const mInputData = IoC.Resolve<Evaluator>(this.bouer, Evaluator)!
 						.exec({
 							data: mData,
 							expression: attr.value,
@@ -356,7 +369,10 @@ export default class ComponentHandler {
 				}
 
 				reactiveEvent.off();
-				Reactive.transform(inputData);
+				Reactive.transform({
+					context: component,
+					inputObject: inputData
+				});
 
 				return forEach(Object.keys(inputData), key => {
 					transferProperty(component.data, inputData, key);
@@ -370,7 +386,7 @@ export default class ComponentHandler {
 		if (isFunction(initializer))
 			initializer.call(component);
 
-		this.addEvent('beforeMount', component.el!, component)
+		this.addComponentEventAndEmitGlobalEvent('beforeMount', component.el!, component)
 		component.emit('beforeMount');
 
 		container.replaceChild(rootElement, componentElement);
@@ -389,15 +405,19 @@ export default class ComponentHandler {
 				const rule = cssRules.item(i);
 				if (!rule) continue;
 				const mRule = rule as dynamic;
-				const selector = (mRule.selectorText as string).substr(1);
-				const separation = rootClassList[selector] ? "" : " ";
-				const uniqueIdentifier = "." + styleId;
-				const selectorTextSplitted = mRule.selectorText.split(' ');
 
-				if (selectorTextSplitted[0] === toLower(rootElement.tagName))
-					selectorTextSplitted.shift();
+				if (mRule.selectorText) {
+					const selector = (mRule.selectorText as string).substr(1);
+					const separation = rootClassList[selector] ? "" : " ";
+					const uniqueIdentifier = "." + styleId;
+					const selectorTextSplitted = mRule.selectorText.split(' ');
 
-				mRule.selectorText = uniqueIdentifier + separation + selectorTextSplitted.join(' ');
+					if (selectorTextSplitted[0] === toLower(rootElement.tagName))
+						selectorTextSplitted.shift();
+
+					mRule.selectorText = uniqueIdentifier + separation + selectorTextSplitted.join(' ');
+				}
+
 				if (isStyle) rules.push(mRule.cssText);
 			}
 			if (isStyle) style.innerText = rules.join(' ');
@@ -451,34 +471,37 @@ export default class ComponentHandler {
 		const compile = (scriptContent?: string) => {
 			try {
 				// Executing the mixed scripts
-				IoC.Resolve<Evaluator>('Evaluator')!
+				IoC.Resolve<Evaluator>(this.bouer, Evaluator)!
 					.execRaw((scriptContent || ''), component);
 
-				this.addEvent('mounted', component.el!, component);
+				this.addComponentEventAndEmitGlobalEvent('mounted', component.el!, component);
 				component.emit('mounted');
 
 				// TODO: Something between this two events
 
-				this.addEvent('beforeLoad', component.el!, component)
+				this.addComponentEventAndEmitGlobalEvent('beforeLoad', component.el!, component)
 				component.emit('beforeLoad');
 
-				IoC.Resolve<Compiler>('Compiler')!
+				IoC.Resolve<Compiler>(this.bouer, Compiler)!
 					.compile({
-						data: Reactive.transform(component.data),
+						data: Reactive.transform({
+							context: component,
+							inputObject: component.data
+						}),
 						el: rootElement,
 						componentSlot: elementSlots,
 						context: component,
 						onDone: () => {
-							this.addEvent('loaded', component.el!, component);
+							this.addComponentEventAndEmitGlobalEvent('loaded', component.el!, component);
 							component.emit('loaded');
 						}
 					});
 
-				Observer.observe(container, options => {
-					const { mutation, element } = options;
-					if (element.isConnected) return;
+				Task.run(stopTask => {
+					if (component.el!.isConnected) return;
+
 					component.destroy();
-					mutation.disconnect();
+					stopTask();
 
 					const stylesController = this.stylesController[component.name];
 					if (!stylesController)
@@ -552,7 +575,7 @@ export default class ComponentHandler {
 					"<" + $name + "></" + $name + "> component, remove it in order to be compiled."));
 				Logger.log(error);
 
-				this.addEvent('failed', componentElement, component, this.bouer)
+				this.addComponentEventAndEmitGlobalEvent('failed', componentElement, component, this.bouer)
 					.emit();
 			});
 		});

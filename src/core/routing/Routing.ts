@@ -17,10 +17,10 @@ export default class Routing {
 	base: string | null = null;
 
 	constructor(bouer: Bouer) {
-		IoC.Register(this);
-
 		this.bouer = bouer;
 		this.routeView = this.bouer.el.querySelector('[route-view]');
+
+		IoC.Register(this);
 	}
 
 	init() {
@@ -87,7 +87,7 @@ export default class Routing {
 			this.pushState(resolver.href, DOM.title);
 
 		const routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route!);
-		IoC.Resolve<ComponentHandler>('ComponentHandler')!
+		IoC.Resolve<ComponentHandler>(this.bouer, ComponentHandler)!
 			.order(componentElement, {}, component => {
 				component.on('loaded', () => {
 					this.markActiveAnchors(routeToSet);
@@ -114,7 +114,7 @@ export default class Routing {
 		}
 
 		// Search for the right page
-		return IoC.Resolve<ComponentHandler>('ComponentHandler')!
+		return IoC.Resolve<ComponentHandler>(this.bouer, ComponentHandler)!
 			.find(component => {
 				if (!component.route) return false;
 
@@ -132,6 +132,9 @@ export default class Routing {
 		const anchors = this.bouer.el.querySelectorAll('a');
 
 		forEach(this.activeAnchors, anchor =>
+			anchor.classList.remove(className));
+
+		forEach([].slice.call(this.bouer.el.querySelectorAll('a.' + className)), (anchor:HTMLAnchorElement) =>
 			anchor.classList.remove(className));
 
 		this.activeAnchors = [];

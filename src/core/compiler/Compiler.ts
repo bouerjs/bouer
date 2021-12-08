@@ -31,21 +31,21 @@ export default class Compiler {
   }
 
   constructor(bouer: Bouer, appOptions: IBouer) {
-    IoC.Register(this);
-
-    this.bouer = bouer;
+		this.bouer = bouer;
     this.bouerOptions = appOptions;
 
-    this.binder = IoC.Resolve('Binder')!;
-    this.delimiter = IoC.Resolve('DelimiterHandler')!;
-    this.eventHandler = IoC.Resolve('EventHandler')!;
-    this.component = IoC.Resolve('ComponentHandler')!;
+    this.binder = IoC.Resolve(this.bouer, Binder)!;
+    this.delimiter = IoC.Resolve(this.bouer, DelimiterHandler)!;
+    this.eventHandler = IoC.Resolve(this.bouer, EventHandler)!;
+    this.component = IoC.Resolve(this.bouer, ComponentHandler)!;
+
+    IoC.Register(this);
   }
 
   compile(options: {
     /** The element that wil be compiled */
     el: Element,
-    /** The data that will be injected in the compilation */
+    /** The data that should be injected in the compilation */
     data?: object,
     /**
      * In case of components having content inside of the definition,
@@ -53,7 +53,7 @@ export default class Compiler {
      * in `componentSlot` property in order to be replaced on the compilation.
      */
     componentSlot?: Element
-    /** The function that will be fired when the compilation is done */
+    /** The function that should be fired when the compilation is done */
     onDone?: (element: Element, data?: object) => void,
 
     /** The context of this compilation process */
@@ -76,7 +76,7 @@ export default class Compiler {
       if (node instanceof Element) {
         // e-skip" directive
         if (Constants.skip in node.attributes)
-          return directive.ignore(node);
+          return directive.skip(node);
 
         if (node.localName === Constants.slot && options.componentSlot) {
           const insertSlot = (slot: Element, reference: Node) => {
