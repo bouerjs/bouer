@@ -2,6 +2,7 @@ import { Constants } from "../../shared/helpers/Constants";
 import IoC from "../../shared/helpers/IoC";
 import {
 	createEl,
+	findAttribute,
 	forEach, isFunction, isNull,
 	isObject,
 	toArray,
@@ -21,6 +22,7 @@ import Bouer from "../../instance/Bouer";
 import Watch from "./Watch";
 import Middleware from "../middleware/Middleware";
 import Task from "../../shared/helpers/Task";
+
 export interface BinderConfig {
 	node: Node,
 	data: dynamic,
@@ -42,11 +44,12 @@ export default class Binder {
 		'text': 'value',
 		'number': 'valueAsNumber',
 		'checkbox': 'checked',
-		'radio': 'checked',
+		'radio': 'value'
 	}
+
 	private BindingDirection = {
-		fromInputToData: 'to-data-property',
-		fromDataToInput: 'to-input'
+		fromInputToData: 'fromInputToData',
+		fromDataToInput: 'fromDataToInput'
 	}
 
 	constructor(bouer: Bouer) {
@@ -69,9 +72,8 @@ export default class Binder {
 		const originalValue = trim(node.nodeValue ?? '');
 		const originalName = node.nodeName;
 		const ownerElement = (node as any).ownerElement || node.parentNode;
-		const onUpdate = options.onUpdate || ((v: any, n: Node) => { });
-
 		const middleware = IoC.Resolve<Middleware>(this.bouer, Middleware)!;
+		const onUpdate = options.onUpdate || ((v: any, n: Node) => { });
 
 		// Clousure cache property settings
 		const propertyBindConfig: BinderConfig = {
@@ -84,7 +86,7 @@ export default class Binder {
 			value: ''
 		};
 
-		const $middleware = (type: 'bind' | 'update') => {
+		const $runDirectiveMiddlewares = (type: 'bind' | 'update') => {
 			middleware.run(originalName, {
 				type: type,
 				action: middleware => {
@@ -103,128 +105,143 @@ export default class Binder {
 		// Two-Way Data Binding: e-bind:[?]="..."
 		if (originalName.substr(0, Constants.bind.length) === Constants.bind) {
 			let propertyNameToBind = '';
-			if (Constants.bind === originalName) {
-				const key = ownerElement.type || ownerElement.localName;
-				propertyNameToBind = this.DEFAULT_BINDER_PROPERTIES[key] || 'value';
-			} else {
+			const binderTarget = ownerElement.type || ownerElement.localName;
+
+			if (Constants.bind === originalName)
+				propertyNameToBind = this.DEFAULT_BINDER_PROPERTIES[binderTarget] || 'value';
+			else
 				propertyNameToBind = originalName.split(':')[1]; // e-bind:value -> value
-			}
 
-			const isSelect = (ownerElement instanceof HTMLSelectElement);
+			const isSelect = ownerElement instanceof HTMLSelectElement;
 			const isSelectMultiple = isSelect && ownerElement.multiple === true;
-			const bindConfig = originalValue.split('|').map(x => trim(x));
-			const bindProperty = bindConfig[0];
+			const modelAttribute = findAttribute(ownerElement, [':value'], true);
+			const dataBindModel: any = modelAttribute ? modelAttribute.value :  "\""+ ownerElement.value +"\"";
+			const dataBindProperty = trim(originalValue);
+
 			let boundPropertyValue: any;
-			let bindModelValue: any;
-			let bindModel: any;
+			let boundModelValue: any;
 
-			const callback = (direction: string, value: any,) => {
-				if (!(bindModel = bindConfig[1])) {
-					const attrValue = trim(ownerElement.getAttribute('value'))
-					if (attrValue) bindModel = "'" + attrValue + "'";
-				}
-
-				if (isSelect && !isSelectMultiple && Array.isArray(boundPropertyValue) && !bindModel) {
+			const callback = (direction: string, value: any) => {
+				if (isSelect && !isSelectMultiple && Array.isArray(boundPropertyValue) && !dataBindModel) {
 					return Logger.error("Since it's a <select> array binding, it expects the “multiple” attribute in" +
-						" order to bind the multi values.");
+						" order to bind the multiple values.");
 				}
 
 				// Array Binding
-				if (!isSelectMultiple && (Array.isArray(boundPropertyValue) && !bindModel)) {
+				if (!isSelectMultiple && (Array.isArray(boundPropertyValue) && !dataBindModel)) {
 					return Logger.error("Since it's an array binding it expects a model but it has not been defined" +
-						", provide a model as it follows " +
-						originalName + "=\"" + bindProperty + " | Model\" or value=\"String-Model\".");
+						", provide a model as it follows: value=\"String-Model\" or :value=\"Object-Model\".");
 				}
 
-				switch (direction) {
-					case this.BindingDirection.fromDataToInput: {
-						if (Array.isArray(boundPropertyValue)) {
-							// select-multiple handling
-							if (isSelectMultiple) {
-								return forEach(toArray(ownerElement.options), (option: HTMLOptionElement) => {
-									option.selected = boundPropertyValue.indexOf(trim(option.value)) !== -1;
-								});
-							}
+				const $set: { [key: string]: Function } = {
+					fromDataToInput: () => {
+						// Normal Property Set
+						if (!Array.isArray(boundPropertyValue)) {
+							// In case of radio button we need to check if the value is the same to check it
+							if (binderTarget === 'radio')
+								return ownerElement.checked = ownerElement[propertyNameToBind] == value;
 
-							// checkboxes, radio, etc
-							if (boundPropertyValue.indexOf(bindModelValue) === -1) {
-								switch (typeof ownerElement[propertyNameToBind]) {
-									case 'boolean': ownerElement[propertyNameToBind] = false; break;
-									case 'number': ownerElement[propertyNameToBind] = 0; break;
-									default: ownerElement[propertyNameToBind] = ""; break;
-								}
-							}
-
-							return;
+							// Default Binding
+							return ownerElement[propertyNameToBind] = (isObject(value) ? toStr(value) : (isNull(value) ? '' : value));
 						}
 
-						// Default Binding
-						return ownerElement[propertyNameToBind] = (isObject(value) ? toStr(value) : (isNull(value) ? '' : value));
-					}
-					case this.BindingDirection.fromInputToData: {
-						if (Array.isArray(boundPropertyValue)) {
-							// select-multiple handling
-							if (isSelectMultiple) {
-								const optionCollection: string[] = [];
-								forEach(toArray(ownerElement.options), (option: HTMLOptionElement) => {
-									if (option.selected === true)
-										optionCollection.push(trim(option.value));
-								});
+						// Array Set
 
-								boundPropertyValue.splice(0, boundPropertyValue.length);
-								return boundPropertyValue.push.apply(boundPropertyValue, optionCollection);
-							}
+						boundModelValue = boundModelValue || this.evaluator.exec({
+							data: data,
+							expression: dataBindModel,
+							context: context
+						});
 
-							bindModelValue = bindModelValue || this.evaluator.exec({
-								data: data,
-								expression: bindModel,
-								context: context
+						// select-multiple handling
+						if (isSelectMultiple) {
+							return forEach(toArray(ownerElement.options), (option: HTMLOptionElement) => {
+								option.selected = boundPropertyValue.indexOf(trim(option.value)) !== -1;
 							});
-							if (value)
-								boundPropertyValue.push(bindModelValue);
-							else
-								boundPropertyValue.splice(boundPropertyValue.indexOf(bindModelValue), 1);
-							return;
 						}
 
-						// Default Binding
-						return data[bindProperty] = value;
+						// checkboxes, radio, etc
+						if (boundPropertyValue.indexOf(boundModelValue) === -1) {
+							switch (typeof ownerElement[propertyNameToBind]) {
+								case 'boolean': ownerElement[propertyNameToBind] = false; break;
+								case 'number': ownerElement[propertyNameToBind] = 0; break;
+								default: ownerElement[propertyNameToBind] = ""; break;
+							}
+						}
+					},
+					fromInputToData: () => {
+						// Normal Property Set
+						if (!Array.isArray(boundPropertyValue)) {
+							// Default Binding
+							return data[dataBindProperty] = value;
+						}
+
+						// Array Set
+
+						boundModelValue = boundModelValue || this.evaluator.exec({
+							data: data,
+							expression: dataBindModel,
+							context: context
+						});
+
+						// select-multiple handling
+						if (isSelectMultiple) {
+							const optionCollection: string[] = [];
+							forEach(toArray(ownerElement.options), (option: HTMLOptionElement) => {
+								if (option.selected === true)
+									optionCollection.push(trim(option.value));
+							});
+
+							boundPropertyValue.splice(0, boundPropertyValue.length);
+							return boundPropertyValue.push.apply(boundPropertyValue, optionCollection);
+						}
+
+						if (value)
+							boundPropertyValue.push(boundModelValue);
+						else
+							boundPropertyValue.splice(boundPropertyValue.indexOf(boundModelValue), 1);
 					}
 				}
+
+				return $set[direction]();
 			}
 
-			const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
-				this.binds.push(reactive.onChange(value => {
-					callback(this.BindingDirection.fromDataToInput, value)
-					onUpdate(value, node);
-					$middleware('update');
-				}, node));
+			ReactiveEvent.once('AfterGet', evt => {
+				// Adding the event on emittion
+				evt.onemit = reactive => {
+					this.binds.push(reactive.onChange(value => {
+						callback(this.BindingDirection.fromDataToInput, value);
+						onUpdate(value, node);
+						$runDirectiveMiddlewares('update');
+					}, node));
+				}
+
+				// calling the main event
+				boundPropertyValue = this.evaluator.exec({
+					data: data,
+					expression: dataBindProperty,
+					context: context
+				});
 			});
 
-			const result = boundPropertyValue = this.evaluator.exec({
-				data: data,
-				expression: bindProperty,
-				context: context
-			});
+			callback(this.BindingDirection.fromDataToInput, boundPropertyValue);
 
-			reactiveEvent.off();
-
-			callback(this.BindingDirection.fromDataToInput, result);
-
-			const listeners = [toLower(ownerElement.nodeName), 'propertychange', 'change'];
-			const callbackEvent = () => {
-				callback(this.BindingDirection.fromInputToData, ownerElement[propertyNameToBind]);
-			};
+			const listeners = ['input','propertychange','change'];
+			if (!listeners.includes(ownerElement.localName))
+				listeners.push(ownerElement.localName);
 
 			// Applying the events
 			forEach(listeners, listener => {
 				if (listener === 'change' && ownerElement.localName !== 'select') return;
-				ownerElement.addEventListener(listener, callbackEvent, false);
+
+				ownerElement.addEventListener(listener, () => {
+					callback(this.BindingDirection.fromInputToData, ownerElement[propertyNameToBind]);
+				}, false);
 			});
 
 			// Removing the e-bind attr
 			ownerElement.removeAttribute(node.nodeName);
-			$middleware('bind');
+			$runDirectiveMiddlewares('bind');
 			return propertyBindConfig; // Stop Two-Way Data Binding Process
 		}
 
@@ -288,14 +305,14 @@ export default class Binder {
 				this.binds.push(reactive.onChange(value => {
 					setter();
 					onUpdate(value, node);
-					$middleware('update');
+					$runDirectiveMiddlewares('update');
 				}, node));
 			}
 			setter();
 		});
 
 		propertyBindConfig.node = nodeToBind;
-		$middleware('bind');
+		$runDirectiveMiddlewares('bind');
 		return propertyBindConfig;
 	}
 
