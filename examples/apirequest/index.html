@@ -7,19 +7,35 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Api Request</title>
 	<link rel="stylesheet" href="../shared.css">
+	<style>
+		nav {
+			display: flex;
+		}
+
+		nav input {
+			max-width: 60px;
+		}
+	</style>
 </head>
 
 <body>
 	<div id="app">
 		<div class="center">
+			<nav class="navigator">
+				<button class="prev" title="Show previous info: Page {{ start == 0 ? 0 : start - 1 }}"
+								e-disabled="{ 'true' : start === 0 }"
+								on:click="prev">Prev</button>
+				<input class="qty" type="number" e-bind="limit" title="Page Size (Number of items)" />
+				<input class="page" type="number" e-bind="start" title="Current Page" />
+				<button class="next" title="Show next info: Page {{ start + 1 }}"
+								on:click="next">Next</button>
+			</nav>
+
+			<div>Status: {{ requestStatus }} </div>
 
 			<ul>
-				<li e-req:[users-data]="item of users?_start={{ start }}&_limit={{ limit }}"
-						on:request="requested"
-						on:response="responded"
-						on:fail="failed"
-						on:done="done"
-						e-content="{{ item.name }}">
+				<li e-req="user of users?_start={{ start }}&_limit={{ limit }}" on:request="requested"
+					on:response="responded" on:fail="failed" on:done="done" e-content="{{ user.name }}">
 					Loading...
 				</li>
 			</ul>
@@ -37,18 +53,36 @@
 
 				start: 0,
 				limit: 5,
+				requestStatus: '',
 
 				// Methods
+				next: function () {
+					this.data.start++;
+				},
+				prev: function () {
+					if (this.data.start === 0) return;
+					this.data.start--;
+				},
+
 				requested: function (evt) {
+					this.data.requestStatus = 'Requesting to Server...';
 					console.log(evt);
 				},
 				responded: function (evt) {
+					this.data.requestStatus = 'Server Responded...';
 					console.log(evt);
 				},
 				failed: function (evt) {
+					this.data.requestStatus = 'Request Failed...';
 					console.log(evt);
 				},
 				done: function (evt) {
+
+					var _this = this;
+					setTimeout(function () {
+						_this.data.requestStatus = 'Completed';
+					}, 2000);
+
 					console.log(evt);
 				},
 			},
