@@ -25,11 +25,21 @@ Let's learn more about **Bouer**, checkout our [website](https://bouerjs.github.
 
 ## Contributing
 
-1. Fork it
-2. Create your feature branch (`git checkout -b my-new-feature`)
-3. Commit your changes (`git commit -am "Add some feature"`)
-4. Push to the branch (`git push origin my-new-feature`)
-5. Create new Pull Request
+```shell
+# cloning the repository
+$ git clone https://github.com/bouerjs/bouer.git
+
+# installing all the dependencies for development
+$ npm install
+
+# running the server
+$ npm run dev
+```
+
+1. Create your feature branch (`git checkout -b my-new-feature`)
+2. Commit your changes (`git commit -am "Add some feature"`)
+3. Push to the branch (`git push origin my-new-feature`)
+4. Create new Pull Request
 
 For major changes, please open an issue first to discuss what you would like to change.
 
