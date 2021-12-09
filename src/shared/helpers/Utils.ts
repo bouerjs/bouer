@@ -157,7 +157,7 @@ export function toLower(str: string) {
 export function toStr(input: any) {
 	if (isPrimitive(input)) {
 		return String(input);
-	} else if (isObject(input)) {
+	} else if (isObject(input) || Array.isArray(input)) {
 		return JSON.stringify(input);
 	} else if (isFunction(input.toString)) {
 		return input.toString();
