@@ -35,6 +35,7 @@ export default class Bouer implements IBouer {
 	globalData: object;
 	config?: IBouerConfig;
 	dependencies: dynamic = {};
+	isDestroyed: boolean = false;
 	__id__: number = IoC.GetId();
 
 	/** Data Exposition and Injection handler*/
@@ -323,9 +324,8 @@ export default class Bouer implements IBouer {
 			})
 		});
 
-		let isDestroyed = false;
 		GLOBAL.addEventListener('beforeunload', () => {
-			if (isDestroyed) return stop();
+			if (this.isDestroyed) return;
 
 			eventHandler.emit({
 				eventName: 'beforeDestroy',
@@ -333,11 +333,11 @@ export default class Bouer implements IBouer {
 			});
 
 			this.destroy();
-			isDestroyed = true;
+			this.isDestroyed = true;
 		}, { once: true });
 
 		Task.run(stopTask => {
-			if (isDestroyed) return stopTask();
+			if (this.isDestroyed) return stopTask();
 			if (this.el.isConnected) return;
 
 			eventHandler.emit({
@@ -347,7 +347,7 @@ export default class Bouer implements IBouer {
 
 			this.destroy();
 			stopTask();
-			isDestroyed = true;
+			this.isDestroyed = true;
 		});
 
 		// Initializing Routing
@@ -431,8 +431,9 @@ export default class Bouer implements IBouer {
 	 * @param watchableScope the function that should be called when the any reactive property change
 	 * @returns an object having all the watches and the method to destroy watches at once
 	 */
-	react(watchableScope: () => void) {
-		return IoC.Resolve<Binder>(this, Binder)!.onPropertyInScopeChange(watchableScope);
+	react(watchableScope: (app: Bouer) => void) {
+		return IoC.Resolve<Binder>(this, Binder)!
+				.onPropertyInScopeChange(watchableScope);
 	}
 
 	/**
@@ -510,15 +511,15 @@ export default class Bouer implements IBouer {
 		const immediate = arguments[2];
 
 		return function executable() {
-			const args = arguments;
+			const args: any = [].slice.call(arguments);
 			const later = function () {
 				timeout = null;
-				if (!immediate) callback.call(_this, args);
+				if (!immediate) callback.apply(_this, args);
 			};
 			const callNow = immediate && !timeout;
 			clearTimeout(timeout);
 			timeout = setTimeout(later, wait);
-			if (callNow) callback.call(_this, args);
+			if (callNow) callback.apply(_this, args);
 		};
 	}
 
@@ -548,9 +549,12 @@ export default class Bouer implements IBouer {
 
 	destroy() {
 		const el = this.el!;
-		this.emit('destroyed', {
-			element: this.el!
-		});
+		const destroyedEvents = IoC.Resolve<EventHandler>(this, EventHandler)!
+					.$events['destroyed'] || [];
+
+		this.emit('destroyed', { element: this.el! });
+		// Dispatching all the destroy events
+		forEach(destroyedEvents, es => es.emit({ once: true }));
 
 		if (el.tagName == 'body')
 			el.innerHTML = '';
