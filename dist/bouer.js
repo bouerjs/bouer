@@ -375,9 +375,9 @@ var IoC = /** @class */ (function () {
      * @returns the instance of the class
      */
     IoC.Resolve = function (app, $class) {
-        var appContainer = this.container[app.__id__];
-        if (!appContainer)
+        if (app.isDestroyed)
             throw new Error("Application already disposed.");
+        var appContainer = this.container[app.__id__];
         var mContainer = appContainer[$class.name];
         return mContainer.ClassInstance;
     };
@@ -3140,12 +3140,13 @@ var Binder = /** @class */ (function () {
         return mWatch;
     };
     Binder.prototype.onPropertyInScopeChange = function (watchable) {
+        var _this = this;
         var watches = [];
         ReactiveEvent.once('AfterGet', function (evt) {
             evt.onemit = function (reactive) {
-                watches.push(new Watch(reactive, function () { return watchable(); }));
+                watches.push(reactive.onChange(function () { return watchable.call(_this.bouer, _this.bouer); }));
             };
-            watchable();
+            watchable.call(_this.bouer, _this.bouer);
         });
         return watches;
     };
@@ -3372,6 +3373,7 @@ var Bouer = /** @class */ (function () {
         this.name = 'Bouer';
         this.version = '3.0.0';
         this.dependencies = {};
+        this.isDestroyed = false;
         this.__id__ = IoC.GetId();
         /**
          * Gets all the elemens having the `ref` attribute
@@ -3515,19 +3517,18 @@ var Bouer = /** @class */ (function () {
                 attachedNode: el
             }); }
         });
-        var isDestroyed = false;
         GLOBAL.addEventListener('beforeunload', function () {
-            if (isDestroyed)
-                return stop();
+            if (_this_1.isDestroyed)
+                return;
             eventHandler.emit({
                 eventName: 'beforeDestroy',
                 attachedNode: el
             });
             _this_1.destroy();
-            isDestroyed = true;
+            _this_1.isDestroyed = true;
         }, { once: true });
         Task.run(function (stopTask) {
-            if (isDestroyed)
+            if (_this_1.isDestroyed)
                 return stopTask();
             if (_this_1.el.isConnected)
                 return;
@@ -3537,7 +3538,7 @@ var Bouer = /** @class */ (function () {
             });
             _this_1.destroy();
             stopTask();
-            isDestroyed = true;
+            _this_1.isDestroyed = true;
         });
         // Initializing Routing
         routing.init();
@@ -3600,7 +3601,8 @@ var Bouer = /** @class */ (function () {
      * @returns an object having all the watches and the method to destroy watches at once
      */
     Bouer.prototype.react = function (watchableScope) {
-        return IoC.Resolve(this, Binder).onPropertyInScopeChange(watchableScope);
+        return IoC.Resolve(this, Binder)
+            .onPropertyInScopeChange(watchableScope);
     };
     /**
      * Add an Event Listener to the instance or to an object
@@ -3660,17 +3662,17 @@ var Bouer = /** @class */ (function () {
         wait = isNull(wait) ? 500 : wait;
         var immediate = arguments[2];
         return function executable() {
-            var args = arguments;
+            var args = [].slice.call(arguments);
             var later = function () {
                 timeout = null;
                 if (!immediate)
-                    callback.call(_this, args);
+                    callback.apply(_this, args);
             };
             var callNow = immediate && !timeout;
             clearTimeout(timeout);
             timeout = setTimeout(later, wait);
             if (callNow)
-                callback.call(_this, args);
+                callback.apply(_this, args);
         };
     };
     /**
@@ -3689,9 +3691,11 @@ var Bouer = /** @class */ (function () {
     };
     Bouer.prototype.destroy = function () {
         var el = this.el;
-        this.emit('destroyed', {
-            element: this.el
-        });
+        var destroyedEvents = IoC.Resolve(this, EventHandler)
+            .$events['destroyed'] || [];
+        this.emit('destroyed', { element: this.el });
+        // Dispatching all the destroy events
+        forEach(destroyedEvents, function (es) { return es.emit({ once: true }); });
         if (el.tagName == 'body')
             el.innerHTML = '';
         else if (DOM.contains(el))
