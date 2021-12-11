@@ -41,8 +41,8 @@ export default class IoC {
 	 * @returns the instance of the class
 	 */
 	static Resolve<T>(app: Bouer, $class: Function): T | null {
+		if (app.isDestroyed) throw new Error("Application already disposed.");
 		const appContainer = this.container[app.__id__];
-		if (!appContainer) throw new Error("Application already disposed.");
 		const mContainer = appContainer[$class.name];
 		return mContainer.ClassInstance;
 	}
