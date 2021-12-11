@@ -328,15 +328,15 @@ export default class Binder {
 		return mWatch;
 	}
 
-	onPropertyInScopeChange(watchable: () => void) {
+	onPropertyInScopeChange(watchable: (app: Bouer) => void) {
 		const watches: Watch<any, any>[] = [];
 
 		ReactiveEvent.once('AfterGet', evt => {
 			evt.onemit = reactive => {
-				watches.push(new Watch(reactive, () => watchable()));
+				watches.push(reactive.onChange(() => watchable.call(this.bouer, this.bouer)));
 			}
-			watchable();
-		})
+			watchable.call(this.bouer, this.bouer);
+		});
 
 		return watches;
 	}
