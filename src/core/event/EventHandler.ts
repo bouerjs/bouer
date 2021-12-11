@@ -9,7 +9,6 @@ import {
 	forEach,
 	isFunction,
 	isNull,
-	toLower,
 	trim,
 	where
 } from "../../shared/helpers/Utils";
@@ -40,10 +39,10 @@ export type EventSubscription = {
 }
 
 export default class EventHandler {
-	private bouer: Bouer;
-	private evaluator: Evaluator;
-	private $events: { [key: string]: EventSubscription[] } = {};
-	private input = createEl('input').build();
+	bouer: Bouer;
+	evaluator: Evaluator;
+	$events: { [key: string]: EventSubscription[] } = {};
+	input = createEl('input').build();
 
 	constructor(bouer: Bouer) {
 		this.bouer = bouer;
