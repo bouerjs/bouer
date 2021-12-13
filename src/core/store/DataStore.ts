@@ -1,7 +1,7 @@
+import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
 import IoC from "../../shared/helpers/IoC";
 import Logger from "../../shared/logger/Logger";
-import dynamic from "../../types/dynamic";
 
 export default class DataStore {
   wait: { [key: string]: { nodes: Element[], data?: object } } = {};

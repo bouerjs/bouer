@@ -1,6 +1,6 @@
 import Bouer from "../instance/Bouer";
-import { code, DOM, isNull } from "../shared/helpers/Utils";
 import IoC from "../shared/helpers/IoC";
+import { code, DOM } from "../shared/helpers/Utils";
 
 export default class CommentHandler {
   bouer: Bouer;

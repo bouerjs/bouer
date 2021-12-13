@@ -1,5 +1,8 @@
+import BinderConfig from "../../definitions/types/BinderConfig";
+import CustomDirective from "../../definitions/types/CustomDirective";
+import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
-import { Constants } from "../../shared/helpers/Constants";
+import Constants from "../../shared/helpers/Constants";
 import Extend from "../../shared/helpers/Extend";
 import IoC from "../../shared/helpers/IoC";
 import {
@@ -18,9 +21,7 @@ import {
 	urlCombine
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
-import customDirective from "../../types/customDirective";
-import dynamic from "../../types/dynamic";
-import Binder, { BinderConfig } from "../binder/Binder";
+import Binder from "../binder/Binder";
 import CommentHandler from "../CommentHandler";
 import ComponentHandler from "../component/ComponentHandler";
 import DelimiterHandler from "../DelimiterHandler";
@@ -41,11 +42,11 @@ export default class Directive {
 	comment: CommentHandler;
 	eventHandler: EventHandler;
 	delimiter: DelimiterHandler;
-	$custom: customDirective = {};
+	$custom: CustomDirective = {};
 	context: object;
 
 	constructor(
-		customDirective: customDirective,
+		customDirective: CustomDirective,
 		compiler: Compiler,
 		compilerContext: object) {
 		this.compiler = compiler;

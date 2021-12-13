@@ -7,6 +7,7 @@
 
 Object.defineProperty(exports, '__esModule', { value: true });
 
+// Quotes “"+  +"”
 function webRequest(url, options) {
     if (!url)
         return Promise.reject(new Error("Invalid Url"));
@@ -394,6 +395,17 @@ var IoC = /** @class */ (function () {
     return IoC;
 }());
 
+var Task = /** @class */ (function () {
+    function Task() {
+    }
+    Task.run = function (callback, milliseconds) {
+        var t_id = setInterval(function () {
+            callback(function () { return clearInterval(t_id); });
+        }, milliseconds || 1000);
+    };
+    return Task;
+}());
+
 function __spreadArray(to, from, pack) {
     if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
         if (ar || !(i in from)) {
@@ -488,17 +500,6 @@ var Extend = /** @class */ (function () {
         return out;
     };
     return Extend;
-}());
-
-var Task = /** @class */ (function () {
-    function Task() {
-    }
-    Task.run = function (callback, milliseconds) {
-        var t_id = setInterval(function () {
-            callback(function () { return clearInterval(t_id); });
-        }, milliseconds || 1000);
-    };
-    return Task;
 }());
 
 var DelimiterHandler = /** @class */ (function () {

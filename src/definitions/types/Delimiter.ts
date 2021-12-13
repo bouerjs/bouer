@@ -1,4 +1,4 @@
-type delimiter = {
+type Delimiter = {
   /** The name of the delimiter */
   name: string,
   /** The delimiter structure */
@@ -10,4 +10,4 @@ type delimiter = {
   },
   action?: (valueToSet: string, node: Node, data: object) => string
 }
-export default delimiter;
+export default Delimiter;

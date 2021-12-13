@@ -10,11 +10,11 @@ import {
 	toArray
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
-import dynamic from "../../types/dynamic";
-import watchCallback from "../../types/watchCallback";
+import WatchCallback from "../../definitions/types/WatchCallback";
 import Watch from "../binder/Watch";
 import Component from "../component/Component";
 import ReactiveEvent from "../event/ReactiveEvent";
+import dynamic from "../../definitions/types/Dynamic";
 
 export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 	propertyName: string;
@@ -113,7 +113,7 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 		forEach(this.watches, watch => watch.callback(this.propertyValue, oldPropertyValue));
 	}
 
-	onChange(callback: watchCallback, node?: Node): Watch<TValue, TObject> {
+	onChange(callback: WatchCallback, node?: Node): Watch<TValue, TObject> {
 		const w = new Watch(this, callback, { node: node });
 		this.watches.push(w);
 		return w;
@@ -150,7 +150,7 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 
 						switch (method) {
 							case 'push': case 'unshift':
-								forEach(toArray(arguments), arg => {
+								forEach(toArray(arguments), (arg: any) => {
 									if (!isObject(arg) && !Array.isArray(arg)) return;
 									executer(arg);
 								});

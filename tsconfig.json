@@ -8,11 +8,17 @@
     "lib": ["ES2015", "DOM"],
     "isolatedModules": true,
     "esModuleInterop": false,
+		"emitDeclarationOnly": true,
+    "outDir": "types",
+		"declaration": true
   },
-  "exclude": ["node_modules", "dist"],
+  "exclude": [
+		"node_modules",
+		"dist"
+	],
   "include": [
-    "./src",
-    "./test",
-    "./*"
+    "./src/core",
+    "./src/instance",
+    "./src/shared"
   ]
 }

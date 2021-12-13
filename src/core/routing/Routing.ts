@@ -1,8 +1,8 @@
+import IComponent from "../../definitions/interfaces/IComponent";
 import Bouer from "../../instance/Bouer";
 import IoC from "../../shared/helpers/IoC";
 import { createAnyEl, createEl, DOM, forEach, GLOBAL, isNull, toArray, trim, urlCombine, urlResolver } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
-import IComponent from "../../types/IComponent";
 import Component from "../component/Component";
 import ComponentHandler from "../component/ComponentHandler";
 

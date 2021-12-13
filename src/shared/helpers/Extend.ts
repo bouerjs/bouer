@@ -1,4 +1,4 @@
-import dynamic from "../../types/dynamic";
+import dynamic from "../../definitions/types/Dynamic";
 import { forEach, isNull, transferProperty } from "./Utils";
 
 export default class Extend {

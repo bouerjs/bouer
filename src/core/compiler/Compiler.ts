@@ -1,15 +1,15 @@
+import IBouer from "../../definitions/interfaces/IBouer";
+import DelimiterResponse from "../../definitions/types/DelimiterResponse";
 import Bouer from "../../instance/Bouer";
-import { Constants } from "../../shared/helpers/Constants";
+import Constants from "../../shared/helpers/Constants";
 import IoC from "../../shared/helpers/IoC";
 import {
-  connectNode, DOM,
-  forEach, isFunction,
-  isString,
-  startWith, toArray
+	connectNode, DOM,
+	forEach, isFunction,
+	isString,
+	startWith, toArray
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
-import delimiterResponse from "../../types/delimiterResponse";
-import IBouer from "../../types/IBouer";
 import Binder from "../binder/Binder";
 import ComponentHandler from "../component/ComponentHandler";
 import DelimiterHandler from "../DelimiterHandler";
@@ -209,7 +209,7 @@ export default class Compiler {
         return this.eventHandler.handle(node, data, context);
 
       // Property binding
-      let delimitersFields: delimiterResponse[];
+      let delimitersFields: DelimiterResponse[];
       if (isString(node.nodeValue) && (delimitersFields = this.delimiter.run(node.nodeValue!)) && delimitersFields.length !== 0) {
         this.binder.create({
           node: connectNode(node, rootElement),

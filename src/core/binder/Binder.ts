@@ -1,39 +1,26 @@
-import { Constants } from "../../shared/helpers/Constants";
+import BinderConfig from "../../definitions/types/BinderConfig";
+import DelimiterResponse from "../../definitions/types/DelimiterResponse";
+import dynamic from "../../definitions/types/Dynamic";
+import WatchCallback from "../../definitions/types/WatchCallback";
+import Bouer from "../../instance/Bouer";
+import Constants from "../../shared/helpers/Constants";
 import IoC from "../../shared/helpers/IoC";
+import Task from "../../shared/helpers/Task";
 import {
 	createEl,
 	findAttribute,
 	forEach, isFunction, isNull,
 	isObject,
-	toArray,
-	toLower,
-	toStr,
+	toArray, toStr,
 	trim,
 	where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
-import delimiterResponse from "../../types/delimiterResponse";
-import dynamic from "../../types/dynamic";
-import watchCallback from "../../types/watchCallback";
 import Compiler from "../compiler/Compiler";
 import Evaluator from "../Evaluator";
 import ReactiveEvent from "../event/ReactiveEvent";
-import Bouer from "../../instance/Bouer";
-import Watch from "./Watch";
 import Middleware from "../middleware/Middleware";
-import Task from "../../shared/helpers/Task";
-
-export interface BinderConfig {
-	node: Node,
-	data: dynamic,
-	parent: Element,
-	nodeName: string,
-	nodeValue: string,
-	fields: delimiterResponse[],
-	argument?: string,
-	modifiers?: string[],
-	value: string
-}
+import Watch from "./Watch";
 
 export default class Binder {
 	bouer: Bouer;
@@ -63,7 +50,7 @@ export default class Binder {
 	create(options: {
 		node: Node,
 		data: dynamic,
-		fields: delimiterResponse[],
+		fields: DelimiterResponse[],
 		isReplaceProperty?: boolean,
 		context: object,
 		onUpdate?: (value: any, node: Node) => void,
@@ -316,7 +303,7 @@ export default class Binder {
 		return propertyBindConfig;
 	}
 
-	onPropertyChange(propertyName: string, callback: watchCallback, targetObject?: object) {
+	onPropertyChange(propertyName: string, callback: WatchCallback, targetObject?: object) {
 		let mWatch: Watch<any, any> | null = null;
 		const mTargetObject = targetObject || this.bouer.data;
 

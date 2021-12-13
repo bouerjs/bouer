@@ -1,9 +1,9 @@
-import Component from "../core/component/Component";
-import { MiddlewareConfigActions } from "../core/middleware/Middleware";
-import Bouer from "../instance/Bouer";
-import customDirective from "./customDirective";
-import delimiter from "./delimiter";
-import dynamic from "./dynamic";
+import Component from "../../core/component/Component";
+import Bouer from "../../instance/Bouer";
+import CustomDirective from "../types/CustomDirective";
+import Delimiter from "../types/delimiter";
+import dynamic from "../types/Dynamic";
+import MiddlewareConfigActions from "../types/MiddlewareConfigActions";
 import IBouerConfig from "./IBouerConfig";
 import IComponent from "./IComponent";
 
@@ -21,13 +21,13 @@ export default interface IBouer {
 	components?: (IComponent | Component)[];
 
 	/** The custom directives for this instance */
-	directives?: customDirective,
+	directives?: CustomDirective,
 
 	/** The dependencies of the instance */
 	dependencies?: dynamic,
 
 	/** Appends delimiters to the instance */
-	delimiters?: delimiter[],
+	delimiters?: Delimiter[],
 
 	/** Middlewares that should be used in the application */
 	middleware?: (

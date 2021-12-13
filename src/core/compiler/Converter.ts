@@ -1,4 +1,4 @@
-import { Constants } from "../../shared/helpers/Constants";
+import Constants from "../../shared/helpers/Constants";
 import Extend from "../../shared/helpers/Extend";
 import IoC from "../../shared/helpers/IoC";
 import Logger from "../../shared/logger/Logger";

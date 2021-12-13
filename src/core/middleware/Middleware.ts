@@ -1,17 +1,8 @@
+import IMiddleware from "../../definitions/interfaces/IMiddleware";
+import MiddlewareConfigActions from "../../definitions/types/MiddlewareConfigActions";
+import MiddlewareObject from "../../definitions/types/MiddlewareObject";
 import Bouer from "../../instance/Bouer";
 import IoC from "../../shared/helpers/IoC";
-import Logger from "../../shared/logger/Logger";
-import IMiddleware from "../../types/IMiddleware";
-
-export type MiddlewareObject = {
-	bind?: (context: IMiddleware, next: () => void) => Promise<any>,
-	update?: (context: IMiddleware, next: () => void) => Promise<any>
-}
-
-export type MiddlewareConfigActions = (
-	bind: (configure: (context: IMiddleware) => Promise<any>) => void,
-	update: (configure: (context: IMiddleware) => Promise<any>) => void
-) => void;
 
 export default class Middleware {
 	private middlewareConfigContainer: { [key: string]: MiddlewareObject[] } = {};

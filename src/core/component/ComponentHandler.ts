@@ -1,3 +1,5 @@
+import IComponent from "../../definitions/interfaces/IComponent";
+import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
 import Extend from "../../shared/helpers/Extend";
 import IoC from "../../shared/helpers/IoC";
@@ -17,9 +19,6 @@ import {
 	urlResolver, webRequest, where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
-import dynamic from "../../types/dynamic";
-import IBouer from "../../types/IBouer";
-import IComponent from "../../types/IComponent";
 import Compiler from "../compiler/Compiler";
 import DelimiterHandler from "../DelimiterHandler";
 import Evaluator from "../Evaluator";

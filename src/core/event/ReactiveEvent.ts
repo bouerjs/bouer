@@ -6,17 +6,18 @@ type CallbackReactiveProperty = <TProperty, TObject>(
 	reactive: Reactive<TProperty,
 		TObject>) => void;
 
-interface ReactiveKeyEvents {
-	BeforeGet: 'BeforeGet',
-	BeforeSet: 'BeforeSet',
-	AfterGet: 'AfterGet',
-	AfterSet: 'AfterSet',
-}
 
 type ReactiveEventResult = {
 	eventName: keyof ReactiveKeyEvents,
 	callback: CallbackReactiveProperty,
 	off: () => void
+}
+
+interface ReactiveKeyEvents {
+	BeforeGet: 'BeforeGet',
+	BeforeSet: 'BeforeSet',
+	AfterGet: 'AfterGet',
+	AfterSet: 'AfterSet',
 }
 
 export default class ReactiveEvent {

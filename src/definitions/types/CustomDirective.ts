@@ -1,6 +1,6 @@
-import { BinderConfig } from "../core/binder/Binder";
+import BinderConfig from "./BinderConfig";
 
-type customDirective = {
+type CustomDirective = {
   [key: string]: {
     /** Allow to remove the directive after the bind */
     removable?: boolean,
@@ -9,4 +9,4 @@ type customDirective = {
   }
 };
 
-export default customDirective;
+export default CustomDirective;

@@ -1,6 +1,7 @@
 
 // Quotes “"+  +"”
-import dynamic from "../../types/dynamic";
+
+import dynamic from "../../definitions/types/Dynamic";
 
 export function webRequest(url: string, options?: {
 	body?: any;
@@ -30,7 +31,7 @@ export function webRequest(url: string, options?: {
 	const body = getOption('body', undefined);
 
 	const xhr = createXhr(method);
-	interface IResponse {
+	type IResponse = {
 		url: string,
 		ok: boolean,
 		status: number,

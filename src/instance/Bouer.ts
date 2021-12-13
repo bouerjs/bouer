@@ -11,7 +11,7 @@ import Reactive from "../core/reactive/Reactive";
 import Routing from "../core/routing/Routing";
 import Skeleton from "../core/Skeleton";
 import DataStore from "../core/store/DataStore";
-import { Constants } from "../shared/helpers/Constants";
+import Constants from "../shared/helpers/Constants";
 import IoC from "../shared/helpers/IoC";
 import Task from "../shared/helpers/Task";
 import {
@@ -20,12 +20,12 @@ import {
 	isNull, isObject, toArray, transferProperty, trim
 } from "../shared/helpers/Utils";
 import Logger from "../shared/logger/Logger";
-import delimiter from "../types/delimiter";
-import dynamic from "../types/dynamic";
-import IBouer from "../types/IBouer";
-import IBouerConfig from "../types/IBouerConfig";
-import IComponent from "../types/IComponent";
-import watchCallback from "../types/watchCallback";
+import IBouer from "../definitions/interfaces/IBouer";
+import IBouerConfig from "../definitions/interfaces/IBouerConfig";
+import WatchCallback from "../definitions/types/WatchCallback";
+import dynamic from "../definitions/types/Dynamic";
+import delimiter from "../definitions/types/delimiter";
+import IComponent from "../definitions/interfaces/IComponent";
 
 export default class Bouer implements IBouer {
 	el: Element;
@@ -422,7 +422,7 @@ export default class Bouer implements IBouer {
 	 * @param targetObject the target object having the property to watch
 	 * @returns the watch object having the method to destroy the watch
 	 */
-	watch(propertyName: string, callback: watchCallback, targetObject?: object) {
+	watch(propertyName: string, callback: WatchCallback, targetObject?: object) {
 		return IoC.Resolve<Binder>(this, Binder)!.onPropertyChange(propertyName, callback, targetObject);
 	}
 

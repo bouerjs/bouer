@@ -1,6 +1,6 @@
 import { startWith } from "./Utils";
 
-export const Constants = {
+const Constants = {
   skip: 'e-skip',
 
   build: 'e-build',
@@ -53,3 +53,5 @@ export const Constants = {
     return (Object.keys(this).map(key => (this as any)[key] as string).indexOf(value) !== -1)
   }
 }
+
+export default Constants;

@@ -1,5 +1,9 @@
+import dynamic from "../../definitions/types/Dynamic";
+import EventEmitterOptions from "../../definitions/types/EventEmitterOptions";
+import EventModifiers from "../../definitions/types/EventModifiers";
+import EventSubscription from "../../definitions/types/EventSubscription";
 import Bouer from "../../instance/Bouer";
-import { Constants } from "../../shared/helpers/Constants";
+import Constants from "../../shared/helpers/Constants";
 import IoC from "../../shared/helpers/IoC";
 import Task from "../../shared/helpers/Task";
 import {
@@ -13,31 +17,7 @@ import {
 	where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
-import dynamic from "../../types/dynamic";
 import Evaluator from "../Evaluator";
-
-type EventModifiers = {
-	capture?: boolean;
-	once?: boolean;
-	passive?: boolean;
-	signal?: AbortSignal;
-}
-
-export type EventEmitterOptions = {
-	eventName: string
-	init?: CustomEventInit,
-	once?: boolean,
-	attachedNode?: Node
-}
-
-export type EventSubscription = {
-	eventName: string
-	attachedNode?: Node,
-	modifiers?: EventModifiers,
-	callback: (evt: Event | CustomEvent, ...args: any[]) => void,
-	emit: (options?: { init?: CustomEventInit, once?: boolean, }) => void
-}
-
 export default class EventHandler {
 	bouer: Bouer;
 	evaluator: Evaluator;

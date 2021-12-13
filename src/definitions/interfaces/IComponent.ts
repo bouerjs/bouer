@@ -1,4 +1,4 @@
-import Component from "../core/component/Component";
+import Component from "../../core/component/Component";
 import ILifeCycleHooks from "./ILifeCycleHooks";
 
 export default interface IComponent extends ILifeCycleHooks {

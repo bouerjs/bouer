@@ -1,5 +1,5 @@
 import Bouer from "../instance/Bouer";
-import { Constants } from "../shared/helpers/Constants";
+import Constants from "../shared/helpers/Constants";
 import IoC from "../shared/helpers/IoC";
 import { createEl, DOM, forEach, toArray } from "../shared/helpers/Utils";
 

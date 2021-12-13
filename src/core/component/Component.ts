@@ -1,3 +1,7 @@
+import IComponent from "../../definitions/interfaces/IComponent";
+import ILifeCycleHooks from "../../definitions/interfaces/ILifeCycleHooks";
+import dynamic from "../../definitions/types/Dynamic";
+import EventSubscription from "../../definitions/types/EventSubscription";
 import Bouer from "../../instance/Bouer";
 import IoC from "../../shared/helpers/IoC";
 import UriHandler from "../../shared/helpers/UriHandler";
@@ -5,10 +9,7 @@ import {
 	createAnyEl, forEach, isObject, isString, toLower, transferProperty, trim, where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
-import dynamic from "../../types/dynamic";
-import IComponent from "../../types/IComponent";
-import ILifeCycleHooks from "../../types/ILifeCycleHooks";
-import EventHandler, { EventSubscription } from "../event/EventHandler";
+import EventHandler from "../event/EventHandler";
 import Reactive from "../reactive/Reactive";
 export default class Component implements IComponent {
 	name: string;

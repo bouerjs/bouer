@@ -6,8 +6,8 @@ import {
   getDescriptor, GLOBAL, transferProperty
 } from "../shared/helpers/Utils";
 import Logger from "../shared/logger/Logger";
-import dynamic from "../types/dynamic";
 import IoC from "../shared/helpers/IoC";
+import dynamic from "../definitions/types/Dynamic";
 
 export default class Evaluator {
   private global: Window & typeof globalThis | null;
