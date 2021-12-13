@@ -1,0 +1,37 @@
+declare const Constants: {
+    skip: string;
+    build: string;
+    array: string;
+    if: string;
+    elseif: string;
+    else: string;
+    show: string;
+    req: string;
+    for: string;
+    data: string;
+    def: string;
+    wait: string;
+    content: string;
+    bind: string;
+    property: string;
+    skeleton: string;
+    route: string;
+    href: string;
+    entry: string;
+    on: string;
+    silent: string;
+    slot: string;
+    ref: string;
+    put: string;
+    builtInEvents: {
+        add: string;
+        compile: string;
+        request: string;
+        response: string;
+        fail: string;
+        done: string;
+    };
+    check: (node: Node, cmd: string) => boolean;
+    isConstant: (value: string) => boolean;
+};
+export default Constants;
