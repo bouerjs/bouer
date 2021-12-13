@@ -406,7 +406,7 @@ export default class ComponentHandler {
 				const mRule = rule as dynamic;
 
 				if (mRule.selectorText) {
-					const selector = (mRule.selectorText as string).substr(1);
+					const selector = (mRule.selectorText as string).substring(1);
 					const separation = rootClassList[selector] ? "" : " ";
 					const uniqueIdentifier = "." + styleId;
 					const selectorTextSplitted = mRule.selectorText.split(' ');
@@ -431,7 +431,7 @@ export default class ComponentHandler {
 			const mStyle = asset.cloneNode(true) as Element;
 
 			if (mStyle instanceof HTMLLinkElement) {
-				const path = component.path[0] === '/' ? component.path.substr(1) : component.path;
+				const path = component.path[0] === '/' ? component.path.substring(1) : component.path;
 				mStyle.href = pathResolver(path, mStyle.getAttribute('href') || '');
 			}
 
@@ -541,7 +541,7 @@ export default class ComponentHandler {
 			if (script.src == '' || script.innerHTML)
 				localScriptsContent.push(script.innerHTML);
 			else {
-				const path = component.path[0] === '/' ? component.path.substr(1) : component.path;
+				const path = component.path[0] === '/' ? component.path.substring(1) : component.path;
 				script.src = pathResolver(path, script.getAttribute('src') || '');
 				onlineScriptsUrls.push(script.src);
 			}

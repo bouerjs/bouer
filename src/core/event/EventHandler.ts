@@ -42,7 +42,7 @@ export default class EventHandler {
 		// <button on:submit.once.stopPropagation="times++"></button>
 		const nodeValue = trim(node.nodeValue ?? '');
 
-		const eventNameWithModifiers = nodeName.substr(Constants.on.length);
+		const eventNameWithModifiers = nodeName.substring(Constants.on.length);
 		let allModifiers = eventNameWithModifiers.split('.');
 		const eventName = allModifiers[0];
 		allModifiers.shift();

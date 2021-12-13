@@ -28,10 +28,10 @@ export default class Binder {
 	binds: Watch<any, any>[] = [];
 
 	private DEFAULT_BINDER_PROPERTIES: any = {
-		'text': 'value',
-		'number': 'valueAsNumber',
-		'checkbox': 'checked',
-		'radio': 'value'
+		text: 'value',
+		number: 'valueAsNumber',
+		checkbox: 'checked',
+		radio: 'value'
 	}
 
 	private BindingDirection = {
@@ -90,7 +90,7 @@ export default class Binder {
 		}
 
 		// Two-Way Data Binding: e-bind:[?]="..."
-		if (originalName.substr(0, Constants.bind.length) === Constants.bind) {
+		if (originalName.substring(0, Constants.bind.length) === Constants.bind) {
 			let propertyNameToBind = '';
 			const binderTarget = ownerElement.type || ownerElement.localName;
 
@@ -236,8 +236,8 @@ export default class Binder {
 		let nodeToBind = node;
 
 		// If definable property e-[?]="..."
-		if (originalName.substr(0, Constants.property.length) === Constants.property && isNull(isReplaceProperty)) {
-			propertyBindConfig.nodeName = originalName.substr(Constants.property.length);
+		if (originalName.substring(0, Constants.property.length) === Constants.property && isNull(isReplaceProperty)) {
+			propertyBindConfig.nodeName = originalName.substring(Constants.property.length);
 			ownerElement.setAttribute(propertyBindConfig.nodeName, originalValue);
 			nodeToBind = ownerElement.attributes[propertyBindConfig.nodeName];
 

@@ -99,7 +99,7 @@ export default class Compiler {
             return insertSlot(options.componentSlot!, node);
           } else if (node.hasAttribute('name')) {
             // In case of target slot insertion
-            const target = (node.attributes as any)['name'] as Attr;
+            const target = node.attributes.getNamedItem('name') as Attr
 
 						return (function innerWalker(element: Element) {
 							const slotValue = element.getAttribute(Constants.slot);
@@ -120,15 +120,15 @@ export default class Compiler {
 
         // e-def="{...}" directive
         if (Constants.def in node.attributes)
-          directive.def((node.attributes as any)[Constants.def], data);
+          directive.def(node.attributes.getNamedItem(Constants.def) as Attr, data);
 
         // e-entry="..." directive
         if (Constants.entry in node.attributes)
-          directive.entry((node.attributes as any)[Constants.entry], data);
+          directive.entry(node.attributes.getNamedItem(Constants.entry) as Attr, data);
 
         // wait-data="..." directive
         if (Constants.wait in node.attributes)
-          return directive.wait((node.attributes as any)[Constants.wait]);
+          return directive.wait(node.attributes.getNamedItem(Constants.wait) as Attr);
 
         // <component></component>
         if (this.component.check(node.localName))
@@ -136,11 +136,11 @@ export default class Compiler {
 
         // e-for="..." directive
         if (Constants.for in node.attributes)
-          return directive.for((node.attributes as any)[Constants.for], data);
+          return directive.for(node.attributes.getNamedItem(Constants.for) as Attr, data);
 
         // e-if="..." directive
         if (Constants.if in node.attributes)
-          return directive.if((node.attributes as any)[Constants.if], data);
+          return directive.if(node.attributes.getNamedItem(Constants.if) as Attr, data);
 
         // e-else-if="..." or e-else directive
         if ((Constants.elseif in node.attributes) || (Constants.else in node.attributes))
@@ -148,11 +148,11 @@ export default class Compiler {
 
         // e-show="..." directive
         if (Constants.show in node.attributes)
-          directive.show((node.attributes as any)[Constants.show], data);
+          directive.show(node.attributes.getNamedItem(Constants.show) as Attr, data);
 
         // e-req="..." | e-req:[id]="..."  directive
         let reqNode: any = null;
-        if ((reqNode = (node.attributes as any)[Constants.req]) ||
+        if ((reqNode = node.attributes.getNamedItem(Constants.req) as Attr) ||
           (reqNode = toArray(node.attributes).find(attr => Constants.check(attr, Constants.req))))
           return directive.req(reqNode, data);
 
@@ -170,7 +170,7 @@ export default class Compiler {
 
         // put="..." directive
         if (Constants.put in node.attributes)
-          return directive.put((node.attributes as any)[Constants.put], data);
+          return directive.put(node.attributes.getNamedItem(Constants.put) as Attr, data);
 
         // Looping the attributes
         forEach(toArray(node.attributes), (attr: Attr) => {
@@ -210,7 +210,8 @@ export default class Compiler {
 
       // Property binding
       let delimitersFields: DelimiterResponse[];
-      if (isString(node.nodeValue) && (delimitersFields = this.delimiter.run(node.nodeValue!)) && delimitersFields.length !== 0) {
+      if (isString(node.nodeValue) && (delimitersFields = this.delimiter.run(node.nodeValue!))
+					&& delimitersFields.length !== 0) {
         this.binder.create({
           node: connectNode(node, rootElement),
           fields: delimitersFields,

@@ -148,7 +148,7 @@ export function trim(value: string) {
 }
 
 export function startWith(value: string, pattern: string) {
-	return (value.substr(0, pattern.length) === pattern);
+	return (value.substring(0, pattern.length) === pattern);
 }
 
 export function toLower(str: string) {
@@ -180,7 +180,7 @@ export function getDescriptor<TObject>(obj: TObject, prop: string) {
 	return Object.getOwnPropertyDescriptor(obj, prop);
 }
 
-export function findAttribute(element: Element, attributesToCheck: Array<string>, removeIfFound: boolean = false): Attr | null {
+export function findAttribute(element: Element, attributesToCheck: string[], removeIfFound: boolean = false): Attr | null {
 	let res: Attr | null = null;
 
 	if (!element) return null;
@@ -314,8 +314,8 @@ export function urlCombine(base: string, ...parts: string[]) {
  * Relative path resolver
  */
 export function pathResolver(relative: string, path: string) {
-	const isCurrentDir = (v: string) => v.substr(0, 2) === './';
-	const isParentDir = (v: string) => v.substr(0, 3) === '../';
+	const isCurrentDir = (v: string) => v.substring(0, 2) === './';
+	const isParentDir = (v: string) => v.substring(0, 3) === '../';
 
 	const toDirPath = (v: string) => {
 		const values = v.split('/');
@@ -329,7 +329,7 @@ export function pathResolver(relative: string, path: string) {
 	}
 
 	if (isCurrentDir(path))
-		return toDirPath(relative).relative + path.substr(1);
+		return toDirPath(relative).relative + path.substring(1);
 
 	if (isParentDir(path)) {
 		const parts = toDirPath(relative).parts;
@@ -340,7 +340,7 @@ export function pathResolver(relative: string, path: string) {
 					return value;
 
 				parts.pop();
-				return pathLookUp(value.substr(3));
+				return pathLookUp(value.substring(3));
 			})(path)
 		);
 

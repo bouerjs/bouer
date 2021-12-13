@@ -420,7 +420,7 @@ export default class Directive {
 						let listCopy = Extend.array(list);
 
 						const findFilter = (fName: string) =>
-							filters.find(item => item.substr(0, fName.length) === fName);
+							filters.find(item => item.substring(0, fName.length) === fName);
 
 						// applying where:
 						let filterConfig = findFilter('where');
@@ -550,7 +550,7 @@ export default class Directive {
 		ownerElement.removeAttribute(node.nodeName);
 
 		(execute = (obj: any) => {
-			const attrNameToSet = node.nodeName.substr(Constants.property.length);
+			const attrNameToSet = node.nodeName.substring(Constants.property.length);
 			let attr = (ownerElement.attributes as any)[attrNameToSet] as Attr;
 			if (!attr) {
 				(ownerElement.setAttribute(attrNameToSet, ''));
@@ -761,7 +761,7 @@ export default class Directive {
 		ownerElement.removeAttribute(node.nodeName);
 
 		const subcribeEvent = (eventName: string) => {
-			const attr = (ownerElement.attributes as any)[Constants.on + eventName];
+			const attr = ownerElement.attributes.getNamedItem(Constants.on + eventName);
 			if (attr) this.eventHandler.handle(attr, data, this.context);
 
 			return {

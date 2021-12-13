@@ -30,7 +30,7 @@ export default class Routing {
 
 		const base = DOM.head.querySelector('base');
 		if (base) {
-			const baseHref = (base.attributes as any)['href'];
+			const baseHref = base.attributes.getNamedItem('href');
 			if (!baseHref)
 				return Logger.error("The href=\"/\" attribute is required in base element.");
 			this.base = baseHref.value;
@@ -66,7 +66,7 @@ export default class Routing {
 
 		// In case of: /about/me/, remove the last forward slash
 		if (navigatoTo[navigatoTo.length - 1] === '/')
-			navigatoTo = navigatoTo.substr(0, navigatoTo.length - 1);
+			navigatoTo = navigatoTo.substring(0, navigatoTo.length - 1);
 
 		const page = this.toPage(navigatoTo);
 
