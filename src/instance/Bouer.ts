@@ -28,18 +28,18 @@ import delimiter from "../definitions/types/delimiter";
 import IComponent from "../definitions/interfaces/IComponent";
 
 export default class Bouer implements IBouer {
-	el: Element;
-	name = 'Bouer';
-	version = '3.0.0';
-	data: object;
-	globalData: object;
-	config?: IBouerConfig;
-	dependencies: dynamic = {};
+	readonly el: Element;
+	readonly name = 'Bouer';
+	readonly version = '3.0.0';
+	readonly data: dynamic;
+	readonly globalData: dynamic;
+	readonly config?: IBouerConfig;
+	readonly dependencies: dynamic<object> = {};
+	readonly __id__: number = IoC.GetId();
 	isDestroyed: boolean = false;
-	__id__: number = IoC.GetId();
 
 	/** Data Exposition and Injection handler*/
-	$data: {
+	readonly $data: {
 		/**
 		 * Gets the exposed `data` or the value provided for `data` directive
 		 * @param key the data:[`key`]="..." directive key value or the app.$data.set(`key`) key provided.
@@ -62,7 +62,7 @@ export default class Bouer implements IBouer {
 	}
 
 	/** Requests handler */
-	$req: {
+	readonly $req: {
 		/**
 		 * Gets the `e-req` directive response value
 		 * @param key the e-req:[`key`]="..." directive key value.
@@ -78,7 +78,7 @@ export default class Bouer implements IBouer {
 	}
 
 	/** Waiting data Handler */
-	$wait: {
+	readonly $wait: {
 		/**
 		 * Gets the elements and data of the `wait-data` directive.
 		 * @param key the wait-data="`key`" directive value or the app.$wait.set(`key`) key provided.
@@ -100,7 +100,7 @@ export default class Bouer implements IBouer {
 	}
 
 	/** Delimiters handler */
-	$delimiters: {
+	readonly $delimiters: {
 		/** Adds a delimiter into the instance */
 		add: (item: delimiter) => void
 		/** Removes a delimiter from the instance */
@@ -110,7 +110,7 @@ export default class Bouer implements IBouer {
 	};
 
 	/** Skeleton handler */
-	$skeleton: {
+	readonly $skeleton: {
 		/** Removes skeletons havining the `id` provided */
 		clear: (id?: string) => void,
 		/** Set Color of the Wave and/or the Background */
@@ -118,13 +118,13 @@ export default class Bouer implements IBouer {
 	}
 
 	/** Components Handler */
-	$components: {
+	readonly $components: {
 		add: (component: IComponent) => void
 		get: (name: string) => (Component | IComponent)
 	}
 
 	/** Routing Handler */
-	$routing: {
+	readonly $routing: {
 		/** Store Bouer application instance */
 		bouer: Bouer;
 
@@ -157,7 +157,7 @@ export default class Bouer implements IBouer {
 	 * Gets all the elemens having the `ref` attribute
 	 * @returns an object having all the elements with the `ref attribute value` defined as the key.
 	 */
-	refs: dynamic = {};
+	readonly refs: dynamic<Element> = {};
 
 	/**
 	 * Default constructor
@@ -273,7 +273,7 @@ export default class Bouer implements IBouer {
 
 		defineProperty(this, 'refs', {
 			get: () => {
-				const mRefs: dynamic = {};
+				const mRefs: dynamic<Element> = {};
 				forEach(toArray(this.el.querySelectorAll("[" + Constants.ref + "]")), (ref: any) => {
 					const mRef = ref.attributes[Constants.ref] as Attr;
 					let value = trim(mRef.value) || ref.name || '';

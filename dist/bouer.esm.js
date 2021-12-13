@@ -159,7 +159,7 @@ function trim(value) {
     return value ? value.trim() : value;
 }
 function startWith(value, pattern) {
-    return (value.substr(0, pattern.length) === pattern);
+    return (value.substring(0, pattern.length) === pattern);
 }
 function toLower(str) {
     return str.toLowerCase();
@@ -306,8 +306,8 @@ function urlCombine(base) {
  * Relative path resolver
  */
 function pathResolver(relative, path) {
-    var isCurrentDir = function (v) { return v.substr(0, 2) === './'; };
-    var isParentDir = function (v) { return v.substr(0, 3) === '../'; };
+    var isCurrentDir = function (v) { return v.substring(0, 2) === './'; };
+    var isParentDir = function (v) { return v.substring(0, 3) === '../'; };
     var toDirPath = function (v) {
         var values = v.split('/');
         if (/\.html$|\.css$|\.js$/gi.test(v))
@@ -318,14 +318,14 @@ function pathResolver(relative, path) {
         };
     };
     if (isCurrentDir(path))
-        return toDirPath(relative).relative + path.substr(1);
+        return toDirPath(relative).relative + path.substring(1);
     if (isParentDir(path)) {
         var parts_1 = toDirPath(relative).parts;
         parts_1.push((function pathLookUp(value) {
             if (!isParentDir(value))
                 return value;
             parts_1.pop();
-            return pathLookUp(value.substr(3));
+            return pathLookUp(value.substring(3));
         })(path));
         return parts_1.join('/');
     }
@@ -636,7 +636,7 @@ var EventHandler = /** @class */ (function () {
             return Logger.error("Invalid ParentElement of “" + nodeName + "”");
         // <button on:submit.once.stopPropagation="times++"></button>
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
-        var eventNameWithModifiers = nodeName.substr(Constants.on.length);
+        var eventNameWithModifiers = nodeName.substring(Constants.on.length);
         var allModifiers = eventNameWithModifiers.split('.');
         var eventName = allModifiers[0];
         allModifiers.shift();
@@ -871,7 +871,7 @@ var Routing = /** @class */ (function () {
         this.base = "/";
         var base = DOM.head.querySelector('base');
         if (base) {
-            var baseHref = base.attributes['href'];
+            var baseHref = base.attributes.getNamedItem('href');
             if (!baseHref)
                 return Logger.error("The href=\"/\" attribute is required in base element.");
             this.base = baseHref.value;
@@ -902,7 +902,7 @@ var Routing = /** @class */ (function () {
         var navigatoTo = (usehash ? resolver.hash : resolver.pathname).split('?')[0];
         // In case of: /about/me/, remove the last forward slash
         if (navigatoTo[navigatoTo.length - 1] === '/')
-            navigatoTo = navigatoTo.substr(0, navigatoTo.length - 1);
+            navigatoTo = navigatoTo.substring(0, navigatoTo.length - 1);
         var page = this.toPage(navigatoTo);
         this.clear();
         if (!page)
@@ -1304,7 +1304,7 @@ var ComponentHandler = /** @class */ (function () {
                     continue;
                 var mRule = rule;
                 if (mRule.selectorText) {
-                    var selector = mRule.selectorText.substr(1);
+                    var selector = mRule.selectorText.substring(1);
                     var separation = rootClassList[selector] ? "" : " ";
                     var uniqueIdentifier = "." + styleId;
                     var selectorTextSplitted = mRule.selectorText.split(' ');
@@ -1325,7 +1325,7 @@ var ComponentHandler = /** @class */ (function () {
         forEach(stylesAssets, function (asset) {
             var mStyle = asset.cloneNode(true);
             if (mStyle instanceof HTMLLinkElement) {
-                var path = component.path[0] === '/' ? component.path.substr(1) : component.path;
+                var path = component.path[0] === '/' ? component.path.substring(1) : component.path;
                 mStyle.href = pathResolver(path, mStyle.getAttribute('href') || '');
             }
             //Checking if this component already have styles added
@@ -1413,7 +1413,7 @@ var ComponentHandler = /** @class */ (function () {
             if (script.src == '' || script.innerHTML)
                 localScriptsContent.push(script.innerHTML);
             else {
-                var path = component.path[0] === '/' ? component.path.substr(1) : component.path;
+                var path = component.path[0] === '/' ? component.path.substring(1) : component.path;
                 script.src = pathResolver(path, script.getAttribute('src') || '');
                 onlineScriptsUrls.push(script.src);
             }
@@ -1868,7 +1868,7 @@ var Directive = /** @class */ (function () {
                     _filters: function (list) {
                         var listCopy = Extend.array(list);
                         var findFilter = function (fName) {
-                            return filters.find(function (item) { return item.substr(0, fName.length) === fName; });
+                            return filters.find(function (item) { return item.substring(0, fName.length) === fName; });
                         };
                         // applying where:
                         var filterConfig = findFilter('where');
@@ -1981,7 +1981,7 @@ var Directive = /** @class */ (function () {
         });
         ownerElement.removeAttribute(node.nodeName);
         (execute = function (obj) {
-            var attrNameToSet = node.nodeName.substr(Constants.property.length);
+            var attrNameToSet = node.nodeName.substring(Constants.property.length);
             var attr = ownerElement.attributes[attrNameToSet];
             if (!attr) {
                 (ownerElement.setAttribute(attrNameToSet, ''));
@@ -2160,7 +2160,7 @@ var Directive = /** @class */ (function () {
             });
         ownerElement.removeAttribute(node.nodeName);
         var subcribeEvent = function (eventName) {
-            var attr = ownerElement.attributes[Constants.on + eventName];
+            var attr = ownerElement.attributes.getNamedItem(Constants.on + eventName);
             if (attr)
                 _this.eventHandler.handle(attr, data, _this.context);
             return {
@@ -2456,7 +2456,7 @@ var Compiler = /** @class */ (function () {
                     }
                     else if (node.hasAttribute('name')) {
                         // In case of target slot insertion
-                        var target_1 = node.attributes['name'];
+                        var target_1 = node.attributes.getNamedItem('name');
                         return (function innerWalker(element) {
                             var slotValue = element.getAttribute(Constants.slot);
                             if (slotValue && slotValue === target_1.value) {
@@ -2473,31 +2473,31 @@ var Compiler = /** @class */ (function () {
                 }
                 // e-def="{...}" directive
                 if (Constants.def in node.attributes)
-                    directive.def(node.attributes[Constants.def], data);
+                    directive.def(node.attributes.getNamedItem(Constants.def), data);
                 // e-entry="..." directive
                 if (Constants.entry in node.attributes)
-                    directive.entry(node.attributes[Constants.entry], data);
+                    directive.entry(node.attributes.getNamedItem(Constants.entry), data);
                 // wait-data="..." directive
                 if (Constants.wait in node.attributes)
-                    return directive.wait(node.attributes[Constants.wait]);
+                    return directive.wait(node.attributes.getNamedItem(Constants.wait));
                 // <component></component>
                 if (_this.component.check(node.localName))
                     return _this.component.order(node, data);
                 // e-for="..." directive
                 if (Constants.for in node.attributes)
-                    return directive.for(node.attributes[Constants.for], data);
+                    return directive.for(node.attributes.getNamedItem(Constants.for), data);
                 // e-if="..." directive
                 if (Constants.if in node.attributes)
-                    return directive.if(node.attributes[Constants.if], data);
+                    return directive.if(node.attributes.getNamedItem(Constants.if), data);
                 // e-else-if="..." or e-else directive
                 if ((Constants.elseif in node.attributes) || (Constants.else in node.attributes))
                     Logger.warn('The "' + Constants.elseif + '" or "' + Constants.else + '" requires an element with "' + Constants.if + '" above.');
                 // e-show="..." directive
                 if (Constants.show in node.attributes)
-                    directive.show(node.attributes[Constants.show], data);
+                    directive.show(node.attributes.getNamedItem(Constants.show), data);
                 // e-req="..." | e-req:[id]="..."  directive
                 var reqNode = null;
-                if ((reqNode = node.attributes[Constants.req]) ||
+                if ((reqNode = node.attributes.getNamedItem(Constants.req)) ||
                     (reqNode = toArray(node.attributes).find(function (attr) { return Constants.check(attr, Constants.req); })))
                     return directive.req(reqNode, data);
                 // data="..." | data:[id]="..." directive
@@ -2513,7 +2513,7 @@ var Compiler = /** @class */ (function () {
                     return directive.data(dataNode, data);
                 // put="..." directive
                 if (Constants.put in node.attributes)
-                    return directive.put(node.attributes[Constants.put], data);
+                    return directive.put(node.attributes.getNamedItem(Constants.put), data);
                 // Looping the attributes
                 forEach(toArray(node.attributes), function (attr) {
                     walker(attr, data);
@@ -2544,7 +2544,8 @@ var Compiler = /** @class */ (function () {
                 return _this.eventHandler.handle(node, data, context);
             // Property binding
             var delimitersFields;
-            if (isString(node.nodeValue) && (delimitersFields = _this.delimiter.run(node.nodeValue)) && delimitersFields.length !== 0) {
+            if (isString(node.nodeValue) && (delimitersFields = _this.delimiter.run(node.nodeValue))
+                && delimitersFields.length !== 0) {
                 _this.binder.create({
                     node: connectNode(node, rootElement),
                     fields: delimitersFields,
@@ -2573,10 +2574,10 @@ var Binder = /** @class */ (function () {
     function Binder(bouer) {
         this.binds = [];
         this.DEFAULT_BINDER_PROPERTIES = {
-            'text': 'value',
-            'number': 'valueAsNumber',
-            'checkbox': 'checked',
-            'radio': 'value'
+            text: 'value',
+            number: 'valueAsNumber',
+            checkbox: 'checked',
+            radio: 'value'
         };
         this.BindingDirection = {
             fromInputToData: 'fromInputToData',
@@ -2622,7 +2623,7 @@ var Binder = /** @class */ (function () {
             });
         };
         // Two-Way Data Binding: e-bind:[?]="..."
-        if (originalName.substr(0, Constants.bind.length) === Constants.bind) {
+        if (originalName.substring(0, Constants.bind.length) === Constants.bind) {
             var propertyNameToBind_1 = '';
             var binderTarget_1 = ownerElement.type || ownerElement.localName;
             if (Constants.bind === originalName)
@@ -2749,8 +2750,8 @@ var Binder = /** @class */ (function () {
         // One-Way Data Binding
         var nodeToBind = node;
         // If definable property e-[?]="..."
-        if (originalName.substr(0, Constants.property.length) === Constants.property && isNull(isReplaceProperty)) {
-            propertyBindConfig.nodeName = originalName.substr(Constants.property.length);
+        if (originalName.substring(0, Constants.property.length) === Constants.property && isNull(isReplaceProperty)) {
+            propertyBindConfig.nodeName = originalName.substring(Constants.property.length);
             ownerElement.setAttribute(propertyBindConfig.nodeName, originalValue);
             nodeToBind = ownerElement.attributes[propertyBindConfig.nodeName];
             // Removing the e-[?] attr
@@ -3047,8 +3048,8 @@ var Bouer = /** @class */ (function () {
         this.name = 'Bouer';
         this.version = '3.0.0';
         this.dependencies = {};
-        this.isDestroyed = false;
         this.__id__ = IoC.GetId();
+        this.isDestroyed = false;
         /**
          * Gets all the elemens having the `ref` attribute
          * @returns an object having all the elements with the `ref attribute value` defined as the key.
@@ -3661,9 +3662,9 @@ var Component = /** @class */ (function () {
     Component.prototype.addAssets = function (assets) {
         var $assets = [];
         var assetsTypeMapper = {
-            'css': 'link',
-            'js': 'script',
-            'style': 'link'
+            js: 'script',
+            css: 'link',
+            style: 'link'
         };
         forEach(assets, function (asset, index) {
             if (!asset.src || !trim(asset.src))

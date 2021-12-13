@@ -9,10 +9,10 @@ import IComponent from "./IComponent";
 
 export default interface IBouer {
 	/** The data of the instance */
-	data?: object
+	data?: dynamic
 
 	/** The data of the whole instance */
-	globalData?: object
+	globalData?: dynamic
 
 	/** The configuration of the instance */
 	config?: IBouerConfig
@@ -24,7 +24,7 @@ export default interface IBouer {
 	directives?: CustomDirective,
 
 	/** The dependencies of the instance */
-	dependencies?: dynamic,
+	dependencies?: dynamic<object>,
 
 	/** Appends delimiters to the instance */
 	delimiters?: Delimiter[],

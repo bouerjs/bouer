@@ -12,23 +12,22 @@ import Logger from "../../shared/logger/Logger";
 import EventHandler from "../event/EventHandler";
 import Reactive from "../reactive/Reactive";
 export default class Component implements IComponent {
-	name: string;
-	path: string;
-	data?: object;
-	template?: string;
-	keepAlive?: boolean;
-	prefetch?: boolean = false;
-	title?: string = undefined;
-	route?: string = undefined;
-	isDefault?: boolean = undefined;
-	isNotFound?: boolean = undefined;
+	readonly name: string;
+	readonly path: string;
+	readonly data?: object;
+	readonly template?: string;
+	readonly keepAlive?: boolean;
+	readonly prefetch?: boolean = false;
+	readonly title?: string = undefined;
+	readonly route?: string = undefined;
+	readonly isDefault?: boolean = undefined;
+	readonly isNotFound?: boolean = undefined;
 
-	el?: Element = undefined;
-	bouer?: Bouer = undefined;
-	children?: (Component | IComponent)[] = [];
-	assets: (HTMLScriptElement | HTMLStyleElement | HTMLLinkElement)[] = [];
-  restrictions?: ((component: (Component | IComponent)) => boolean | Promise<boolean>)[];
-
+	readonly el?: Element = undefined;
+	readonly bouer?: Bouer = undefined;
+	readonly children?: (Component | IComponent)[] = [];
+	readonly assets: (HTMLScriptElement | HTMLStyleElement | HTMLLinkElement)[] = [];
+  readonly restrictions?: ((component: (Component | IComponent)) => boolean | Promise<boolean>)[];
 	// Store temporarily this component UI orders
 	private events: EventSubscription[] = [];
 
@@ -83,6 +82,7 @@ export default class Component implements IComponent {
 
 		// Destroying all the events attached to the this instance
 		forEach(this.events, evt => this.off((evt.eventName as any), evt.callback));
+
 		this.events = [];
 
 		this.emit('destroyed');
@@ -135,9 +135,9 @@ export default class Component implements IComponent {
 
 		const $assets: any[] = [];
 		const assetsTypeMapper: dynamic = {
-			'css': 'link',
-			'js': 'script',
-			'style': 'link'
+			js: 'script',
+			css: 'link',
+			style: 'link'
 		}
 		forEach(assets, (asset, index) => {
 			if (!asset.src || !trim(asset.src))

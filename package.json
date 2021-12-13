@@ -8,12 +8,13 @@
     "publish": "rollup --config rollup.config.js --configPlugin typescript",
     "release": "node scripts/build.js --prod"
   },
+	"typings": "types/index.d.ts",
   "keywords": [
     "Bouer"
   ],
   "author": {
 		"name": "Afonso Matumona",
-		"email": "Afonsomatumona@hotmail.com",
+		"email": "afonsomatumona@hotmail.com",
 		"url": "https://www.linkedin.com/in/afonsomatelias"
 	},
   "license": "MIT License",
