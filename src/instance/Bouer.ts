@@ -11,6 +11,12 @@ import Reactive from "../core/reactive/Reactive";
 import Routing from "../core/routing/Routing";
 import Skeleton from "../core/Skeleton";
 import DataStore from "../core/store/DataStore";
+import IBouer from "../definitions/interfaces/IBouer";
+import IBouerConfig from "../definitions/interfaces/IBouerConfig";
+import IComponent from "../definitions/interfaces/IComponent";
+import delimiter from "../definitions/interfaces/IDelimiter";
+import dynamic from "../definitions/types/Dynamic";
+import WatchCallback from "../definitions/types/WatchCallback";
 import Constants from "../shared/helpers/Constants";
 import IoC from "../shared/helpers/IoC";
 import Task from "../shared/helpers/Task";
@@ -20,12 +26,6 @@ import {
 	isNull, isObject, toArray, transferProperty, trim
 } from "../shared/helpers/Utils";
 import Logger from "../shared/logger/Logger";
-import IBouer from "../definitions/interfaces/IBouer";
-import IBouerConfig from "../definitions/interfaces/IBouerConfig";
-import WatchCallback from "../definitions/types/WatchCallback";
-import dynamic from "../definitions/types/Dynamic";
-import delimiter from "../definitions/types/delimiter";
-import IComponent from "../definitions/interfaces/IComponent";
 
 export default class Bouer implements IBouer {
 	readonly el: Element;
@@ -36,6 +36,7 @@ export default class Bouer implements IBouer {
 	readonly config?: IBouerConfig;
 	readonly dependencies: dynamic<object> = {};
 	readonly __id__: number = IoC.GetId();
+
 	isDestroyed: boolean = false;
 
 	/** Data Exposition and Injection handler*/
@@ -346,8 +347,8 @@ export default class Bouer implements IBouer {
 			});
 
 			this.destroy();
-			stopTask();
 			this.isDestroyed = true;
+			stopTask();
 		});
 
 		// Initializing Routing
@@ -433,7 +434,7 @@ export default class Bouer implements IBouer {
 	 */
 	react(watchableScope: (app: Bouer) => void) {
 		return IoC.Resolve<Binder>(this, Binder)!
-				.onPropertyInScopeChange(watchableScope);
+			.onPropertyInScopeChange(watchableScope);
 	}
 
 	/**
@@ -532,11 +533,11 @@ export default class Bouer implements IBouer {
 		/** The element that wil be compiled */
 		el: Element,
 		/** The context of this compilation process */
-		context: object,
+		context: Bouer | Component,
 		/** The data that should be injected in the compilation */
-		data?: object,
+		data?: dynamic,
 		/** The function that should be fired when the compilation is done */
-		onDone?: (element: Element, data?: object | undefined) => void
+		onDone?: (element: Element, data?: dynamic | undefined) => void
 	}) {
 		return IoC.Resolve<Compiler>(this, Compiler)!.
 			compile({
@@ -550,7 +551,7 @@ export default class Bouer implements IBouer {
 	destroy() {
 		const el = this.el!;
 		const destroyedEvents = IoC.Resolve<EventHandler>(this, EventHandler)!
-					.$events['destroyed'] || [];
+			.$events['destroyed'] || [];
 
 		this.emit('destroyed', { element: this.el! });
 		// Dispatching all the destroy events
