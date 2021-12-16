@@ -1,7 +1,10 @@
-import BinderConfig from "../types/BinderConfig";
+import IBinderConfig from "./IBinderConfig";
 import dynamic from "../types/Dynamic";
 
 export default interface IMiddleware {
-	binder: BinderConfig;
+	/** binder configuration of the directive */
+	binder: IBinderConfig;
+
+	/** some extra detail of the middleware config */
 	detail: dynamic;
 }

@@ -9,7 +9,7 @@ export default class UriHandler {
   }
 
   params(urlPattern?: string) {
-    const mParams: dynamic = {};
+    const mParams: dynamic<string> = {};
 
     const buildQueryParams = () => {
       // Building from query string
