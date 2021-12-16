@@ -1,21 +1,21 @@
-import Bouer from "../browser";
-import Delimiter from "../definitions/types/Delimiter";
-import DelimiterResponse from "../definitions/types/DelimiterResponse";
+import Bouer from "../instance/Bouer";
+import IDelimiter from "../definitions/interfaces/IDelimiter";
+import IDelimiterResponse from "../definitions/interfaces/IDelimiterResponse";
 import IoC from "../shared/helpers/IoC";
 import { isNull, trim } from "../shared/helpers/Utils";
 
 export default class DelimiterHandler {
-  delimiters: Array<Delimiter> = [];
+  delimiters: Array<IDelimiter> = [];
 	bouer: Bouer;
 
-  constructor(delimiters: Array<Delimiter>, bouer: Bouer) {
+  constructor(delimiters: Array<IDelimiter>, bouer: Bouer) {
 		this.bouer = bouer;
     this.delimiters = delimiters;
 
     IoC.Register(this);
   }
 
-  add(item: Delimiter) {
+  add(item: IDelimiter) {
     this.delimiters.push(item);
   }
 
@@ -24,9 +24,9 @@ export default class DelimiterHandler {
     this.delimiters.splice(index, 1);
   }
 
-  run(content: string): DelimiterResponse[] {
+  run(content: string): IDelimiterResponse[] {
     if (isNull(content) || trim(content) === '') return [];
-    let mDelimiter: Delimiter | null = null;
+    let mDelimiter: IDelimiter | null = null;
 
     const checkContent = (text: string, flag?: string): RegExpMatchArray | undefined => {
       const center = '([\\S\\s]*?)';

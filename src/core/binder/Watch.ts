@@ -4,10 +4,10 @@ import Reactive from "../reactive/Reactive";
 export default class Watch<TValue, TObject> {
   property: string;
   node: Node | undefined;
+  reactive: Reactive<TValue, TObject>;
   callback: WatchCallback;
   onDestroy?: () => void | undefined;
 
-  private reactive: Reactive<TValue, TObject>;
 
   constructor(reactive: Reactive<TValue, TObject>, callback: WatchCallback, options?: {
     node?: Node,

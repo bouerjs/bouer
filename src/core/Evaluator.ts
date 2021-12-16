@@ -8,6 +8,7 @@ import {
 import Logger from "../shared/logger/Logger";
 import IoC from "../shared/helpers/IoC";
 import dynamic from "../definitions/types/Dynamic";
+import { Component, IComponent } from "..";
 
 export default class Evaluator {
   private global: Window & typeof globalThis | null;
@@ -33,7 +34,7 @@ export default class Evaluator {
     return mWindow!;
   }
 
-  execRaw(expression: string, context?: object): void {
+  execRaw(expression: string, context?: Bouer | Component): void {
     // Executing the expression
     try {
       const mExpression = "(function(){ " + expression + " }).apply(this, arguments)";
@@ -47,9 +48,9 @@ export default class Evaluator {
     data: object,
     expression: string,
     isReturn?: boolean,
-    aditional?: object,
+    aditional?: dynamic,
     args?: any[],
-		context: object
+		context: Bouer | Component
   }) {
     let { data, args, expression, isReturn, aditional, context } = options;
     const mGlobal = this.global as dynamic;

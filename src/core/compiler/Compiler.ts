@@ -1,16 +1,18 @@
 import IBouer from "../../definitions/interfaces/IBouer";
-import DelimiterResponse from "../../definitions/types/DelimiterResponse";
+import IDelimiterResponse from "../../definitions/interfaces/IDelimiterResponse";
+import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
 import Constants from "../../shared/helpers/Constants";
 import IoC from "../../shared/helpers/IoC";
 import {
-	connectNode, DOM,
+	DOM,
 	forEach, isFunction,
 	isString,
 	startWith, toArray
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Binder from "../binder/Binder";
+import Component from "../component/Component";
 import ComponentHandler from "../component/ComponentHandler";
 import DelimiterHandler from "../DelimiterHandler";
 import EventHandler from "../event/EventHandler";
@@ -46,7 +48,7 @@ export default class Compiler {
     /** The element that wil be compiled */
     el: Element,
     /** The data that should be injected in the compilation */
-    data?: object,
+    data?: dynamic,
     /**
      * In case of components having content inside of the definition,
      * a wrapper (Example: <div>) with the content need to be provided
@@ -54,10 +56,10 @@ export default class Compiler {
      */
     componentSlot?: Element
     /** The function that should be fired when the compilation is done */
-    onDone?: (element: Element, data?: object) => void,
+    onDone?: (element: Element, data?: dynamic) => void,
 
     /** The context of this compilation process */
-    context: object
+    context: Bouer | Component
   }) {
     const rootElement = options.el;
     const context = options.context || this.bouer;
@@ -209,11 +211,12 @@ export default class Compiler {
         return this.eventHandler.handle(node, data, context);
 
       // Property binding
-      let delimitersFields: DelimiterResponse[];
+      let delimitersFields: IDelimiterResponse[];
       if (isString(node.nodeValue) && (delimitersFields = this.delimiter.run(node.nodeValue!))
 					&& delimitersFields.length !== 0) {
         this.binder.create({
-          node: connectNode(node, rootElement),
+					node: node,
+					isConnected: () => rootElement.isConnected,
           fields: delimitersFields,
           context: context,
           data: data

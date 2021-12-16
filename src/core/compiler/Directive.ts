@@ -1,4 +1,5 @@
-import BinderConfig from "../../definitions/types/BinderConfig";
+import IComponent from "../../definitions/interfaces/IComponent";
+import IBinderConfig from "../../definitions/interfaces/IBinderConfig";
 import CustomDirective from "../../definitions/types/CustomDirective";
 import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
@@ -6,7 +7,6 @@ import Constants from "../../shared/helpers/Constants";
 import Extend from "../../shared/helpers/Extend";
 import IoC from "../../shared/helpers/IoC";
 import {
-	connectNode,
 	createAnyEl,
 	defineProperty,
 	findAttribute,
@@ -23,6 +23,7 @@ import {
 import Logger from "../../shared/logger/Logger";
 import Binder from "../binder/Binder";
 import CommentHandler from "../CommentHandler";
+import Component from "../component/Component";
 import ComponentHandler from "../component/ComponentHandler";
 import DelimiterHandler from "../DelimiterHandler";
 import Evaluator from "../Evaluator";
@@ -43,12 +44,12 @@ export default class Directive {
 	eventHandler: EventHandler;
 	delimiter: DelimiterHandler;
 	$custom: CustomDirective = {};
-	context: object;
+	context: Bouer | Component;
 
 	constructor(
 		customDirective: CustomDirective,
 		compiler: Compiler,
-		compilerContext: object) {
+		compilerContext: Bouer | Component) {
 		this.compiler = compiler;
 		this.context = compilerContext;
 		this.bouer = compiler.bouer;
@@ -78,8 +79,8 @@ export default class Directive {
 	}
 
 	if(node: Node, data: object) {
-		const ownerElement = this.toOwnerNode(node) as Element;
-		const container = ownerElement.parentElement;
+		const ownerNode = this.toOwnerNode(node) as Element;
+		const container = ownerNode.parentElement;
 
 		if (!container) return;
 
@@ -90,7 +91,7 @@ export default class Directive {
 
 		if (nodeName === Constants.elseif || nodeName === Constants.else) return;
 
-		let currentEl: Element | null = ownerElement;
+		let currentEl: Element | null = ownerNode;
 		let reactives: { attr: Attr, reactive: Reactive<any, any> }[] = [];
 
 		do { // Searching for 'e-else-if' and 'e-else' to complete the conditional chain
@@ -110,9 +111,6 @@ export default class Directive {
 				return Logger.error(this.errorMsgNodeValue(attr));
 
 			conditions.push({ node: attr, element: currentEl });
-
-			connectNode(currentEl, container);
-			connectNode(attr, container);
 
 			if (attr.nodeName === ('e-else')) {
 				currentEl.removeAttribute(attr.nodeName); break;
@@ -137,8 +135,12 @@ export default class Directive {
 			currentEl.removeAttribute(attr.nodeName);
 		} while (currentEl = currentEl.nextElementSibling);
 
-		forEach(reactives, item =>
-			this.binder.binds.push(item.reactive.onChange(() => execute(), item.attr)));
+		forEach(reactives, item => {
+			this.binder.binds.push({
+				isConnected: () => container.isConnected,
+				watch: item.reactive.onChange(() => execute(), item.attr)
+			})
+		});
 
 		(execute = () => {
 			forEach(conditions, chainItem => {
@@ -180,7 +182,7 @@ export default class Directive {
 	}
 
 	show(node: Node, data: object) {
-		const ownerElement = this.toOwnerNode(node);
+		const ownerNode = this.toOwnerNode(node);
 		const nodeValue = trim(node.nodeValue ?? '');
 
 		if (nodeValue === '')
@@ -199,23 +201,23 @@ export default class Directive {
 			element.style.display = value ? '' : 'none';
 		}
 
-		connectNode(node, ownerElement);
 		const bindResult = this.binder.create({
 			data: data,
 			node: node,
+			isConnected: () => ownerNode.isConnected,
 			fields: [{ expression: nodeValue, field: nodeValue }],
 			context: this.context,
-			onUpdate: () => execute(ownerElement)
+			onUpdate: () => execute(ownerNode)
 		});
 
-		execute(ownerElement);
+		execute(ownerNode);
 
-		ownerElement.removeAttribute(bindResult.node.nodeName);
+		ownerNode.removeAttribute(bindResult.node.nodeName);
 	}
 
 	for(node: Node, data: object) {
-		const ownerElement = this.toOwnerNode(node) as Element;
-		const container = ownerElement.parentElement;
+		const ownerNode = this.toOwnerNode(node) as Element;
+		const container = ownerNode.parentElement;
 
 		if (!container) return;
 
@@ -236,20 +238,19 @@ export default class Directive {
 		const delimiters = this.delimiter.run(nodeValue);
 		if (delimiters.length !== 0)
 			this.binder.create({
+				node: node,
 				data: data,
 				fields: delimiters,
 				isReplaceProperty: true,
-				node: node,
 				context: this.context,
+				isConnected: () => comment.isConnected,
 				onUpdate: () => execute()
 			});
 
-		ownerElement.removeAttribute(nodeName);
-		const forItem = ownerElement.cloneNode(true);
-		container.replaceChild(comment, ownerElement);
+		ownerNode.removeAttribute(nodeName);
+		const forItem = ownerNode.cloneNode(true);
+		container.replaceChild(comment, ownerNode);
 
-		connectNode(forItem, comment);
-		connectNode(node, comment);
 
 		const $where = (list: any[], filterConfigParts: string[]) => {
 			let whereValue = filterConfigParts[1];
@@ -365,7 +366,12 @@ export default class Directive {
 		}
 
 		const reactivePropertyEvent = ReactiveEvent.on('AfterGet',
-			reactive => this.binder.binds.push(reactive.onChange(() => execute(), node)));
+			reactive => {
+				this.binder.binds.push({
+					isConnected: () => comment.isConnected,
+					watch: reactive.onChange(() => execute(), node)
+				});
+			});
 		let expObj: ExpObject | null = builder(nodeValue);
 		reactivePropertyEvent.off();
 
@@ -457,7 +463,7 @@ export default class Directive {
 	}
 
 	def(node: Node, data: object) {
-		const ownerElement = this.toOwnerNode(node);
+		const ownerNode = this.toOwnerNode(node);
 		const nodeValue = trim(node.nodeValue ?? '');
 
 		if (nodeValue === '')
@@ -477,22 +483,22 @@ export default class Directive {
 				+ node.nodeName + "” and got “" + nodeValue + "”."));
 
 		this.bouer.set(inputData, data);
-		ownerElement.removeAttribute(node.nodeName);
+		ownerNode.removeAttribute(node.nodeName);
 	}
 
 	content(node: Node) {
-		const ownerElement = this.toOwnerNode(node);
+		const ownerNode = this.toOwnerNode(node);
 		const nodeValue = trim(node.nodeValue ?? '');
 
 		if (nodeValue === '')
 			return Logger.error(this.errorMsgEmptyNode(node));
 
-		ownerElement.innerText = nodeValue;
-		ownerElement.removeAttribute(node.nodeName);
+		ownerNode.innerText = nodeValue;
+		ownerNode.removeAttribute(node.nodeName);
 	}
 
 	bind(node: Node, data: object) {
-		const ownerElement = this.toOwnerNode(node);
+		const ownerNode = this.toOwnerNode(node);
 		const nodeValue = trim(node.nodeValue ?? '');
 
 		if (nodeValue === '')
@@ -502,17 +508,18 @@ export default class Directive {
 			return Logger.error(this.errorMsgNodeValue(node));
 
 		this.binder.create({
-			node: connectNode(node, ownerElement),
+			node: node,
+			isConnected: () => ownerNode.isConnected,
 			fields: [{ field: nodeValue, expression: nodeValue }],
 			context: this.context,
 			data: data
 		});
 
-		ownerElement.removeAttribute(node.nodeName);
+		ownerNode.removeAttribute(node.nodeName);
 	}
 
 	property(node: Node, data: object) {
-		const ownerElement = this.toOwnerNode(node) as Element;
+		const ownerNode = this.toOwnerNode(node) as Element;
 		const nodeValue = trim(node.nodeValue ?? '');
 		let execute = (obj: object) => { };
 
@@ -536,8 +543,9 @@ export default class Directive {
 
 		this.binder.create({
 			data: data,
-			node: connectNode(node, ownerElement),
+			node: node,
 			isReplaceProperty: false,
+			isConnected: () => ownerNode.isConnected,
 			fields: [{ expression: nodeValue, field: nodeValue }],
 			context: this.context,
 			onUpdate: () => execute(this.evaluator.exec({
@@ -547,14 +555,14 @@ export default class Directive {
 			}))
 		});
 
-		ownerElement.removeAttribute(node.nodeName);
+		ownerNode.removeAttribute(node.nodeName);
 
 		(execute = (obj: any) => {
 			const attrNameToSet = node.nodeName.substring(Constants.property.length);
-			let attr = (ownerElement.attributes as any)[attrNameToSet] as Attr;
+			let attr = (ownerNode.attributes as any)[attrNameToSet] as Attr;
 			if (!attr) {
-				(ownerElement.setAttribute(attrNameToSet, ''));
-				attr = (ownerElement.attributes as any)[attrNameToSet] as Attr;
+				(ownerNode.setAttribute(attrNameToSet, ''));
+				attr = (ownerNode.attributes as any)[attrNameToSet] as Attr;
 			}
 
 			forEach(Object.keys(obj), key => {
@@ -564,18 +572,18 @@ export default class Directive {
 			});
 
 			if (attr.value === '')
-				return ownerElement.removeAttribute(attrNameToSet);
+				return ownerNode.removeAttribute(attrNameToSet);
 		})(inputData);
 	}
 
 	data(node: Node, data: object) {
-		const ownerElement = this.toOwnerNode(node);
+		const ownerNode = this.toOwnerNode(node);
 		const nodeValue = trim(node.nodeValue ?? '');
 
 		if (this.delimiter.run(nodeValue).length !== 0)
 			return Logger.error("The “data” attribute cannot contain delimiter.");
 
-		ownerElement.removeAttribute(node.nodeName);
+		ownerNode.removeAttribute(node.nodeName);
 
 		let inputData: dynamic = {};
 		const mData = Extend.obj(data, { $data: data });
@@ -620,36 +628,37 @@ export default class Directive {
 		});
 		return this.compiler.compile({
 			data: inputData,
-			el: ownerElement,
+			el: ownerNode,
 			context: this.context,
 		});
 	}
 
 	href(node: Node, data: object) {
-		const ownerElement = this.toOwnerNode(node);
+		const ownerNode = this.toOwnerNode(node);
 		const nodeValue = trim(node.nodeValue ?? '');
 
 		if (nodeValue === '')
 			return Logger.error(this.errorMsgEmptyNode(node));
 
-		ownerElement.removeAttribute(node.nodeName);
+		ownerNode.removeAttribute(node.nodeName);
 
 		const usehash = (this.bouer.config || {}).usehash ?? true;
 		const routeToSet = urlCombine((usehash ? '#' : ''), nodeValue);
 
-		ownerElement.setAttribute('href', routeToSet);
-		const href = ownerElement.attributes['href'] as Attr;
+		ownerNode.setAttribute('href', routeToSet);
+		const href = ownerNode.attributes['href'] as Attr;
 		const delimiters = this.delimiter.run(nodeValue);
 
 		if (delimiters.length !== 0)
 			this.binder.create({
 				data: data,
-				node: connectNode(href, ownerElement),
+				node: href,
+				isConnected: () => ownerNode.isConnected,
 				context: this.context,
 				fields: delimiters
 			});
 
-		(ownerElement as HTMLAnchorElement)
+		(ownerNode as HTMLAnchorElement)
 			.addEventListener('click', event => {
 				event.preventDefault();
 
@@ -659,7 +668,7 @@ export default class Directive {
 	}
 
 	entry(node: Node, data: object) {
-		const ownerElement = this.toOwnerNode(node) as Element;
+		const ownerNode = this.toOwnerNode(node) as Element;
 		const nodeValue = trim(node.nodeValue ?? '');
 
 		if (nodeValue === '')
@@ -668,19 +677,19 @@ export default class Directive {
 		if (this.delimiter.run(nodeValue).length !== 0)
 			return Logger.error(this.errorMsgNodeValue(node));
 
-		ownerElement.removeAttribute(node.nodeName);
+		ownerNode.removeAttribute(node.nodeName);
 		IoC.Resolve<ComponentHandler>(this.bouer, ComponentHandler)!
 			.prepare([
 				{
 					name: nodeValue,
-					template: ownerElement.outerHTML,
+					template: ownerNode.outerHTML,
 					data: data
 				}
 			]);
 	}
 
 	put(node: Node, data: object) {
-		const ownerElement = this.toOwnerNode(node) as Element;
+		const ownerNode = this.toOwnerNode(node) as Element;
 		let nodeValue = trim(node.nodeValue ?? '');
 		let execute = () => { };
 
@@ -690,26 +699,27 @@ export default class Directive {
 
 		if (this.delimiter.run(nodeValue).length !== 0)
 			return Logger.error("Expected an expression with no delimiter in “"
-			+ node.nodeName +	"” and got “" + (node.nodeValue ?? '') + "”.");
+				+ node.nodeName + "” and got “" + (node.nodeValue ?? '') + "”.");
 
 		this.binder.create({
 			data: data,
-			node: connectNode(node, ownerElement),
+			node: node,
+			isConnected: () => ownerNode.isConnected,
 			fields: [{ expression: nodeValue, field: nodeValue }],
 			context: this.context,
 			isReplaceProperty: false,
 			onUpdate: () => execute()
 		});
 
-		ownerElement.removeAttribute(node.nodeName);
+		ownerNode.removeAttribute(node.nodeName);
 
 		(execute = () => {
-			ownerElement.innerHTML = '';
+			ownerNode.innerHTML = '';
 			nodeValue = trim(node.nodeValue ?? '');
 			if (nodeValue === '') return;
 
 			const componentElement = createAnyEl(nodeValue)
-				.appendTo(ownerElement)
+				.appendTo(ownerNode)
 				.build();
 
 			IoC.Resolve<ComponentHandler>(this.bouer, ComponentHandler)!
@@ -718,7 +728,7 @@ export default class Directive {
 	}
 
 	req(node: Node, data: object) {
-		const ownerElement = this.toOwnerNode(node) as Element;
+		const ownerNode = this.toOwnerNode(node) as Element;
 		const nodeName = node.nodeName;
 		const nodeValue = trim(node.nodeValue ?? '');
 
@@ -726,25 +736,19 @@ export default class Directive {
 			return Logger.error(("Expected a valid “for” expression in “" + nodeName
 				+ "” and got “" + nodeValue + "”." + "\nValid: e-req=\"item of [url]\"."));
 
-		// If it's list request type, connect ownerNode
-		if (nodeValue.includes(' of '))
-			connectNode(ownerElement, ownerElement.parentNode!);
-
-		connectNode(node, ownerElement);
-
 		const delimiters = this.delimiter.run(nodeValue);
 		const localDataStore: dynamic = {};
 
 		let onInsertOrUpdate = () => { };
 		let onUpdate = () => { };
 
-		let binderConfig: BinderConfig = {
+		let binderConfig: IBinderConfig = {
 			node: node,
 			data: data,
 			nodeName: nodeName,
 			nodeValue: nodeValue,
 			fields: delimiters,
-			parent: ownerElement,
+			parent: ownerNode,
 			value: nodeValue
 		};
 
@@ -752,22 +756,23 @@ export default class Directive {
 			binderConfig = this.binder.create({
 				data: data,
 				node: node,
-				context: this.context,
 				fields: delimiters,
+				context: this.context,
 				isReplaceProperty: false,
+				isConnected: () => ownerNode.isConnected,
 				onUpdate: () => onUpdate()
 			});
 
-		ownerElement.removeAttribute(node.nodeName);
+		ownerNode.removeAttribute(node.nodeName);
 
 		const subcribeEvent = (eventName: string) => {
-			const attr = ownerElement.attributes.getNamedItem(Constants.on + eventName);
+			const attr = ownerNode.attributes.getNamedItem(Constants.on + eventName);
 			if (attr) this.eventHandler.handle(attr, data, this.context);
 
 			return {
 				emit: (detailObj?: dynamic) => {
 					this.eventHandler.emit({
-						attachedNode: ownerElement,
+						attachedNode: ownerNode,
 						eventName: eventName,
 						init: {
 							detail: detailObj
@@ -870,7 +875,7 @@ export default class Directive {
 					// Removing the: “(...)”  “,”  and getting only the variable
 					const variable = trim(expObject.variables.split(',')[0].replace(/\(|\)/g, ''));
 					return this.compiler.compile({
-						el: ownerElement,
+						el: ownerNode,
 						data: Extend.obj({ [variable]: response.data }, data),
 						context: this.context,
 						onDone: (_, inData) => {
@@ -884,13 +889,13 @@ export default class Directive {
 
 				if (expObject.type === 'of') {
 					const forDirectiveContent = expObject.expression.replace(expObject.path, '_response_');
-					ownerElement.setAttribute(Constants.for, forDirectiveContent);
+					ownerNode.setAttribute(Constants.for, forDirectiveContent);
 
 					(data as any)._response_ = undefined;
 					defineProperty(data, '_response_', getDescriptor(response, 'data')!)
 
 					return this.compiler.compile({
-						el: ownerElement,
+						el: ownerNode,
 						data: data,
 						context: this.context,
 						onDone: (_, inData) => {
@@ -969,7 +974,7 @@ export default class Directive {
 	}
 
 	wait(node: Node) {
-		const ownerElement = this.toOwnerNode(node);
+		const ownerNode = this.toOwnerNode(node);
 		const nodeValue = trim(node.nodeValue ?? '');
 
 		if (nodeValue === '')
@@ -978,12 +983,12 @@ export default class Directive {
 		if (this.delimiter.run(nodeValue).length !== 0)
 			return Logger.error(this.errorMsgNodeValue(node));
 
-		ownerElement.removeAttribute(node.nodeName);
+		ownerNode.removeAttribute(node.nodeName);
 		const dataStore = IoC.Resolve<DataStore>(this.bouer, DataStore)!;
 		const mWait = dataStore.wait[nodeValue];
 
 		if (mWait) {
-			mWait.nodes.push(ownerElement);
+			mWait.nodes.push(ownerNode);
 			// No data exposed yet
 			if (!mWait.data) return;
 
@@ -1000,21 +1005,23 @@ export default class Directive {
 			});
 		}
 
-		return dataStore.wait[nodeValue] = { nodes: [ownerElement] };
+		return dataStore.wait[nodeValue] = { nodes: [ownerNode] };
 	}
 
 	custom(node: Node, data: object): boolean {
-		const ownerElement = this.toOwnerNode(node);
+		const ownerNode = this.toOwnerNode(node);
 		const nodeName = node.nodeName;
 		const nodeValue = trim(node.nodeValue ?? '');
 		const delimiters = this.delimiter.run(nodeValue);
 		const $directiveConfig = this.$custom[nodeName];
+
 		const bindConfig = this.binder.create({
 			data: data,
-			node: connectNode(node, ownerElement),
+			node: node,
 			fields: delimiters,
 			isReplaceProperty: false,
 			context: this.context,
+			isConnected: () => ownerNode.isConnected,
 			onUpdate: () => {
 				if (typeof $directiveConfig.update === 'function')
 					$directiveConfig.update(node, bindConfig);
@@ -1022,7 +1029,7 @@ export default class Directive {
 		});
 
 		if ($directiveConfig.removable ?? true)
-			ownerElement.removeAttribute(nodeName);
+			ownerNode.removeAttribute(nodeName);
 
 		const modifiers = nodeName.split('.');
 		modifiers.shift();
@@ -1043,7 +1050,7 @@ export default class Directive {
 
 		if (nodeValue !== '') return;
 
-		const ownerElement = this.toOwnerNode(node);
-		ownerElement.removeAttribute(node.nodeName);
+		const ownerNode = this.toOwnerNode(node);
+		ownerNode.removeAttribute(node.nodeName);
 	}
 }
