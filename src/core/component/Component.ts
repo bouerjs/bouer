@@ -1,7 +1,8 @@
+import IAsset from "../../definitions/interfaces/IAsset";
 import IComponent from "../../definitions/interfaces/IComponent";
 import ILifeCycleHooks from "../../definitions/interfaces/ILifeCycleHooks";
 import dynamic from "../../definitions/types/Dynamic";
-import EventSubscription from "../../definitions/types/EventSubscription";
+import IEventSubscription from "../../definitions/interfaces/IEventSubscription";
 import Bouer from "../../instance/Bouer";
 import IoC from "../../shared/helpers/IoC";
 import UriHandler from "../../shared/helpers/UriHandler";
@@ -9,6 +10,7 @@ import {
 	createAnyEl, forEach, isObject, isString, toLower, transferProperty, trim, where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
+import Binder from "../binder/Binder";
 import EventHandler from "../event/EventHandler";
 import Reactive from "../reactive/Reactive";
 export default class Component implements IComponent {
@@ -22,18 +24,19 @@ export default class Component implements IComponent {
 	route?: string = undefined;
 	isDefault?: boolean = undefined;
 	isNotFound?: boolean = undefined;
+	isDestroyed: boolean = false;
 
 	el?: Element = undefined;
 	bouer?: Bouer = undefined;
 	readonly children?: (Component | IComponent)[] = [];
 	readonly assets: (HTMLScriptElement | HTMLStyleElement | HTMLLinkElement)[] = [];
-  readonly restrictions?: ((component: (Component | IComponent)) => boolean | Promise<boolean>)[];
+	readonly restrictions?: ((component: (Component | IComponent)) => boolean | Promise<boolean>)[];
 	// Store temporarily this component UI orders
-	private events: EventSubscription[] = [];
+	private events: IEventSubscription[] = [];
 
 	// Hooks
-	requested?(event: CustomEvent) { };
-	created?(event: CustomEvent) { };
+	requested?(event: CustomEvent) { }
+	created?(event: CustomEvent) { }
 	beforeMount?(event: CustomEvent) { }
 	mounted?(event: CustomEvent) { }
 	beforeLoad?(event: CustomEvent) { }
@@ -41,7 +44,7 @@ export default class Component implements IComponent {
 	beforeDestroy?(event: CustomEvent) { }
 	destroyed?(event: CustomEvent) { }
 	blocked?(event: CustomEvent) { }
-	failed?(event: CustomEvent) { };
+	failed?(event: CustomEvent) { }
 
 	constructor(optionsOrPath: string | IComponent) {
 		let _name: any = undefined;
@@ -75,6 +78,13 @@ export default class Component implements IComponent {
 
 	destroy() {
 		if (!this.el) return false;
+
+		if (this.isDestroyed)
+			return;
+
+		if (!this.keepAlive)
+			this.isDestroyed = true;
+
 		this.emit('beforeDestroy');
 
 		let container = this.el.parentElement;
@@ -101,18 +111,11 @@ export default class Component implements IComponent {
 	}
 
 	on<TKey extends keyof ILifeCycleHooks>(eventName: TKey, callback: (event: CustomEvent) => void) {
-		const context = (eventName == 'beforeDestroy' ||
-			eventName == 'beforeLoad' ||
-			eventName == 'beforeMount' ||
-			eventName == 'destroyed' ||
-			eventName == 'loaded' ||
-			eventName == 'mounted') ? this : this.bouer;
-
 		const evt = IoC.Resolve<EventHandler>(this.bouer!, EventHandler)!.on({
 			eventName,
 			callback: callback as any,
 			attachedNode: this.el!,
-			context: context!
+			context: (eventName == 'requested' || eventName == 'failed' || eventName == 'blocked') ? this.bouer! : this
 		});
 		this.events.push(evt);
 		return evt;
@@ -127,12 +130,7 @@ export default class Component implements IComponent {
 		this.events = where(this.events, evt => !(evt.eventName == eventName && evt.callback == callback));
 	}
 
-	addAssets(assets: {
-		type: string,
-		src: string,
-		scoped: boolean
-	}[]) {
-
+	addAssets(assets: IAsset[]) {
 		const $assets: any[] = [];
 		const assetsTypeMapper: dynamic = {
 			js: 'script',

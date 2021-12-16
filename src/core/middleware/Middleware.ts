@@ -1,11 +1,11 @@
 import IMiddleware from "../../definitions/interfaces/IMiddleware";
 import MiddlewareConfigActions from "../../definitions/types/MiddlewareConfigActions";
-import MiddlewareObject from "../../definitions/types/MiddlewareObject";
+import IMiddlewareObject from "../../definitions/interfaces/IMiddlewareObject";
 import Bouer from "../../instance/Bouer";
 import IoC from "../../shared/helpers/IoC";
 
 export default class Middleware {
-	private middlewareConfigContainer: { [key: string]: MiddlewareObject[] } = {};
+	private middlewareConfigContainer: { [key: string]: IMiddlewareObject[] } = {};
 	bouer: Bouer;
 
 	constructor(bouer: Bouer) {
@@ -60,7 +60,7 @@ export default class Middleware {
 		if (!this.middlewareConfigContainer[directive])
 			this.middlewareConfigContainer[directive] = [];
 
-		const middleware: MiddlewareObject = {};
+		const middleware: IMiddlewareObject = {};
 
 		actions(
 			bind => middleware.bind = bind,

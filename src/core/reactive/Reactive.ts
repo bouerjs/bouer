@@ -15,6 +15,7 @@ import Watch from "../binder/Watch";
 import Component from "../component/Component";
 import ReactiveEvent from "../event/ReactiveEvent";
 import dynamic from "../../definitions/types/Dynamic";
+import IComponent from "../../definitions/interfaces/IComponent";
 
 export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 	propertyName: string;
@@ -23,12 +24,16 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 	propertyDescriptor: PropertyDescriptor | undefined;
 	watches: Array<Watch<TValue, TObject>> = [];
 	isComputed: boolean;
-	context: object;
+	context: Bouer | Component;
 
 	computedGetter?: () => any
 	computedSetter?: (value: TValue) => void
 
-	constructor(options: { propertyName: string, sourceObject: TObject, context: object }) {
+	constructor(options: {
+		propertyName: string,
+		sourceObject: TObject,
+		context: Bouer | Component
+	}) {
 		this.propertyName = options.propertyName;
 		this.propertySource = options.sourceObject;
 		this.context = options.context;
@@ -92,7 +97,7 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 					this.propertyValue = value;
 				else {
 					Reactive.transform({
-						inputObject :value,
+						inputObject: value,
 						context: this.context
 					});
 					if (!isNull(this.propertyValue))
@@ -120,7 +125,7 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 	}
 
 	static transform = <TObject>(options: {
-		context: object,
+		context: Bouer | Component,
 		inputObject: TObject,
 		reactiveObj?: Reactive<any, any>,
 	}) => {

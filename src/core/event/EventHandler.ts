@@ -1,14 +1,13 @@
 import dynamic from "../../definitions/types/Dynamic";
-import EventEmitterOptions from "../../definitions/types/EventEmitterOptions";
-import EventModifiers from "../../definitions/types/EventModifiers";
-import EventSubscription from "../../definitions/types/EventSubscription";
+import IEventEmitterOptions from "../../definitions/interfaces/IEventEmitterOptions";
+import IEventModifiers from "../../definitions/interfaces/IEventModifiers";
+import IEventSubscription from "../../definitions/interfaces/IEventSubscription";
 import Bouer from "../../instance/Bouer";
 import Constants from "../../shared/helpers/Constants";
 import IoC from "../../shared/helpers/IoC";
 import Task from "../../shared/helpers/Task";
 import {
 	buildError,
-	connectNode,
 	createEl,
 	forEach,
 	isFunction,
@@ -17,11 +16,13 @@ import {
 	where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
+import Component from "../component/Component";
 import Evaluator from "../Evaluator";
+
 export default class EventHandler {
 	bouer: Bouer;
 	evaluator: Evaluator;
-	$events: { [key: string]: EventSubscription[] } = {};
+	$events: { [key: string]: IEventSubscription[] } = {};
 	input = createEl('input').build();
 
 	constructor(bouer: Bouer) {
@@ -32,11 +33,11 @@ export default class EventHandler {
 		this.cleanup();
 	}
 
-	handle(node: Node, data: object, context: object) {
-		const ownerElement = ((node as any).ownerElement || node.parentNode) as Element;
+	handle(node: Node, data: object, context: Bouer | Component) {
+		const ownerNode = ((node as any).ownerElement || node.parentNode) as Element;
 		const nodeName = node.nodeName;
 
-		if (isNull(ownerElement))
+		if (isNull(ownerNode))
 			return Logger.error("Invalid ParentElement of “" + nodeName + "”");
 
 		// <button on:submit.once.stopPropagation="times++"></button>
@@ -51,8 +52,7 @@ export default class EventHandler {
 		if (nodeValue === '')
 			return Logger.error("Expected an expression in the “" + nodeName + "” and got an <empty string>.");
 
-		connectNode(node, ownerElement);
-		ownerElement.removeAttribute(nodeName);
+		ownerNode.removeAttribute(nodeName);
 
 		const callback = (evt: CustomEvent | Event) => {
 			// Calling the modifiers
@@ -96,20 +96,20 @@ export default class EventHandler {
 		});
 
 		if (!('on' + eventName in this.input))
-			this.on({ eventName, callback, modifiers: modifiersObject, context, attachedNode: ownerElement });
+			this.on({ eventName, callback, modifiers: modifiersObject, context, attachedNode: ownerNode });
 		else
-			ownerElement.addEventListener(eventName, callback, modifiersObject);
+			ownerNode.addEventListener(eventName, callback, modifiersObject);
 	}
 
 	on(options: {
 		eventName: string,
 		callback: (event: CustomEvent | Event) => void,
 		attachedNode?: Node,
-		context: object,
-		modifiers?: EventModifiers
+		context: Bouer | Component,
+		modifiers?: IEventModifiers
 	}) {
 		const { eventName, callback, context, attachedNode, modifiers } = options;
-		const event: EventSubscription = {
+		const event: IEventSubscription = {
 			eventName: eventName,
 			callback: evt => callback.apply(context || this.bouer, [evt]),
 			attachedNode: attachedNode,
@@ -147,7 +147,7 @@ export default class EventHandler {
 		});
 	}
 
-	emit(options: EventEmitterOptions) {
+	emit(options: IEventEmitterOptions) {
 		const { eventName, init, once, attachedNode } = options;
 		const events = this.$events[eventName];
 
