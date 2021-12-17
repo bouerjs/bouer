@@ -159,7 +159,7 @@ export default class EventHandler {
 			node.dispatchEvent(new CustomEvent(eventName, init));
 		}
 
-		forEach(events, (evt, index) => {
+		forEach(events, evt => {
 			const node = evt.attachedNode;
 
 			// If a node was provided, just dispatch the events in this node
@@ -171,10 +171,10 @@ export default class EventHandler {
 			// Otherwise, if this events has a node, dispatch the node event
 			if (node) return emitter(node, evt.callback);
 
-			// Otherwise, dispatch all events
+			// Otherwise, dispatch the event
 			evt.callback.call(this.bouer, new CustomEvent(eventName, init));
 			if ((once ?? false) === true)
-				events.splice(index, 1);
+				events.splice(events.indexOf(evt), 1);
 		});
 	}
 
@@ -186,6 +186,6 @@ export default class EventHandler {
 					if (event.attachedNode.isConnected) return true;
 				});
 			});
-		});
+		}, 1000);
 	}
 }
