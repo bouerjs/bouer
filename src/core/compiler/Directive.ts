@@ -113,7 +113,8 @@ export default class Directive {
 			conditions.push({ node: attr, element: currentEl });
 
 			if (attr.nodeName === ('e-else')) {
-				currentEl.removeAttribute(attr.nodeName); break;
+				currentEl.removeAttribute(attr.nodeName);
+				break;
 			}
 
 			// Listening to the property get only if the callback function is defined
@@ -137,19 +138,19 @@ export default class Directive {
 
 		forEach(reactives, item => {
 			this.binder.binds.push({
-				isConnected: () => container.isConnected,
+				isConnected: () => comment.isConnected,
 				watch: item.reactive.onChange(() => execute(), item.attr)
 			})
 		});
 
 		(execute = () => {
 			forEach(conditions, chainItem => {
-				if (chainItem.element.parentElement) {
-					if (comment.isConnected)
-						container.removeChild(chainItem.element);
-					else
-						container.replaceChild(comment, chainItem.element);
-				}
+				if (!chainItem.element.parentElement) return;
+
+				if (comment.isConnected)
+					container.removeChild(chainItem.element);
+				else
+					container.replaceChild(comment, chainItem.element);
 			});
 
 			const conditionalExpression = conditions.map((item, index) => {
@@ -729,6 +730,7 @@ export default class Directive {
 
 	req(node: Node, data: object) {
 		const ownerNode = this.toOwnerNode(node) as Element;
+		const container = this.toOwnerNode(ownerNode) as Element;
 		const nodeName = node.nodeName;
 		const nodeValue = trim(node.nodeValue ?? '');
 
@@ -749,7 +751,7 @@ export default class Directive {
 			nodeValue: nodeValue,
 			fields: delimiters,
 			parent: ownerNode,
-			value: nodeValue
+			value: nodeValue,
 		};
 
 		if (delimiters.length !== 0)
@@ -759,7 +761,7 @@ export default class Directive {
 				fields: delimiters,
 				context: this.context,
 				isReplaceProperty: false,
-				isConnected: () => ownerNode.isConnected,
+				isConnected: () => container.isConnected,
 				onUpdate: () => onUpdate()
 			});
 
@@ -838,10 +840,6 @@ export default class Directive {
 		}
 
 		const middleware = IoC.Resolve<Middleware>(this.bouer, Middleware)!;
-		const requestEvent = subcribeEvent(Constants.builtInEvents.request);
-		const responseEvent = subcribeEvent(Constants.builtInEvents.response);
-		const failEvent = subcribeEvent(Constants.builtInEvents.fail);
-		const doneEvent = subcribeEvent(Constants.builtInEvents.done);
 		const dataKey = (node.nodeName.split(':')[1] || '').replace(/\[|\]/g, '');
 
 		(onInsertOrUpdate = () => {
@@ -855,7 +853,7 @@ export default class Directive {
 					inputObject: response
 				});
 
-				responseEvent.emit({
+				subcribeEvent(Constants.builtInEvents.response).emit({
 					response: response
 				});
 
@@ -908,7 +906,7 @@ export default class Directive {
 				}
 			}
 
-			requestEvent.emit();
+			subcribeEvent(Constants.builtInEvents.request).emit();
 
 			middleware.run('req', {
 				type: 'bind',
@@ -926,10 +924,10 @@ export default class Directive {
 						success: (response: any) => {
 							responseHandler(response);
 						},
-						fail: (error: any) => failEvent.emit({
+						fail: (error: any) => subcribeEvent(Constants.builtInEvents.fail).emit({
 							error: error
 						}),
-						done: () => doneEvent.emit()
+						done: () => subcribeEvent(Constants.builtInEvents.done).emit()
 					};
 
 					middleware(context, cbs);
@@ -961,10 +959,10 @@ export default class Directive {
 
 							localDataStore.data = response.data;
 						},
-						fail: (error: any) => failEvent.emit({
+						fail: (error: any) => subcribeEvent(Constants.builtInEvents.fail).emit({
 							error: error
 						}),
-						done: () => doneEvent.emit()
+						done: () => subcribeEvent(Constants.builtInEvents.done).emit()
 					};
 
 					middleware(context, cbs);
