@@ -1347,6 +1347,7 @@ var ComponentHandler = /** @class */ (function () {
             forEach(_this.requests[url], function (request) {
                 request.success(content, url);
             });
+            delete _this.requests[url];
         })
             .catch(function (error) {
             if (!hasBaseElement)
@@ -1355,8 +1356,6 @@ var ComponentHandler = /** @class */ (function () {
             forEach(_this.requests[url], function (request) {
                 request.fail(error, url);
             });
-        })
-            .finally(function () {
             delete _this.requests[url];
         });
     };
@@ -1806,9 +1805,16 @@ var Middleware = /** @class */ (function () {
                         Promise.resolve(middlewareAction(config, function () {
                             isNext = true;
                         }))
-                            .then(function (value) { return isNext ? null : cbs.success(value); })
-                            .catch(function (error) { return isNext ? null : cbs.fail(error); })
-                            .finally(function () { return isNext ? null : cbs.done(); });
+                            .then(function (value) {
+                            if (!isNext)
+                                cbs.success(value);
+                            cbs.done();
+                        })
+                            .catch(function (error) {
+                            if (!isNext)
+                                cbs.fail(error);
+                            cbs.done();
+                        });
                     });
                 }
                 else {
@@ -3062,7 +3068,7 @@ var Binder = /** @class */ (function () {
             });
             callback_1(this.BindingDirection.fromDataToInput, boundPropertyValue_1);
             var listeners = ['input', 'propertychange', 'change'];
-            if (!listeners.includes(ownerNode.localName))
+            if (listeners.indexOf(ownerNode.localName) === -1)
                 listeners.push(ownerNode.localName);
             // Applying the events
             forEach(listeners, function (listener) {
@@ -3401,8 +3407,7 @@ var Bouer = /** @class */ (function () {
         if (typeof options.middleware === 'function')
             options.middleware.call(this, middleware.register, this);
         // Transform the data properties into a reative
-        this.data = options.data;
-        Reactive.transform({
+        this.data = Reactive.transform({
             inputObject: options.data || {},
             context: this
         });
@@ -3562,6 +3567,7 @@ var Bouer = /** @class */ (function () {
      * @returns the object with the data setted
      */
     Bouer.prototype.set = function (inputData, targetObject) {
+        if (targetObject === void 0) { targetObject = this.data; }
         if (!isObject(inputData)) {
             Logger.error('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".');
             return targetObject;
@@ -3570,14 +3576,11 @@ var Bouer = /** @class */ (function () {
             Logger.error('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".');
             return inputData;
         }
-        targetObject = targetObject || this.data;
         // Transforming the input
         Reactive.transform({
             inputObject: inputData,
             context: this
         });
-        // Assining
-        Object.assign(targetObject, inputData);
         // Transfering the properties
         forEach(Object.keys(inputData), function (key) { return transferProperty(targetObject, inputData, key); });
         return targetObject;
