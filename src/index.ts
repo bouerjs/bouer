@@ -1,11 +1,10 @@
 import Bouer from "./instance/Bouer";
 import Component from "./core/component/Component";
-import IBouer from "./definitions/interfaces/IBouer";
-import IComponent from "./definitions/interfaces/IComponent";
+import IBouerOptions from "./definitions/interfaces/IBouerOptions";
+import IComponentOptions from "./definitions/interfaces/IComponentOptions";
 import Watch from "./core/binder/Watch";
 import Reactive from "./core/reactive/Reactive";
 import MiddlewareConfigActions from "./definitions/types/MiddlewareConfigActions";
-import IProperty from "./definitions/interfaces/IProperty";
 import IBinderConfig from "./definitions/interfaces/IBinderConfig";
 import IDelimiter from "./definitions/interfaces/IDelimiter";
 import IDelimiterResponse from "./definitions/interfaces/IDelimiterResponse";
@@ -18,15 +17,14 @@ import IAsset from "./definitions/interfaces/IAsset";
 
 export {
 	Bouer as default,
-	IBouer,
+	IBouerOptions,
 
 	Component,
-	IComponent,
+	IComponentOptions,
 
 	Watch,
 	WatchCallback,
 	Reactive,
-	IProperty,
 
 	MiddlewareConfigActions,
 	IMiddleware,
