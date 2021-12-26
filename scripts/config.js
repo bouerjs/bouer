@@ -26,20 +26,20 @@ const builds = {
     extra: {
       transpile: false
     },
-    input: resolve('src', 'browser.ts'),
+    input: resolve('src', 'instance/Bouer.ts'),
     output: {
       file: outputName('bouer.js'),
     }
   },
   'cjs-common-js': {
-    input: resolve('src', 'common.ts'),
+    input: resolve('src', 'index.ts'),
     output: {
       file: outputName('bouer.common.js'),
       exports: "named"
     }
   },
   'es-browser-esm': {
-    input: resolve('src', 'browser.esm.ts'),
+    input: resolve('src', 'index.ts'),
     output: {
       file: outputName('bouer.esm.js'),
       exports: "named"

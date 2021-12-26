@@ -3,55 +3,6 @@
  * Copyright Easy.js 2018-2020 | 2021-2021 Afonso Matumona
  * Released under the MIT License.
  */
-/**
- * Store instances of classes to provide any where of
- * the application, but not via constructor.
- * @see https://www.tutorialsteacher.com/ioc/ioc-container
- */
-var IoC = /** @class */ (function () {
-    function IoC() {
-    }
-    /**
-     * Register an instance into the DI container
-     * @param obj the instance to be store
-     */
-    IoC.Register = function (obj) {
-        var objAsAny = obj;
-        if (!this.container[objAsAny.bouer.__id__])
-            this.container[objAsAny.bouer.__id__] = {};
-        this.container[objAsAny.bouer.__id__][objAsAny.constructor.name] = {
-            app: objAsAny.bouer,
-            ClassInstance: obj
-        };
-    };
-    /**
-     * Resolve and Retrieve the instance registered
-     * @param app the application
-     * @param $class the class registered
-     * @returns the instance of the class
-     */
-    IoC.Resolve = function (app, $class) {
-        if (app.isDestroyed)
-            throw new Error("Application already disposed.");
-        var appContainer = this.container[app.__id__];
-        var mContainer = appContainer[$class.name];
-        return mContainer.ClassInstance;
-    };
-    /**
-     * Destroy an instance registered
-     * @param key the name of the class registered
-     */
-    IoC.Dispose = function (bouer) {
-        delete this.container[bouer.__id__];
-    };
-    IoC.GetId = function () {
-        return IoC.identifierController++;
-    };
-    IoC.identifierController = 1;
-    IoC.container = {};
-    return IoC;
-}());
-
 // Quotes “"+  +"”
 function webRequest(url, options) {
     if (!url)
@@ -337,63 +288,114 @@ function buildError(error) {
     error.stack = '';
     return error;
 }
-/**
- * Used to Bind the `isConnected` property of a node to another
- * in order to avoid binding cleanup where the element is not in the DOM
- */
-function connectNode(node, nodeToConnectWith) {
-    defineProperty(node, 'isConnected', { get: function () { return nodeToConnectWith.isConnected; } });
-    return node;
-}
 var DOM = document;
 var GLOBAL = globalThis;
 var anchor = createEl('a').build();
 
-var UriHandler = /** @class */ (function () {
-    function UriHandler(url) {
-        this.url = url || DOM.location.href;
-    }
-    UriHandler.prototype.params = function (urlPattern) {
+var Constants = {
+    skip: 'e-skip',
+    build: 'e-build',
+    array: 'e-array',
+    if: 'e-if',
+    elseif: 'e-else-if',
+    else: 'e-else',
+    show: 'e-show',
+    req: 'e-req',
+    for: 'e-for',
+    data: 'data',
+    def: 'e-def',
+    wait: 'wait-data',
+    content: 'e-content',
+    bind: 'e-bind',
+    property: 'e-',
+    skeleton: 'e-skeleton',
+    route: 'route-view',
+    href: ':href',
+    entry: 'e-entry',
+    on: 'on:',
+    silent: 'silent',
+    slot: 'slot',
+    ref: 'ref',
+    put: 'e-put',
+    builtInEvents: {
+        add: 'add',
+        compile: 'compile',
+        request: 'request',
+        response: 'response',
+        fail: 'fail',
+        done: 'done',
+    },
+    check: function (node, cmd) {
+        return startWith(node.nodeName, cmd);
+    },
+    isConstant: function (value) {
         var _this = this;
-        var mParams = {};
-        var buildQueryParams = function () {
-            // Building from query string
-            var queryStr = _this.url.split('?')[1];
-            if (!queryStr)
-                return _this;
-            var keys = queryStr.split('&');
-            forEach(keys, function (key) {
-                var pair = key.split('=');
-                mParams[pair[0]] = (pair[1] || '').split('#')[0];
-            });
-        };
-        if (urlPattern && isString(urlPattern)) {
-            var urlWithQueryParamsIgnored = this.url.split('?')[0];
-            var urlPartsReversed_1 = urlWithQueryParamsIgnored.split('/').reverse();
-            if (urlPartsReversed_1[0] === '')
-                urlPartsReversed_1.shift();
-            var urlPatternReversed = urlPattern.split('/').reverse();
-            forEach(urlPatternReversed, function (value, index) {
-                var valueExec = RegExp("{([\\S\\s]*?)}").exec(value);
-                if (Array.isArray(valueExec))
-                    mParams[valueExec[1]] = urlPartsReversed_1[index];
-            });
-        }
-        buildQueryParams();
-        return mParams;
+        return (Object.keys(this).map(function (key) { return _this[key]; }).indexOf(value) !== -1);
+    }
+};
+
+/**
+ * Store instances of classes to provide as service any where
+ * of the application, but not via constructor.
+ * @see https://www.tutorialsteacher.com/ioc/ioc-container
+ */
+var IoC = /** @class */ (function () {
+    function IoC() {
+    }
+    /**
+     * Register an instance into the DI container
+     * @param obj the instance to be store
+     */
+    IoC.Register = function (obj) {
+        var _a;
+        var objAsAny = obj;
+        var bouer = objAsAny.bouer;
+        var services;
+        var serviceName = objAsAny.constructor.name;
+        if (!(services = this.container.get(bouer)))
+            return this.container.set(bouer, (_a = {},
+                _a[serviceName] = obj,
+                _a));
+        services[serviceName] = obj;
     };
-    UriHandler.prototype.add = function (params) {
-        var mParams = [];
-        forEach(Object.keys(params), function (key) {
-            mParams.push(key + '=' + params[key]);
-        });
-        var joined = mParams.join('&');
-        return (this.url.includes('?')) ? '&' + joined : '?' + joined;
+    /**
+     * Resolve and Retrieve the instance registered
+     * @param app the application
+     * @param $class the class registered
+     * @returns the instance of the class
+     */
+    IoC.Resolve = function (app, $class) {
+        if (app.isDestroyed)
+            throw new Error("Application already disposed.");
+        var services = this.container.get(app);
+        if (!services)
+            throw new Error("Application not registered!");
+        return services[$class.name];
     };
-    UriHandler.prototype.remove = function (param) {
-        return param;
+    /**
+     * Destroy an instance registered
+     * @param key the name of the class registered
+     */
+    IoC.Dispose = function (app) {
+        return this.container.delete(app);
     };
-    return UriHandler;
+    IoC.GetId = function () {
+        return IoC.identifierController++;
+    };
+    IoC.identifierController = 1;
+    IoC.container = new Map();
+    return IoC;
+}());
+
+var Task = /** @class */ (function () {
+    function Task() {
+    }
+    Task.run = function (callback, milliseconds) {
+        var t_id = setInterval(function () {
+            callback(function () { return clearInterval(t_id); });
+        }, milliseconds || 1000);
+    };
+    return Task;
 }());
 
 function __spreadArray(to, from, pack) {
@@ -439,59 +441,6 @@ var Logger = /** @class */ (function () {
     };
     Logger.prefix = '[Bouer]';
     return Logger;
-}());
-
-var Constants = {
-    skip: 'e-skip',
-    build: 'e-build',
-    array: 'e-array',
-    if: 'e-if',
-    elseif: 'e-else-if',
-    else: 'e-else',
-    show: 'e-show',
-    req: 'e-req',
-    for: 'e-for',
-    data: 'data',
-    def: 'e-def',
-    wait: 'wait-data',
-    content: 'e-content',
-    bind: 'e-bind',
-    property: 'e-',
-    skeleton: 'e-skeleton',
-    route: 'route-view',
-    href: ':href',
-    entry: 'e-entry',
-    on: 'on:',
-    silent: 'silent',
-    slot: 'slot',
-    ref: 'ref',
-    put: 'e-put',
-    builtInEvents: {
-        add: 'add',
-        compile: 'compile',
-        request: 'request',
-        response: 'response',
-        fail: 'fail',
-        done: 'done',
-    },
-    check: function (node, cmd) {
-        return startWith(node.nodeName, cmd);
-    },
-    isConstant: function (value) {
-        var _this = this;
-        return (Object.keys(this).map(function (key) { return _this[key]; }).indexOf(value) !== -1);
-    }
-};
-
-var Task = /** @class */ (function () {
-    function Task() {
-    }
-    Task.run = function (callback, milliseconds) {
-        var t_id = setInterval(function () {
-            callback(function () { return clearInterval(t_id); });
-        }, milliseconds || 1000);
-    };
-    return Task;
 }());
 
 var Extend = /** @class */ (function () {
@@ -543,6 +492,51 @@ var Extend = /** @class */ (function () {
         return out;
     };
     return Extend;
+}());
+
+var DelimiterHandler = /** @class */ (function () {
+    function DelimiterHandler(delimiters, bouer) {
+        this.delimiters = [];
+        this.bouer = bouer;
+        this.delimiters = delimiters;
+        IoC.Register(this);
+    }
+    DelimiterHandler.prototype.add = function (item) {
+        this.delimiters.push(item);
+    };
+    DelimiterHandler.prototype.remove = function (name) {
+        var index = this.delimiters.findIndex(function (item) { return item.name === name; });
+        this.delimiters.splice(index, 1);
+    };
+    DelimiterHandler.prototype.run = function (content) {
+        var _this = this;
+        if (isNull(content) || trim(content) === '')
+            return [];
+        var mDelimiter = null;
+        var checkContent = function (text, flag) {
+            var center = '([\\S\\s]*?)';
+            for (var i = 0; i < _this.delimiters.length; i++) {
+                var delimiter = _this.delimiters[i];
+                var result_1 = text.match(RegExp(delimiter.delimiter.open + center + delimiter.delimiter.close, flag || ''));
+                if (result_1) {
+                    mDelimiter = delimiter;
+                    return result_1;
+                }
+            }
+        };
+        var result = checkContent(content, 'g');
+        if (!result)
+            return [];
+        return result.map(function (item) {
+            var matches = checkContent(item);
+            return {
+                field: matches[0],
+                expression: trim(matches[1]),
+                delimiter: mDelimiter
+            };
+        });
+    };
+    return DelimiterHandler;
 }());
 
 var Evaluator = /** @class */ (function () {
@@ -630,9 +624,9 @@ var EventHandler = /** @class */ (function () {
     EventHandler.prototype.handle = function (node, data, context) {
         var _this = this;
         var _a;
-        var ownerElement = (node.ownerElement || node.parentNode);
+        var ownerNode = (node.ownerElement || node.parentNode);
         var nodeName = node.nodeName;
-        if (isNull(ownerElement))
+        if (isNull(ownerNode))
             return Logger.error("Invalid ParentElement of “" + nodeName + "”");
         // <button on:submit.once.stopPropagation="times++"></button>
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
@@ -642,8 +636,7 @@ var EventHandler = /** @class */ (function () {
         allModifiers.shift();
         if (nodeValue === '')
             return Logger.error("Expected an expression in the “" + nodeName + "” and got an <empty string>.");
-        connectNode(node, ownerElement);
-        ownerElement.removeAttribute(nodeName);
+        ownerNode.removeAttribute(nodeName);
         var callback = function (evt) {
             // Calling the modifiers
             var availableModifiersFunction = {
@@ -681,9 +674,9 @@ var EventHandler = /** @class */ (function () {
             }
         });
         if (!('on' + eventName in this.input))
-            this.on({ eventName: eventName, callback: callback, modifiers: modifiersObject, context: context, attachedNode: ownerElement });
+            this.on({ eventName: eventName, callback: callback, modifiers: modifiersObject, context: context, attachedNode: ownerNode });
         else
-            ownerElement.addEventListener(eventName, callback, modifiersObject);
+            ownerNode.addEventListener(eventName, callback, modifiersObject);
     };
     EventHandler.prototype.on = function (options) {
         var _this = this;
@@ -725,7 +718,7 @@ var EventHandler = /** @class */ (function () {
             node.addEventListener(eventName, callback, { once: true });
             node.dispatchEvent(new CustomEvent(eventName, init));
         };
-        forEach(events, function (evt, index) {
+        forEach(events, function (evt) {
             var node = evt.attachedNode;
             // If a node was provided, just dispatch the events in this node
             if (attachedNode) {
@@ -736,10 +729,10 @@ var EventHandler = /** @class */ (function () {
             // Otherwise, if this events has a node, dispatch the node event
             if (node)
                 return emitter(node, evt.callback);
-            // Otherwise, dispatch all events
+            // Otherwise, dispatch the event
             evt.callback.call(_this.bouer, new CustomEvent(eventName, init));
             if ((once !== null && once !== void 0 ? once : false) === true)
-                events.splice(index, 1);
+                events.splice(events.indexOf(evt), 1);
         });
     };
     EventHandler.prototype.cleanup = function () {
@@ -753,54 +746,9 @@ var EventHandler = /** @class */ (function () {
                         return true;
                 });
             });
-        });
+        }, 1000);
     };
     return EventHandler;
-}());
-
-var DelimiterHandler = /** @class */ (function () {
-    function DelimiterHandler(delimiters, bouer) {
-        this.delimiters = [];
-        this.bouer = bouer;
-        this.delimiters = delimiters;
-        IoC.Register(this);
-    }
-    DelimiterHandler.prototype.add = function (item) {
-        this.delimiters.push(item);
-    };
-    DelimiterHandler.prototype.remove = function (name) {
-        var index = this.delimiters.findIndex(function (item) { return item.name === name; });
-        this.delimiters.splice(index, 1);
-    };
-    DelimiterHandler.prototype.run = function (content) {
-        var _this = this;
-        if (isNull(content) || trim(content) === '')
-            return [];
-        var mDelimiter = null;
-        var checkContent = function (text, flag) {
-            var center = '([\\S\\s]*?)';
-            for (var i = 0; i < _this.delimiters.length; i++) {
-                var delimiter = _this.delimiters[i];
-                var result_1 = text.match(RegExp(delimiter.delimiter.open + center + delimiter.delimiter.close, flag || ''));
-                if (result_1) {
-                    mDelimiter = delimiter;
-                    return result_1;
-                }
-            }
-        };
-        var result = checkContent(content, 'g');
-        if (!result)
-            return [];
-        return result.map(function (item) {
-            var matches = checkContent(item);
-            return {
-                field: matches[0],
-                expression: trim(matches[1]),
-                delimiter: mDelimiter
-            };
-        });
-    };
-    return DelimiterHandler;
 }());
 
 var ReactiveEvent = /** @class */ (function () {
@@ -849,6 +797,374 @@ var ReactiveEvent = /** @class */ (function () {
     ReactiveEvent.BeforeSet = [];
     ReactiveEvent.AfterSet = [];
     return ReactiveEvent;
+}());
+
+var Watch = /** @class */ (function () {
+    function Watch(reactive, callback, options) {
+        var _this = this;
+        this.destroy = function () {
+            var indexOfThis = _this.reactive.watches.indexOf(_this);
+            if (indexOfThis !== -1)
+                _this.reactive.watches.splice(indexOfThis, 1);
+            if (_this.onDestroy)
+                _this.onDestroy();
+        };
+        this.reactive = reactive;
+        this.property = reactive.propertyName;
+        this.callback = callback;
+        if (options) {
+            this.node = options.node;
+            this.onDestroy = options.onDestroy;
+        }
+    }
+    return Watch;
+}());
+
+var UriHandler = /** @class */ (function () {
+    function UriHandler(url) {
+        this.url = url || DOM.location.href;
+    }
+    UriHandler.prototype.params = function (urlPattern) {
+        var _this = this;
+        var mParams = {};
+        var buildQueryParams = function () {
+            // Building from query string
+            var queryStr = _this.url.split('?')[1];
+            if (!queryStr)
+                return _this;
+            var keys = queryStr.split('&');
+            forEach(keys, function (key) {
+                var pair = key.split('=');
+                mParams[pair[0]] = (pair[1] || '').split('#')[0];
+            });
+        };
+        if (urlPattern && isString(urlPattern)) {
+            var urlWithQueryParamsIgnored = this.url.split('?')[0];
+            var urlPartsReversed_1 = urlWithQueryParamsIgnored.split('/').reverse();
+            if (urlPartsReversed_1[0] === '')
+                urlPartsReversed_1.shift();
+            var urlPatternReversed = urlPattern.split('/').reverse();
+            forEach(urlPatternReversed, function (value, index) {
+                var valueExec = RegExp("{([\\S\\s]*?)}").exec(value);
+                if (Array.isArray(valueExec))
+                    mParams[valueExec[1]] = urlPartsReversed_1[index];
+            });
+        }
+        buildQueryParams();
+        return mParams;
+    };
+    UriHandler.prototype.add = function (params) {
+        var mParams = [];
+        forEach(Object.keys(params), function (key) {
+            mParams.push(key + '=' + params[key]);
+        });
+        var joined = mParams.join('&');
+        return (this.url.includes('?')) ? '&' + joined : '?' + joined;
+    };
+    UriHandler.prototype.remove = function (param) {
+        return param;
+    };
+    return UriHandler;
+}());
+
+var Component = /** @class */ (function () {
+    function Component(optionsOrPath) {
+        this.prefetch = false;
+        this.title = undefined;
+        this.route = undefined;
+        this.isDefault = undefined;
+        this.isNotFound = undefined;
+        this.isDestroyed = false;
+        this.el = undefined;
+        this.bouer = undefined;
+        this.children = [];
+        this.assets = [];
+        // Store temporarily this component UI orders
+        this.events = [];
+        var _name = undefined;
+        var _path = undefined;
+        if (!isString(optionsOrPath)) {
+            _name = optionsOrPath.name;
+            _path = optionsOrPath.path;
+            Object.assign(this, optionsOrPath);
+        }
+        else {
+            _path = optionsOrPath;
+        }
+        this.name = _name;
+        this.path = _path;
+        this.data = Reactive.transform({
+            context: this,
+            inputObject: this.data || {}
+        });
+    }
+    // Hooks
+    Component.prototype.requested = function (event) { };
+    Component.prototype.created = function (event) { };
+    Component.prototype.beforeMount = function (event) { };
+    Component.prototype.mounted = function (event) { };
+    Component.prototype.beforeLoad = function (event) { };
+    Component.prototype.loaded = function (event) { };
+    Component.prototype.beforeDestroy = function (event) { };
+    Component.prototype.destroyed = function (event) { };
+    Component.prototype.blocked = function (event) { };
+    Component.prototype.failed = function (event) { };
+    Component.prototype.export = function (options) {
+        var _this = this;
+        if (!isObject(options))
+            return Logger.log("Invalid object for component.export(...), only \"Object Literal\" is allowed.");
+        return forEach(Object.keys(options), function (key) {
+            _this.data[key] = options[key];
+            transferProperty(_this.data, options, key);
+        });
+    };
+    Component.prototype.destroy = function () {
+        var _this = this;
+        if (!this.el)
+            return false;
+        if (this.isDestroyed)
+            return;
+        if (!this.keepAlive)
+            this.isDestroyed = true;
+        this.emit('beforeDestroy');
+        var container = this.el.parentElement;
+        if (container)
+            container.removeChild(this.el) !== null;
+        // Destroying all the events attached to the this instance
+        forEach(this.events, function (evt) { return _this.off(evt.eventName, evt.callback); });
+        this.events = [];
+        this.emit('destroyed');
+    };
+    Component.prototype.params = function () {
+        return new UriHandler().params(this.route);
+    };
+    Component.prototype.emit = function (eventName, init) {
+        IoC.Resolve(this.bouer, EventHandler).emit({
+            eventName: eventName,
+            attachedNode: this.el,
+            init: init
+        });
+    };
+    Component.prototype.on = function (eventName, callback) {
+        var context = (eventName == 'requested' || eventName == 'failed' || eventName == 'blocked') ? this.bouer : this;
+        var evt = IoC.Resolve(this.bouer, EventHandler).on({
+            eventName: eventName,
+            callback: callback,
+            attachedNode: this.el,
+            context: context
+        });
+        this.events.push(evt);
+        return evt;
+    };
+    Component.prototype.off = function (eventName, callback) {
+        IoC.Resolve(this.bouer, EventHandler).off({
+            eventName: eventName,
+            callback: callback,
+            attachedNode: this.el
+        });
+        this.events = where(this.events, function (evt) { return !(evt.eventName == eventName && evt.callback == callback); });
+    };
+    Component.prototype.addAssets = function (assets) {
+        var $assets = [];
+        var assetsTypeMapper = {
+            js: 'script',
+            css: 'link',
+            style: 'link'
+        };
+        forEach(assets, function (asset, index) {
+            if (!asset.src || !trim(asset.src))
+                return Logger.error('Invalid asset “src”, in assets[' + index + '].src');
+            var type = '';
+            if (!asset.type) {
+                var srcSplitted = asset.src.split('.');
+                type = assetsTypeMapper[toLower(srcSplitted[srcSplitted.length - 1])];
+                if (!type)
+                    return Logger.error("Couldn't find out what type of asset it is, provide " +
+                        "the “type” explicitly at assets[" + index + "].type");
+            }
+            else {
+                asset.type = toLower(asset.type);
+                type = assetsTypeMapper[asset.type] || asset.type;
+            }
+            var $asset = createAnyEl(type, function (el) {
+                var _a;
+                if ((_a = asset.scoped) !== null && _a !== void 0 ? _a : true)
+                    el.setAttribute('scoped', 'true');
+                switch (toLower(type)) {
+                    case 'script':
+                        el.setAttribute('src', asset.src);
+                        break;
+                    case 'link':
+                        el.setAttribute('href', asset.src);
+                        el.setAttribute('rel', 'stylesheet');
+                        el.setAttribute('type', 'text/css');
+                        break;
+                    default:
+                        el.setAttribute('src', asset.src);
+                        break;
+                }
+            }).build();
+            $assets.push($asset);
+        });
+        this.assets.push.apply(this.assets, $assets);
+    };
+    return Component;
+}());
+
+var Reactive = /** @class */ (function () {
+    function Reactive(options) {
+        var _this = this;
+        this.watches = [];
+        this.get = function () {
+            ReactiveEvent.emit('BeforeGet', _this);
+            _this.propertyValue = _this.isComputed ? _this.computedGetter() : _this.propertyValue;
+            var value = _this.propertyValue;
+            ReactiveEvent.emit('AfterGet', _this);
+            return value;
+        };
+        this.set = function (value) {
+            var oldPropertyValue = _this.propertyValue;
+            if (oldPropertyValue === value)
+                return;
+            ReactiveEvent.emit('BeforeSet', _this);
+            if (isObject(value) || Array.isArray(value)) {
+                if ((typeof _this.propertyValue) !== (typeof value))
+                    return Logger.error(("Cannot set “" + (typeof value) + "” in “" +
+                        _this.propertyName + "” property."));
+                if (Array.isArray(value)) {
+                    Reactive.transform({
+                        inputObject: value,
+                        reactiveObj: _this,
+                        context: _this.context
+                    });
+                    var propValueAsAny = _this.propertyValue;
+                    propValueAsAny.splice(0, propValueAsAny.length);
+                    propValueAsAny.push.apply(propValueAsAny, value);
+                }
+                else if (isObject(value)) {
+                    if ((value instanceof Node)) // If some html element
+                        _this.propertyValue = value;
+                    else {
+                        Reactive.transform({
+                            inputObject: value,
+                            context: _this.context
+                        });
+                        if (!isNull(_this.propertyValue))
+                            mapper(value, _this.propertyValue);
+                        else
+                            _this.propertyValue = value;
+                    }
+                }
+            }
+            else {
+                _this.propertyValue = value;
+            }
+            if (_this.isComputed && _this.computedSetter)
+                _this.computedSetter(value);
+            ReactiveEvent.emit('AfterSet', _this);
+            // Calling all the watches
+            forEach(_this.watches, function (watch) { return watch.callback(_this.propertyValue, oldPropertyValue); });
+        };
+        this.propertyName = options.propertyName;
+        this.propertySource = options.sourceObject;
+        this.context = options.context;
+        // Setting the value of the property
+        this.propertyDescriptor = getDescriptor(this.propertySource, this.propertyName);
+        this.propertyValue = this.propertyDescriptor.value;
+        this.isComputed = typeof this.propertyValue === 'function' && this.propertyValue.name === '$computed';
+        if (this.isComputed) {
+            var computedResult = this.propertyValue.call(this.context);
+            if ('get' in computedResult || isFunction(computedResult)) {
+                this.computedGetter = computedResult.get || computedResult;
+            }
+            if ('set' in computedResult) {
+                this.computedSetter = computedResult.set;
+            }
+            if (!this.computedGetter)
+                throw new Error("Computed property must be a function “function $computed(){...}” " +
+                    "that returns a function for “getter only” or an object with a “get” and/or “set” function");
+            this.propertyValue = undefined;
+        }
+        if (typeof this.propertyValue === 'function' && !this.isComputed)
+            this.propertyValue = this.propertyValue.bind(this.context);
+    }
+    Reactive.prototype.onChange = function (callback, node) {
+        var w = new Watch(this, callback, { node: node });
+        this.watches.push(w);
+        return w;
+    };
+    Reactive.transform = function (options) {
+        var context = options.context;
+        var executer = function (inputObject, reactiveObj, visiting, visited) {
+            if (Array.isArray(inputObject)) {
+                if (reactiveObj == null) {
+                    Logger.warn('Cannot transform this array to a reactive one because no reactive objecto was provided');
+                    return inputObject;
+                }
+                if (visiting.indexOf(inputObject) !== -1)
+                    return inputObject;
+                visiting === null || visiting === void 0 ? void 0 : visiting.push(inputObject);
+                var REACTIVE_ARRAY_METHODS = ['push', 'pop', 'unshift', 'shift', 'splice'];
+                var inputArray_1 = inputObject;
+                var reference_1 = {}; // Using clousure to cache the array methods
+                var prototype_1 = inputArray_1.__proto__ = Object.create(Array.prototype);
+                forEach(REACTIVE_ARRAY_METHODS, function (method) {
+                    // cache original method
+                    reference_1[method] = inputArray_1[method].bind(inputArray_1);
+                    // changing to the reactive one
+                    prototype_1[method] = function reactive() {
+                        var oldArrayValue = inputArray_1.slice();
+                        switch (method) {
+                            case 'push':
+                            case 'unshift':
+                                forEach(toArray(arguments), function (arg) {
+                                    if (!isObject(arg) && !Array.isArray(arg))
+                                        return;
+                                    executer(arg);
+                                });
+                        }
+                        var result = reference_1[method].apply(inputArray_1, arguments);
+                        forEach(reactiveObj.watches, function (watch) { return watch.callback(inputArray_1, oldArrayValue); });
+                        return result;
+                    };
+                });
+                return inputArray_1;
+            }
+            if (!isObject(inputObject))
+                return inputObject;
+            if (visiting.indexOf(inputObject) !== -1)
+                return inputObject;
+            visiting === null || visiting === void 0 ? void 0 : visiting.push(inputObject);
+            forEach(Object.keys(inputObject), function (key) {
+                var mInputObject = inputObject;
+                // Already a reactive property, do nothing
+                if (isNull(getDescriptor(inputObject, key).value))
+                    return;
+                var propertyValue = mInputObject[key];
+                if (propertyValue && (propertyValue instanceof Bouer) ||
+                    (propertyValue instanceof Component) ||
+                    (propertyValue instanceof Node))
+                    return;
+                var reactive = new Reactive({
+                    propertyName: key,
+                    sourceObject: inputObject,
+                    context: context
+                });
+                defineProperty(inputObject, key, reactive);
+                if (isObject(propertyValue))
+                    executer(propertyValue);
+                else if (Array.isArray(propertyValue)) {
+                    executer(propertyValue, reactive); // Transform the array to a reactive one
+                    forEach(propertyValue, function (item) { return executer(item); });
+                }
+            });
+            visiting === null || visiting === void 0 ? void 0 : visiting.splice(visiting.indexOf(inputObject), 1);
+            visited === null || visited === void 0 ? void 0 : visited.push(inputObject);
+            return inputObject;
+        };
+        return executer(options.inputObject, options.reactiveObj, [], []);
+    };
+    return Reactive;
 }());
 
 var Routing = /** @class */ (function () {
@@ -1571,8 +1887,8 @@ var Directive = /** @class */ (function () {
     Directive.prototype.if = function (node, data) {
         var _this = this;
         var _a, _b;
-        var ownerElement = this.toOwnerNode(node);
-        var container = ownerElement.parentElement;
+        var ownerNode = this.toOwnerNode(node);
+        var container = ownerNode.parentElement;
         if (!container)
             return;
         var conditions = [];
@@ -1581,7 +1897,7 @@ var Directive = /** @class */ (function () {
         var execute = function () { };
         if (nodeName === Constants.elseif || nodeName === Constants.else)
             return;
-        var currentEl = ownerElement;
+        var currentEl = ownerNode;
         var reactives = [];
         var _loop_1 = function () {
             if (currentEl == null)
@@ -1597,8 +1913,6 @@ var Directive = /** @class */ (function () {
             if (this_1.delimiter.run((_b = attr.nodeValue) !== null && _b !== void 0 ? _b : '').length !== 0)
                 return { value: Logger.error(this_1.errorMsgNodeValue(attr)) };
             conditions.push({ node: attr, element: currentEl });
-            connectNode(currentEl, container);
-            connectNode(attr, container);
             if (attr.nodeName === ('e-else')) {
                 currentEl.removeAttribute(attr.nodeName);
                 return "break";
@@ -1628,16 +1942,19 @@ var Directive = /** @class */ (function () {
                 break;
         } while (currentEl = currentEl.nextElementSibling);
         forEach(reactives, function (item) {
-            return _this.binder.binds.push(item.reactive.onChange(function () { return execute(); }, item.attr));
+            _this.binder.binds.push({
+                isConnected: function () { return comment.isConnected; },
+                watch: item.reactive.onChange(function () { return execute(); }, item.attr)
+            });
         });
         (execute = function () {
             forEach(conditions, function (chainItem) {
-                if (chainItem.element.parentElement) {
-                    if (comment.isConnected)
-                        container.removeChild(chainItem.element);
-                    else
-                        container.replaceChild(comment, chainItem.element);
-                }
+                if (!chainItem.element.parentElement)
+                    return;
+                if (comment.isConnected)
+                    container.removeChild(chainItem.element);
+                else
+                    container.replaceChild(comment, chainItem.element);
             });
             var conditionalExpression = conditions.map(function (item, index) {
                 var $value = item.node.value;
@@ -1669,7 +1986,7 @@ var Directive = /** @class */ (function () {
     Directive.prototype.show = function (node, data) {
         var _this = this;
         var _a;
-        var ownerElement = this.toOwnerNode(node);
+        var ownerNode = this.toOwnerNode(node);
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
         if (nodeValue === '')
             return Logger.error(this.errorMsgEmptyNode(node));
@@ -1683,22 +2000,22 @@ var Directive = /** @class */ (function () {
             });
             element.style.display = value ? '' : 'none';
         };
-        connectNode(node, ownerElement);
         var bindResult = this.binder.create({
             data: data,
             node: node,
+            isConnected: function () { return ownerNode.isConnected; },
             fields: [{ expression: nodeValue, field: nodeValue }],
             context: this.context,
-            onUpdate: function () { return execute(ownerElement); }
+            onUpdate: function () { return execute(ownerNode); }
         });
-        execute(ownerElement);
-        ownerElement.removeAttribute(bindResult.node.nodeName);
+        execute(ownerNode);
+        ownerNode.removeAttribute(bindResult.node.nodeName);
     };
     Directive.prototype.for = function (node, data) {
         var _this = this;
         var _a;
-        var ownerElement = this.toOwnerNode(node);
-        var container = ownerElement.parentElement;
+        var ownerNode = this.toOwnerNode(node);
+        var container = ownerNode.parentElement;
         if (!container)
             return;
         var comment = this.comment.create();
@@ -1715,18 +2032,17 @@ var Directive = /** @class */ (function () {
         var delimiters = this.delimiter.run(nodeValue);
         if (delimiters.length !== 0)
             this.binder.create({
+                node: node,
                 data: data,
                 fields: delimiters,
                 isReplaceProperty: true,
-                node: node,
                 context: this.context,
+                isConnected: function () { return comment.isConnected; },
                 onUpdate: function () { return execute(); }
             });
-        ownerElement.removeAttribute(nodeName);
-        var forItem = ownerElement.cloneNode(true);
-        container.replaceChild(comment, ownerElement);
-        connectNode(forItem, comment);
-        connectNode(node, comment);
+        ownerNode.removeAttribute(nodeName);
+        var forItem = ownerNode.cloneNode(true);
+        container.replaceChild(comment, ownerNode);
         var $where = function (list, filterConfigParts) {
             var whereValue = filterConfigParts[1];
             var whereKeys = filterConfigParts[2];
@@ -1823,7 +2139,12 @@ var Directive = /** @class */ (function () {
                 isForOf: trim(forSeparator) === 'of',
             };
         };
-        var reactivePropertyEvent = ReactiveEvent.on('AfterGet', function (reactive) { return _this.binder.binds.push(reactive.onChange(function () { return execute(); }, node)); });
+        var reactivePropertyEvent = ReactiveEvent.on('AfterGet', function (reactive) {
+            _this.binder.binds.push({
+                isConnected: function () { return comment.isConnected; },
+                watch: reactive.onChange(function () { return execute(); }, node)
+            });
+        });
         var expObj = builder(nodeValue);
         reactivePropertyEvent.off();
         (execute = function () {
@@ -1903,7 +2224,7 @@ var Directive = /** @class */ (function () {
     };
     Directive.prototype.def = function (node, data) {
         var _a;
-        var ownerElement = this.toOwnerNode(node);
+        var ownerNode = this.toOwnerNode(node);
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
         if (nodeValue === '')
             return Logger.error(this.errorMsgEmptyNode(node));
@@ -1918,37 +2239,38 @@ var Directive = /** @class */ (function () {
             return Logger.error(("Expected a valid Object Literal expression in “"
                 + node.nodeName + "” and got “" + nodeValue + "”."));
         this.bouer.set(inputData, data);
-        ownerElement.removeAttribute(node.nodeName);
+        ownerNode.removeAttribute(node.nodeName);
     };
     Directive.prototype.content = function (node) {
         var _a;
-        var ownerElement = this.toOwnerNode(node);
+        var ownerNode = this.toOwnerNode(node);
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
         if (nodeValue === '')
             return Logger.error(this.errorMsgEmptyNode(node));
-        ownerElement.innerText = nodeValue;
-        ownerElement.removeAttribute(node.nodeName);
+        ownerNode.innerText = nodeValue;
+        ownerNode.removeAttribute(node.nodeName);
     };
     Directive.prototype.bind = function (node, data) {
         var _a;
-        var ownerElement = this.toOwnerNode(node);
+        var ownerNode = this.toOwnerNode(node);
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
         if (nodeValue === '')
             return Logger.error(this.errorMsgEmptyNode(node));
         if (this.delimiter.run(nodeValue).length !== 0)
             return Logger.error(this.errorMsgNodeValue(node));
         this.binder.create({
-            node: connectNode(node, ownerElement),
+            node: node,
+            isConnected: function () { return ownerNode.isConnected; },
             fields: [{ field: nodeValue, expression: nodeValue }],
             context: this.context,
             data: data
         });
-        ownerElement.removeAttribute(node.nodeName);
+        ownerNode.removeAttribute(node.nodeName);
     };
     Directive.prototype.property = function (node, data) {
         var _this = this;
         var _a;
-        var ownerElement = this.toOwnerNode(node);
+        var ownerNode = this.toOwnerNode(node);
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
         var execute = function (obj) { };
         var errorInvalidValue = function (node) {
@@ -1969,8 +2291,9 @@ var Directive = /** @class */ (function () {
             return Logger.error(errorInvalidValue(node));
         this.binder.create({
             data: data,
-            node: connectNode(node, ownerElement),
+            node: node,
             isReplaceProperty: false,
+            isConnected: function () { return ownerNode.isConnected; },
             fields: [{ expression: nodeValue, field: nodeValue }],
             context: this.context,
             onUpdate: function () { return execute(_this.evaluator.exec({
@@ -1979,13 +2302,13 @@ var Directive = /** @class */ (function () {
                 context: _this.context
             })); }
         });
-        ownerElement.removeAttribute(node.nodeName);
+        ownerNode.removeAttribute(node.nodeName);
         (execute = function (obj) {
             var attrNameToSet = node.nodeName.substring(Constants.property.length);
-            var attr = ownerElement.attributes[attrNameToSet];
+            var attr = ownerNode.attributes[attrNameToSet];
             if (!attr) {
-                (ownerElement.setAttribute(attrNameToSet, ''));
-                attr = ownerElement.attributes[attrNameToSet];
+                (ownerNode.setAttribute(attrNameToSet, ''));
+                attr = ownerNode.attributes[attrNameToSet];
             }
             forEach(Object.keys(obj), function (key) {
                 /* if has a falsy value remove the key */
@@ -1994,16 +2317,16 @@ var Directive = /** @class */ (function () {
                 attr.value = (attr.value.includes(key) ? attr.value : trim(attr.value + ' ' + key));
             });
             if (attr.value === '')
-                return ownerElement.removeAttribute(attrNameToSet);
+                return ownerNode.removeAttribute(attrNameToSet);
         })(inputData);
     };
     Directive.prototype.data = function (node, data) {
         var _a;
-        var ownerElement = this.toOwnerNode(node);
+        var ownerNode = this.toOwnerNode(node);
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
         if (this.delimiter.run(nodeValue).length !== 0)
             return Logger.error("The “data” attribute cannot contain delimiter.");
-        ownerElement.removeAttribute(node.nodeName);
+        ownerNode.removeAttribute(node.nodeName);
         var inputData = {};
         var mData = Extend.obj(data, { $data: data });
         var reactiveEvent = ReactiveEvent.on('AfterGet', function (reactive) {
@@ -2041,31 +2364,32 @@ var Directive = /** @class */ (function () {
         });
         return this.compiler.compile({
             data: inputData,
-            el: ownerElement,
+            el: ownerNode,
             context: this.context,
         });
     };
     Directive.prototype.href = function (node, data) {
         var _this = this;
         var _a, _b;
-        var ownerElement = this.toOwnerNode(node);
+        var ownerNode = this.toOwnerNode(node);
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
         if (nodeValue === '')
             return Logger.error(this.errorMsgEmptyNode(node));
-        ownerElement.removeAttribute(node.nodeName);
+        ownerNode.removeAttribute(node.nodeName);
         var usehash = (_b = (this.bouer.config || {}).usehash) !== null && _b !== void 0 ? _b : true;
         var routeToSet = urlCombine((usehash ? '#' : ''), nodeValue);
-        ownerElement.setAttribute('href', routeToSet);
-        var href = ownerElement.attributes['href'];
+        ownerNode.setAttribute('href', routeToSet);
+        var href = ownerNode.attributes['href'];
         var delimiters = this.delimiter.run(nodeValue);
         if (delimiters.length !== 0)
             this.binder.create({
                 data: data,
-                node: connectNode(href, ownerElement),
+                node: href,
+                isConnected: function () { return ownerNode.isConnected; },
                 context: this.context,
                 fields: delimiters
             });
-        ownerElement
+        ownerNode
             .addEventListener('click', function (event) {
             event.preventDefault();
             IoC.Resolve(_this.bouer, Routing)
@@ -2074,18 +2398,18 @@ var Directive = /** @class */ (function () {
     };
     Directive.prototype.entry = function (node, data) {
         var _a;
-        var ownerElement = this.toOwnerNode(node);
+        var ownerNode = this.toOwnerNode(node);
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
         if (nodeValue === '')
             return Logger.error(this.errorMsgEmptyNode(node));
         if (this.delimiter.run(nodeValue).length !== 0)
             return Logger.error(this.errorMsgNodeValue(node));
-        ownerElement.removeAttribute(node.nodeName);
+        ownerNode.removeAttribute(node.nodeName);
         IoC.Resolve(this.bouer, ComponentHandler)
             .prepare([
             {
                 name: nodeValue,
-                template: ownerElement.outerHTML,
+                template: ownerNode.outerHTML,
                 data: data
             }
         ]);
@@ -2093,7 +2417,7 @@ var Directive = /** @class */ (function () {
     Directive.prototype.put = function (node, data) {
         var _this = this;
         var _a, _b;
-        var ownerElement = this.toOwnerNode(node);
+        var ownerNode = this.toOwnerNode(node);
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
         var execute = function () { };
         if (nodeValue === '')
@@ -2103,21 +2427,22 @@ var Directive = /** @class */ (function () {
                 + node.nodeName + "” and got “" + ((_b = node.nodeValue) !== null && _b !== void 0 ? _b : '') + "”.");
         this.binder.create({
             data: data,
-            node: connectNode(node, ownerElement),
+            node: node,
+            isConnected: function () { return ownerNode.isConnected; },
             fields: [{ expression: nodeValue, field: nodeValue }],
             context: this.context,
             isReplaceProperty: false,
             onUpdate: function () { return execute(); }
         });
-        ownerElement.removeAttribute(node.nodeName);
+        ownerNode.removeAttribute(node.nodeName);
         (execute = function () {
             var _a;
-            ownerElement.innerHTML = '';
+            ownerNode.innerHTML = '';
             nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
             if (nodeValue === '')
                 return;
             var componentElement = createAnyEl(nodeValue)
-                .appendTo(ownerElement)
+                .appendTo(ownerNode)
                 .build();
             IoC.Resolve(_this.bouer, ComponentHandler)
                 .order(componentElement, data);
@@ -2126,16 +2451,13 @@ var Directive = /** @class */ (function () {
     Directive.prototype.req = function (node, data) {
         var _this = this;
         var _a;
-        var ownerElement = this.toOwnerNode(node);
+        var ownerNode = this.toOwnerNode(node);
+        var container = this.toOwnerNode(ownerNode);
         var nodeName = node.nodeName;
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
         if (!nodeValue.includes(' of ') && !nodeValue.includes(' as '))
             return Logger.error(("Expected a valid “for” expression in “" + nodeName
                 + "” and got “" + nodeValue + "”." + "\nValid: e-req=\"item of [url]\"."));
-        // If it's list request type, connect ownerNode
-        if (nodeValue.includes(' of '))
-            connectNode(ownerElement, ownerElement.parentNode);
-        connectNode(node, ownerElement);
         var delimiters = this.delimiter.run(nodeValue);
         var localDataStore = {};
         var onInsertOrUpdate = function () { };
@@ -2146,27 +2468,28 @@ var Directive = /** @class */ (function () {
             nodeName: nodeName,
             nodeValue: nodeValue,
             fields: delimiters,
-            parent: ownerElement,
-            value: nodeValue
+            parent: ownerNode,
+            value: nodeValue,
         };
         if (delimiters.length !== 0)
             binderConfig = this.binder.create({
                 data: data,
                 node: node,
-                context: this.context,
                 fields: delimiters,
+                context: this.context,
                 isReplaceProperty: false,
+                isConnected: function () { return container.isConnected; },
                 onUpdate: function () { return onUpdate(); }
             });
-        ownerElement.removeAttribute(node.nodeName);
+        ownerNode.removeAttribute(node.nodeName);
         var subcribeEvent = function (eventName) {
-            var attr = ownerElement.attributes.getNamedItem(Constants.on + eventName);
+            var attr = ownerNode.attributes.getNamedItem(Constants.on + eventName);
             if (attr)
                 _this.eventHandler.handle(attr, data, _this.context);
             return {
                 emit: function (detailObj) {
                     _this.eventHandler.emit({
-                        attachedNode: ownerElement,
+                        attachedNode: ownerNode,
                         eventName: eventName,
                         init: {
                             detail: detailObj
@@ -2215,10 +2538,6 @@ var Directive = /** @class */ (function () {
             return true;
         };
         var middleware = IoC.Resolve(this.bouer, Middleware);
-        var requestEvent = subcribeEvent(Constants.builtInEvents.request);
-        var responseEvent = subcribeEvent(Constants.builtInEvents.response);
-        var failEvent = subcribeEvent(Constants.builtInEvents.fail);
-        var doneEvent = subcribeEvent(Constants.builtInEvents.done);
         var dataKey = (node.nodeName.split(':')[1] || '').replace(/\[|\]/g, '');
         (onInsertOrUpdate = function () {
             var expObject = builder(trim(node.nodeValue || ''));
@@ -2230,7 +2549,7 @@ var Directive = /** @class */ (function () {
                     context: _this.context,
                     inputObject: response
                 });
-                responseEvent.emit({
+                subcribeEvent(Constants.builtInEvents.response).emit({
                     response: response
                 });
                 // Handle Content Insert/Update
@@ -2249,7 +2568,7 @@ var Directive = /** @class */ (function () {
                     // Removing the: “(...)”  “,”  and getting only the variable
                     var variable = trim(expObject.variables.split(',')[0].replace(/\(|\)/g, ''));
                     return _this.compiler.compile({
-                        el: ownerElement,
+                        el: ownerNode,
                         data: Extend.obj((_a = {}, _a[variable] = response.data, _a), data),
                         context: _this.context,
                         onDone: function (_, inData) {
@@ -2262,11 +2581,11 @@ var Directive = /** @class */ (function () {
                 }
                 if (expObject.type === 'of') {
                     var forDirectiveContent = expObject.expression.replace(expObject.path, '_response_');
-                    ownerElement.setAttribute(Constants.for, forDirectiveContent);
+                    ownerNode.setAttribute(Constants.for, forDirectiveContent);
                     data._response_ = undefined;
                     defineProperty(data, '_response_', getDescriptor(response, 'data'));
                     return _this.compiler.compile({
-                        el: ownerElement,
+                        el: ownerNode,
                         data: data,
                         context: _this.context,
                         onDone: function (_, inData) {
@@ -2278,7 +2597,7 @@ var Directive = /** @class */ (function () {
                     });
                 }
             };
-            requestEvent.emit();
+            subcribeEvent(Constants.builtInEvents.request).emit();
             middleware.run('req', {
                 type: 'bind',
                 action: function (middleware) {
@@ -2294,10 +2613,10 @@ var Directive = /** @class */ (function () {
                         success: function (response) {
                             responseHandler(response);
                         },
-                        fail: function (error) { return failEvent.emit({
+                        fail: function (error) { return subcribeEvent(Constants.builtInEvents.fail).emit({
                             error: error
                         }); },
-                        done: function () { return doneEvent.emit(); }
+                        done: function () { return subcribeEvent(Constants.builtInEvents.done).emit(); }
                     };
                     middleware(context, cbs);
                 }
@@ -2325,10 +2644,10 @@ var Directive = /** @class */ (function () {
                                 return;
                             localDataStore.data = response.data;
                         },
-                        fail: function (error) { return failEvent.emit({
+                        fail: function (error) { return subcribeEvent(Constants.builtInEvents.fail).emit({
                             error: error
                         }); },
-                        done: function () { return doneEvent.emit(); }
+                        done: function () { return subcribeEvent(Constants.builtInEvents.done).emit(); }
                     };
                     middleware(context, cbs);
                 }
@@ -2338,17 +2657,17 @@ var Directive = /** @class */ (function () {
     Directive.prototype.wait = function (node) {
         var _this = this;
         var _a;
-        var ownerElement = this.toOwnerNode(node);
+        var ownerNode = this.toOwnerNode(node);
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
         if (nodeValue === '')
             return Logger.error(this.errorMsgEmptyNode(node));
         if (this.delimiter.run(nodeValue).length !== 0)
             return Logger.error(this.errorMsgNodeValue(node));
-        ownerElement.removeAttribute(node.nodeName);
+        ownerNode.removeAttribute(node.nodeName);
         var dataStore = IoC.Resolve(this.bouer, DataStore);
         var mWait = dataStore.wait[nodeValue];
         if (mWait) {
-            mWait.nodes.push(ownerElement);
+            mWait.nodes.push(ownerNode);
             // No data exposed yet
             if (!mWait.data)
                 return;
@@ -2364,28 +2683,29 @@ var Directive = /** @class */ (function () {
                 });
             });
         }
-        return dataStore.wait[nodeValue] = { nodes: [ownerElement] };
+        return dataStore.wait[nodeValue] = { nodes: [ownerNode] };
     };
     Directive.prototype.custom = function (node, data) {
         var _a, _b, _c;
-        var ownerElement = this.toOwnerNode(node);
+        var ownerNode = this.toOwnerNode(node);
         var nodeName = node.nodeName;
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
         var delimiters = this.delimiter.run(nodeValue);
         var $directiveConfig = this.$custom[nodeName];
         var bindConfig = this.binder.create({
             data: data,
-            node: connectNode(node, ownerElement),
+            node: node,
             fields: delimiters,
             isReplaceProperty: false,
             context: this.context,
+            isConnected: function () { return ownerNode.isConnected; },
             onUpdate: function () {
                 if (typeof $directiveConfig.update === 'function')
                     $directiveConfig.update(node, bindConfig);
             }
         });
         if ((_b = $directiveConfig.removable) !== null && _b !== void 0 ? _b : true)
-            ownerElement.removeAttribute(nodeName);
+            ownerNode.removeAttribute(nodeName);
         var modifiers = nodeName.split('.');
         modifiers.shift();
         // my-custom-dir:arg.mod1.mod2
@@ -2401,20 +2721,20 @@ var Directive = /** @class */ (function () {
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
         if (nodeValue !== '')
             return;
-        var ownerElement = this.toOwnerNode(node);
-        ownerElement.removeAttribute(node.nodeName);
+        var ownerNode = this.toOwnerNode(node);
+        ownerNode.removeAttribute(node.nodeName);
     };
     return Directive;
 }());
 
 var Compiler = /** @class */ (function () {
-    function Compiler(bouer, appOptions) {
+    function Compiler(bouer, directives) {
         this.NODES_TO_IGNORE_IN_COMPILATION = {
             'SCRIPT': 1,
             '#comment': 8
         };
         this.bouer = bouer;
-        this.bouerOptions = appOptions;
+        this.directives = directives;
         this.binder = IoC.Resolve(this.bouer, Binder);
         this.delimiter = IoC.Resolve(this.bouer, DelimiterHandler);
         this.eventHandler = IoC.Resolve(this.bouer, EventHandler);
@@ -2428,7 +2748,7 @@ var Compiler = /** @class */ (function () {
         var data = (options.data || this.bouer.data);
         if (!this.analize(rootElement.outerHTML))
             return rootElement;
-        var directive = new Directive(this.bouerOptions.directives || {}, this, context);
+        var directive = new Directive(this.directives || {}, this, context);
         var walker = function (node, data) {
             if (node.nodeName in _this.NODES_TO_IGNORE_IN_COMPILATION)
                 return;
@@ -2547,7 +2867,8 @@ var Compiler = /** @class */ (function () {
             if (isString(node.nodeValue) && (delimitersFields = _this.delimiter.run(node.nodeValue))
                 && delimitersFields.length !== 0) {
                 _this.binder.create({
-                    node: connectNode(node, rootElement),
+                    node: node,
+                    isConnected: function () { return rootElement.isConnected; },
                     fields: delimitersFields,
                     context: context,
                     data: data
@@ -2594,7 +2915,7 @@ var Binder = /** @class */ (function () {
         var node = options.node, data = options.data, fields = options.fields, isReplaceProperty = options.isReplaceProperty, context = options.context;
         var originalValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
         var originalName = node.nodeName;
-        var ownerElement = node.ownerElement || node.parentNode;
+        var ownerNode = node.ownerElement || node.parentNode;
         var middleware = IoC.Resolve(this.bouer, Middleware);
         var onUpdate = options.onUpdate || (function (v, n) { });
         // Clousure cache property settings
@@ -2604,7 +2925,7 @@ var Binder = /** @class */ (function () {
             nodeName: originalName,
             nodeValue: originalValue,
             fields: fields,
-            parent: ownerElement,
+            parent: ownerNode,
             value: ''
         };
         var $runDirectiveMiddlewares = function (type) {
@@ -2625,15 +2946,15 @@ var Binder = /** @class */ (function () {
         // Two-Way Data Binding: e-bind:[?]="..."
         if (originalName.substring(0, Constants.bind.length) === Constants.bind) {
             var propertyNameToBind_1 = '';
-            var binderTarget_1 = ownerElement.type || ownerElement.localName;
+            var binderTarget_1 = ownerNode.type || ownerNode.localName;
             if (Constants.bind === originalName)
                 propertyNameToBind_1 = this.DEFAULT_BINDER_PROPERTIES[binderTarget_1] || 'value';
             else
                 propertyNameToBind_1 = originalName.split(':')[1]; // e-bind:value -> value
-            var isSelect_1 = ownerElement instanceof HTMLSelectElement;
-            var isSelectMultiple_1 = isSelect_1 && ownerElement.multiple === true;
-            var modelAttribute = findAttribute(ownerElement, [':value'], true);
-            var dataBindModel_1 = modelAttribute ? modelAttribute.value : "\"" + ownerElement.value + "\"";
+            var isSelect_1 = ownerNode instanceof HTMLSelectElement;
+            var isSelectMultiple_1 = isSelect_1 && ownerNode.multiple === true;
+            var modelAttribute = findAttribute(ownerNode, [':value'], true);
+            var dataBindModel_1 = modelAttribute ? modelAttribute.value : "\"" + ownerNode.value + "\"";
             var dataBindProperty_1 = trim(originalValue);
             var boundPropertyValue_1;
             var boundModelValue_1;
@@ -2653,9 +2974,9 @@ var Binder = /** @class */ (function () {
                         if (!Array.isArray(boundPropertyValue_1)) {
                             // In case of radio button we need to check if the value is the same to check it
                             if (binderTarget_1 === 'radio')
-                                return ownerElement.checked = ownerElement[propertyNameToBind_1] == value;
+                                return ownerNode.checked = ownerNode[propertyNameToBind_1] == value;
                             // Default Binding
-                            return ownerElement[propertyNameToBind_1] = (isObject(value) ? toStr(value) : (isNull(value) ? '' : value));
+                            return ownerNode[propertyNameToBind_1] = (isObject(value) ? toStr(value) : (isNull(value) ? '' : value));
                         }
                         // Array Set
                         boundModelValue_1 = boundModelValue_1 || _this.evaluator.exec({
@@ -2665,21 +2986,21 @@ var Binder = /** @class */ (function () {
                         });
                         // select-multiple handling
                         if (isSelectMultiple_1) {
-                            return forEach(toArray(ownerElement.options), function (option) {
+                            return forEach(toArray(ownerNode.options), function (option) {
                                 option.selected = boundPropertyValue_1.indexOf(trim(option.value)) !== -1;
                             });
                         }
                         // checkboxes, radio, etc
                         if (boundPropertyValue_1.indexOf(boundModelValue_1) === -1) {
-                            switch (typeof ownerElement[propertyNameToBind_1]) {
+                            switch (typeof ownerNode[propertyNameToBind_1]) {
                                 case 'boolean':
-                                    ownerElement[propertyNameToBind_1] = false;
+                                    ownerNode[propertyNameToBind_1] = false;
                                     break;
                                 case 'number':
-                                    ownerElement[propertyNameToBind_1] = 0;
+                                    ownerNode[propertyNameToBind_1] = 0;
                                     break;
                                 default:
-                                    ownerElement[propertyNameToBind_1] = "";
+                                    ownerNode[propertyNameToBind_1] = "";
                                     break;
                             }
                         }
@@ -2699,7 +3020,7 @@ var Binder = /** @class */ (function () {
                         // select-multiple handling
                         if (isSelectMultiple_1) {
                             var optionCollection_1 = [];
-                            forEach(toArray(ownerElement.options), function (option) {
+                            forEach(toArray(ownerNode.options), function (option) {
                                 if (option.selected === true)
                                     optionCollection_1.push(trim(option.value));
                             });
@@ -2717,11 +3038,14 @@ var Binder = /** @class */ (function () {
             ReactiveEvent.once('AfterGet', function (evt) {
                 // Adding the event on emittion
                 evt.onemit = function (reactive) {
-                    _this.binds.push(reactive.onChange(function (value) {
-                        callback_1(_this.BindingDirection.fromDataToInput, value);
-                        onUpdate(value, node);
-                        $runDirectiveMiddlewares('update');
-                    }, node));
+                    _this.binds.push({
+                        isConnected: options.isConnected,
+                        watch: reactive.onChange(function (value) {
+                            callback_1(_this.BindingDirection.fromDataToInput, value);
+                            onUpdate(value, node);
+                            $runDirectiveMiddlewares('update');
+                        }, node)
+                    });
                 };
                 // calling the main event
                 boundPropertyValue_1 = _this.evaluator.exec({
@@ -2732,18 +3056,18 @@ var Binder = /** @class */ (function () {
             });
             callback_1(this.BindingDirection.fromDataToInput, boundPropertyValue_1);
             var listeners = ['input', 'propertychange', 'change'];
-            if (!listeners.includes(ownerElement.localName))
-                listeners.push(ownerElement.localName);
+            if (!listeners.includes(ownerNode.localName))
+                listeners.push(ownerNode.localName);
             // Applying the events
             forEach(listeners, function (listener) {
-                if (listener === 'change' && ownerElement.localName !== 'select')
+                if (listener === 'change' && ownerNode.localName !== 'select')
                     return;
-                ownerElement.addEventListener(listener, function () {
-                    callback_1(_this.BindingDirection.fromInputToData, ownerElement[propertyNameToBind_1]);
+                ownerNode.addEventListener(listener, function () {
+                    callback_1(_this.BindingDirection.fromInputToData, ownerNode[propertyNameToBind_1]);
                 }, false);
             });
             // Removing the e-bind attr
-            ownerElement.removeAttribute(node.nodeName);
+            ownerNode.removeAttribute(node.nodeName);
             $runDirectiveMiddlewares('bind');
             return propertyBindConfig; // Stop Two-Way Data Binding Process
         }
@@ -2752,10 +3076,10 @@ var Binder = /** @class */ (function () {
         // If definable property e-[?]="..."
         if (originalName.substring(0, Constants.property.length) === Constants.property && isNull(isReplaceProperty)) {
             propertyBindConfig.nodeName = originalName.substring(Constants.property.length);
-            ownerElement.setAttribute(propertyBindConfig.nodeName, originalValue);
-            nodeToBind = ownerElement.attributes[propertyBindConfig.nodeName];
+            ownerNode.setAttribute(propertyBindConfig.nodeName, originalValue);
+            nodeToBind = ownerNode.attributes[propertyBindConfig.nodeName];
             // Removing the e-[?] attr
-            ownerElement.removeAttribute(node.nodeName);
+            ownerNode.removeAttribute(node.nodeName);
         }
         // Property value setter
         var setter = function () {
@@ -2773,8 +3097,8 @@ var Binder = /** @class */ (function () {
                 });
                 result = isNull(result) ? '' : result;
                 valueToSet = valueToSet.replace(field.field, toStr(result));
-                if (delimiter && isFunction(delimiter.action))
-                    valueToSet = delimiter.action(valueToSet, node, data);
+                if (delimiter && typeof delimiter.update === 'function')
+                    valueToSet = delimiter.update(valueToSet, node, data);
             });
             propertyBindConfig.value = valueToSet;
             if (!isHtml)
@@ -2783,7 +3107,7 @@ var Binder = /** @class */ (function () {
                 var htmlSnippet = createEl('div', function (el) {
                     el.innerHTML = valueToSet;
                 }).build().children[0];
-                ownerElement.appendChild(htmlSnippet);
+                ownerNode.appendChild(htmlSnippet);
                 IoC.Resolve(_this.bouer, Compiler).compile({
                     el: htmlSnippet,
                     data: data,
@@ -2793,11 +3117,14 @@ var Binder = /** @class */ (function () {
         };
         ReactiveEvent.once('AfterGet', function (event) {
             event.onemit = function (reactive) {
-                _this.binds.push(reactive.onChange(function (value) {
-                    setter();
-                    onUpdate(value, node);
-                    $runDirectiveMiddlewares('update');
-                }, node));
+                _this.binds.push({
+                    isConnected: options.isConnected,
+                    watch: reactive.onChange(function (value) {
+                        setter();
+                        onUpdate(value, node);
+                        $runDirectiveMiddlewares('update');
+                    }, node)
+                });
             };
             setter();
         });
@@ -2806,11 +3133,10 @@ var Binder = /** @class */ (function () {
         return propertyBindConfig;
     };
     Binder.prototype.onPropertyChange = function (propertyName, callback, targetObject) {
-        var mWatch = null;
-        var mTargetObject = targetObject || this.bouer.data;
+        var mWatch;
         ReactiveEvent.once('AfterGet', function (event) {
             event.onemit = function (reactive) { return mWatch = reactive.onChange(callback); };
-            mTargetObject[propertyName];
+            targetObject[propertyName];
         });
         return mWatch;
     };
@@ -2830,11 +3156,9 @@ var Binder = /** @class */ (function () {
         var _this = this;
         Task.run(function () {
             _this.binds = where(_this.binds, function (bind) {
-                if (!bind.node)
+                if (bind.isConnected())
                     return true;
-                if (bind.node.isConnected)
-                    return true;
-                bind.destroy();
+                bind.watch.destroy();
             });
         });
     };
@@ -2850,19 +3174,19 @@ var Converter = /** @class */ (function () {
         var element = undefined;
         var instance = this;
         // If it's not a HTML Element, just return
-        if ((input instanceof Element))
+        if ((input instanceof HTMLElement))
             element = input;
-        // If the element is an object
-        else if (isObject(input))
-            return input;
         // If it's a string try to get the element
-        else if (isString(input)) {
+        else if (typeof input === 'string') {
             try {
-                element = this.bouer.el.querySelector(input);
+                var $el = this.bouer.el.querySelector(input);
+                if (!$el)
+                    return null;
+                element = $el;
             }
             catch (_a) {
                 // Unknown element type
-                return input;
+                return null;
             }
         }
         // If the element is not
@@ -3047,14 +3371,13 @@ var Bouer = /** @class */ (function () {
         var _this_1 = this;
         this.name = 'Bouer';
         this.version = '3.0.0';
-        this.dependencies = {};
         this.__id__ = IoC.GetId();
-        this.isDestroyed = false;
         /**
          * Gets all the elemens having the `ref` attribute
          * @returns an object having all the elements with the `ref attribute value` defined as the key.
          */
         this.refs = {};
+        this.isDestroyed = false;
         options = options || {};
         // Applying all the options defined
         this.config = options.config;
@@ -3072,7 +3395,8 @@ var Bouer = /** @class */ (function () {
         if (typeof options.middleware === 'function')
             options.middleware.call(this, middleware.register, this);
         // Transform the data properties into a reative
-        this.data = Reactive.transform({
+        this.data = options.data;
+        Reactive.transform({
             inputObject: options.data || {},
             context: this
         });
@@ -3090,7 +3414,7 @@ var Bouer = /** @class */ (function () {
         var eventHandler = new EventHandler(this);
         var routing = new Routing(this);
         var componentHandler = new ComponentHandler(this);
-        var compiler = new Compiler(this, options);
+        var compiler = new Compiler(this, options.directives || {});
         new Converter(this);
         var skeleton = new Skeleton(this);
         skeleton.init();
@@ -3212,8 +3536,8 @@ var Bouer = /** @class */ (function () {
                 attachedNode: _this_1.el
             });
             _this_1.destroy();
-            stopTask();
             _this_1.isDestroyed = true;
+            stopTask();
         });
         // Initializing Routing
         routing.init();
@@ -3234,7 +3558,7 @@ var Bouer = /** @class */ (function () {
     Bouer.prototype.set = function (inputData, targetObject) {
         if (!isObject(inputData)) {
             Logger.error('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".');
-            return {};
+            return targetObject;
         }
         if (isObject(targetObject) && targetObject == null) {
             Logger.error('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".');
@@ -3246,6 +3570,8 @@ var Bouer = /** @class */ (function () {
             inputObject: inputData,
             context: this
         });
+        // Assining
+        Object.assign(targetObject, inputData);
         // Transfering the properties
         forEach(Object.keys(inputData), function (key) { return transferProperty(targetObject, inputData, key); });
         return targetObject;
@@ -3268,7 +3594,8 @@ var Bouer = /** @class */ (function () {
      * @returns the watch object having the method to destroy the watch
      */
     Bouer.prototype.watch = function (propertyName, callback, targetObject) {
-        return IoC.Resolve(this, Binder).onPropertyChange(propertyName, callback, targetObject);
+        if (targetObject === void 0) { targetObject = this.data; }
+        return IoC.Resolve(this, Binder).onPropertyChange(propertyName, callback, targetObject || this.data);
     };
     /**
      * Watch all reactive properties in the provided scope.
@@ -3366,11 +3693,13 @@ var Bouer = /** @class */ (function () {
     };
     Bouer.prototype.destroy = function () {
         var el = this.el;
-        var destroyedEvents = IoC.Resolve(this, EventHandler)
-            .$events['destroyed'] || [];
+        var $events = IoC.Resolve(this, EventHandler).$events;
+        var destroyedEvents = ($events['destroyed'] || []).concat(($events['component:destroyed'] || []));
         this.emit('destroyed', { element: this.el });
         // Dispatching all the destroy events
         forEach(destroyedEvents, function (es) { return es.emit({ once: true }); });
+        $events['destroyed'] = [];
+        $events['component:destroyed'] = [];
         if (el.tagName == 'body')
             el.innerHTML = '';
         else if (DOM.contains(el))
@@ -3385,325 +3714,4 @@ var Bouer = /** @class */ (function () {
     return Bouer;
 }());
 
-var Watch = /** @class */ (function () {
-    function Watch(reactive, callback, options) {
-        var _this = this;
-        this.destroy = function () {
-            var indexOfThis = _this.reactive.watches.indexOf(_this);
-            if (indexOfThis !== -1)
-                _this.reactive.watches.splice(indexOfThis, 1);
-            if (_this.onDestroy)
-                _this.onDestroy();
-        };
-        this.reactive = reactive;
-        this.property = reactive.propertyName;
-        this.callback = callback;
-        if (options) {
-            this.node = options.node;
-            this.onDestroy = options.onDestroy;
-        }
-    }
-    return Watch;
-}());
-
-var Reactive = /** @class */ (function () {
-    function Reactive(options) {
-        var _this = this;
-        this.watches = [];
-        this.get = function () {
-            ReactiveEvent.emit('BeforeGet', _this);
-            _this.propertyValue = _this.isComputed ? _this.computedGetter() : _this.propertyValue;
-            var value = _this.propertyValue;
-            ReactiveEvent.emit('AfterGet', _this);
-            return value;
-        };
-        this.set = function (value) {
-            var oldPropertyValue = _this.propertyValue;
-            if (oldPropertyValue === value)
-                return;
-            ReactiveEvent.emit('BeforeSet', _this);
-            if (isObject(value) || Array.isArray(value)) {
-                if ((typeof _this.propertyValue) !== (typeof value))
-                    return Logger.error(("Cannot set “" + (typeof value) + "” in “" +
-                        _this.propertyName + "” property."));
-                if (Array.isArray(value)) {
-                    Reactive.transform({
-                        inputObject: value,
-                        reactiveObj: _this,
-                        context: _this.context
-                    });
-                    var propValueAsAny = _this.propertyValue;
-                    propValueAsAny.splice(0, propValueAsAny.length);
-                    propValueAsAny.push.apply(propValueAsAny, value);
-                }
-                else if (isObject(value)) {
-                    if ((value instanceof Node)) // If some html element
-                        _this.propertyValue = value;
-                    else {
-                        Reactive.transform({
-                            inputObject: value,
-                            context: _this.context
-                        });
-                        if (!isNull(_this.propertyValue))
-                            mapper(value, _this.propertyValue);
-                        else
-                            _this.propertyValue = value;
-                    }
-                }
-            }
-            else {
-                _this.propertyValue = value;
-            }
-            if (_this.isComputed && _this.computedSetter)
-                _this.computedSetter(value);
-            ReactiveEvent.emit('AfterSet', _this);
-            // Calling all the watches
-            forEach(_this.watches, function (watch) { return watch.callback(_this.propertyValue, oldPropertyValue); });
-        };
-        this.propertyName = options.propertyName;
-        this.propertySource = options.sourceObject;
-        this.context = options.context;
-        // Setting the value of the property
-        this.propertyDescriptor = getDescriptor(this.propertySource, this.propertyName);
-        this.propertyValue = this.propertyDescriptor.value;
-        this.isComputed = typeof this.propertyValue === 'function' && this.propertyValue.name === '$computed';
-        if (this.isComputed) {
-            var computedResult = this.propertyValue.call(this.context);
-            if ('get' in computedResult || isFunction(computedResult)) {
-                this.computedGetter = computedResult.get || computedResult;
-            }
-            if ('set' in computedResult) {
-                this.computedSetter = computedResult.set;
-            }
-            if (!this.computedGetter)
-                throw new Error("Computed property must be a function “function $computed(){...}” " +
-                    "that returns a function for “getter only” or an object with a “get” and/or “set” function");
-            this.propertyValue = undefined;
-        }
-        if (typeof this.propertyValue === 'function' && !this.isComputed)
-            this.propertyValue = this.propertyValue.bind(this.context);
-    }
-    Reactive.prototype.onChange = function (callback, node) {
-        var w = new Watch(this, callback, { node: node });
-        this.watches.push(w);
-        return w;
-    };
-    Reactive.transform = function (options) {
-        var context = options.context;
-        var executer = function (inputObject, reactiveObj, visiting, visited) {
-            if (Array.isArray(inputObject)) {
-                if (reactiveObj == null) {
-                    Logger.warn('Cannot transform this array to a reactive one because no reactive objecto was provided');
-                    return inputObject;
-                }
-                if (visiting === null || visiting === void 0 ? void 0 : visiting.includes(inputObject))
-                    return inputObject;
-                visiting === null || visiting === void 0 ? void 0 : visiting.push(inputObject);
-                var REACTIVE_ARRAY_METHODS = ['push', 'pop', 'unshift', 'shift', 'splice'];
-                var inputArray_1 = inputObject;
-                var reference_1 = {}; // Using clousure to cache the array methods
-                var prototype_1 = inputArray_1.__proto__ = Object.create(Array.prototype);
-                forEach(REACTIVE_ARRAY_METHODS, function (method) {
-                    // cache original method
-                    reference_1[method] = inputArray_1[method].bind(inputArray_1);
-                    // changing to the reactive one
-                    prototype_1[method] = function reactive() {
-                        var oldArrayValue = inputArray_1.slice();
-                        switch (method) {
-                            case 'push':
-                            case 'unshift':
-                                forEach(toArray(arguments), function (arg) {
-                                    if (!isObject(arg) && !Array.isArray(arg))
-                                        return;
-                                    executer(arg);
-                                });
-                        }
-                        var result = reference_1[method].apply(inputArray_1, arguments);
-                        forEach(reactiveObj.watches, function (watch) { return watch.callback(inputArray_1, oldArrayValue); });
-                        return result;
-                    };
-                });
-                return inputArray_1;
-            }
-            if (!isObject(inputObject))
-                return inputObject;
-            if (visiting === null || visiting === void 0 ? void 0 : visiting.includes(inputObject))
-                return inputObject;
-            visiting === null || visiting === void 0 ? void 0 : visiting.push(inputObject);
-            forEach(Object.keys(inputObject), function (key) {
-                var mInputObject = inputObject;
-                // Already a reactive property, do nothing
-                if (isNull(getDescriptor(inputObject, key).value))
-                    return;
-                var propertyValue = mInputObject[key];
-                if (propertyValue && (propertyValue instanceof Bouer) ||
-                    (propertyValue instanceof Component) ||
-                    (propertyValue instanceof Node))
-                    return;
-                var reactive = new Reactive({
-                    propertyName: key,
-                    sourceObject: inputObject,
-                    context: context
-                });
-                defineProperty(inputObject, key, reactive);
-                if (isObject(propertyValue))
-                    executer(propertyValue);
-                else if (Array.isArray(propertyValue)) {
-                    executer(propertyValue, reactive); // Transform the array to a reactive one
-                    forEach(propertyValue, function (item) { return executer(item); });
-                }
-            });
-            visiting === null || visiting === void 0 ? void 0 : visiting.splice(visiting.indexOf(inputObject), 1);
-            visited === null || visited === void 0 ? void 0 : visited.push(inputObject);
-            return inputObject;
-        };
-        return executer(options.inputObject, options.reactiveObj, [], []);
-    };
-    return Reactive;
-}());
-
-var Component = /** @class */ (function () {
-    function Component(optionsOrPath) {
-        this.prefetch = false;
-        this.title = undefined;
-        this.route = undefined;
-        this.isDefault = undefined;
-        this.isNotFound = undefined;
-        this.el = undefined;
-        this.bouer = undefined;
-        this.children = [];
-        this.assets = [];
-        // Store temporarily this component UI orders
-        this.events = [];
-        var _name = undefined;
-        var _path = undefined;
-        if (!isString(optionsOrPath)) {
-            _name = optionsOrPath.name;
-            _path = optionsOrPath.path;
-            Object.assign(this, optionsOrPath);
-        }
-        else {
-            _path = optionsOrPath;
-        }
-        this.name = _name;
-        this.path = _path;
-        this.data = Reactive.transform({
-            context: this,
-            inputObject: this.data || {}
-        });
-    }
-    // Hooks
-    Component.prototype.requested = function (event) { };
-    Component.prototype.created = function (event) { };
-    Component.prototype.beforeMount = function (event) { };
-    Component.prototype.mounted = function (event) { };
-    Component.prototype.beforeLoad = function (event) { };
-    Component.prototype.loaded = function (event) { };
-    Component.prototype.beforeDestroy = function (event) { };
-    Component.prototype.destroyed = function (event) { };
-    Component.prototype.blocked = function (event) { };
-    Component.prototype.failed = function (event) { };
-    Component.prototype.export = function (options) {
-        var _this = this;
-        if (!isObject(options))
-            return Logger.log("Invalid object for component.export(...), only \"Object Literal\" is allowed.");
-        return forEach(Object.keys(options), function (key) {
-            _this.data[key] = options[key];
-            transferProperty(_this.data, options, key);
-        });
-    };
-    Component.prototype.destroy = function () {
-        var _this = this;
-        if (!this.el)
-            return false;
-        this.emit('beforeDestroy');
-        var container = this.el.parentElement;
-        if (container)
-            container.removeChild(this.el) !== null;
-        // Destroying all the events attached to the this instance
-        forEach(this.events, function (evt) { return _this.off(evt.eventName, evt.callback); });
-        this.events = [];
-        this.emit('destroyed');
-    };
-    Component.prototype.params = function () {
-        return new UriHandler().params(this.route);
-    };
-    Component.prototype.emit = function (eventName, init) {
-        IoC.Resolve(this.bouer, EventHandler).emit({
-            eventName: eventName,
-            attachedNode: this.el,
-            init: init
-        });
-    };
-    Component.prototype.on = function (eventName, callback) {
-        var context = (eventName == 'beforeDestroy' ||
-            eventName == 'beforeLoad' ||
-            eventName == 'beforeMount' ||
-            eventName == 'destroyed' ||
-            eventName == 'loaded' ||
-            eventName == 'mounted') ? this : this.bouer;
-        var evt = IoC.Resolve(this.bouer, EventHandler).on({
-            eventName: eventName,
-            callback: callback,
-            attachedNode: this.el,
-            context: context
-        });
-        this.events.push(evt);
-        return evt;
-    };
-    Component.prototype.off = function (eventName, callback) {
-        IoC.Resolve(this.bouer, EventHandler).off({
-            eventName: eventName,
-            callback: callback,
-            attachedNode: this.el
-        });
-        this.events = where(this.events, function (evt) { return !(evt.eventName == eventName && evt.callback == callback); });
-    };
-    Component.prototype.addAssets = function (assets) {
-        var $assets = [];
-        var assetsTypeMapper = {
-            js: 'script',
-            css: 'link',
-            style: 'link'
-        };
-        forEach(assets, function (asset, index) {
-            if (!asset.src || !trim(asset.src))
-                return Logger.error('Invalid asset “src”, in assets[' + index + '].src');
-            var type = '';
-            if (!asset.type) {
-                var srcSplitted = asset.src.split('.');
-                type = assetsTypeMapper[toLower(srcSplitted[srcSplitted.length - 1])];
-                if (!type)
-                    return Logger.error("Couldn't find out what type of asset it is, provide " +
-                        "the “type” explicitly at assets[" + index + "].type");
-            }
-            else {
-                asset.type = toLower(asset.type);
-                type = assetsTypeMapper[asset.type] || asset.type;
-            }
-            var $asset = createAnyEl(type, function (el) {
-                var _a;
-                if ((_a = asset.scoped) !== null && _a !== void 0 ? _a : true)
-                    el.setAttribute('scoped', 'true');
-                switch (toLower(type)) {
-                    case 'script':
-                        el.setAttribute('src', asset.src);
-                        break;
-                    case 'link':
-                        el.setAttribute('href', asset.src);
-                        el.setAttribute('rel', 'stylesheet');
-                        el.setAttribute('type', 'text/css');
-                        break;
-                    default:
-                        el.setAttribute('src', asset.src);
-                        break;
-                }
-            }).build();
-            $assets.push($asset);
-        });
-        this.assets.push.apply(this.assets, $assets);
-    };
-    return Component;
-}());
-
-export { Component, Bouer as default };
+export { Component, Reactive, Watch, Bouer as default };
