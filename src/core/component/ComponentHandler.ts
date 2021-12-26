@@ -1,4 +1,4 @@
-import IComponent from "../../definitions/interfaces/IComponent";
+import IComponentOptions from "../../definitions/interfaces/IComponentOptions";
 import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
 import Extend from "../../shared/helpers/Extend";
@@ -34,7 +34,7 @@ export default class ComponentHandler {
 	private requests: dynamic = {};
 	delimiter: DelimiterHandler;
 	eventHandler: EventHandler;
-	components: { [key: string]: (Component | IComponent) } = {};
+	components: { [key: string]: (Component<any> | IComponentOptions<any>) } = {};
 	// Avoids to add multiple styles of the same component if it's already in use
 	stylesController: { [key: string]: { styles: Element[], elements: Element[] }, } = {};
 
@@ -73,6 +73,7 @@ export default class ComponentHandler {
 				forEach(this.requests[url], (request: dynamic) => {
 					request.success(content, url);
 				});
+				delete this.requests[url];
 			})
 			.catch(error => {
 				if (!hasBaseElement)
@@ -81,13 +82,11 @@ export default class ComponentHandler {
 				forEach(this.requests[url], (request: dynamic) => {
 					request.fail(error, url);
 				});
-			})
-			.finally(() => {
 				delete this.requests[url];
-			});
+			})
 	}
 
-	prepare(components: (Component | IComponent)[], parent?: (Component | IComponent)) {
+	prepare(components: (Component<any> | IComponentOptions<any>)[], parent?: (Component<any> | IComponentOptions<any>)) {
 		forEach(components, component => {
 			const ctorName = component.constructor.name;
 			const isBuitInClass = ctorName === "IComponent" || ctorName === "Component" || ctorName === "Object";
@@ -149,15 +148,15 @@ export default class ComponentHandler {
 		});
 	}
 
-	order(componentElement: Element, data: object, callback?: (component: Component) => void) {
+	order(componentElement: Element, data: object, callback?: (component: Component<any>) => void) {
 		const $name = toLower(componentElement.nodeName);
 		const mComponents = this.components as dynamic;
 		let hasComponent = mComponents[$name];
 		if (!hasComponent)
 			return Logger.error("No component with name “" + $name + "” registered.");
 
-		const component = (hasComponent as (Component | IComponent));
-		const icomponent = (component as IComponent);
+		const component = (hasComponent as (Component<any> | IComponentOptions<any>));
+		const icomponent = (component as IComponentOptions<any>);
 
 		const mainExecutionWrapper = () => {
 			if (component.template) {
@@ -236,7 +235,7 @@ export default class ComponentHandler {
 		return mainExecutionWrapper();
 	}
 
-	find(callback: (item: (Component | IComponent)) => boolean) {
+	find(callback: (item: (Component<any> | IComponentOptions<any>)) => boolean) {
 		const keys = Object.keys(this.components);
 		for (let i = 0; i < keys.length; i++) {
 			const component = this.components[keys[i]];
@@ -273,7 +272,7 @@ export default class ComponentHandler {
 		}
 	}
 
-	private insert(componentElement: Element, component: Component, data: object, callback?: (component: Component) => void) {
+	private insert(componentElement: Element, component: Component<any>, data: object, callback?: <Data>(component: Component<Data>) => void) {
 		const $name = toLower(componentElement.nodeName);
 		const container = componentElement.parentElement;
 		if (!componentElement.isConnected || !container)
