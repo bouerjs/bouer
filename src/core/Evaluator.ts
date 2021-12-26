@@ -1,14 +1,14 @@
+import RenderContext from "../definitions/types/RenderContext";
+import dynamic from "../definitions/types/Dynamic";
 import Bouer from "../instance/Bouer";
 import Extend from "../shared/helpers/Extend";
+import IoC from "../shared/helpers/IoC";
 import {
-  buildError,
-  createEl, forEach,
-  getDescriptor, GLOBAL, transferProperty
+	buildError,
+	createEl, forEach,
+	getDescriptor, GLOBAL, transferProperty
 } from "../shared/helpers/Utils";
 import Logger from "../shared/logger/Logger";
-import IoC from "../shared/helpers/IoC";
-import dynamic from "../definitions/types/Dynamic";
-import { Component, IComponent } from "..";
 
 export default class Evaluator {
   private global: Window & typeof globalThis | null;
@@ -34,7 +34,7 @@ export default class Evaluator {
     return mWindow!;
   }
 
-  execRaw(expression: string, context?: Bouer | Component): void {
+  execRaw(expression: string, context?: RenderContext): void {
     // Executing the expression
     try {
       const mExpression = "(function(){ " + expression + " }).apply(this, arguments)";
@@ -50,7 +50,7 @@ export default class Evaluator {
     isReturn?: boolean,
     aditional?: dynamic,
     args?: any[],
-		context: Bouer | Component
+		context: RenderContext
   }) {
     let { data, args, expression, isReturn, aditional, context } = options;
     const mGlobal = this.global as dynamic;
