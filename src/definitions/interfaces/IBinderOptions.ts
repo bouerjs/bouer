@@ -1,7 +1,6 @@
-import Component from "../../core/component/Component";
-import Bouer from "../../instance/Bouer";
-import IDelimiterResponse from "./IDelimiterResponse";
+import RenderContext from "../types/RenderContext";
 import dynamic from "../types/Dynamic";
+import IDelimiterResponse from "./IDelimiterResponse";
 
 export default interface IBinderOptions {
 	/** Node to the bound */
@@ -17,7 +16,7 @@ export default interface IBinderOptions {
 	isReplaceProperty?: boolean,
 
 	/** The context of the binding */
-	context: Bouer | Component,
+	context: RenderContext,
 
 	/** Allow to check if the bound element/parent-element is still connected to the DOM  */
 	isConnected: () => boolean,
