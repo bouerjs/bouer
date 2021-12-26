@@ -1,3 +1,3 @@
-type WatchCallback = <TNewValue, TOldValue>(newValue: TNewValue, oldValue: TOldValue) => void;
+type WatchCallback = <ValueNew, ValueOld>(valueNew: ValueNew, valueOld: ValueOld) => void;
 
 export default WatchCallback;

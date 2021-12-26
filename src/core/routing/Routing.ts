@@ -1,4 +1,4 @@
-import IComponent from "../../definitions/interfaces/IComponent";
+import IComponentOptions from "../../definitions/interfaces/IComponentOptions";
 import Bouer from "../../instance/Bouer";
 import IoC from "../../shared/helpers/IoC";
 import { createAnyEl, DOM, forEach, GLOBAL, isNull, toArray, trim, urlCombine, urlResolver } from "../../shared/helpers/Utils";
@@ -8,8 +8,8 @@ import ComponentHandler from "../component/ComponentHandler";
 
 export default class Routing {
 	bouer: Bouer;
-	defaultPage?: Component | IComponent = undefined;
-	notFoundPage?: Component | IComponent = undefined;
+	defaultPage?: Component | IComponentOptions<any> = undefined;
+	notFoundPage?: Component | IComponentOptions<any> = undefined;
 	routeView: Element | null = null;
 	activeAnchors: HTMLAnchorElement[] = [];
 
@@ -156,7 +156,7 @@ export default class Routing {
 	 * Allow to configure the `Default Page` and `NotFound Page`
 	 * @param component the component to be checked
 	 */
-	configure(component: IComponent) {
+	configure<Data>(component: IComponentOptions<Data>) {
 		if (component.isDefault === true && !isNull(this.defaultPage))
 			return Logger.warn("There are multiple “Default Page” provided, check the “" + component.route + "” route.");
 

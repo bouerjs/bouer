@@ -41,9 +41,15 @@ export default class Middleware {
 					Promise.resolve(middlewareAction(config, () => {
 						isNext = true;
 					}))
-						.then(value => isNext ? null : cbs.success(value))
-						.catch(error => isNext ? null : cbs.fail(error))
-						.finally(() => isNext ? null : cbs.done());
+						.then(value => {
+							if (!isNext) cbs.success(value);
+							cbs.done()
+						})
+						.catch(error => {
+
+							if (!isNext) cbs.fail(error);
+							cbs.done();
+						});
 				});
 			} else {
 				(runnable.default || (() => { }))();

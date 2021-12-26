@@ -29,8 +29,8 @@ export function webRequest(url: string, options?: {
 	const headers = getOption('headers', {});
 	const method = getOption('method', 'get');
 	const body = getOption('body', undefined);
-
 	const xhr = createXhr(method);
+
 	type IResponse = {
 		url: string,
 		ok: boolean,
@@ -257,7 +257,7 @@ export function mapper(source: dynamic, destination: dynamic) {
 
 		if (key in destination) {
 			if (isObject(sourceValue))
-				return mapper(sourceValue, destination[key]);
+				return mapper(sourceValue as any, destination[key]);
 			return destination[key] = sourceValue;
 		}
 
