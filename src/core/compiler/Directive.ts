@@ -1,5 +1,5 @@
-import IComponent from "../../definitions/interfaces/IComponent";
 import IBinderConfig from "../../definitions/interfaces/IBinderConfig";
+import RenderContext from "../../definitions/types/RenderContext";
 import CustomDirective from "../../definitions/types/CustomDirective";
 import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
@@ -23,7 +23,6 @@ import {
 import Logger from "../../shared/logger/Logger";
 import Binder from "../binder/Binder";
 import CommentHandler from "../CommentHandler";
-import Component from "../component/Component";
 import ComponentHandler from "../component/ComponentHandler";
 import DelimiterHandler from "../DelimiterHandler";
 import Evaluator from "../Evaluator";
@@ -44,12 +43,12 @@ export default class Directive {
 	eventHandler: EventHandler;
 	delimiter: DelimiterHandler;
 	$custom: CustomDirective = {};
-	context: Bouer | Component;
+	context: RenderContext;
 
 	constructor(
 		customDirective: CustomDirective,
 		compiler: Compiler,
-		compilerContext: Bouer | Component) {
+		compilerContext: RenderContext) {
 		this.compiler = compiler;
 		this.context = compilerContext;
 		this.bouer = compiler.bouer;

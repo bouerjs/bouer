@@ -1,3 +1,6 @@
+import RenderContext from "../../definitions/types/RenderContext";
+import dynamic from "../../definitions/types/Dynamic";
+import WatchCallback from "../../definitions/types/WatchCallback";
 import Bouer from "../../instance/Bouer";
 import {
 	defineProperty,
@@ -10,29 +13,26 @@ import {
 	toArray
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
-import WatchCallback from "../../definitions/types/WatchCallback";
 import Watch from "../binder/Watch";
 import Component from "../component/Component";
 import ReactiveEvent from "../event/ReactiveEvent";
-import dynamic from "../../definitions/types/Dynamic";
-import IComponent from "../../definitions/interfaces/IComponent";
 
-export default class Reactive<TValue, TObject> implements PropertyDescriptor {
+export default class Reactive<Value, TObject> implements PropertyDescriptor {
 	propertyName: string;
-	propertyValue: TValue;
+	propertyValue: Value;
 	propertySource: TObject;
 	propertyDescriptor: PropertyDescriptor | undefined;
-	watches: Array<Watch<TValue, TObject>> = [];
+	watches: Array<Watch<Value, TObject>> = [];
 	isComputed: boolean;
-	context: Bouer | Component;
+	context: RenderContext;
 
 	computedGetter?: () => any
-	computedSetter?: (value: TValue) => void
+	computedSetter?: (value: Value) => void
 
 	constructor(options: {
 		propertyName: string,
 		sourceObject: TObject,
-		context: Bouer | Component
+		context: RenderContext
 	}) {
 		this.propertyName = options.propertyName;
 		this.propertySource = options.sourceObject;
@@ -40,7 +40,7 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 		// Setting the value of the property
 		this.propertyDescriptor = getDescriptor(this.propertySource, this.propertyName);
 
-		this.propertyValue = this.propertyDescriptor!.value as TValue;
+		this.propertyValue = this.propertyDescriptor!.value as Value;
 		this.isComputed = typeof this.propertyValue === 'function' && this.propertyValue.name === '$computed';
 		if (this.isComputed) {
 			const computedResult = (this.propertyValue as any).call(this.context);
@@ -72,7 +72,7 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 		return value;
 	}
 
-	set = (value: TValue) => {
+	set = (value: Value) => {
 		const oldPropertyValue = this.propertyValue;
 		if (oldPropertyValue === value) return;
 		ReactiveEvent.emit('BeforeSet', this);
@@ -118,26 +118,26 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 		forEach(this.watches, watch => watch.callback(this.propertyValue, oldPropertyValue));
 	}
 
-	onChange(callback: WatchCallback, node?: Node): Watch<TValue, TObject> {
+	onChange(callback: WatchCallback, node?: Node): Watch<Value, TObject> {
 		const w = new Watch(this, callback, { node: node });
 		this.watches.push(w);
 		return w;
 	}
 
-	static transform = <TObject>(options: {
-		context: Bouer | Component,
-		inputObject: TObject,
+	static transform = <InputObject>(options: {
+		context: RenderContext,
+		inputObject: InputObject,
 		reactiveObj?: Reactive<any, any>,
 	}) => {
 		const context = options.context;
-		const executer = (inputObject: TObject, reactiveObj?: Reactive<any, any>, visiting?: any[], visited?: any[]) => {
+		const executer = (inputObject: InputObject, reactiveObj?: Reactive<any, any>, visiting?: any[], visited?: any[]) => {
 			if (Array.isArray(inputObject)) {
 				if (reactiveObj == null) {
 					Logger.warn('Cannot transform this array to a reactive one because no reactive objecto was provided');
 					return inputObject;
 				}
 
-				if (visiting?.includes(inputObject))
+				if (visiting!.indexOf(inputObject) !== -1)
 					return inputObject;
 				visiting?.push(inputObject);
 
@@ -174,7 +174,7 @@ export default class Reactive<TValue, TObject> implements PropertyDescriptor {
 			if (!isObject(inputObject))
 				return inputObject;
 
-			if (visiting?.includes(inputObject))
+			if (visiting!.indexOf(inputObject) !== -1)
 				return inputObject;
 			visiting?.push(inputObject);
 

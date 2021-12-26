@@ -1,7 +1,8 @@
-import dynamic from "../../definitions/types/Dynamic";
 import IEventEmitterOptions from "../../definitions/interfaces/IEventEmitterOptions";
 import IEventModifiers from "../../definitions/interfaces/IEventModifiers";
 import IEventSubscription from "../../definitions/interfaces/IEventSubscription";
+import RenderContext from "../../definitions/types/RenderContext";
+import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
 import Constants from "../../shared/helpers/Constants";
 import IoC from "../../shared/helpers/IoC";
@@ -16,7 +17,6 @@ import {
 	where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
-import Component from "../component/Component";
 import Evaluator from "../Evaluator";
 
 export default class EventHandler {
@@ -33,7 +33,7 @@ export default class EventHandler {
 		this.cleanup();
 	}
 
-	handle(node: Node, data: object, context: Bouer | Component) {
+	handle(node: Node, data: object, context: RenderContext) {
 		const ownerNode = ((node as any).ownerElement || node.parentNode) as Element;
 		const nodeName = node.nodeName;
 
@@ -105,7 +105,7 @@ export default class EventHandler {
 		eventName: string,
 		callback: (event: CustomEvent | Event) => void,
 		attachedNode?: Node,
-		context: Bouer | Component,
+		context: RenderContext,
 		modifiers?: IEventModifiers
 	}) {
 		const { eventName, callback, context, attachedNode, modifiers } = options;
