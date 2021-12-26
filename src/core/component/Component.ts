@@ -1,8 +1,8 @@
 import IAsset from "../../definitions/interfaces/IAsset";
-import IComponent from "../../definitions/interfaces/IComponent";
+import IComponentOptions from "../../definitions/interfaces/IComponentOptions";
+import IEventSubscription from "../../definitions/interfaces/IEventSubscription";
 import ILifeCycleHooks from "../../definitions/interfaces/ILifeCycleHooks";
 import dynamic from "../../definitions/types/Dynamic";
-import IEventSubscription from "../../definitions/interfaces/IEventSubscription";
 import Bouer from "../../instance/Bouer";
 import IoC from "../../shared/helpers/IoC";
 import UriHandler from "../../shared/helpers/UriHandler";
@@ -10,13 +10,12 @@ import {
 	createAnyEl, forEach, isObject, isString, toLower, transferProperty, trim, where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
-import Binder from "../binder/Binder";
 import EventHandler from "../event/EventHandler";
 import Reactive from "../reactive/Reactive";
-export default class Component implements IComponent {
+export default class Component<Data = {}> implements IComponentOptions<Data> {
 	name: string;
 	path: string;
-	data?: object;
+	data?: Data;
 	template?: string;
 	keepAlive?: boolean;
 	prefetch?: boolean = false;
@@ -28,9 +27,9 @@ export default class Component implements IComponent {
 
 	el?: Element = undefined;
 	bouer?: Bouer = undefined;
-	readonly children?: (Component | IComponent)[] = [];
+	readonly children?: (Component | IComponentOptions<Data>)[] = [];
 	readonly assets: (HTMLScriptElement | HTMLStyleElement | HTMLLinkElement)[] = [];
-	readonly restrictions?: ((component: (Component | IComponent)) => boolean | Promise<boolean>)[];
+	readonly restrictions?: ((component: (Component | IComponentOptions<Data>)) => boolean | Promise<boolean>)[];
 	// Store temporarily this component UI orders
 	private events: IEventSubscription[] = [];
 
@@ -46,13 +45,13 @@ export default class Component implements IComponent {
 	blocked?(event: CustomEvent) { }
 	failed?(event: CustomEvent) { }
 
-	constructor(optionsOrPath: string | IComponent) {
+	constructor(optionsOrPath: string | IComponentOptions<Data>) {
 		let _name: any = undefined;
 		let _path: any = undefined;
 
 		if (!isString(optionsOrPath)) {
-			_name = (optionsOrPath as IComponent).name;
-			_path = (optionsOrPath as IComponent).path;
+			_name = (optionsOrPath as IComponentOptions<Data>).name;
+			_path = (optionsOrPath as IComponentOptions<Data>).path;
 			Object.assign(this, optionsOrPath);
 		} else {
 			_path = optionsOrPath;
@@ -61,12 +60,14 @@ export default class Component implements IComponent {
 		this.name = _name;
 		this.path = _path;
 		this.data = Reactive.transform({
-			context: this,
+			context: this as any,
 			inputObject: this.data || {}
 		});
 	}
 
-	export(options: object) {
+	export<ExportableData>(
+		options: ExportableData
+	) {
 		if (!isObject(options))
 			return Logger.log("Invalid object for component.export(...), only \"Object Literal\" is allowed.");
 
@@ -102,7 +103,10 @@ export default class Component implements IComponent {
 		return new UriHandler().params(this.route);
 	}
 
-	emit<TKey extends keyof ILifeCycleHooks>(eventName: TKey, init?: CustomEventInit) {
+	emit<TKey extends keyof ILifeCycleHooks>(
+		eventName: TKey,
+		init?: CustomEventInit
+	) {
 		IoC.Resolve<EventHandler>(this.bouer!, EventHandler)!.emit({
 			eventName: eventName,
 			attachedNode: this.el!,
@@ -110,18 +114,24 @@ export default class Component implements IComponent {
 		})
 	}
 
-	on<TKey extends keyof ILifeCycleHooks>(eventName: TKey, callback: (event: CustomEvent) => void) {
+	on<TKey extends keyof ILifeCycleHooks>(
+		eventName: TKey,
+		callback: (event: CustomEvent) => void
+	) {
+		const context = (eventName == 'requested' || eventName == 'failed' || eventName == 'blocked') ? this.bouer! : this;
 		const evt = IoC.Resolve<EventHandler>(this.bouer!, EventHandler)!.on({
 			eventName,
 			callback: callback as any,
 			attachedNode: this.el!,
-			context: (eventName == 'requested' || eventName == 'failed' || eventName == 'blocked') ? this.bouer! : this
+			context: context as any
 		});
 		this.events.push(evt);
 		return evt;
 	}
 
-	off<TKey extends keyof ILifeCycleHooks>(eventName: TKey, callback: (event: CustomEvent) => void) {
+	off<TKey extends keyof ILifeCycleHooks>(
+		eventName: TKey, callback: (event: CustomEvent) => void
+	) {
 		IoC.Resolve<EventHandler>(this.bouer!, EventHandler)!.off({
 			eventName,
 			callback: callback as any,
