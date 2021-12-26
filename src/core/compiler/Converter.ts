@@ -26,26 +26,25 @@ export default class Converter {
     IoC.Register(this);
   }
 
-  htmlToJsObj(input: any,
+  htmlToJsObj(input: string | HTMLElement,
     options?: {
       names?: string,
       values?: string
-    }, onSet?: (builtObject: object, propName: string, value: any, element: Element) => void): object {
+    }, onSet?: (builtObject: object, propName: string, value: any, element: Element) => void): object | null {
     let element: Element | undefined = undefined;
     const instance = this;
     // If it's not a HTML Element, just return
-    if ((input instanceof Element))
+    if ((input instanceof HTMLElement))
       element = input;
-    // If the element is an object
-    else if (isObject(input))
-      return input;
     // If it's a string try to get the element
-    else if (isString(input)) {
+    else if (typeof input === 'string') {
       try {
-        element = this.bouer.el.querySelector(input);
+				const $el = this.bouer.el.querySelector(input);
+				if (!$el) return null;
+        element = $el;
       } catch {
         // Unknown element type
-        return input
+        return null;
       }
     }
 
