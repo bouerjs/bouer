@@ -1,7 +1,5 @@
-import IBinderOptions from "../../definitions/interfaces/IBinderOptions";
 import IBinderConfig from "../../definitions/interfaces/IBinderConfig";
-import IDelimiterResponse from "../../definitions/interfaces/IDelimiterResponse";
-import dynamic from "../../definitions/types/Dynamic";
+import IBinderOptions from "../../definitions/interfaces/IBinderOptions";
 import WatchCallback from "../../definitions/types/WatchCallback";
 import Bouer from "../../instance/Bouer";
 import Constants from "../../shared/helpers/Constants";
@@ -10,7 +8,7 @@ import Task from "../../shared/helpers/Task";
 import {
 	createEl,
 	findAttribute,
-	forEach, isFunction, isNull,
+	forEach, isNull,
 	isObject,
 	toArray, toStr,
 	trim,
@@ -18,7 +16,6 @@ import {
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Compiler from "../compiler/Compiler";
-import Component from "../component/Component";
 import Evaluator from "../Evaluator";
 import ReactiveEvent from "../event/ReactiveEvent";
 import Middleware from "../middleware/Middleware";
@@ -213,7 +210,7 @@ export default class Binder {
 			callback(this.BindingDirection.fromDataToInput, boundPropertyValue);
 
 			const listeners = ['input', 'propertychange', 'change'];
-			if (!listeners.includes(ownerNode.localName))
+			if (listeners.indexOf(ownerNode.localName) === -1)
 				listeners.push(ownerNode.localName);
 
 			// Applying the events
@@ -306,13 +303,15 @@ export default class Binder {
 		return propertyBindConfig;
 	}
 
-	onPropertyChange(propertyName: string, callback: WatchCallback, targetObject?: object) {
-		let mWatch: Watch<any, any> | null = null;
-		const mTargetObject = targetObject || this.bouer.data;
+	onPropertyChange<Value, TargetObject>(
+		propertyName: string | number | symbol,
+		callback: WatchCallback, targetObject: TargetObject
+	) {
+		let mWatch: Watch<Value, TargetObject> | undefined;
 
 		ReactiveEvent.once('AfterGet', event => {
-			event.onemit = reactive => mWatch = reactive.onChange(callback);
-			const _ = (mTargetObject as any)[propertyName];
+			event.onemit = reactive => mWatch = reactive.onChange(callback) as any;
+			const _ = (targetObject as any)[propertyName];
 		});
 
 		return mWatch;
