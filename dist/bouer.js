@@ -1101,7 +1101,7 @@ var Reactive = /** @class */ (function () {
     };
     Reactive.transform = function (options) {
         var context = options.context;
-        var executer = function (inputObject, reactiveObj, visiting, visited) {
+        var executer = function (inputObject, visiting, visited, reactiveObj) {
             if (Array.isArray(inputObject)) {
                 if (reactiveObj == null) {
                     Logger.warn('Cannot transform this array to a reactive one because no reactive objecto was provided');
@@ -1109,7 +1109,7 @@ var Reactive = /** @class */ (function () {
                 }
                 if (visiting.indexOf(inputObject) !== -1)
                     return inputObject;
-                visiting === null || visiting === void 0 ? void 0 : visiting.push(inputObject);
+                visiting.push(inputObject);
                 var REACTIVE_ARRAY_METHODS = ['push', 'pop', 'unshift', 'shift', 'splice'];
                 var inputArray_1 = inputObject;
                 var reference_1 = {}; // Using clousure to cache the array methods
@@ -1126,7 +1126,7 @@ var Reactive = /** @class */ (function () {
                                 forEach(toArray(arguments), function (arg) {
                                     if (!isObject(arg) && !Array.isArray(arg))
                                         return;
-                                    executer(arg);
+                                    executer(arg, visiting, visited);
                                 });
                         }
                         var result = reference_1[method].apply(inputArray_1, arguments);
@@ -1140,7 +1140,7 @@ var Reactive = /** @class */ (function () {
                 return inputObject;
             if (visiting.indexOf(inputObject) !== -1)
                 return inputObject;
-            visiting === null || visiting === void 0 ? void 0 : visiting.push(inputObject);
+            visiting.push(inputObject);
             forEach(Object.keys(inputObject), function (key) {
                 var mInputObject = inputObject;
                 // Already a reactive property, do nothing
@@ -1158,17 +1158,17 @@ var Reactive = /** @class */ (function () {
                 });
                 defineProperty(inputObject, key, reactive);
                 if (isObject(propertyValue))
-                    executer(propertyValue);
+                    executer(propertyValue, visiting, visited);
                 else if (Array.isArray(propertyValue)) {
-                    executer(propertyValue, reactive); // Transform the array to a reactive one
-                    forEach(propertyValue, function (item) { return executer(item); });
+                    executer(propertyValue, visiting, visited, reactive); // Transform the array to a reactive one
+                    forEach(propertyValue, function (item) { return executer(item, visiting, visited); });
                 }
             });
-            visiting === null || visiting === void 0 ? void 0 : visiting.splice(visiting.indexOf(inputObject), 1);
-            visited === null || visited === void 0 ? void 0 : visited.push(inputObject);
+            visiting.splice(visiting.indexOf(inputObject), 1);
+            visited.push(inputObject);
             return inputObject;
         };
-        return executer(options.inputObject, options.reactiveObj, [], []);
+        return executer(options.inputObject, [], [], options.reactiveObj);
     };
     return Reactive;
 }());

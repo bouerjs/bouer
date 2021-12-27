@@ -130,16 +130,16 @@ export default class Reactive<Value, TObject> implements PropertyDescriptor {
 		reactiveObj?: Reactive<any, any>,
 	}) => {
 		const context = options.context;
-		const executer = (inputObject: InputObject, reactiveObj?: Reactive<any, any>, visiting?: any[], visited?: any[]) => {
+		const executer = (inputObject: InputObject, visiting: any[], visited: any[], reactiveObj?: Reactive<any, any>) => {
 			if (Array.isArray(inputObject)) {
 				if (reactiveObj == null) {
 					Logger.warn('Cannot transform this array to a reactive one because no reactive objecto was provided');
 					return inputObject;
 				}
 
-				if (visiting!.indexOf(inputObject) !== -1)
+				if (visiting.indexOf(inputObject) !== -1)
 					return inputObject;
-				visiting?.push(inputObject);
+				visiting.push(inputObject);
 
 				const REACTIVE_ARRAY_METHODS = ['push', 'pop', 'unshift', 'shift', 'splice']
 				const inputArray = inputObject as any;
@@ -157,7 +157,7 @@ export default class Reactive<Value, TObject> implements PropertyDescriptor {
 							case 'push': case 'unshift':
 								forEach(toArray(arguments), (arg: any) => {
 									if (!isObject(arg) && !Array.isArray(arg)) return;
-									executer(arg);
+									executer(arg, visiting, visited);
 								});
 						}
 
@@ -176,7 +176,7 @@ export default class Reactive<Value, TObject> implements PropertyDescriptor {
 
 			if (visiting!.indexOf(inputObject) !== -1)
 				return inputObject;
-			visiting?.push(inputObject);
+			visiting.push(inputObject);
 
 			forEach(Object.keys(inputObject), key => {
 				const mInputObject = inputObject as dynamic;
@@ -201,19 +201,19 @@ export default class Reactive<Value, TObject> implements PropertyDescriptor {
 				defineProperty(inputObject, key, reactive);
 
 				if (isObject(propertyValue))
-					executer(propertyValue);
+					executer(propertyValue, visiting, visited);
 				else if (Array.isArray(propertyValue)) {
-					executer(propertyValue as any, reactive); // Transform the array to a reactive one
-					forEach(propertyValue, (item: object) => executer(item as any));
+					executer(propertyValue as any, visiting, visited, reactive); // Transform the array to a reactive one
+					forEach(propertyValue, (item: object) => executer(item as any, visiting, visited));
 				}
 			});
 
-			visiting?.splice(visiting.indexOf(inputObject), 1);
-			visited?.push(inputObject);
+			visiting.splice(visiting.indexOf(inputObject), 1);
+			visited.push(inputObject);
 
 			return inputObject;
 		}
 
-		return executer(options.inputObject, options.reactiveObj, [], []);
+		return executer(options.inputObject, [], [], options.reactiveObj);
 	}
 }
