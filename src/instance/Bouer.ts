@@ -11,11 +11,12 @@ import Reactive from "../core/reactive/Reactive";
 import Routing from "../core/routing/Routing";
 import Skeleton from "../core/Skeleton";
 import DataStore from "../core/store/DataStore";
-import IBouer from "../definitions/interfaces/IBouer";
+import IBouerOptions from "../definitions/interfaces/IBouerOptions";
 import IBouerConfig from "../definitions/interfaces/IBouerConfig";
-import IComponent from "../definitions/interfaces/IComponent";
-import delimiter from "../definitions/interfaces/IDelimiter";
+import IComponentOptions from "../definitions/interfaces/IComponentOptions";
+import IDelimiter from "../definitions/interfaces/IDelimiter";
 import dynamic from "../definitions/types/Dynamic";
+import RenderContext from "../definitions/types/RenderContext";
 import WatchCallback from "../definitions/types/WatchCallback";
 import Constants from "../shared/helpers/Constants";
 import IoC from "../shared/helpers/IoC";
@@ -27,16 +28,20 @@ import {
 } from "../shared/helpers/Utils";
 import Logger from "../shared/logger/Logger";
 
-export default class Bouer implements IBouer {
+export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> implements IBouerOptions<Data, GlobalData, Dependencies> {
 	readonly el: Element;
 	readonly name = 'Bouer';
 	readonly version = '3.0.0';
-	readonly data: dynamic;
-	readonly globalData: dynamic;
+	readonly data: Data;
+	readonly globalData: GlobalData;
 	readonly config?: IBouerConfig;
-	readonly dependencies: dynamic<object> = {};
+	readonly dependencies: Dependencies;
 	readonly __id__: number = IoC.GetId();
-
+	/**
+	 * Gets all the elemens having the `ref` attribute
+	 * @returns an object having all the elements with the `ref attribute value` defined as the key.
+	 */
+	readonly refs: dynamic<Element> = {};
 	isDestroyed: boolean = false;
 
 	/** Data Exposition and Injection handler*/
@@ -46,14 +51,14 @@ export default class Bouer implements IBouer {
 		 * @param key the data:[`key`]="..." directive key value or the app.$data.set(`key`) key provided.
 		 * @returns the expected object | null
 		 */
-		get: (key?: string) => any,
+		get: (key?: string) => object | undefined,
 		/**
 		 * Sets a value into a storage the used anywhere of the application.
 		 * @param key the key of the data to be stored.
 		 * @param data the data to be stored.
 		 * @param toReactive allow to transform the data to a reactive one after being setted. By default is `false`.
 		 */
-		set: (key: string, data: object | any[], toReactive?: boolean) => any,
+		set: (key: string, data: object | any[], toReactive?: boolean) => void,
 		/**
 		 * Destroy the stored data
 		 * @param key the data:[`key`]="..." directive value or the app.$data.set(`key`) key provided.
@@ -85,7 +90,7 @@ export default class Bouer implements IBouer {
 		 * @param key the wait-data="`key`" directive value or the app.$wait.set(`key`) key provided.
 		 * @returns the expected object | null
 		 */
-		get: (key?: string) => any,
+		get: (key?: string) => object | undefined,
 		/**
 		 * Provides data for `wait-data` directive elements.
 		 * @param key the key of `wait-data` directive value.
@@ -103,11 +108,11 @@ export default class Bouer implements IBouer {
 	/** Delimiters handler */
 	readonly $delimiters: {
 		/** Adds a delimiter into the instance */
-		add: (item: delimiter) => void
+		add: (item: IDelimiter) => void
 		/** Removes a delimiter from the instance */
 		remove: (name: string) => void;
 		/** Retrieve all the delimiters */
-		get: () => delimiter[];
+		get: () => IDelimiter[];
 	};
 
 	/** Skeleton handler */
@@ -120,8 +125,8 @@ export default class Bouer implements IBouer {
 
 	/** Components Handler */
 	readonly $components: {
-		add: (component: IComponent) => void
-		get: (name: string) => (Component | IComponent)
+		add: <Data>(component: IComponentOptions<Data>) => void
+		get: <Data>(name: string) => (Component<Data> | IComponentOptions<Data>)
 	}
 
 	/** Routing Handler */
@@ -133,10 +138,10 @@ export default class Bouer implements IBouer {
 		routeView: Element | null;
 
 		/** Store the Component defined has NotFound Page */
-		defaultPage?: Component | IComponent;
+		defaultPage?: Component<any> | IComponentOptions<any>;
 
 		/** Store the Component defined has NotFound Page */
-		notFoundPage?: Component | IComponent;
+		notFoundPage?: Component<any> | IComponentOptions<any>;
 
 		/** Store `href` value of the <base /> tag */
 		base?: string | null;
@@ -154,23 +159,23 @@ export default class Bouer implements IBouer {
 		markActiveAnchors: (route: string) => void
 	}
 
-	/**
-	 * Gets all the elemens having the `ref` attribute
-	 * @returns an object having all the elements with the `ref attribute value` defined as the key.
-	 */
-	readonly refs: dynamic<Element> = {};
+
 
 	/**
 	 * Default constructor
 	 * @param selector the selector of the element to be controlled by the instance
 	 * @param options the options to the instance
 	 */
-	constructor(selector: string, options?: IBouer) {
+	constructor(
+		selector: string,
+		options?: IBouerOptions<Data, GlobalData, Dependencies>
+	) {
+
 		options = options || {};
 		// Applying all the options defined
 
 		this.config = options.config;
-		this.dependencies = options.dependencies || {};
+		this.dependencies = options.dependencies || {} as any;
 
 		if (isNull(selector) || trim(selector) === '')
 			throw Logger.error(new Error('Invalid selector provided to the instance.'));
@@ -209,7 +214,7 @@ export default class Bouer implements IBouer {
 		const eventHandler = new EventHandler(this);
 		const routing = new Routing(this);
 		const componentHandler = new ComponentHandler(this);
-		const compiler = new Compiler(this, options);
+		const compiler = new Compiler(this, options.directives || {});
 		const converter = new Converter(this);
 		const skeleton = new Skeleton(this);
 		skeleton.init();
@@ -369,19 +374,20 @@ export default class Bouer implements IBouer {
 	 * @param targetObject the target were the inputData
 	 * @returns the object with the data setted
 	 */
-	set(inputData: object, targetObject?: object) {
+	set<InputData, TargetObject = Data>(
+		inputData: InputData,
+		targetObject: TargetObject | Data = this.data
+	) {
 
 		if (!isObject(inputData)) {
 			Logger.error('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".');
-			return {};
+			return targetObject;
 		}
 
 		if (isObject(targetObject) && targetObject == null) {
 			Logger.error('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".');
 			return inputData;
 		}
-
-		targetObject = targetObject || this.data;
 
 		// Transforming the input
 		Reactive.transform({
@@ -401,18 +407,22 @@ export default class Bouer implements IBouer {
 	 * @param onSet a function that should be fired when a value is setted
 	 * @returns the Object Compiled from the HTML
 	 */
-	toJsObj(input: any, options?: {
-		/**
-		 * attributes that tells the compiler to lookup to the element, e.g: [name],[data-name].
-		 * * Note: The definition order matters.
-		 */
-		names?: string,
-		/**
-		 * attributes that tells the compiler where it going to get the value, e.g: [value],[data-value].
-		 * * Note: The definition order matters.
-		 */
-		values?: string
-	}, onSet?: (builtObject: object, propName: string, value: any, element: Element) => void) {
+	toJsObj(
+		input: string | HTMLElement,
+		options?: {
+			/**
+			 * attributes that tells the compiler to lookup to the element, e.g: [name],[data-name].
+			 * * Note: The definition order matters.
+			 */
+			names?: string,
+			/**
+			 * attributes that tells the compiler where it going to get the value, e.g: [value],[data-value].
+			 * * Note: The definition order matters.
+			 */
+			values?: string
+		},
+		onSet?: (builtObjectLayer: object, propName: string, value: any, element: Element) => void
+	) {
 		return IoC.Resolve<Converter>(this, Converter)!.htmlToJsObj(input, options, onSet);
 	}
 
@@ -423,8 +433,14 @@ export default class Bouer implements IBouer {
 	 * @param targetObject the target object having the property to watch
 	 * @returns the watch object having the method to destroy the watch
 	 */
-	watch(propertyName: string, callback: WatchCallback, targetObject?: object) {
-		return IoC.Resolve<Binder>(this, Binder)!.onPropertyChange(propertyName, callback, targetObject);
+	watch<Key extends keyof TargetObject, TargetObject = Data>(
+		propertyName: Key,
+		callback: (valueNew: TargetObject[Key], valueOld: TargetObject[Key]) => void,
+		targetObject: TargetObject | Data = this.data
+	) {
+		return IoC.Resolve<Binder>(this, Binder)!.onPropertyChange<TargetObject[Key], TargetObject | Data>(
+			propertyName, callback as WatchCallback, targetObject || this.data
+		);
 	}
 
 	/**
@@ -432,7 +448,9 @@ export default class Bouer implements IBouer {
 	 * @param watchableScope the function that should be called when the any reactive property change
 	 * @returns an object having all the watches and the method to destroy watches at once
 	 */
-	react(watchableScope: (app: Bouer) => void) {
+	react(
+		watchableScope: (app: Bouer) => void
+	) {
 		return IoC.Resolve<Binder>(this, Binder)!
 			.onPropertyInScopeChange(watchableScope);
 	}
@@ -445,7 +463,8 @@ export default class Bouer implements IBouer {
 	 * @param modifiers An object having all the event modifier
 	 * @returns The event added
 	 */
-	on(eventName: string,
+	on(
+		eventName: string,
 		callback: (event: CustomEvent | Event) => void,
 		options?: {
 			attachedNode?: Node,
@@ -455,7 +474,8 @@ export default class Bouer implements IBouer {
 				passive?: boolean;
 				signal?: AbortSignal;
 			}
-		}) {
+		}
+	) {
 		return IoC.Resolve<EventHandler>(this, EventHandler)!.
 			on({
 				eventName,
@@ -472,7 +492,11 @@ export default class Bouer implements IBouer {
 	 * @param callback the callback that should be fired
 	 * @param attachedNode A node to attach the event
 	 */
-	off(eventName: string, callback: (event: CustomEvent | Event) => void, attachedNode?: Node) {
+	off(
+		eventName: string,
+		callback: (event: CustomEvent | Event) => void,
+		attachedNode?: Node
+	) {
 		return IoC.Resolve<EventHandler>(this, EventHandler)!.
 			off({
 				eventName,
@@ -485,12 +509,15 @@ export default class Bouer implements IBouer {
 	 * Dispatch an event
 	 * @param options options for the emission
 	 */
-	emit(eventName: string, options?: {
-		element?: Node,
-		init?: CustomEventInit,
-		once?: boolean
-	}) {
-		var mOptions = (options || {});
+	emit(
+		eventName: string,
+		options?: {
+			element?: Node,
+			init?: CustomEventInit,
+			once?: boolean
+		}
+	) {
+		const mOptions = (options || {});
 		return IoC.Resolve<EventHandler>(this, EventHandler)!.
 			emit({
 				eventName: eventName,
@@ -506,7 +533,10 @@ export default class Bouer implements IBouer {
 	 * @param wait milliseconds to the be waited before the single execution
 	 * @returns executable function
 	 */
-	lazy(callback: (args: IArguments) => void, wait?: number) {
+	lazy(
+		callback: (...args: any[]) => void,
+		wait?: number
+	) {
 		const _this = this;
 		let timeout: any; wait = isNull(wait) ? 500 : wait;
 		const immediate = arguments[2];
@@ -529,15 +559,15 @@ export default class Bouer implements IBouer {
 	 * @param options the options of the compilation process
 	 * @returns
 	 */
-	compile(options: {
+	compile<Data>(options: {
 		/** The element that wil be compiled */
 		el: Element,
 		/** The context of this compilation process */
-		context: Bouer | Component,
+		context: RenderContext,
 		/** The data that should be injected in the compilation */
-		data?: dynamic,
+		data?: Data,
 		/** The function that should be fired when the compilation is done */
-		onDone?: (element: Element, data?: dynamic | undefined) => void
+		onDone?: (element: Element, data?: Data | undefined) => void
 	}) {
 		return IoC.Resolve<Compiler>(this, Compiler)!.
 			compile({
@@ -550,12 +580,14 @@ export default class Bouer implements IBouer {
 
 	destroy() {
 		const el = this.el!;
-		const destroyedEvents = IoC.Resolve<EventHandler>(this, EventHandler)!
-			.$events['destroyed'] || [];
+		const $events = IoC.Resolve<EventHandler>(this, EventHandler)!.$events;
+		const destroyedEvents = ($events['destroyed'] || []).concat(($events['component:destroyed'] || []));
 
 		this.emit('destroyed', { element: this.el! });
 		// Dispatching all the destroy events
 		forEach(destroyedEvents, es => es.emit({ once: true }));
+		$events['destroyed'] = [];
+		$events['component:destroyed'] = [];
 
 		if (el.tagName == 'body')
 			el.innerHTML = '';
