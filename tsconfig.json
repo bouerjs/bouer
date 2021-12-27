@@ -1,14 +1,14 @@
 {
   "compilerOptions": {
-    //"noEmit": true,
-    "target": "ES2015",
-    "moduleResolution": "Node",
+    "noEmit": true,
     "strict": true,
     "allowJs": true,
+    "target": "ES2015",
+    "moduleResolution": "Node",
     "lib": ["ES2015", "DOM"],
-    "isolatedModules": true,
+    "isolatedModules": false,
     "esModuleInterop": false,
-		"emitDeclarationOnly": true,
+		"emitDeclarationOnly": false,
     "outDir": "types",
 		"declaration": true,
   },
@@ -17,8 +17,6 @@
 		"dist"
 	],
   "include": [
-    "./src/core",
-    "./src/instance",
-    "./src/shared"
+    "./src/**/*"
   ]
 }
