@@ -1,22 +1,31 @@
 {
-  "name": "bouer.js",
+  "name": "bouerjs",
   "version": "3.0.0",
   "description": "A library that provides a fastest and easy way to bind data to your pages",
+  "main": "dist/bouer.common.js",
+  "module": "dist/bouer.esm.js",
+  "typings": "types/index.d.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "rollup --config rollup.config.js --configPlugin typescript --w",
     "publish": "rollup --config rollup.config.js --configPlugin typescript",
     "release": "node scripts/build.js --prod"
   },
-	"typings": "types/index.d.ts",
+  "files": [
+    "src",
+    "dist/*.js",
+    "types/*.d.ts"
+  ],
   "keywords": [
-    "Bouer"
+    "bouer",
+    "bouerjs",
+    "bouer.js"
   ],
   "author": {
-		"name": "Afonso Matumona",
-		"email": "afonsomatumona@hotmail.com",
-		"url": "https://www.linkedin.com/in/afonsomatelias"
-	},
+    "name": "Afonso Matumona",
+    "email": "afonsomatumona@hotmail.com",
+    "url": "https://www.linkedin.com/in/afonsomatelias"
+  },
   "license": "MIT License",
   "devDependencies": {
     "@babel/cli": "^7.2.3",
@@ -27,7 +36,7 @@
     "@rollup/plugin-buble": "^0.21.3",
     "@rollup/plugin-commonjs": "^21.0.0",
     "@rollup/plugin-typescript": "^8.2.5",
-    "@types/node": "^16.10.3",
+    "@types/node": "^16.11.13",
     "rollup": "^2.58.0",
     "rollup-plugin-cleanup": "^3.2.1",
     "terser": "^5.9.0",
