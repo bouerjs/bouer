@@ -1,22 +1,14 @@
+import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
 
-type Instance = {
-	app: Bouer,
-	ClassInstance: any
-}
-
-type Container = {
-	[appId: number]: { [name: string]: Instance }
-};
-
 /**
- * Store instances of classes to provide any where of
- * the application, but not via constructor.
+ * Store instances of classes to provide as service any where
+ * of the application, but not via constructor.
  * @see https://www.tutorialsteacher.com/ioc/ioc-container
  */
 export default class IoC {
 	private static identifierController: number = 1;
-	private static container: Container = {};
+	private static container: Map<Bouer, dynamic> = new Map();
 
 	/**
 	 * Register an instance into the DI container
@@ -24,14 +16,16 @@ export default class IoC {
 	 */
 	static Register<T>(obj: T) {
 		const objAsAny = (obj as any);
+		const bouer = objAsAny.bouer;
+		let services: dynamic | undefined;
+		const serviceName = objAsAny.constructor.name;
 
-		if (!this.container[objAsAny.bouer.__id__])
-			this.container[objAsAny.bouer.__id__] = {};
+		if (!(services = this.container.get(bouer)))
+			return this.container.set(bouer, {
+				[serviceName]: obj
+			});
 
-		this.container[objAsAny.bouer.__id__][objAsAny.constructor.name] = {
-			app: objAsAny.bouer,
-			ClassInstance: obj
-		};
+		services[serviceName] = obj;
 	}
 
 	/**
@@ -40,19 +34,19 @@ export default class IoC {
 	 * @param $class the class registered
 	 * @returns the instance of the class
 	 */
-	static Resolve<T>(app: Bouer, $class: Function): T | null {
+	static Resolve<Service>(app: Bouer, $class: Function): Service {
 		if (app.isDestroyed) throw new Error("Application already disposed.");
-		const appContainer = this.container[app.__id__];
-		const mContainer = appContainer[$class.name];
-		return mContainer.ClassInstance;
+		let services = this.container.get(app);
+		if (!services) throw new Error("Application not registered!");
+		return services[$class.name]
 	}
 
 	/**
 	 * Destroy an instance registered
 	 * @param key the name of the class registered
 	 */
-	static Dispose(bouer: Bouer) {
-		delete this.container[bouer.__id__];
+	static Dispose(app: Bouer) {
+		return this.container.delete(app);
 	}
 
 	static GetId(): number {
