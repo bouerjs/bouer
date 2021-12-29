@@ -10,9 +10,10 @@ import {
 	createAnyEl, forEach, isObject, isString, toLower, transferProperty, trim, where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
+import Base from "../Base";
 import EventHandler from "../event/EventHandler";
 import Reactive from "../reactive/Reactive";
-export default class Component<Data = {}> implements IComponentOptions<Data> {
+export default class Component<Data = {}> extends Base implements IComponentOptions<Data>{
 	name: string;
 	path: string;
 	data?: Data;
@@ -46,6 +47,8 @@ export default class Component<Data = {}> implements IComponentOptions<Data> {
 	failed?(event: CustomEvent) { }
 
 	constructor(optionsOrPath: string | IComponentOptions<Data>) {
+		super();
+
 		let _name: any = undefined;
 		let _path: any = undefined;
 

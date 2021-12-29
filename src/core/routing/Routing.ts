@@ -3,10 +3,11 @@ import Bouer from "../../instance/Bouer";
 import IoC from "../../shared/helpers/IoC";
 import { createAnyEl, DOM, forEach, GLOBAL, isNull, toArray, trim, urlCombine, urlResolver } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
+import Base from "../Base";
 import Component from "../component/Component";
 import ComponentHandler from "../component/ComponentHandler";
 
-export default class Routing {
+export default class Routing extends Base {
 	bouer: Bouer;
 	defaultPage?: Component | IComponentOptions<any> = undefined;
 	notFoundPage?: Component | IComponentOptions<any> = undefined;
@@ -17,6 +18,8 @@ export default class Routing {
 	base: string | null = null;
 
 	constructor(bouer: Bouer) {
+		super();
+
 		this.bouer = bouer;
 		this.routeView = this.bouer.el.querySelector('[route-view]');
 

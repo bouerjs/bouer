@@ -33,8 +33,9 @@ import Reactive from "../reactive/Reactive";
 import Routing from "../routing/Routing";
 import DataStore from "../store/DataStore";
 import Compiler from "./Compiler";
+import Base from "../Base";
 
-export default class Directive {
+export default class Directive extends Base {
 	bouer: Bouer;
 	binder: Binder;
 	evaluator: Evaluator;
@@ -48,7 +49,10 @@ export default class Directive {
 	constructor(
 		customDirective: CustomDirective,
 		compiler: Compiler,
-		compilerContext: RenderContext) {
+		compilerContext: RenderContext
+	) {
+		super();
+
 		this.compiler = compiler;
 		this.context = compilerContext;
 		this.bouer = compiler.bouer;

@@ -2,16 +2,18 @@ import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
 import IoC from "../../shared/helpers/IoC";
 import Logger from "../../shared/logger/Logger";
+import Base from "../Base";
 
-export default class DataStore {
+export default class DataStore extends Base {
   wait: { [key: string]: { nodes: Element[], data?: object } } = {};
   data: dynamic = {};
   req: dynamic = {};
 	bouer: Bouer;
 
   constructor(bouer: Bouer) {
-		this.bouer = bouer;
+		super();
 
+		this.bouer = bouer;
 		IoC.Register(this);
 	}
 

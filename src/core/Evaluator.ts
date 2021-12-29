@@ -9,12 +9,15 @@ import {
 	getDescriptor, GLOBAL, transferProperty
 } from "../shared/helpers/Utils";
 import Logger from "../shared/logger/Logger";
+import Base from "./Base";
 
-export default class Evaluator {
+export default class Evaluator extends Base {
   private global: Window & typeof globalThis | null;
   private bouer: Bouer;
 
   constructor(bouer: Bouer) {
+		super();
+
 		this.bouer = bouer;
     this.global = this.createWindow() as any;
 

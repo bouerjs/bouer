@@ -15,13 +15,14 @@ import {
 	where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
+import Base from "../Base";
 import Compiler from "../compiler/Compiler";
 import Evaluator from "../Evaluator";
 import ReactiveEvent from "../event/ReactiveEvent";
 import Middleware from "../middleware/Middleware";
 import Watch from "./Watch";
 
-export default class Binder {
+export default class Binder extends Base {
 	bouer: Bouer;
 	evaluator: Evaluator;
 	binds: { isConnected: () => boolean, watch: Watch<any, any> }[] = [];
@@ -39,6 +40,8 @@ export default class Binder {
 	}
 
 	constructor(bouer: Bouer) {
+		super();
+
 		this.bouer = bouer;
 		this.evaluator = IoC.Resolve(this.bouer, Evaluator)!;
 

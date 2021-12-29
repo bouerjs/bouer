@@ -27,15 +27,16 @@ import {
 	isNull, isObject, toArray, transferProperty, trim
 } from "../shared/helpers/Utils";
 import Logger from "../shared/logger/Logger";
+import Base from "../core/Base";
 
-export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> implements IBouerOptions<Data, GlobalData, Dependencies> {
+export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extends Base implements IBouerOptions<Data, GlobalData, Dependencies> {
 	readonly el: Element;
 	readonly name = 'Bouer';
 	readonly version = '3.0.0';
 	readonly data: Data;
 	readonly globalData: GlobalData;
 	readonly config?: IBouerConfig;
-	readonly dependencies: Dependencies;
+	readonly deps: Dependencies;
 	readonly __id__: number = IoC.GetId();
 	/**
 	 * Gets all the elemens having the `ref` attribute
@@ -170,12 +171,13 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> implem
 		selector: string,
 		options?: IBouerOptions<Data, GlobalData, Dependencies>
 	) {
+		super();
 
 		options = options || {};
 		// Applying all the options defined
 
 		this.config = options.config;
-		this.dependencies = options.dependencies || {} as any;
+		this.deps = options.deps || {} as any;
 
 		if (isNull(selector) || trim(selector) === '')
 			throw Logger.error(new Error('Invalid selector provided to the instance.'));

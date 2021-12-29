@@ -1,13 +1,15 @@
 import Bouer from "../instance/Bouer";
 import IoC from "../shared/helpers/IoC";
 import { code, DOM } from "../shared/helpers/Utils";
+import Base from "./Base";
 
-export default class CommentHandler {
+export default class CommentHandler extends Base {
   bouer: Bouer;
 
   constructor(bouer: Bouer) {
-    this.bouer = bouer;
+		super();
 
+    this.bouer = bouer;
     IoC.Register(this);
   }
 

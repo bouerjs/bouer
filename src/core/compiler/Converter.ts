@@ -15,14 +15,16 @@ import {
   toArray,
   trim
 } from "../../shared/helpers/Utils";
+import Base from "../Base";
 
 
-export default class Converter {
+export default class Converter extends Base {
   bouer: Bouer;
 
   constructor(bouer: Bouer) {
-		this.bouer = bouer;
+		super();
 
+		this.bouer = bouer;
     IoC.Register(this);
   }
 

@@ -3,15 +3,17 @@ import IDelimiter from "../definitions/interfaces/IDelimiter";
 import IDelimiterResponse from "../definitions/interfaces/IDelimiterResponse";
 import IoC from "../shared/helpers/IoC";
 import { isNull, trim } from "../shared/helpers/Utils";
+import Base from "./Base";
 
-export default class DelimiterHandler {
+export default class DelimiterHandler extends Base {
   delimiters: Array<IDelimiter> = [];
 	bouer: Bouer;
 
   constructor(delimiters: Array<IDelimiter>, bouer: Bouer) {
+		super();
+
 		this.bouer = bouer;
     this.delimiters = delimiters;
-
     IoC.Register(this);
   }
 

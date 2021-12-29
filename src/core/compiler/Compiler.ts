@@ -11,13 +11,14 @@ import {
 	startWith, toArray
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
+import Base from "../Base";
 import Binder from "../binder/Binder";
 import ComponentHandler from "../component/ComponentHandler";
 import DelimiterHandler from "../DelimiterHandler";
 import EventHandler from "../event/EventHandler";
 import Directive from "./Directive";
 
-export default class Compiler {
+export default class Compiler extends Base {
 	bouer: Bouer;
 	binder: Binder;
 	delimiter: DelimiterHandler;
@@ -25,13 +26,14 @@ export default class Compiler {
 	component: ComponentHandler;
 	directives: CustomDirective;
 
-
 	private NODES_TO_IGNORE_IN_COMPILATION = {
 		'SCRIPT': 1,
 		'#comment': 8
 	}
 
 	constructor(bouer: Bouer, directives: CustomDirective) {
+		super();
+
 		this.bouer = bouer;
 		this.directives = directives;
 		this.binder = IoC.Resolve(this.bouer, Binder)!;

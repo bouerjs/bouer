@@ -23,7 +23,7 @@ export default interface IBouerOptions<Data, GlobalData, Dependencies> {
 	readonly directives?: CustomDirective,
 
 	/** The dependencies of the instance */
-	readonly dependencies?: Dependencies,
+	readonly deps?: Dependencies,
 
 	/** Appends delimiters to the instance */
 	readonly delimiters?: IDelimiter[],

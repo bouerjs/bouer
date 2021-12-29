@@ -3,14 +3,16 @@ import MiddlewareConfigActions from "../../definitions/types/MiddlewareConfigAct
 import IMiddlewareObject from "../../definitions/interfaces/IMiddlewareObject";
 import Bouer from "../../instance/Bouer";
 import IoC from "../../shared/helpers/IoC";
+import Base from "../Base";
 
-export default class Middleware {
+export default class Middleware extends Base {
 	private middlewareConfigContainer: { [key: string]: IMiddlewareObject[] } = {};
 	bouer: Bouer;
 
 	constructor(bouer: Bouer) {
-		this.bouer = bouer;
+		super();
 
+		this.bouer = bouer;
 		IoC.Register(this);
 	}
 

@@ -18,14 +18,17 @@ import {
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Evaluator from "../Evaluator";
+import Base from "../Base";
 
-export default class EventHandler {
+export default class EventHandler extends Base {
 	bouer: Bouer;
 	evaluator: Evaluator;
 	$events: { [key: string]: IEventSubscription[] } = {};
 	input = createEl('input').build();
 
 	constructor(bouer: Bouer) {
+		super();
+
 		this.bouer = bouer;
 		this.evaluator = IoC.Resolve(this.bouer, Evaluator)!;
 

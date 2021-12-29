@@ -16,8 +16,9 @@ import Logger from "../../shared/logger/Logger";
 import Watch from "../binder/Watch";
 import Component from "../component/Component";
 import ReactiveEvent from "../event/ReactiveEvent";
+import Base from "../Base";
 
-export default class Reactive<Value, TObject> implements PropertyDescriptor {
+export default class Reactive<Value, TObject> extends Base implements PropertyDescriptor {
 	propertyName: string;
 	propertyValue: Value;
 	propertySource: TObject;
@@ -34,6 +35,8 @@ export default class Reactive<Value, TObject> implements PropertyDescriptor {
 		sourceObject: TObject,
 		context: RenderContext
 	}) {
+		super();
+
 		this.propertyName = options.propertyName;
 		this.propertySource = options.sourceObject;
 		this.context = options.context;
@@ -187,9 +190,7 @@ export default class Reactive<Value, TObject> implements PropertyDescriptor {
 
 				const propertyValue = mInputObject[key];
 
-				if (propertyValue && (propertyValue instanceof Bouer) ||
-					(propertyValue instanceof Component) ||
-					(propertyValue instanceof Node))
+				if ((propertyValue instanceof Object) && ((propertyValue.isBouer) || (propertyValue instanceof Node)))
 					return;
 
 				const reactive = new Reactive({

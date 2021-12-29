@@ -2,8 +2,9 @@ import Bouer from "../instance/Bouer";
 import Constants from "../shared/helpers/Constants";
 import IoC from "../shared/helpers/IoC";
 import { createEl, DOM, forEach, toArray } from "../shared/helpers/Utils";
+import Base from "./Base";
 
-export default class Skeleton {
+export default class Skeleton extends Base {
   bouer: Bouer;
   style: HTMLStyleElement;
   backgroudColor: string = '';
@@ -13,6 +14,8 @@ export default class Skeleton {
   identifier: string = "bouer";
 
   constructor(bouer: Bouer) {
+		super();
+
 		this.reset();
     this.bouer = bouer;
     this.style = createEl('style', el => el.id = this.identifier).build();

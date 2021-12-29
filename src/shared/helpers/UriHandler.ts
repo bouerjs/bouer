@@ -1,10 +1,13 @@
+import Base from "../../core/Base";
 import dynamic from "../../definitions/types/Dynamic";
 import { DOM, forEach, isString } from "./Utils";
 
-export default class UriHandler {
+export default class UriHandler extends Base {
   url: string;
 
   constructor(url?: string) {
+		super();
+
     this.url = url || DOM.location.href;
   }
 

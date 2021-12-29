@@ -19,6 +19,7 @@ import {
 	urlResolver, webRequest, where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
+import Base from "../Base";
 import Compiler from "../compiler/Compiler";
 import DelimiterHandler from "../DelimiterHandler";
 import Evaluator from "../Evaluator";
@@ -28,7 +29,7 @@ import Reactive from "../reactive/Reactive";
 import Routing from "../routing/Routing";
 import Component from "./Component";
 
-export default class ComponentHandler {
+export default class ComponentHandler extends Base {
 	private bouer: Bouer;
 	// Handle all the components web requests to avoid multiple requests
 	private requests: dynamic = {};
@@ -39,6 +40,8 @@ export default class ComponentHandler {
 	stylesController: { [key: string]: { styles: Element[], elements: Element[] }, } = {};
 
 	constructor(bouer: Bouer) {
+		super();
+
 		this.bouer = bouer;
 		this.delimiter = IoC.Resolve(this.bouer, DelimiterHandler)!;
 		this.eventHandler = IoC.Resolve(this.bouer, EventHandler)!;
