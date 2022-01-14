@@ -80,25 +80,30 @@ export default class Compiler extends Base {
 				if (Constants.skip in node.attributes)
 					return directive.skip(node);
 
-				if (node.localName === Constants.slot && options.componentSlot) {
+				if ((node.localName.toLowerCase() === Constants.slot || node.tagName.toLowerCase() === Constants.slot)
+					&& options.componentSlot) {
+					const componentSlot = options.componentSlot;
 					const insertSlot = (slot: Element, reference: Node) => {
 						const $walker = (child: Node) => {
 							const cloned = child.cloneNode(true);
-							rootElement.insertBefore(cloned, reference);
+							reference.parentNode!.insertBefore(cloned, reference);
 							walker(cloned, data);
 						}
 
-						if (slot.nodeName === 'SLOTCONTAINER')
+						if (slot.nodeName === 'SLOTCONTAINER' || slot.nodeName === 'SLOT')
 							forEach(toArray(slot.childNodes), (child: Node) => $walker(child));
 						else
 							$walker(slot);
 
-						rootElement.removeChild(reference);
+							reference.parentNode!.removeChild(reference);
 					}
 
 					if (node.hasAttribute('default')) {
+						if (componentSlot.childNodes.length == 0)
+							return;
+
 						// In case of default slot insertion
-						return insertSlot(options.componentSlot!, node);
+						return insertSlot(componentSlot, node);
 					} else if (node.hasAttribute('name')) {
 						// In case of target slot insertion
 						const target = node.attributes.getNamedItem('name') as Attr
@@ -116,7 +121,7 @@ export default class Compiler extends Base {
 							forEach(toArray(element.children), (child: Element) => {
 								innerWalker(child);
 							});
-						})(options.componentSlot!);
+						})(componentSlot);
 					}
 				}
 
@@ -232,8 +237,16 @@ export default class Compiler extends Base {
 		if (rootElement.hasAttribute(Constants.silent))
 			rootElement.removeAttribute(Constants.silent)
 
-		if (isFunction(options.onDone))
+		if (isFunction(options.onDone)){
 			options.onDone!.call(context, rootElement);
+		}
+
+		this.eventHandler.emit({
+			eventName: Constants.builtInEvents.compile,
+			attachedNode: rootElement,
+			once: true,
+			init: { detail: data }
+		})
 
 		return rootElement;
 	}
