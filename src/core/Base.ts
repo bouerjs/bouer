@@ -1,3 +1,4 @@
 export default class Base {
-	readonly isBouer = true;
+	/** irt -> Ignore Reactive Transformation */
+	readonly $irt = true;
 }
