@@ -2,6 +2,7 @@
 // Quotes “"+  +"”
 
 import dynamic from "../../definitions/types/Dynamic";
+import Prop from "./Prop";
 
 export function webRequest(url: string, options?: {
 	body?: any;
@@ -167,19 +168,6 @@ export function toStr(input: any) {
 	}
 }
 
-export function defineProperty<TObject>(object: TObject, property: string, descriptor: PropertyDescriptor) {
-	Object.defineProperty(object, property, descriptor);
-	return object;
-}
-
-export function transferProperty<TSourceObject, TDestinationObject>(dest: TSourceObject, src: TDestinationObject, name: string) {
-	defineProperty(dest, name, getDescriptor(src, name) as PropertyDescriptor);
-}
-
-export function getDescriptor<TObject>(obj: TObject, prop: string) {
-	return Object.getOwnPropertyDescriptor(obj, prop);
-}
-
 export function findAttribute(element: Element, attributesToCheck: string[], removeIfFound: boolean = false): Attr | null {
 	let res: Attr | null = null;
 
@@ -261,7 +249,7 @@ export function mapper(source: dynamic, destination: dynamic) {
 			return destination[key] = sourceValue;
 		}
 
-		transferProperty(destination, source, key);
+		Prop.transfer(destination, source, key);
 	});
 }
 

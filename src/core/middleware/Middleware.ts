@@ -42,16 +42,14 @@ export default class Middleware extends Base {
 				runnable.action((config, cbs) => {
 					Promise.resolve(middlewareAction(config, () => {
 						isNext = true;
-					}))
-						.then(value => {
-							if (!isNext) cbs.success(value);
-							cbs.done()
-						})
-						.catch(error => {
+					})).then(value => {
+						if (!isNext) cbs.success(value);
+						cbs.done()
+					}).catch(error => {
 
-							if (!isNext) cbs.fail(error);
-							cbs.done();
-						});
+						if (!isNext) cbs.fail(error);
+						cbs.done();
+					});
 				});
 			} else {
 				(runnable.default || (() => { }))();
@@ -76,5 +74,11 @@ export default class Middleware extends Base {
 		);
 
 		this.middlewareConfigContainer[directive].push(middleware);
+	}
+
+	has = (directive: string) => {
+		const middlewares = this.middlewareConfigContainer[directive];
+		if (!middlewares) return false;
+		return middlewares.length > 0
 	}
 }

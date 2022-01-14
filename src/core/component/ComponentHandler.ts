@@ -3,6 +3,7 @@ import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
 import Extend from "../../shared/helpers/Extend";
 import IoC from "../../shared/helpers/IoC";
+import Prop from "../../shared/helpers/Prop";
 import Task from "../../shared/helpers/Task";
 import {
 	anchor,
@@ -10,12 +11,11 @@ import {
 	code,
 	createAnyEl,
 	createEl,
-	defineProperty,
 	DOM,
 	forEach, isFunction,
 	isNull,
 	isObject, pathResolver, toArray,
-	toLower, transferProperty, urlCombine,
+	toLower, urlCombine,
 	urlResolver, webRequest, where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
@@ -103,9 +103,8 @@ export default class ComponentHandler extends Base {
 
 			if (isNull(component.path) && isNull(component.template))
 				return Logger.warn("The component with name “" + component.name + "”" +
-					component.route ? (" and the route “" + component.route + "”") : "" +
-					" has not “path” or “template” property defined, " +
-				"then it was ignored.");
+					(component.route ? (" and route “" + component.route + "”") : "") +
+					" has not “path” or “template” property defined, " + "then it was ignored.");
 
 			if (!isNull((this.components as any)[component.name!]))
 				return Logger.warn("The component name “" + component.name + "” is already define, try changing the name.");
@@ -113,14 +112,12 @@ export default class ComponentHandler extends Base {
 			if (!isNull(parent)) { // TODO: Inherit the parent info
 			}
 
+			if (!isNull(component.route)) { // Completing the API
+				component.route = "/" + urlCombine((isNull(parent) ? "" : parent!.route!), component.route!);
+			}
+
 			if (Array.isArray(component.children))
 				this.prepare(component.children, component);
-
-			if (!isNull(component.route)) { // Completing the API
-				component.route = "/" + urlCombine(
-					(isNull(parent) ? "" : parent!.route!),
-					component.route!);
-			}
 
 			IoC.Resolve<Routing>(this.bouer, Routing)!
 				.configure(this.components[component.name!] = component);
@@ -144,7 +141,7 @@ export default class ComponentHandler extends Base {
 				return;
 			}
 
-			const prefetch = (this.bouer.config || {}).prefetch ?? true;
+			const prefetch = this.bouer.config.prefetch ?? true;
 			if (!prefetch) return;
 
 			return getContent(component.path);
@@ -342,8 +339,9 @@ export default class ComponentHandler extends Base {
 				const mData = Extend.obj(data, { $data: data });
 
 				const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
-					inputData[reactive.propertyName] = undefined;
-					defineProperty(inputData, reactive.propertyName, reactive);
+					if (!(reactive.propertyName in inputData))
+						inputData[reactive.propertyName] = undefined;
+					Prop.set(inputData, reactive.propertyName, reactive);
 				});
 
 				// If data value is empty gets the main scope value
@@ -376,7 +374,7 @@ export default class ComponentHandler extends Base {
 				});
 
 				return forEach(Object.keys(inputData), key => {
-					transferProperty(component.data, inputData, key);
+					Prop.transfer(component.data, inputData, key);
 				});
 			}
 

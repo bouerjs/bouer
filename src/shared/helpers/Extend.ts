@@ -1,5 +1,6 @@
 import dynamic from "../../definitions/types/Dynamic";
-import { forEach, isNull, transferProperty } from "./Utils";
+import Prop from "./Prop";
+import { forEach, isNull } from "./Utils";
 
 export default class Extend {
   // join objects into one
@@ -8,14 +9,8 @@ export default class Extend {
 
     forEach(args, arg => {
       if (isNull(arg)) return;
-
       forEach(Object.keys(arg), key => {
-        const propValue = (arg as any)[key];
-
-        if (isNull(propValue))
-          return;
-
-        transferProperty(out, arg, key);
+        Prop.transfer(out, arg, key);
       })
     });
 
@@ -37,11 +32,10 @@ export default class Extend {
         if (isNull(value))
           return;
 
-        if (Array.isArray(value)) {
+        if (Array.isArray(value))
           [].push.apply(out, value as never[]);
-        } else {
+        else
           out.push(value);
-        }
       });
     });
     return out;

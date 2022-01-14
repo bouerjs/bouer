@@ -5,9 +5,10 @@ import ILifeCycleHooks from "../../definitions/interfaces/ILifeCycleHooks";
 import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
 import IoC from "../../shared/helpers/IoC";
+import Prop from "../../shared/helpers/Prop";
 import UriHandler from "../../shared/helpers/UriHandler";
 import {
-	createAnyEl, forEach, isObject, isString, toLower, transferProperty, trim, where
+	createAnyEl, forEach, isObject, isString, toLower, trim, where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Base from "../Base";
@@ -16,7 +17,7 @@ import Reactive from "../reactive/Reactive";
 export default class Component<Data = {}> extends Base implements IComponentOptions<Data>{
 	name: string;
 	path: string;
-	data?: Data;
+	data: Data;
 	template?: string;
 	keepAlive?: boolean;
 	prefetch?: boolean = false;
@@ -51,10 +52,12 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 
 		let _name: any = undefined;
 		let _path: any = undefined;
+		let _data: any = undefined;
 
 		if (!isString(optionsOrPath)) {
 			_name = (optionsOrPath as IComponentOptions<Data>).name;
 			_path = (optionsOrPath as IComponentOptions<Data>).path;
+			_data = (optionsOrPath as IComponentOptions<Data>).data;
 			Object.assign(this, optionsOrPath);
 		} else {
 			_path = optionsOrPath;
@@ -64,19 +67,19 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 		this.path = _path;
 		this.data = Reactive.transform({
 			context: this as any,
-			inputObject: this.data || {}
+			inputObject: _data || {}
 		});
 	}
 
 	export<ExportableData>(
-		options: ExportableData
+		exportedData: ExportableData
 	) {
-		if (!isObject(options))
+		if (!isObject(exportedData))
 			return Logger.log("Invalid object for component.export(...), only \"Object Literal\" is allowed.");
 
-		return forEach(Object.keys(options), key => {
-			(this.data as any)[key] = (options as any)[key];
-			transferProperty(this.data, options, key);
+		return forEach(Object.keys(exportedData), key => {
+			(this.data as any)[key] = (exportedData as any)[key];
+			Prop.transfer(this.data, exportedData, key);
 		});
 	}
 
