@@ -1,6 +1,6 @@
 /*!
  * Bouer.js v3.0.0
- * Copyright Easy.js 2018-2020 | 2021-2021 Afonso Matumona
+ * Copyright Easy.js 2018-2020 | 2021-2022 Afonso Matumona
  * Released under the MIT License.
  */
 (function (global, factory) {
@@ -31,6 +31,26 @@ function __spreadArray(to, from, pack) {
     }
     return to.concat(ar || Array.prototype.slice.call(from));
 }
+
+var Prop = /** @class */ (function () {
+    function Prop() {
+    }
+    Prop.set = function (obj, propName, descriptor) {
+        Object.defineProperty(obj, propName, descriptor);
+        return obj;
+    };
+    Prop.descriptor = function (obj, propName) {
+        return Object.getOwnPropertyDescriptor(obj, propName);
+    };
+    Prop.transfer = function (destination, source, propName) {
+        var descriptor = Prop.descriptor(source, propName);
+        var mDst = destination;
+        if (!(propName in destination))
+            mDst[propName] = undefined;
+        Prop.set(destination, propName, descriptor);
+    };
+    return Prop;
+}());
 
 // Quotes “"+  +"”
 function webRequest(url, options) {
@@ -158,16 +178,6 @@ function toStr(input) {
         return String(input);
     }
 }
-function defineProperty(object, property, descriptor) {
-    Object.defineProperty(object, property, descriptor);
-    return object;
-}
-function transferProperty(dest, src, name) {
-    defineProperty(dest, name, getDescriptor(src, name));
-}
-function getDescriptor(obj, prop) {
-    return Object.getOwnPropertyDescriptor(obj, prop);
-}
 function findAttribute(element, attributesToCheck, removeIfFound) {
     if (removeIfFound === void 0) { removeIfFound = false; }
     var res = null;
@@ -238,7 +248,7 @@ function mapper(source, destination) {
                 return mapper(sourceValue, destination[key]);
             return destination[key] = sourceValue;
         }
-        transferProperty(destination, source, key);
+        Prop.transfer(destination, source, key);
     });
 }
 function urlResolver(url) {
@@ -363,6 +373,52 @@ var Constants = {
     }
 };
 
+var Extend = /** @class */ (function () {
+    function Extend() {
+    }
+    // join objects into one
+    Extend.obj = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        var out = {};
+        forEach(args, function (arg) {
+            if (isNull(arg))
+                return;
+            forEach(Object.keys(arg), function (key) {
+                Prop.transfer(out, arg, key);
+            });
+        });
+        return out;
+    };
+    /** join arrays into one */
+    Extend.array = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        var out = [];
+        forEach(args, function (arg) {
+            if (isNull(arg))
+                return;
+            if (!Array.isArray(arg))
+                return out.push(arg);
+            forEach(Object.keys(arg), function (key) {
+                var value = arg[key];
+                if (isNull(value))
+                    return;
+                if (Array.isArray(value))
+                    [].push.apply(out, value);
+                else
+                    out.push(value);
+            });
+        });
+        return out;
+    };
+    return Extend;
+}());
+
 /**
  * Store instances of classes to provide as service any where
  * of the application, but not via constructor.
@@ -464,60 +520,10 @@ var Logger = /** @class */ (function () {
 
 var Base = /** @class */ (function () {
     function Base() {
-        this.isBouer = true;
+        /** irt -> Ignore Reactive Transformation */
+        this.$irt = true;
     }
     return Base;
-}());
-
-var Extend = /** @class */ (function () {
-    function Extend() {
-    }
-    // join objects into one
-    Extend.obj = function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i] = arguments[_i];
-        }
-        var out = {};
-        forEach(args, function (arg) {
-            if (isNull(arg))
-                return;
-            forEach(Object.keys(arg), function (key) {
-                var propValue = arg[key];
-                if (isNull(propValue))
-                    return;
-                transferProperty(out, arg, key);
-            });
-        });
-        return out;
-    };
-    /** join arrays into one */
-    Extend.array = function () {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i] = arguments[_i];
-        }
-        var out = [];
-        forEach(args, function (arg) {
-            if (isNull(arg))
-                return;
-            if (!Array.isArray(arg))
-                return out.push(arg);
-            forEach(Object.keys(arg), function (key) {
-                var value = arg[key];
-                if (isNull(value))
-                    return;
-                if (Array.isArray(value)) {
-                    [].push.apply(out, value);
-                }
-                else {
-                    out.push(value);
-                }
-            });
-        });
-        return out;
-    };
-    return Extend;
 }());
 
 var DelimiterHandler = /** @class */ (function (_super) {
@@ -607,14 +613,14 @@ var Evaluator = /** @class */ (function (_super) {
         var dataToUse = Extend.obj(aditional || {});
         // Defining the scope data
         forEach(Object.keys(data), function (key) {
-            transferProperty(dataToUse, data, key);
+            Prop.transfer(dataToUse, data, key);
         });
         // Applying the global data to the dataToUse variable
         forEach(Object.keys(this.bouer.globalData), function (key) {
             if (key in dataToUse)
                 return Logger.warn('It was not possible to use the globalData property "' + key +
                     '" because it already defined in the current scope.');
-            transferProperty(dataToUse, _this.bouer.globalData, key);
+            Prop.transfer(dataToUse, _this.bouer.globalData, key);
         });
         var keys = Object.keys(dataToUse);
         var returnedValue;
@@ -622,11 +628,11 @@ var Evaluator = /** @class */ (function (_super) {
         forEach(keys, function (key) {
             delete mGlobal[key];
             // In case of non-configurable property store them to be handled
-            if (key in mGlobal && getDescriptor(mGlobal, key).configurable === true)
+            if (key in mGlobal && Prop.descriptor(mGlobal, key).configurable === true)
                 noConfigurableProperties[key] = mGlobal[key];
             if (key in noConfigurableProperties)
                 mGlobal[key] = dataToUse[key];
-            transferProperty(mGlobal, dataToUse, key);
+            Prop.transfer(mGlobal, dataToUse, key);
         });
         // Executing the expression
         try {
@@ -870,8 +876,8 @@ var Reactive = /** @class */ (function (_super) {
             return value;
         };
         _this.set = function (value) {
-            var oldPropertyValue = _this.propertyValue;
-            if (oldPropertyValue === value)
+            _this.propertyValueOld = _this.propertyValue;
+            if (_this.propertyValueOld === value)
                 return;
             ReactiveEvent.emit('BeforeSet', _this);
             if (isObject(value) || Array.isArray(value)) {
@@ -909,14 +915,13 @@ var Reactive = /** @class */ (function (_super) {
             if (_this.isComputed && _this.computedSetter)
                 _this.computedSetter(value);
             ReactiveEvent.emit('AfterSet', _this);
-            // Calling all the watches
-            forEach(_this.watches, function (watch) { return watch.callback(_this.propertyValue, oldPropertyValue); });
+            _this.notify();
         };
         _this.propertyName = options.propertyName;
         _this.propertySource = options.sourceObject;
         _this.context = options.context;
         // Setting the value of the property
-        _this.propertyDescriptor = getDescriptor(_this.propertySource, _this.propertyName);
+        _this.propertyDescriptor = Prop.descriptor(_this.propertySource, _this.propertyName);
         _this.propertyValue = _this.propertyDescriptor.value;
         _this.isComputed = typeof _this.propertyValue === 'function' && _this.propertyValue.name === '$computed';
         if (_this.isComputed) {
@@ -936,6 +941,11 @@ var Reactive = /** @class */ (function (_super) {
             _this.propertyValue = _this.propertyValue.bind(_this.context);
         return _this;
     }
+    Reactive.prototype.notify = function () {
+        var _this = this;
+        // Running all the watches
+        forEach(this.watches, function (watch) { return watch.callback(_this.propertyValue, _this.propertyValueOld); });
+    };
     Reactive.prototype.onChange = function (callback, node) {
         var w = new Watch(this, callback, { node: node });
         this.watches.push(w);
@@ -986,23 +996,23 @@ var Reactive = /** @class */ (function (_super) {
             forEach(Object.keys(inputObject), function (key) {
                 var mInputObject = inputObject;
                 // Already a reactive property, do nothing
-                if (isNull(getDescriptor(inputObject, key).value))
+                if (!('value' in Prop.descriptor(inputObject, key)))
                     return;
                 var propertyValue = mInputObject[key];
-                if ((propertyValue instanceof Object) && ((propertyValue.isBouer) || (propertyValue instanceof Node)))
+                if ((propertyValue instanceof Object) && ((propertyValue.$irt) || (propertyValue instanceof Node)))
                     return;
                 var reactive = new Reactive({
                     propertyName: key,
                     sourceObject: inputObject,
                     context: context
                 });
-                defineProperty(inputObject, key, reactive);
-                if (isObject(propertyValue))
-                    executer(propertyValue, visiting, visited);
-                else if (Array.isArray(propertyValue)) {
+                Prop.set(inputObject, key, reactive);
+                if (Array.isArray(propertyValue)) {
                     executer(propertyValue, visiting, visited, reactive); // Transform the array to a reactive one
                     forEach(propertyValue, function (item) { return executer(item, visiting, visited); });
                 }
+                else if (isObject(propertyValue))
+                    executer(propertyValue, visiting, visited);
             });
             visiting.splice(visiting.indexOf(inputObject), 1);
             visited.push(inputObject);
@@ -1063,7 +1073,7 @@ var Routing = /** @class */ (function (_super) {
             return Logger.log("Invalid url provided to the navigation method.");
         route = trim(route);
         var resolver = urlResolver(route);
-        var usehash = (_a = (this.bouer.config || {}).usehash) !== null && _a !== void 0 ? _a : true;
+        var usehash = (_a = this.bouer.config.usehash) !== null && _a !== void 0 ? _a : true;
         var navigatoTo = (usehash ? resolver.hash : resolver.pathname).split('?')[0];
         // In case of: /about/me/, remove the last forward slash
         if (navigatoTo[navigatoTo.length - 1] === '/')
@@ -1075,8 +1085,10 @@ var Routing = /** @class */ (function (_super) {
         // If it's not found and the url matches .html do nothing
         if (!page && route.endsWith('.html'))
             return;
-        var componentElement = createAnyEl(page.name)
-            .appendTo(this.routeView)
+        var componentElement = createAnyEl(page.name, function (el) {
+            // Inherit the data scope by default
+            el.setAttribute('data', '$data');
+        }).appendTo(this.routeView)
             .build();
         // Document info configuration
         DOM.title = page.title || DOM.title;
@@ -1084,9 +1096,9 @@ var Routing = /** @class */ (function (_super) {
             this.pushState(resolver.href, DOM.title);
         var routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route);
         IoC.Resolve(this.bouer, ComponentHandler$1)
-            .order(componentElement, {}, function (component) {
+            .order(componentElement, this.bouer.data, function (component) {
             component.on('loaded', function () {
-                _this.markActiveAnchors(routeToSet);
+                _this.markActiveAnchorsWithRoute(routeToSet);
             });
         });
     };
@@ -1118,9 +1130,9 @@ var Routing = /** @class */ (function (_super) {
             return false;
         }) || this.notFoundPage;
     };
-    Routing.prototype.markActiveAnchors = function (route) {
+    Routing.prototype.markActiveAnchorsWithRoute = function (route) {
         var _this = this;
-        var className = (this.bouer.config || {}).activeClassName || 'active-link';
+        var className = this.bouer.config.activeClassName || 'active-link';
         var anchors = this.bouer.el.querySelectorAll('a');
         forEach(this.activeAnchors, function (anchor) {
             return anchor.classList.remove(className);
@@ -1135,6 +1147,17 @@ var Routing = /** @class */ (function (_super) {
             anchor.classList.add(className);
             _this.activeAnchors.push(anchor);
         });
+    };
+    Routing.prototype.markActiveAnchor = function (anchor) {
+        var className = this.bouer.config.activeClassName || 'active-link';
+        forEach(this.activeAnchors, function (anchor) {
+            return anchor.classList.remove(className);
+        });
+        forEach([].slice.call(this.bouer.el.querySelectorAll('a.' + className)), function (anchor) {
+            return anchor.classList.remove(className);
+        });
+        anchor.classList.add(className);
+        this.activeAnchors = [anchor];
     };
     Routing.prototype.clear = function () {
         this.routeView.innerHTML = '';
@@ -1224,9 +1247,11 @@ var Component = /** @class */ (function (_super) {
         _this.events = [];
         var _name = undefined;
         var _path = undefined;
+        var _data = undefined;
         if (!isString(optionsOrPath)) {
             _name = optionsOrPath.name;
             _path = optionsOrPath.path;
+            _data = optionsOrPath.data;
             Object.assign(_this, optionsOrPath);
         }
         else {
@@ -1236,7 +1261,7 @@ var Component = /** @class */ (function (_super) {
         _this.path = _path;
         _this.data = Reactive.transform({
             context: _this,
-            inputObject: _this.data || {}
+            inputObject: _data || {}
         });
         return _this;
     }
@@ -1251,13 +1276,13 @@ var Component = /** @class */ (function (_super) {
     Component.prototype.destroyed = function (event) { };
     Component.prototype.blocked = function (event) { };
     Component.prototype.failed = function (event) { };
-    Component.prototype.export = function (options) {
+    Component.prototype.export = function (exportedData) {
         var _this = this;
-        if (!isObject(options))
+        if (!isObject(exportedData))
             return Logger.log("Invalid object for component.export(...), only \"Object Literal\" is allowed.");
-        return forEach(Object.keys(options), function (key) {
-            _this.data[key] = options[key];
-            transferProperty(_this.data, options, key);
+        return forEach(Object.keys(exportedData), function (key) {
+            _this.data[key] = exportedData[key];
+            Prop.transfer(_this.data, exportedData, key);
         });
     };
     Component.prototype.destroy = function () {
@@ -1416,16 +1441,15 @@ var ComponentHandler = /** @class */ (function (_super) {
             }
             if (isNull(component.path) && isNull(component.template))
                 return Logger.warn("The component with name “" + component.name + "”" +
-                    component.route ? (" and the route “" + component.route + "”") : "" +
-                    " has not “path” or “template” property defined, " +
-                    "then it was ignored.");
+                    (component.route ? (" and route “" + component.route + "”") : "") +
+                    " has not “path” or “template” property defined, " + "then it was ignored.");
             if (!isNull(_this.components[component.name]))
                 return Logger.warn("The component name “" + component.name + "” is already define, try changing the name.");
-            if (Array.isArray(component.children))
-                _this.prepare(component.children, component);
             if (!isNull(component.route)) { // Completing the API
                 component.route = "/" + urlCombine((isNull(parent) ? "" : parent.route), component.route);
             }
+            if (Array.isArray(component.children))
+                _this.prepare(component.children, component);
             IoC.Resolve(_this.bouer, Routing)
                 .configure(_this.components[component.name] = component);
             var getContent = function (path) {
@@ -1445,7 +1469,7 @@ var ComponentHandler = /** @class */ (function (_super) {
                     return getContent(component.path);
                 return;
             }
-            var prefetch = (_a = (_this.bouer.config || {}).prefetch) !== null && _a !== void 0 ? _a : true;
+            var prefetch = (_a = _this.bouer.config.prefetch) !== null && _a !== void 0 ? _a : true;
             if (!prefetch)
                 return;
             return getContent(component.path);
@@ -1613,8 +1637,9 @@ var ComponentHandler = /** @class */ (function (_super) {
                 var inputData_1 = {};
                 var mData = Extend.obj(data, { $data: data });
                 var reactiveEvent = ReactiveEvent.on('AfterGet', function (reactive) {
-                    inputData_1[reactive.propertyName] = undefined;
-                    defineProperty(inputData_1, reactive.propertyName, reactive);
+                    if (!(reactive.propertyName in inputData_1))
+                        inputData_1[reactive.propertyName] = undefined;
+                    Prop.set(inputData_1, reactive.propertyName, reactive);
                 });
                 // If data value is empty gets the main scope value
                 if (attr.value === '')
@@ -1642,7 +1667,7 @@ var ComponentHandler = /** @class */ (function (_super) {
                     inputObject: inputData_1
                 });
                 return forEach(Object.keys(inputData_1), function (key) {
-                    transferProperty(component.data, inputData_1, key);
+                    Prop.transfer(component.data, inputData_1, key);
                 });
             }
             rootElement.attributes.setNamedItem(attr);
@@ -1852,13 +1877,11 @@ var Middleware = /** @class */ (function (_super) {
                     runnable.action(function (config, cbs) {
                         Promise.resolve(middlewareAction(config, function () {
                             isNext = true;
-                        }))
-                            .then(function (value) {
+                        })).then(function (value) {
                             if (!isNext)
                                 cbs.success(value);
                             cbs.done();
-                        })
-                            .catch(function (error) {
+                        }).catch(function (error) {
                             if (!isNext)
                                 cbs.fail(error);
                             cbs.done();
@@ -1884,6 +1907,12 @@ var Middleware = /** @class */ (function (_super) {
             var middleware = {};
             actions(function (bind) { return middleware.bind = bind; }, function (update) { return middleware.update = update; });
             _this.middlewareConfigContainer[directive].push(middleware);
+        };
+        _this.has = function (directive) {
+            var middlewares = _this.middlewareConfigContainer[directive];
+            if (!middlewares)
+                return false;
+            return middlewares.length > 0;
         };
         _this.bouer = bouer;
         IoC.Register(_this);
@@ -2010,7 +2039,7 @@ var Directive = /** @class */ (function (_super) {
         } while (currentEl = currentEl.nextElementSibling);
         forEach(reactives, function (item) {
             _this.binder.binds.push({
-                isConnected: function () { return comment.isConnected; },
+                isConnected: function () { return !isNull(Extend.array(conditions.map(function (x) { return x.element; }), comment).find(function (el) { return el.isConnected; })); },
                 watch: item.reactive.onChange(function () { return execute(); }, item.attr)
             });
         });
@@ -2135,6 +2164,7 @@ var Directive = /** @class */ (function (_super) {
                 }
                 var newListCopy_1 = [];
                 forEach(list, function (item) {
+                    var isValid = false;
                     for (var _i = 0, _a = whereKeys.split(',').map(function (m) { return trim(m); }); _i < _a.length; _i++) {
                         var prop = _a[_i];
                         var propValue = _this.evaluator.exec({
@@ -2142,10 +2172,13 @@ var Directive = /** @class */ (function (_super) {
                             expression: prop,
                             context: _this.context
                         });
-                        if (!toStr(propValue).includes(whereValue))
+                        if (toStr(propValue).includes(whereValue)) {
+                            isValid = true;
                             break;
-                        newListCopy_1.push(item);
+                        }
                     }
+                    if (isValid)
+                        newListCopy_1.push(item);
                 });
                 list = newListCopy_1;
             }
@@ -2229,7 +2262,8 @@ var Directive = /** @class */ (function (_super) {
                 data: data,
                 isReturn: false,
                 context: _this.context,
-                expression: "_for(_filters(" + iterable + "), ($$itm, $$idx) => { _each($$itm, $$idx); })",
+                expression: "var __e = _each, __fl = _filters, __f = _for; " +
+                    "__f(__fl(" + iterable + "), function($$itm, $$idx) { __e($$itm, $$idx); })",
                 aditional: {
                     _for: forEach,
                     _each: function (item, index) {
@@ -2297,14 +2331,26 @@ var Directive = /** @class */ (function (_super) {
             return Logger.error(this.errorMsgEmptyNode(node));
         if (this.delimiter.run(nodeValue).length !== 0)
             return Logger.error(this.errorMsgNodeValue(node));
-        var inputData = this.evaluator.exec({
+        var inputData = {};
+        var reactiveEvent = ReactiveEvent.on('AfterGet', function (reactive) {
+            if (!(reactive.propertyName in inputData))
+                inputData[reactive.propertyName] = undefined;
+            Prop.set(inputData, reactive.propertyName, reactive);
+        });
+        var mInputData = this.evaluator.exec({
             data: data,
             expression: nodeValue,
             context: this.context
         });
-        if (!isObject(inputData))
-            return Logger.error(("Expected a valid Object Literal expression in “"
-                + node.nodeName + "” and got “" + nodeValue + "”."));
+        if (!isObject(mInputData))
+            return Logger.error(("Expected a valid Object Literal expression in “" + node.nodeName +
+                "” and got “" + nodeValue + "”."));
+        // Adding all non-existing properties
+        forEach(Object.keys(mInputData), function (key) {
+            if (!(key in inputData))
+                inputData[key] = mInputData[key];
+        });
+        ReactiveEvent.off('AfterGet', reactiveEvent.callback);
         this.bouer.set(inputData, data);
         ownerNode.removeAttribute(node.nodeName);
     };
@@ -2397,8 +2443,9 @@ var Directive = /** @class */ (function (_super) {
         var inputData = {};
         var mData = Extend.obj(data, { $data: data });
         var reactiveEvent = ReactiveEvent.on('AfterGet', function (reactive) {
-            inputData[reactive.propertyName] = undefined;
-            defineProperty(inputData, reactive.propertyName, reactive);
+            if (!(reactive.propertyName in inputData))
+                inputData[reactive.propertyName] = undefined;
+            Prop.set(inputData, reactive.propertyName, reactive);
         });
         // If data value is empty gets the main scope value
         if (nodeValue === '')
@@ -2593,12 +2640,12 @@ var Directive = /** @class */ (function (_super) {
                 return false;
             }
             if ((requestType === 'of' && !Array.isArray(response.data))) {
-                Logger.error(("Using e-ref=\"... “of” ...\" the response must be a " +
+                Logger.error(("Using e-req=\"... “of” ...\" the response must be a " +
                     "list of items, and got “" + typeof response.data + "”."));
                 return false;
             }
             if ((requestType === 'as' && !(typeof response.data === 'object'))) {
-                Logger.error(("Using e-ref=\"... “as” ...\" the response must be a list " +
+                Logger.error(("Using e-req=\"... “as” ...\" the response must be a list " +
                     "of items, and got “" + typeof response.data + "”."));
                 return false;
             }
@@ -2606,6 +2653,8 @@ var Directive = /** @class */ (function (_super) {
         };
         var middleware = IoC.Resolve(this.bouer, Middleware);
         var dataKey = (node.nodeName.split(':')[1] || '').replace(/\[|\]/g, '');
+        if (!middleware.has('req'))
+            return Logger.error("There is no “req” middleware provided for the “e-req” directive requests.");
         (onInsertOrUpdate = function () {
             var expObject = builder(trim(node.nodeValue || ''));
             var responseHandler = function (response) {
@@ -2616,6 +2665,8 @@ var Directive = /** @class */ (function (_super) {
                     context: _this.context,
                     inputObject: response
                 });
+                if (dataKey)
+                    IoC.Resolve(_this.bouer, DataStore).set('req', dataKey, response);
                 subcribeEvent(Constants.builtInEvents.response).emit({
                     response: response
                 });
@@ -2623,51 +2674,42 @@ var Directive = /** @class */ (function (_super) {
                 if (!('data' in localDataStore)) {
                     // Store the data
                     localDataStore.data = undefined;
-                    transferProperty(localDataStore, response, 'data');
+                    Prop.transfer(localDataStore, response, 'data');
                 }
                 else {
                     // Update de local data
                     return localDataStore.data = response.data;
                 }
-                if (dataKey)
-                    IoC.Resolve(_this.bouer, DataStore).set('req', dataKey, response);
                 if (expObject.type === 'as') {
                     // Removing the: “(...)”  “,”  and getting only the variable
                     var variable = trim(expObject.variables.split(',')[0].replace(/\(|\)/g, ''));
+                    if (variable in data)
+                        return Logger.error("There is already a “" + variable + "” defined in the current scope. " +
+                            "Provide another variable name in order to continue.");
+                    data[variable] = response.data;
                     return _this.compiler.compile({
                         el: ownerNode,
-                        data: Extend.obj((_a = {}, _a[variable] = response.data, _a), data),
-                        context: _this.context,
-                        onDone: function (_, inData) {
-                            subcribeEvent(Constants.builtInEvents.compile)
-                                .emit({
-                                data: inData
-                            });
-                        }
+                        data: Reactive.transform({ context: _this.context, inputObject: data }),
+                        context: _this.context
                     });
                 }
                 if (expObject.type === 'of') {
-                    var forDirectiveContent = expObject.expression.replace(expObject.path, '_response_');
+                    var resUniqueName = code(8, 'res');
+                    var forDirectiveContent = expObject.expression.replace(expObject.path, resUniqueName);
+                    var mData = Extend.obj((_a = {}, _a[resUniqueName] = response.data, _a), data);
                     ownerNode.setAttribute(Constants.for, forDirectiveContent);
-                    data._response_ = undefined;
-                    defineProperty(data, '_response_', getDescriptor(response, 'data'));
+                    Prop.set(mData, resUniqueName, Prop.descriptor(response, 'data'));
                     return _this.compiler.compile({
                         el: ownerNode,
-                        data: data,
-                        context: _this.context,
-                        onDone: function (_, inData) {
-                            subcribeEvent(Constants.builtInEvents.compile)
-                                .emit({
-                                data: inData
-                            });
-                        }
+                        data: mData,
+                        context: _this.context
                     });
                 }
             };
             subcribeEvent(Constants.builtInEvents.request).emit();
             middleware.run('req', {
                 type: 'bind',
-                action: function (middleware) {
+                action: function (middlewareRequest) {
                     var context = {
                         binder: binderConfig,
                         detail: {
@@ -2685,7 +2727,7 @@ var Directive = /** @class */ (function (_super) {
                         }); },
                         done: function () { return subcribeEvent(Constants.builtInEvents.done).emit(); }
                     };
-                    middleware(context, cbs);
+                    middlewareRequest(context, cbs);
                 }
             });
         })();
@@ -2827,22 +2869,26 @@ var Compiler = /** @class */ (function (_super) {
                 // e-skip" directive
                 if (Constants.skip in node.attributes)
                     return directive.skip(node);
-                if (node.localName === Constants.slot && options.componentSlot) {
+                if ((node.localName.toLowerCase() === Constants.slot || node.tagName.toLowerCase() === Constants.slot)
+                    && options.componentSlot) {
+                    var componentSlot = options.componentSlot;
                     var insertSlot_1 = function (slot, reference) {
                         var $walker = function (child) {
                             var cloned = child.cloneNode(true);
-                            rootElement.insertBefore(cloned, reference);
+                            reference.parentNode.insertBefore(cloned, reference);
                             walker(cloned, data);
                         };
-                        if (slot.nodeName === 'SLOTCONTAINER')
+                        if (slot.nodeName === 'SLOTCONTAINER' || slot.nodeName === 'SLOT')
                             forEach(toArray(slot.childNodes), function (child) { return $walker(child); });
                         else
                             $walker(slot);
-                        rootElement.removeChild(reference);
+                        reference.parentNode.removeChild(reference);
                     };
                     if (node.hasAttribute('default')) {
+                        if (componentSlot.childNodes.length == 0)
+                            return;
                         // In case of default slot insertion
-                        return insertSlot_1(options.componentSlot, node);
+                        return insertSlot_1(componentSlot, node);
                     }
                     else if (node.hasAttribute('name')) {
                         // In case of target slot insertion
@@ -2858,7 +2904,7 @@ var Compiler = /** @class */ (function (_super) {
                             forEach(toArray(element.children), function (child) {
                                 innerWalker(child);
                             });
-                        })(options.componentSlot);
+                        })(componentSlot);
                     }
                 }
                 // e-def="{...}" directive
@@ -2951,8 +2997,15 @@ var Compiler = /** @class */ (function (_super) {
         walker(rootElement, data);
         if (rootElement.hasAttribute(Constants.silent))
             rootElement.removeAttribute(Constants.silent);
-        if (isFunction(options.onDone))
+        if (isFunction(options.onDone)) {
             options.onDone.call(context, rootElement);
+        }
+        this.eventHandler.emit({
+            eventName: Constants.builtInEvents.compile,
+            attachedNode: rootElement,
+            once: true,
+            init: { detail: data }
+        });
         return rootElement;
     };
     Compiler.prototype.analize = function (htmlSnippet) {
@@ -3016,94 +3069,160 @@ var Binder = /** @class */ (function (_super) {
                 }
             });
         };
-        // Two-Way Data Binding: e-bind:[?]="..."
-        if (originalName.substring(0, Constants.bind.length) === Constants.bind) {
-            var propertyNameToBind_1 = '';
-            var binderTarget_1 = ownerNode.type || ownerNode.localName;
+        var bindOneWay = function () {
+            // One-Way Data Binding
+            var nodeToBind = node;
+            // If definable property e-[?]="..."
+            if (originalName.substring(0, Constants.property.length) === Constants.property && isNull(isReplaceProperty)) {
+                propertyBindConfig.nodeName = originalName.substring(Constants.property.length);
+                ownerNode.setAttribute(propertyBindConfig.nodeName, originalValue);
+                nodeToBind = ownerNode.attributes[propertyBindConfig.nodeName];
+                // Removing the e-[?] attr
+                ownerNode.removeAttribute(node.nodeName);
+            }
+            // Property value setter
+            var setter = function () {
+                var valueToSet = propertyBindConfig.nodeValue;
+                var isHtml = false;
+                // Looping all the fields to be setted
+                forEach(fields, function (field) {
+                    var delimiter = field.delimiter;
+                    if (delimiter && delimiter.name === 'html')
+                        isHtml = true;
+                    var result = _this.evaluator.exec({
+                        data: data,
+                        expression: field.expression,
+                        context: context
+                    });
+                    result = isNull(result) ? '' : result;
+                    valueToSet = valueToSet.replace(field.field, toStr(result));
+                    if (delimiter && typeof delimiter.update === 'function')
+                        valueToSet = delimiter.update(valueToSet, node, data);
+                });
+                propertyBindConfig.value = valueToSet;
+                if (!isHtml)
+                    nodeToBind.nodeValue = valueToSet;
+                else {
+                    var htmlSnippet = createEl('div', function (el) {
+                        el.innerHTML = valueToSet;
+                    }).build().children[0];
+                    ownerNode.appendChild(htmlSnippet);
+                    IoC.Resolve(_this.bouer, Compiler).compile({
+                        el: htmlSnippet,
+                        data: data,
+                        context: context
+                    });
+                }
+            };
+            ReactiveEvent.once('AfterGet', function (event) {
+                event.onemit = function (reactive) {
+                    _this.binds.push({
+                        isConnected: options.isConnected,
+                        watch: reactive.onChange(function (value) {
+                            setter();
+                            onUpdate(value, node);
+                            $runDirectiveMiddlewares('update');
+                        }, node)
+                    });
+                };
+                setter();
+            });
+            propertyBindConfig.node = nodeToBind;
+            $runDirectiveMiddlewares('bind');
+            return propertyBindConfig;
+        };
+        var bindTwoWay = function () {
+            var propertyNameToBind = '';
+            var binderTarget = ownerNode.type || ownerNode.localName;
             if (Constants.bind === originalName)
-                propertyNameToBind_1 = this.DEFAULT_BINDER_PROPERTIES[binderTarget_1] || 'value';
+                propertyNameToBind = _this.DEFAULT_BINDER_PROPERTIES[binderTarget] || 'value';
             else
-                propertyNameToBind_1 = originalName.split(':')[1]; // e-bind:value -> value
-            var isSelect_1 = ownerNode instanceof HTMLSelectElement;
-            var isSelectMultiple_1 = isSelect_1 && ownerNode.multiple === true;
+                propertyNameToBind = originalName.split(':')[1]; // e-bind:value -> value
+            var isSelect = ownerNode instanceof HTMLSelectElement;
+            var isSelectMultiple = isSelect && ownerNode.multiple === true;
             var modelAttribute = findAttribute(ownerNode, [':value'], true);
-            var dataBindModel_1 = modelAttribute ? modelAttribute.value : "\"" + ownerNode.value + "\"";
-            var dataBindProperty_1 = trim(originalValue);
-            var boundPropertyValue_1;
-            var boundModelValue_1;
-            var callback_1 = function (direction, value) {
-                if (isSelect_1 && !isSelectMultiple_1 && Array.isArray(boundPropertyValue_1) && !dataBindModel_1) {
+            var dataBindModel = modelAttribute ? modelAttribute.value : "\"" + ownerNode.value + "\"";
+            var dataBindProperty = trim(originalValue);
+            var boundPropertyValue;
+            var boundModelValue;
+            var callback = function (direction, value) {
+                if (isSelect && !isSelectMultiple && Array.isArray(boundPropertyValue) && !dataBindModel) {
                     return Logger.error("Since it's a <select> array binding, it expects the “multiple” attribute in" +
                         " order to bind the multiple values.");
                 }
                 // Array Binding
-                if (!isSelectMultiple_1 && (Array.isArray(boundPropertyValue_1) && !dataBindModel_1)) {
+                if (!isSelectMultiple && (Array.isArray(boundPropertyValue) && !dataBindModel)) {
                     return Logger.error("Since it's an array binding it expects a model but it has not been defined" +
                         ", provide a model as it follows: value=\"String-Model\" or :value=\"Object-Model\".");
                 }
                 var $set = {
                     fromDataToInput: function () {
                         // Normal Property Set
-                        if (!Array.isArray(boundPropertyValue_1)) {
+                        if (!Array.isArray(boundPropertyValue)) {
                             // In case of radio button we need to check if the value is the same to check it
-                            if (binderTarget_1 === 'radio')
-                                return ownerNode.checked = ownerNode[propertyNameToBind_1] == value;
+                            if (binderTarget === 'radio')
+                                return ownerNode.checked = ownerNode[propertyNameToBind] == value;
                             // Default Binding
-                            return ownerNode[propertyNameToBind_1] = (isObject(value) ? toStr(value) : (isNull(value) ? '' : value));
+                            return ownerNode[propertyNameToBind] = (isObject(value) ? toStr(value) : (isNull(value) ? '' : value));
                         }
                         // Array Set
-                        boundModelValue_1 = boundModelValue_1 || _this.evaluator.exec({
+                        boundModelValue = boundModelValue || _this.evaluator.exec({
                             data: data,
-                            expression: dataBindModel_1,
+                            expression: dataBindModel,
                             context: context
                         });
                         // select-multiple handling
-                        if (isSelectMultiple_1) {
+                        if (isSelectMultiple) {
                             return forEach(toArray(ownerNode.options), function (option) {
-                                option.selected = boundPropertyValue_1.indexOf(trim(option.value)) !== -1;
+                                option.selected = boundPropertyValue.indexOf(trim(option.value)) !== -1;
                             });
                         }
                         // checkboxes, radio, etc
-                        if (boundPropertyValue_1.indexOf(boundModelValue_1) === -1) {
-                            switch (typeof ownerNode[propertyNameToBind_1]) {
+                        if (boundPropertyValue.indexOf(boundModelValue) === -1) {
+                            switch (typeof ownerNode[propertyNameToBind]) {
                                 case 'boolean':
-                                    ownerNode[propertyNameToBind_1] = false;
+                                    ownerNode[propertyNameToBind] = false;
                                     break;
                                 case 'number':
-                                    ownerNode[propertyNameToBind_1] = 0;
+                                    ownerNode[propertyNameToBind] = 0;
                                     break;
                                 default:
-                                    ownerNode[propertyNameToBind_1] = "";
+                                    ownerNode[propertyNameToBind] = "";
                                     break;
                             }
                         }
                     },
                     fromInputToData: function () {
                         // Normal Property Set
-                        if (!Array.isArray(boundPropertyValue_1)) {
+                        if (!Array.isArray(boundPropertyValue)) {
                             // Default Binding
-                            return data[dataBindProperty_1] = value;
+                            return _this.evaluator.exec({
+                                isReturn: false,
+                                context: context,
+                                data: Extend.obj(data, { $vl: value }),
+                                expression: dataBindProperty + '=$vl'
+                            });
                         }
                         // Array Set
-                        boundModelValue_1 = boundModelValue_1 || _this.evaluator.exec({
+                        boundModelValue = boundModelValue || _this.evaluator.exec({
                             data: data,
-                            expression: dataBindModel_1,
+                            expression: dataBindModel,
                             context: context
                         });
                         // select-multiple handling
-                        if (isSelectMultiple_1) {
+                        if (isSelectMultiple) {
                             var optionCollection_1 = [];
                             forEach(toArray(ownerNode.options), function (option) {
                                 if (option.selected === true)
                                     optionCollection_1.push(trim(option.value));
                             });
-                            boundPropertyValue_1.splice(0, boundPropertyValue_1.length);
-                            return boundPropertyValue_1.push.apply(boundPropertyValue_1, optionCollection_1);
+                            boundPropertyValue.splice(0, boundPropertyValue.length);
+                            return boundPropertyValue.push.apply(boundPropertyValue, optionCollection_1);
                         }
                         if (value)
-                            boundPropertyValue_1.push(boundModelValue_1);
+                            boundPropertyValue.push(boundModelValue);
                         else
-                            boundPropertyValue_1.splice(boundPropertyValue_1.indexOf(boundModelValue_1), 1);
+                            boundPropertyValue.splice(boundPropertyValue.indexOf(boundModelValue), 1);
                     }
                 };
                 return $set[direction]();
@@ -3114,20 +3233,20 @@ var Binder = /** @class */ (function (_super) {
                     _this.binds.push({
                         isConnected: options.isConnected,
                         watch: reactive.onChange(function (value) {
-                            callback_1(_this.BindingDirection.fromDataToInput, value);
+                            callback(_this.BindingDirection.fromDataToInput, value);
                             onUpdate(value, node);
                             $runDirectiveMiddlewares('update');
                         }, node)
                     });
                 };
                 // calling the main event
-                boundPropertyValue_1 = _this.evaluator.exec({
+                boundPropertyValue = _this.evaluator.exec({
                     data: data,
-                    expression: dataBindProperty_1,
+                    expression: dataBindProperty,
                     context: context
                 });
             });
-            callback_1(this.BindingDirection.fromDataToInput, boundPropertyValue_1);
+            callback(_this.BindingDirection.fromDataToInput, boundPropertyValue);
             var listeners = ['input', 'propertychange', 'change'];
             if (listeners.indexOf(ownerNode.localName) === -1)
                 listeners.push(ownerNode.localName);
@@ -3136,74 +3255,17 @@ var Binder = /** @class */ (function (_super) {
                 if (listener === 'change' && ownerNode.localName !== 'select')
                     return;
                 ownerNode.addEventListener(listener, function () {
-                    callback_1(_this.BindingDirection.fromInputToData, ownerNode[propertyNameToBind_1]);
+                    callback(_this.BindingDirection.fromInputToData, ownerNode[propertyNameToBind]);
                 }, false);
             });
             // Removing the e-bind attr
             ownerNode.removeAttribute(node.nodeName);
             $runDirectiveMiddlewares('bind');
             return propertyBindConfig; // Stop Two-Way Data Binding Process
-        }
-        // One-Way Data Binding
-        var nodeToBind = node;
-        // If definable property e-[?]="..."
-        if (originalName.substring(0, Constants.property.length) === Constants.property && isNull(isReplaceProperty)) {
-            propertyBindConfig.nodeName = originalName.substring(Constants.property.length);
-            ownerNode.setAttribute(propertyBindConfig.nodeName, originalValue);
-            nodeToBind = ownerNode.attributes[propertyBindConfig.nodeName];
-            // Removing the e-[?] attr
-            ownerNode.removeAttribute(node.nodeName);
-        }
-        // Property value setter
-        var setter = function () {
-            var valueToSet = propertyBindConfig.nodeValue;
-            var isHtml = false;
-            // Looping all the fields to be setted
-            forEach(fields, function (field) {
-                var delimiter = field.delimiter;
-                if (delimiter && delimiter.name === 'html')
-                    isHtml = true;
-                var result = _this.evaluator.exec({
-                    data: data,
-                    expression: field.expression,
-                    context: context
-                });
-                result = isNull(result) ? '' : result;
-                valueToSet = valueToSet.replace(field.field, toStr(result));
-                if (delimiter && typeof delimiter.update === 'function')
-                    valueToSet = delimiter.update(valueToSet, node, data);
-            });
-            propertyBindConfig.value = valueToSet;
-            if (!isHtml)
-                nodeToBind.nodeValue = valueToSet;
-            else {
-                var htmlSnippet = createEl('div', function (el) {
-                    el.innerHTML = valueToSet;
-                }).build().children[0];
-                ownerNode.appendChild(htmlSnippet);
-                IoC.Resolve(_this.bouer, Compiler).compile({
-                    el: htmlSnippet,
-                    data: data,
-                    context: context
-                });
-            }
         };
-        ReactiveEvent.once('AfterGet', function (event) {
-            event.onemit = function (reactive) {
-                _this.binds.push({
-                    isConnected: options.isConnected,
-                    watch: reactive.onChange(function (value) {
-                        setter();
-                        onUpdate(value, node);
-                        $runDirectiveMiddlewares('update');
-                    }, node)
-                });
-            };
-            setter();
-        });
-        propertyBindConfig.node = nodeToBind;
-        $runDirectiveMiddlewares('bind');
-        return propertyBindConfig;
+        if (originalName.substring(0, Constants.bind.length) === Constants.bind)
+            return bindTwoWay();
+        return bindOneWay();
     };
     Binder.prototype.onPropertyChange = function (propertyName, callback, targetObject) {
         var mWatch;
@@ -3457,16 +3519,20 @@ var Bouer = /** @class */ (function (_super) {
          */
         _this_1.refs = {};
         _this_1.isDestroyed = false;
-        options = options || {};
-        // Applying all the options defined
-        _this_1.config = options.config;
-        _this_1.deps = options.deps || {};
         if (isNull(selector) || trim(selector) === '')
             throw Logger.error(new Error('Invalid selector provided to the instance.'));
         var el = DOM.querySelector(selector);
         if (!el)
             throw Logger.error(new SyntaxError("Element with selector “" + selector + "” not found."));
         _this_1.el = el;
+        options = options || {};
+        _this_1.config = options.config || {};
+        _this_1.deps = options.deps || {};
+        forEach(Object.keys(_this_1.deps), function (key) {
+            var deps = _this_1.deps;
+            var value = deps[key];
+            deps[key] = typeof value === 'function' ? value.bind(_this_1) : value;
+        });
         var dataStore = new DataStore(_this_1);
         new Evaluator(_this_1);
         var middleware = new Middleware(_this_1);
@@ -3520,7 +3586,17 @@ var Bouer = /** @class */ (function (_super) {
             unset: function (key) { return delete dataStore.req[key]; },
         };
         _this_1.$wait = {
-            get: function (key) { return key ? dataStore.wait[key] : dataStore.wait; },
+            get: function (key) {
+                if (key) {
+                    var mWait = dataStore.wait[key];
+                    if (!mWait)
+                        return undefined;
+                    return mWait.data;
+                }
+                var output = {};
+                forEach(Object.keys(dataStore.wait), function (k) { return output[k] = dataStore.wait[k].data; });
+                return output;
+            },
             set: function (key, data) {
                 if (!(key in dataStore.wait))
                     return dataStore.wait[key] = { data: data, nodes: [] };
@@ -3550,7 +3626,7 @@ var Bouer = /** @class */ (function (_super) {
             get: function (name) { return componentHandler.components[name]; }
         };
         _this_1.$routing = routing;
-        defineProperty(_this_1, 'refs', {
+        Prop.set(_this_1, 'refs', {
             get: function () {
                 var mRefs = {};
                 forEach(toArray(_this_1.el.querySelectorAll("[" + Constants.ref + "]")), function (ref) {
@@ -3650,7 +3726,32 @@ var Bouer = /** @class */ (function (_super) {
             context: this
         });
         // Transfering the properties
-        forEach(Object.keys(inputData), function (key) { return transferProperty(targetObject, inputData, key); });
+        forEach(Object.keys(inputData), function (key) {
+            var r_src;
+            var r_dst;
+            // Notifying the bound elements and the watches
+            ReactiveEvent.once('AfterGet', function (evt) {
+                evt.onemit = function (reactive) { return r_src = reactive; };
+                Prop.descriptor(inputData, key).get();
+            });
+            // Notifying the bound elements and the watches
+            ReactiveEvent.once('AfterGet', function (evt) {
+                evt.onemit = function (reactive) { return r_dst = reactive; };
+                var desc = Prop.descriptor(targetObject, key);
+                if (desc)
+                    desc.get();
+            });
+            Prop.transfer(targetObject, inputData, key);
+            if (!r_dst || !r_src)
+                return;
+            // Adding the previous watches to the property that is being set
+            forEach(r_dst.watches, function (watch) {
+                if (r_src.watches.indexOf(watch) === -1)
+                    r_src.watches.push(watch);
+            });
+            // Notifying the bounds and watches
+            r_src.notify();
+        });
         return targetObject;
     };
     /**
@@ -3777,10 +3878,10 @@ var Bouer = /** @class */ (function (_super) {
         forEach(destroyedEvents, function (es) { return es.emit({ once: true }); });
         $events['destroyed'] = [];
         $events['component:destroyed'] = [];
-        if (el.tagName == 'body')
+        if (el.tagName == 'BODY')
             el.innerHTML = '';
         else if (DOM.contains(el))
-            DOM.body.removeChild(el);
+            el.parentElement.removeChild(el);
         IoC.Dispose(this);
     };
     // Hooks
