@@ -3,6 +3,7 @@ import IBinderOptions from "../../definitions/interfaces/IBinderOptions";
 import WatchCallback from "../../definitions/types/WatchCallback";
 import Bouer from "../../instance/Bouer";
 import Constants from "../../shared/helpers/Constants";
+import Extend from "../../shared/helpers/Extend";
 import IoC from "../../shared/helpers/IoC";
 import Task from "../../shared/helpers/Task";
 import {
@@ -84,8 +85,83 @@ export default class Binder extends Base {
 			});
 		}
 
-		// Two-Way Data Binding: e-bind:[?]="..."
-		if (originalName.substring(0, Constants.bind.length) === Constants.bind) {
+		const bindOneWay = () => {
+			// One-Way Data Binding
+			let nodeToBind = node;
+
+			// If definable property e-[?]="..."
+			if (originalName.substring(0, Constants.property.length) === Constants.property && isNull(isReplaceProperty)) {
+				propertyBindConfig.nodeName = originalName.substring(Constants.property.length);
+				ownerNode.setAttribute(propertyBindConfig.nodeName, originalValue);
+				nodeToBind = ownerNode.attributes[propertyBindConfig.nodeName];
+
+				// Removing the e-[?] attr
+				ownerNode.removeAttribute(node.nodeName);
+			}
+
+			// Property value setter
+			const setter = () => {
+				let valueToSet = propertyBindConfig.nodeValue;
+				let isHtml = false;
+
+				// Looping all the fields to be setted
+				forEach(fields, field => {
+					const delimiter = field.delimiter;
+
+					if (delimiter && delimiter.name === 'html')
+						isHtml = true;
+
+					let result = this.evaluator.exec({
+						data: data,
+						expression: field.expression,
+						context: context
+					});
+
+					result = isNull(result) ? '' : result;
+					valueToSet = valueToSet.replace(field.field, toStr(result));
+
+					if (delimiter && typeof delimiter.update === 'function')
+						valueToSet = delimiter.update(valueToSet, node, data);
+				});
+
+				propertyBindConfig.value = valueToSet;
+
+				if (!isHtml)
+					nodeToBind.nodeValue = valueToSet;
+				else {
+					const htmlSnippet = createEl('div', el => {
+						el.innerHTML = valueToSet;
+					}).build().children[0];
+					ownerNode.appendChild(htmlSnippet);
+					IoC.Resolve<Compiler>(this.bouer, Compiler)!.compile({
+						el: htmlSnippet,
+						data: data,
+						context: context
+					})
+				}
+			}
+
+			ReactiveEvent.once('AfterGet', event => {
+				event.onemit = reactive => {
+					this.binds.push({
+						isConnected: options.isConnected,
+						watch: reactive.onChange(value => {
+							setter();
+							onUpdate(value, node);
+							$runDirectiveMiddlewares('update');
+						}, node)
+					});
+				}
+				setter();
+
+			});
+
+			propertyBindConfig.node = nodeToBind;
+			$runDirectiveMiddlewares('bind');
+			return propertyBindConfig;
+		}
+
+		const bindTwoWay = () => {
 			let propertyNameToBind = '';
 			const binderTarget = ownerNode.type || ownerNode.localName;
 
@@ -155,11 +231,15 @@ export default class Binder extends Base {
 						// Normal Property Set
 						if (!Array.isArray(boundPropertyValue)) {
 							// Default Binding
-							return data[dataBindProperty] = value;
+							return this.evaluator.exec({
+								isReturn: false,
+								context: context,
+								data: Extend.obj(data, { $vl: value }),
+								expression: dataBindProperty + '=$vl'
+							});
 						}
 
 						// Array Set
-
 						boundModelValue = boundModelValue || this.evaluator.exec({
 							data: data,
 							expression: dataBindModel,
@@ -231,79 +311,9 @@ export default class Binder extends Base {
 			return propertyBindConfig; // Stop Two-Way Data Binding Process
 		}
 
-		// One-Way Data Binding
-		let nodeToBind = node;
-
-		// If definable property e-[?]="..."
-		if (originalName.substring(0, Constants.property.length) === Constants.property && isNull(isReplaceProperty)) {
-			propertyBindConfig.nodeName = originalName.substring(Constants.property.length);
-			ownerNode.setAttribute(propertyBindConfig.nodeName, originalValue);
-			nodeToBind = ownerNode.attributes[propertyBindConfig.nodeName];
-
-			// Removing the e-[?] attr
-			ownerNode.removeAttribute(node.nodeName);
-		}
-
-		// Property value setter
-		const setter = () => {
-			let valueToSet = propertyBindConfig.nodeValue;
-			let isHtml = false;
-
-			// Looping all the fields to be setted
-			forEach(fields, field => {
-				const delimiter = field.delimiter;
-
-				if (delimiter && delimiter.name === 'html')
-					isHtml = true;
-
-				let result = this.evaluator.exec({
-					data: data,
-					expression: field.expression,
-					context: context
-				});
-
-				result = isNull(result) ? '' : result;
-				valueToSet = valueToSet.replace(field.field, toStr(result));
-
-				if (delimiter && typeof delimiter.update === 'function')
-					valueToSet = delimiter.update(valueToSet, node, data);
-			});
-
-			propertyBindConfig.value = valueToSet;
-
-			if (!isHtml)
-				nodeToBind.nodeValue = valueToSet;
-			else {
-				const htmlSnippet = createEl('div', el => {
-					el.innerHTML = valueToSet;
-				}).build().children[0];
-				ownerNode.appendChild(htmlSnippet);
-				IoC.Resolve<Compiler>(this.bouer, Compiler)!.compile({
-					el: htmlSnippet,
-					data: data,
-					context: context
-				})
-			}
-		}
-
-		ReactiveEvent.once('AfterGet', event => {
-			event.onemit = reactive => {
-				this.binds.push({
-					isConnected: options.isConnected,
-					watch: reactive.onChange(value => {
-						setter();
-						onUpdate(value, node);
-						$runDirectiveMiddlewares('update');
-					}, node)
-				});
-			}
-			setter();
-
-		});
-
-		propertyBindConfig.node = nodeToBind;
-		$runDirectiveMiddlewares('bind');
-		return propertyBindConfig;
+		if (originalName.substring(0, Constants.bind.length) === Constants.bind)
+			return bindTwoWay();
+		return bindOneWay();
 	}
 
 	onPropertyChange<Value, TargetObject>(
