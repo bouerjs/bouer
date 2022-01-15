@@ -64,7 +64,7 @@ export default class Routing extends Base {
 		route = trim(route);
 
 		const resolver = urlResolver(route);
-		const usehash = (this.bouer.config || {}).usehash ?? true;
+		const usehash = this.bouer.config.usehash ?? true;
 		let navigatoTo = (usehash ? resolver.hash : resolver.pathname).split('?')[0];
 
 		// In case of: /about/me/, remove the last forward slash
@@ -79,8 +79,10 @@ export default class Routing extends Base {
 		// If it's not found and the url matches .html do nothing
 		if (!page && route.endsWith('.html')) return;
 
-		const componentElement = createAnyEl(page.name!)
-			.appendTo(this.routeView!)
+		const componentElement = createAnyEl(page.name!, el => {
+			// Inherit the data scope by default
+			el.setAttribute('data', '$data');
+		}).appendTo(this.routeView!)
 			.build();
 
 		// Document info configuration
@@ -91,9 +93,9 @@ export default class Routing extends Base {
 
 		const routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route!);
 		IoC.Resolve<ComponentHandler>(this.bouer, ComponentHandler)!
-			.order(componentElement, {}, component => {
+			.order(componentElement, this.bouer.data , component => {
 				component.on('loaded', () => {
-					this.markActiveAnchors(routeToSet);
+					this.markActiveAnchorsWithRoute(routeToSet);
 				});
 			});
 	}
@@ -130,14 +132,14 @@ export default class Routing extends Base {
 			}) || this.notFoundPage;
 	}
 
-	markActiveAnchors(route: string) {
-		const className = (this.bouer.config || {}).activeClassName || 'active-link';
+	markActiveAnchorsWithRoute(route: string) {
+		const className = this.bouer.config.activeClassName || 'active-link';
 		const anchors = this.bouer.el.querySelectorAll('a');
 
 		forEach(this.activeAnchors, anchor =>
 			anchor.classList.remove(className));
 
-		forEach([].slice.call(this.bouer.el.querySelectorAll('a.' + className)), (anchor:HTMLAnchorElement) =>
+		forEach([].slice.call(this.bouer.el.querySelectorAll('a.' + className)), (anchor: HTMLAnchorElement) =>
 			anchor.classList.remove(className));
 
 		this.activeAnchors = [];
@@ -149,6 +151,18 @@ export default class Routing extends Base {
 			anchor.classList.add(className);
 			this.activeAnchors.push(anchor);
 		});
+	}
+
+	markActiveAnchor(anchor: HTMLAnchorElement) {
+		const className = this.bouer.config.activeClassName || 'active-link';
+
+		forEach(this.activeAnchors, anchor =>
+			anchor.classList.remove(className));
+		forEach([].slice.call(this.bouer.el.querySelectorAll('a.' + className)), (anchor: HTMLAnchorElement) =>
+			anchor.classList.remove(className));
+
+		anchor.classList.add(className);
+		this.activeAnchors = [anchor];
 	}
 
 	clear() {
