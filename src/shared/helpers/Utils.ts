@@ -38,8 +38,8 @@ export function webRequest(url: string, options?: {
 		status: number,
 		statusText: string,
 		headers: object,
-		json: () => Promise<object>,
-		text: () => Promise<string>
+		json(): Promise<object>,
+		text(): Promise<string>
 	}
 
 	return new Promise<IResponse>((resolve, reject) => {
