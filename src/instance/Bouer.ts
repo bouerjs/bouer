@@ -22,12 +22,14 @@ import Constants from "../shared/helpers/Constants";
 import IoC from "../shared/helpers/IoC";
 import Task from "../shared/helpers/Task";
 import {
-	createEl, defineProperty, DOM, forEach,
+	createEl, DOM, forEach,
 	GLOBAL,
-	isNull, isObject, toArray, transferProperty, trim
+	isNull, isObject, toArray, trim
 } from "../shared/helpers/Utils";
 import Logger from "../shared/logger/Logger";
 import Base from "../core/Base";
+import Prop from "../shared/helpers/Prop";
+import ReactiveEvent from "../core/event/ReactiveEvent";
 
 export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extends Base implements IBouerOptions<Data, GlobalData, Dependencies> {
 	readonly el: Element;
@@ -35,7 +37,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 	readonly version = '3.0.0';
 	readonly data: Data;
 	readonly globalData: GlobalData;
-	readonly config?: IBouerConfig;
+	readonly config: IBouerConfig;
 	readonly deps: Dependencies;
 	readonly __id__: number = IoC.GetId();
 	/**
@@ -91,7 +93,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		 * @param key the wait-data="`key`" directive value or the app.$wait.set(`key`) key provided.
 		 * @returns the expected object | null
 		 */
-		get: (key?: string) => object | undefined,
+		get: (key: string) => object | undefined,
 		/**
 		 * Provides data for `wait-data` directive elements.
 		 * @param key the key of `wait-data` directive value.
@@ -156,11 +158,12 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		/** Changes the current url to a new one provided */
 		pushState: (url: string, title?: string) => void;
 
+		/** Mark an anchor as active */
+		markActiveAnchor: (anchor: HTMLAnchorElement) => void
+
 		/** Mark all anchors having the route provided as active */
-		markActiveAnchors: (route: string) => void
+		markActiveAnchorsWithRoute: (route: string) => void
 	}
-
-
 
 	/**
 	 * Default constructor
@@ -173,12 +176,6 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 	) {
 		super();
 
-		options = options || {};
-		// Applying all the options defined
-
-		this.config = options.config;
-		this.deps = options.deps || {} as any;
-
 		if (isNull(selector) || trim(selector) === '')
 			throw Logger.error(new Error('Invalid selector provided to the instance.'));
 
@@ -186,6 +183,16 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		if (!el) throw Logger.error(new SyntaxError("Element with selector “" + selector + "” not found."));
 
 		this.el = el;
+
+		options = options || {};
+		this.config = options.config || {};
+		this.deps = options.deps || {} as any;
+
+		forEach(Object.keys(this.deps), key => {
+			const deps = this.deps as any;
+			const value = deps[key];
+			deps[key] = typeof value === 'function' ? value.bind(this) : value;
+		});
 
 		const dataStore = new DataStore(this);
 		const evaluator = new Evaluator(this);
@@ -246,7 +253,17 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 			unset: key => delete dataStore.req[key],
 		};
 		this.$wait = {
-			get: key => key ? dataStore.wait[key] : dataStore.wait,
+			get: key => {
+				if (key) {
+					const mWait = dataStore.wait[key];
+					if (!mWait) return undefined;
+					return mWait.data;
+				}
+
+				const output:dynamic = {};
+				forEach(Object.keys(dataStore.wait), k => output[k] = dataStore.wait[k].data);
+				return output;
+			},
 			set: (key: string, data: object) => {
 				if (!(key in dataStore.wait))
 					return dataStore.wait[key] = { data: data, nodes: [] };
@@ -279,7 +296,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 
 		this.$routing = routing;
 
-		defineProperty(this, 'refs', {
+		Prop.set(this, 'refs', {
 			get: () => {
 				const mRefs: dynamic<Element> = {};
 				forEach(toArray(this.el.querySelectorAll("[" + Constants.ref + "]")), (ref: any) => {
@@ -341,7 +358,6 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 			});
 
 			this.destroy();
-			this.isDestroyed = true;
 		}, { once: true });
 
 		Task.run(stopTask => {
@@ -354,7 +370,6 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 			});
 
 			this.destroy();
-			this.isDestroyed = true;
 			stopTask();
 		});
 
@@ -398,7 +413,34 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		});
 
 		// Transfering the properties
-		forEach(Object.keys(inputData), key => transferProperty(targetObject, inputData, key));
+		forEach(Object.keys(inputData), key => {
+			let r_src: Reactive<any, any> | undefined;
+			let r_dst: Reactive<any, any> | undefined;
+			// Notifying the bound elements and the watches
+			ReactiveEvent.once('AfterGet', evt => {
+				evt.onemit = reactive => r_src = reactive;
+				Prop.descriptor(inputData, key)!.get!();
+			});
+
+			// Notifying the bound elements and the watches
+			ReactiveEvent.once('AfterGet', evt => {
+				evt.onemit = reactive => r_dst = reactive;
+				const desc = Prop.descriptor(targetObject, key);
+				if (desc) desc.get!();
+			});
+
+			Prop.transfer(targetObject, inputData, key);
+
+			if (!r_dst || !r_src) return;
+			// Adding the previous watches to the property that is being set
+			forEach(r_dst.watches, watch => {
+				if (r_src!.watches.indexOf(watch) === -1)
+					r_src!.watches.push(watch);
+			});
+
+			// Notifying the bounds and watches
+			r_src.notify();
+		});
 		return targetObject;
 	}
 
@@ -591,11 +633,12 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		$events['destroyed'] = [];
 		$events['component:destroyed'] = [];
 
-		if (el.tagName == 'body')
+		if (el.tagName == 'BODY')
 			el.innerHTML = '';
 		else if (DOM.contains(el))
-			DOM.body.removeChild(el);
+			el.parentElement!.removeChild(el);
 
+		this.isDestroyed = true;
 		IoC.Dispose(this);
 	}
 
