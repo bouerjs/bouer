@@ -100,8 +100,8 @@ interface Watch<Value, TObject> {
 
 interface Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
 	readonly el: Element;
-	readonly name;
-	readonly version;
+	readonly name: string;
+	readonly version: string;
 	readonly data: Data;
 	readonly globalData: GlobalData;
 	readonly config?: IBouerConfig;
@@ -220,7 +220,6 @@ interface Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
 	beforeDestroy(event: CustomEvent): void;
 	destroyed(event: CustomEvent): void;
 }
-
 
 export {
 	Bouer as default,
