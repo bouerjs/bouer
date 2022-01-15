@@ -1,11 +1,9 @@
-import RenderContext from "../../definitions/types/RenderContext";
 import dynamic from "../../definitions/types/Dynamic";
+import RenderContext from "../../definitions/types/RenderContext";
 import WatchCallback from "../../definitions/types/WatchCallback";
-import Bouer from "../../instance/Bouer";
+import Prop from "../../shared/helpers/Prop";
 import {
-	defineProperty,
 	forEach,
-	getDescriptor,
 	isFunction,
 	isNull,
 	isObject,
@@ -13,14 +11,14 @@ import {
 	toArray
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
-import Watch from "../binder/Watch";
-import Component from "../component/Component";
-import ReactiveEvent from "../event/ReactiveEvent";
 import Base from "../Base";
+import Watch from "../binder/Watch";
+import ReactiveEvent from "../event/ReactiveEvent";
 
-export default class Reactive<Value, TObject> extends Base implements PropertyDescriptor {
+export default class Reactive<Value, TObject extends {}> extends Base implements PropertyDescriptor {
 	propertyName: string;
 	propertyValue: Value;
+	propertyValueOld?: Value;
 	propertySource: TObject;
 	propertyDescriptor: PropertyDescriptor | undefined;
 	watches: Array<Watch<Value, TObject>> = [];
@@ -41,7 +39,8 @@ export default class Reactive<Value, TObject> extends Base implements PropertyDe
 		this.propertySource = options.sourceObject;
 		this.context = options.context;
 		// Setting the value of the property
-		this.propertyDescriptor = getDescriptor(this.propertySource, this.propertyName);
+
+		this.propertyDescriptor = Prop.descriptor(this.propertySource, this.propertyName);
 
 		this.propertyValue = this.propertyDescriptor!.value as Value;
 		this.isComputed = typeof this.propertyValue === 'function' && this.propertyValue.name === '$computed';
@@ -76,8 +75,8 @@ export default class Reactive<Value, TObject> extends Base implements PropertyDe
 	}
 
 	set = (value: Value) => {
-		const oldPropertyValue = this.propertyValue;
-		if (oldPropertyValue === value) return;
+		this.propertyValueOld = this.propertyValue;
+		if (this.propertyValueOld === value) return;
 		ReactiveEvent.emit('BeforeSet', this);
 
 		if (isObject(value) || Array.isArray(value)) {
@@ -117,8 +116,12 @@ export default class Reactive<Value, TObject> extends Base implements PropertyDe
 			this.computedSetter(value);
 
 		ReactiveEvent.emit('AfterSet', this);
-		// Calling all the watches
-		forEach(this.watches, watch => watch.callback(this.propertyValue, oldPropertyValue));
+		this.notify();
+	}
+
+	notify() {
+		// Running all the watches
+		forEach(this.watches, watch => watch.callback(this.propertyValue, this.propertyValueOld));
 	}
 
 	onChange(callback: WatchCallback, node?: Node): Watch<Value, TObject> {
@@ -185,12 +188,12 @@ export default class Reactive<Value, TObject> extends Base implements PropertyDe
 				const mInputObject = inputObject as dynamic;
 
 				// Already a reactive property, do nothing
-				if (isNull(getDescriptor(inputObject, key)!.value))
+				if (!('value' in Prop.descriptor(inputObject, key)!))
 					return;
 
 				const propertyValue = mInputObject[key];
 
-				if ((propertyValue instanceof Object) && ((propertyValue.isBouer) || (propertyValue instanceof Node)))
+				if ((propertyValue instanceof Object) && ((propertyValue.$irt) || (propertyValue instanceof Node)))
 					return;
 
 				const reactive = new Reactive({
@@ -199,14 +202,12 @@ export default class Reactive<Value, TObject> extends Base implements PropertyDe
 					context: context
 				});
 
-				defineProperty(inputObject, key, reactive);
-
-				if (isObject(propertyValue))
-					executer(propertyValue, visiting, visited);
-				else if (Array.isArray(propertyValue)) {
+				Prop.set(inputObject, key, reactive);
+				if (Array.isArray(propertyValue)) {
 					executer(propertyValue as any, visiting, visited, reactive); // Transform the array to a reactive one
 					forEach(propertyValue, (item: object) => executer(item as any, visiting, visited));
-				}
+				} else if (isObject(propertyValue))
+					executer(propertyValue, visiting, visited);
 			});
 
 			visiting.splice(visiting.indexOf(inputObject), 1);
