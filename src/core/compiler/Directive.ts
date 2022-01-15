@@ -7,16 +7,14 @@ import Constants from "../../shared/helpers/Constants";
 import Extend from "../../shared/helpers/Extend";
 import IoC from "../../shared/helpers/IoC";
 import {
+	code,
 	createAnyEl,
-	defineProperty,
 	findAttribute,
 	forEach,
-	getDescriptor,
 	isNull,
 	isObject,
 	toLower,
 	toStr,
-	transferProperty,
 	trim,
 	urlCombine
 } from "../../shared/helpers/Utils";
@@ -34,6 +32,7 @@ import Routing from "../routing/Routing";
 import DataStore from "../store/DataStore";
 import Compiler from "./Compiler";
 import Base from "../Base";
+import Prop from "../../shared/helpers/Prop";
 
 export default class Directive extends Base {
 	bouer: Bouer;
@@ -141,7 +140,7 @@ export default class Directive extends Base {
 
 		forEach(reactives, item => {
 			this.binder.binds.push({
-				isConnected: () => comment.isConnected,
+				isConnected: () => !isNull(Extend.array(conditions.map(x => x.element), comment).find(el => el.isConnected)),
 				watch: item.reactive.onChange(() => execute(), item.attr)
 			})
 		});
@@ -255,7 +254,6 @@ export default class Directive extends Base {
 		const forItem = ownerNode.cloneNode(true);
 		container.replaceChild(comment, ownerNode);
 
-
 		const $where = (list: any[], filterConfigParts: string[]) => {
 			let whereValue = filterConfigParts[1];
 			let whereKeys = filterConfigParts[2];
@@ -284,15 +282,20 @@ export default class Directive extends Base {
 
 				let newListCopy: any[] = [];
 				forEach(list, item => {
+					let isValid = false;
 					for (const prop of whereKeys.split(',').map(m => trim(m))) {
 						let propValue = this.evaluator.exec({
 							data: item,
 							expression: prop,
 							context: this.context
 						});
-						if (!toStr(propValue).includes(whereValue)) break;
-						newListCopy.push(item);
+
+						if (toStr(propValue).includes(whereValue)) {
+							isValid = true;
+							break;
+						}
 					}
+					if (isValid) newListCopy.push(item);
 				});
 				list = newListCopy;
 			}
@@ -399,7 +402,8 @@ export default class Directive extends Base {
 				data: data,
 				isReturn: false,
 				context: this.context,
-				expression: "_for(_filters(" + iterable + "), ($$itm, $$idx) => { _each($$itm, $$idx); })",
+				expression: "var __e = _each, __fl = _filters, __f = _for; " +
+					"__f(__fl(" + iterable + "), function($$itm, $$idx) { __e($$itm, $$idx); })",
 				aditional: {
 					_for: forEach,
 					_each: (item: any, index: any) => {
@@ -476,15 +480,30 @@ export default class Directive extends Base {
 		if (this.delimiter.run(nodeValue).length !== 0)
 			return Logger.error(this.errorMsgNodeValue(node));
 
-		let inputData = this.evaluator.exec({
+		let inputData: dynamic = {};
+		const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
+			if (!(reactive.propertyName in inputData))
+				inputData[reactive.propertyName] = undefined;
+			Prop.set(inputData, reactive.propertyName, reactive);
+		});
+
+		const mInputData = this.evaluator.exec({
 			data: data,
 			expression: nodeValue,
 			context: this.context
 		});
 
-		if (!isObject(inputData))
-			return Logger.error(("Expected a valid Object Literal expression in “"
-				+ node.nodeName + "” and got “" + nodeValue + "”."));
+		if (!isObject(mInputData))
+			return Logger.error(("Expected a valid Object Literal expression in “" + node.nodeName +
+				"” and got “" + nodeValue + "”."));
+
+		// Adding all non-existing properties
+		forEach(Object.keys(mInputData), key => {
+			if (!(key in inputData))
+				inputData[key] = mInputData[key];
+		});
+
+		ReactiveEvent.off('AfterGet', reactiveEvent.callback);
 
 		this.bouer.set(inputData, data);
 		ownerNode.removeAttribute(node.nodeName);
@@ -592,8 +611,9 @@ export default class Directive extends Base {
 		let inputData: dynamic = {};
 		const mData = Extend.obj(data, { $data: data });
 		const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
-			inputData[reactive.propertyName] = undefined;
-			defineProperty(inputData, reactive.propertyName, reactive);
+			if (!(reactive.propertyName in inputData))
+				inputData[reactive.propertyName] = undefined;
+			Prop.set(inputData, reactive.propertyName, reactive);
 		});
 
 		// If data value is empty gets the main scope value
@@ -828,13 +848,13 @@ export default class Directive extends Base {
 			}
 
 			if ((requestType === 'of' && !Array.isArray(response.data))) {
-				Logger.error(("Using e-ref=\"... “of” ...\" the response must be a " +
+				Logger.error(("Using e-req=\"... “of” ...\" the response must be a " +
 					"list of items, and got “" + typeof response.data + "”."));
 				return false;
 			}
 
 			if ((requestType === 'as' && !(typeof response.data === 'object'))) {
-				Logger.error(("Using e-ref=\"... “as” ...\" the response must be a list " +
+				Logger.error(("Using e-req=\"... “as” ...\" the response must be a list " +
 					"of items, and got “" + typeof response.data + "”."));
 				return false;
 			}
@@ -844,6 +864,9 @@ export default class Directive extends Base {
 
 		const middleware = IoC.Resolve<Middleware>(this.bouer, Middleware)!;
 		const dataKey = (node.nodeName.split(':')[1] || '').replace(/\[|\]/g, '');
+
+		if (!middleware.has('req'))
+			return Logger.error("There is no “req” middleware provided for the “e-req” directive requests.");
 
 		(onInsertOrUpdate = () => {
 			const expObject = builder(trim(node.nodeValue || ''));
@@ -856,6 +879,8 @@ export default class Directive extends Base {
 					inputObject: response
 				});
 
+				if (dataKey) IoC.Resolve<DataStore>(this.bouer, DataStore)!.set('req', dataKey, response);
+
 				subcribeEvent(Constants.builtInEvents.response).emit({
 					response: response
 				});
@@ -864,47 +889,39 @@ export default class Directive extends Base {
 				if (!('data' in localDataStore)) {
 					// Store the data
 					localDataStore.data = undefined;
-					transferProperty(localDataStore, response, 'data');
+					Prop.transfer(localDataStore, response, 'data');
 				} else {
 					// Update de local data
 					return localDataStore.data = response.data;
 				}
 
-				if (dataKey) IoC.Resolve<DataStore>(this.bouer, DataStore)!.set('req', dataKey, response);
-
 				if (expObject.type === 'as') {
 					// Removing the: “(...)”  “,”  and getting only the variable
 					const variable = trim(expObject.variables.split(',')[0].replace(/\(|\)/g, ''));
+
+					if (variable in data)
+						return Logger.error("There is already a “" + variable + "” defined in the current scope. " +
+							"Provide another variable name in order to continue.");
+
+					(data as any)[variable] = response.data;
 					return this.compiler.compile({
 						el: ownerNode,
-						data: Extend.obj({ [variable]: response.data }, data),
-						context: this.context,
-						onDone: (_, inData) => {
-							subcribeEvent(Constants.builtInEvents.compile)
-								.emit({
-									data: inData
-								});
-						}
+						data: Reactive.transform({ context: this.context, inputObject: data }),
+						context: this.context
 					});
 				}
 
 				if (expObject.type === 'of') {
-					const forDirectiveContent = expObject.expression.replace(expObject.path, '_response_');
+					const resUniqueName = code(8, 'res');
+					const forDirectiveContent = expObject.expression.replace(expObject.path, resUniqueName);
+					const mData = Extend.obj({ [resUniqueName]: response.data }, data);
 					ownerNode.setAttribute(Constants.for, forDirectiveContent);
 
-					(data as any)._response_ = undefined;
-					defineProperty(data, '_response_', getDescriptor(response, 'data')!)
-
+					Prop.set(mData, resUniqueName, Prop.descriptor(response, 'data')!);
 					return this.compiler.compile({
 						el: ownerNode,
-						data: data,
-						context: this.context,
-						onDone: (_, inData) => {
-							subcribeEvent(Constants.builtInEvents.compile)
-								.emit({
-									data: inData
-								});
-						}
+						data: mData,
+						context: this.context
 					});
 				}
 			}
@@ -913,7 +930,7 @@ export default class Directive extends Base {
 
 			middleware.run('req', {
 				type: 'bind',
-				action: middleware => {
+				action: middlewareRequest => {
 					const context = {
 						binder: binderConfig,
 						detail: {
@@ -933,7 +950,7 @@ export default class Directive extends Base {
 						done: () => subcribeEvent(Constants.builtInEvents.done).emit()
 					};
 
-					middleware(context, cbs);
+					middlewareRequest(context, cbs);
 				}
 			});
 		})();
