@@ -86,7 +86,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 	destroy() {
 		if (!this.el) return false;
 
-		if (this.isDestroyed)
+		if (this.isDestroyed && this.bouer && this.bouer.isDestroyed)
 			return;
 
 		if (!this.keepAlive)
