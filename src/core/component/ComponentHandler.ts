@@ -499,6 +499,9 @@ export default class ComponentHandler extends Base {
 				Task.run(stopTask => {
 					if (component.el!.isConnected) return;
 
+					if (this.bouer.isDestroyed)
+						return stopTask();
+
 					component.destroy();
 					stopTask();
 
