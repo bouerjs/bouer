@@ -1,5 +1,5 @@
 import Bouer from "../instance/Bouer";
-import IoC from "../shared/helpers/IoC";
+import ServiceProvider from "../shared/helpers/ServiceProvider";
 import { code, DOM } from "../shared/helpers/Utils";
 import Base from "./Base";
 
@@ -10,7 +10,7 @@ export default class CommentHandler extends Base {
 		super();
 
     this.bouer = bouer;
-    IoC.Register(this);
+    ServiceProvider.add('CommentHandler', this);
   }
 
   /** Creates a comment with some identifier */

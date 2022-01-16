@@ -5,7 +5,7 @@ import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
 import Constants from "../../shared/helpers/Constants";
 import Extend from "../../shared/helpers/Extend";
-import IoC from "../../shared/helpers/IoC";
+import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import {
 	code,
 	createAnyEl,
@@ -57,10 +57,10 @@ export default class Directive extends Base {
 		this.bouer = compiler.bouer;
 		this.$custom = customDirective;
 
-		this.evaluator = IoC.Resolve(this.bouer, Evaluator)!;
-		this.delimiter = IoC.Resolve(this.bouer, DelimiterHandler)!;
-		this.binder = IoC.Resolve(this.bouer, Binder)!;
-		this.eventHandler = IoC.Resolve(this.bouer, EventHandler)!;
+		this.evaluator = ServiceProvider.get(this.bouer, 'Evaluator')!;
+		this.delimiter = ServiceProvider.get(this.bouer, 'DelimiterHandler')!;
+		this.binder = ServiceProvider.get(this.bouer, 'Binder')!;
+		this.eventHandler = ServiceProvider.get(this.bouer, 'EventHandler')!;
 
 		this.comment = new CommentHandler(this.bouer);
 	}
@@ -643,7 +643,7 @@ export default class Directive extends Base {
 		let dataKey = node.nodeName.split(':')[1];
 		if (dataKey) {
 			dataKey = dataKey.replace(/\[|\]/g, '');
-			IoC.Resolve<DataStore>(this.bouer, DataStore)!.set('data', dataKey, inputData);
+			ServiceProvider.get<DataStore>(this.bouer, 'DataStore')!.set('data', dataKey, inputData);
 		}
 
 		Reactive.transform({
@@ -686,7 +686,7 @@ export default class Directive extends Base {
 			.addEventListener('click', event => {
 				event.preventDefault();
 
-				IoC.Resolve<Routing>(this.bouer, Routing)!
+				ServiceProvider.get<Routing>(this.bouer, 'Routing')!
 					.navigate(href.value);
 			}, false);
 	}
@@ -702,7 +702,7 @@ export default class Directive extends Base {
 			return Logger.error(this.errorMsgNodeValue(node));
 
 		ownerNode.removeAttribute(node.nodeName);
-		IoC.Resolve<ComponentHandler>(this.bouer, ComponentHandler)!
+		ServiceProvider.get<ComponentHandler>(this.bouer, 'ComponentHandler')!
 			.prepare([
 				{
 					name: nodeValue,
@@ -746,7 +746,7 @@ export default class Directive extends Base {
 				.appendTo(ownerNode)
 				.build();
 
-			IoC.Resolve<ComponentHandler>(this.bouer, ComponentHandler)!
+			ServiceProvider.get<ComponentHandler>(this.bouer, 'ComponentHandler')!
 				.order(componentElement, data);
 		})();
 	}
@@ -862,7 +862,7 @@ export default class Directive extends Base {
 			return true;
 		}
 
-		const middleware = IoC.Resolve<Middleware>(this.bouer, Middleware)!;
+		const middleware = ServiceProvider.get<Middleware>(this.bouer, 'Middleware')!;
 		const dataKey = (node.nodeName.split(':')[1] || '').replace(/\[|\]/g, '');
 
 		if (!middleware.has('req'))
@@ -879,7 +879,7 @@ export default class Directive extends Base {
 					inputObject: response
 				});
 
-				if (dataKey) IoC.Resolve<DataStore>(this.bouer, DataStore)!.set('req', dataKey, response);
+				if (dataKey) ServiceProvider.get<DataStore>(this.bouer, 'DataStore')!.set('req', dataKey, response);
 
 				subcribeEvent(Constants.builtInEvents.response).emit({
 					response: response
@@ -1002,7 +1002,7 @@ export default class Directive extends Base {
 			return Logger.error(this.errorMsgNodeValue(node));
 
 		ownerNode.removeAttribute(node.nodeName);
-		const dataStore = IoC.Resolve<DataStore>(this.bouer, DataStore)!;
+		const dataStore = ServiceProvider.get<DataStore>(this.bouer, 'DataStore')!;
 		const mWait = dataStore.wait[nodeValue];
 
 		if (mWait) {

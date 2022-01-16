@@ -19,7 +19,7 @@ import dynamic from "../definitions/types/Dynamic";
 import RenderContext from "../definitions/types/RenderContext";
 import WatchCallback from "../definitions/types/WatchCallback";
 import Constants from "../shared/helpers/Constants";
-import IoC from "../shared/helpers/IoC";
+import ServiceProvider from "../shared/helpers/ServiceProvider";
 import Task from "../shared/helpers/Task";
 import {
 	createEl, DOM, forEach,
@@ -39,7 +39,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 	readonly globalData: GlobalData;
 	readonly config: IBouerConfig;
 	readonly deps: Dependencies;
-	readonly __id__: number = IoC.GetId();
+	readonly __id__: number = ServiceProvider.GenerateId();
 	/**
 	 * Gets all the elemens having the `ref` attribute
 	 * @returns an object having all the elements with the `ref attribute value` defined as the key.
@@ -244,7 +244,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 						context: this,
 						inputObject: data
 					});
-				return IoC.Resolve<DataStore>(this, DataStore)!.set('data', key, data);
+				return ServiceProvider.get<DataStore>(this, 'DataStore')!.set('data', key, data);
 			},
 			unset: key => delete dataStore.data[key]
 		};
@@ -467,7 +467,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		},
 		onSet?: (builtObjectLayer: object, propName: string, value: any, element: Element) => void
 	) {
-		return IoC.Resolve<Converter>(this, Converter)!.htmlToJsObj(input, options, onSet);
+		return ServiceProvider.get<Converter>(this, 'Converter')!.htmlToJsObj(input, options, onSet);
 	}
 
 	/**
@@ -482,7 +482,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		callback: (valueNew: TargetObject[Key], valueOld: TargetObject[Key]) => void,
 		targetObject: TargetObject | Data = this.data
 	) {
-		return IoC.Resolve<Binder>(this, Binder)!.onPropertyChange<TargetObject[Key], TargetObject | Data>(
+		return ServiceProvider.get<Binder>(this, 'Binder')!.onPropertyChange<TargetObject[Key], TargetObject | Data>(
 			propertyName, callback as WatchCallback, targetObject || this.data
 		);
 	}
@@ -495,7 +495,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 	react(
 		watchableScope: (app: Bouer) => void
 	) {
-		return IoC.Resolve<Binder>(this, Binder)!
+		return ServiceProvider.get<Binder>(this, 'Binder')!
 			.onPropertyInScopeChange(watchableScope);
 	}
 
@@ -520,7 +520,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 			}
 		}
 	) {
-		return IoC.Resolve<EventHandler>(this, EventHandler)!.
+		return ServiceProvider.get<EventHandler>(this, 'EventHandler')!.
 			on({
 				eventName,
 				callback,
@@ -541,7 +541,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		callback: (event: CustomEvent | Event) => void,
 		attachedNode?: Node
 	) {
-		return IoC.Resolve<EventHandler>(this, EventHandler)!.
+		return ServiceProvider.get<EventHandler>(this, 'EventHandler')!.
 			off({
 				eventName,
 				callback,
@@ -562,7 +562,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		}
 	) {
 		const mOptions = (options || {});
-		return IoC.Resolve<EventHandler>(this, EventHandler)!.
+		return ServiceProvider.get<EventHandler>(this, 'EventHandler')!.
 			emit({
 				eventName: eventName,
 				attachedNode: mOptions.element,
@@ -613,7 +613,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		/** The function that should be fired when the compilation is done */
 		onDone?: (element: Element, data?: Data | undefined) => void
 	}) {
-		return IoC.Resolve<Compiler>(this, Compiler)!.
+		return ServiceProvider.get<Compiler>(this, 'Compiler')!.
 			compile({
 				el: options.el,
 				data: options.data,
@@ -624,7 +624,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 
 	destroy() {
 		const el = this.el!;
-		const $events = IoC.Resolve<EventHandler>(this, EventHandler)!.$events;
+		const $events = ServiceProvider.get<EventHandler>(this, 'EventHandler')!.$events;
 		const destroyedEvents = ($events['destroyed'] || []).concat(($events['component:destroyed'] || []));
 
 		this.emit('destroyed', { element: this.el! });
@@ -639,7 +639,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 			el.parentElement!.removeChild(el);
 
 		this.isDestroyed = true;
-		IoC.Dispose(this);
+		ServiceProvider.clear(this);
 	}
 
 	// Hooks

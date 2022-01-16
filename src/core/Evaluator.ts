@@ -2,7 +2,7 @@ import RenderContext from "../definitions/types/RenderContext";
 import dynamic from "../definitions/types/Dynamic";
 import Bouer from "../instance/Bouer";
 import Extend from "../shared/helpers/Extend";
-import IoC from "../shared/helpers/IoC";
+import ServiceProvider from "../shared/helpers/ServiceProvider";
 import {
 	buildError,
 	createEl, forEach, GLOBAL
@@ -21,7 +21,7 @@ export default class Evaluator extends Base {
 		this.bouer = bouer;
 		this.global = this.createWindow() as any;
 
-		IoC.Register(this);
+		ServiceProvider.add('Evaluator', this);
 	}
 
 	private createWindow() {

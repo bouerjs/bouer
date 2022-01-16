@@ -4,7 +4,7 @@ import IEventSubscription from "../../definitions/interfaces/IEventSubscription"
 import ILifeCycleHooks from "../../definitions/interfaces/ILifeCycleHooks";
 import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
-import IoC from "../../shared/helpers/IoC";
+import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import Prop from "../../shared/helpers/Prop";
 import UriHandler from "../../shared/helpers/UriHandler";
 import {
@@ -35,18 +35,6 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 	// Store temporarily this component UI orders
 	private events: IEventSubscription[] = [];
 
-	// Hooks
-	requested?(event: CustomEvent) { }
-	created?(event: CustomEvent) { }
-	beforeMount?(event: CustomEvent) { }
-	mounted?(event: CustomEvent) { }
-	beforeLoad?(event: CustomEvent) { }
-	loaded?(event: CustomEvent) { }
-	beforeDestroy?(event: CustomEvent) { }
-	destroyed?(event: CustomEvent) { }
-	blocked?(event: CustomEvent) { }
-	failed?(event: CustomEvent) { }
-
 	constructor(optionsOrPath: string | IComponentOptions<Data>) {
 		super();
 
@@ -70,6 +58,18 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 			inputObject: _data || {}
 		});
 	}
+
+	// Hooks
+	requested?(event: CustomEvent) { }
+	created?(event: CustomEvent) { }
+	beforeMount?(event: CustomEvent) { }
+	mounted?(event: CustomEvent) { }
+	beforeLoad?(event: CustomEvent) { }
+	loaded?(event: CustomEvent) { }
+	beforeDestroy?(event: CustomEvent) { }
+	destroyed?(event: CustomEvent) { }
+	blocked?(event: CustomEvent) { }
+	failed?(event: CustomEvent) { }
 
 	export<ExportableData>(
 		exportedData: ExportableData
@@ -95,13 +95,12 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 		this.emit('beforeDestroy');
 
 		let container = this.el.parentElement;
-		if (container) container.removeChild(this.el) !== null;
+		if (container) container.removeChild(this.el);
 
 		// Destroying all the events attached to the this instance
 		forEach(this.events, evt => this.off((evt.eventName as any), evt.callback));
 
 		this.events = [];
-
 		this.emit('destroyed');
 	}
 
@@ -113,7 +112,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 		eventName: TKey,
 		init?: CustomEventInit
 	) {
-		IoC.Resolve<EventHandler>(this.bouer!, EventHandler)!.emit({
+		ServiceProvider.get<EventHandler>(this.bouer!, 'EventHandler')!.emit({
 			eventName: eventName,
 			attachedNode: this.el!,
 			init: init
@@ -125,7 +124,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 		callback: (event: CustomEvent) => void
 	) {
 		const context = (eventName == 'requested' || eventName == 'failed' || eventName == 'blocked') ? this.bouer! : this;
-		const evt = IoC.Resolve<EventHandler>(this.bouer!, EventHandler)!.on({
+		const evt = ServiceProvider.get<EventHandler>(this.bouer!, 'EventHandler')!.on({
 			eventName,
 			callback: callback as any,
 			attachedNode: this.el!,
@@ -138,7 +137,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 	off<TKey extends keyof ILifeCycleHooks>(
 		eventName: TKey, callback: (event: CustomEvent) => void
 	) {
-		IoC.Resolve<EventHandler>(this.bouer!, EventHandler)!.off({
+		ServiceProvider.get<EventHandler>(this.bouer!, 'EventHandler')!.off({
 			eventName,
 			callback: callback as any,
 			attachedNode: this.el!

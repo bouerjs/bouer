@@ -3,7 +3,7 @@ import CustomDirective from "../../definitions/types/CustomDirective";
 import RenderContext from "../../definitions/types/RenderContext";
 import Bouer from "../../instance/Bouer";
 import Constants from "../../shared/helpers/Constants";
-import IoC from "../../shared/helpers/IoC";
+import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import {
 	DOM,
 	forEach, isFunction,
@@ -36,12 +36,12 @@ export default class Compiler extends Base {
 
 		this.bouer = bouer;
 		this.directives = directives;
-		this.binder = IoC.Resolve(this.bouer, Binder)!;
-		this.delimiter = IoC.Resolve(this.bouer, DelimiterHandler)!;
-		this.eventHandler = IoC.Resolve(this.bouer, EventHandler)!;
-		this.component = IoC.Resolve(this.bouer, ComponentHandler)!;
+		this.binder = ServiceProvider.get(this.bouer, 'Binder')!;
+		this.delimiter = ServiceProvider.get(this.bouer, 'DelimiterHandler')!;
+		this.eventHandler = ServiceProvider.get(this.bouer, 'EventHandler')!;
+		this.component = ServiceProvider.get(this.bouer, 'ComponentHandler')!;
 
-		IoC.Register(this);
+		ServiceProvider.add('Compiler', this);
 	}
 
 	compile<Data>(options: {

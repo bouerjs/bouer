@@ -1,6 +1,6 @@
 import Constants from "../../shared/helpers/Constants";
 import Extend from "../../shared/helpers/Extend";
-import IoC from "../../shared/helpers/IoC";
+import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import Logger from "../../shared/logger/Logger";
 import Bouer from "../../instance/Bouer";
 import {
@@ -25,7 +25,7 @@ export default class Converter extends Base {
 		super();
 
 		this.bouer = bouer;
-    IoC.Register(this);
+    ServiceProvider.add('Converter', this);
   }
 
   htmlToJsObj(input: string | HTMLElement,

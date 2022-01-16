@@ -5,7 +5,7 @@ import RenderContext from "../../definitions/types/RenderContext";
 import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
 import Constants from "../../shared/helpers/Constants";
-import IoC from "../../shared/helpers/IoC";
+import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import Task from "../../shared/helpers/Task";
 import {
 	buildError,
@@ -30,9 +30,9 @@ export default class EventHandler extends Base {
 		super();
 
 		this.bouer = bouer;
-		this.evaluator = IoC.Resolve(this.bouer, Evaluator)!;
+		this.evaluator = ServiceProvider.get(this.bouer, 'Evaluator')!;
 
-		IoC.Register(this);
+		ServiceProvider.add('EventHandler', this);
 		this.cleanup();
 	}
 

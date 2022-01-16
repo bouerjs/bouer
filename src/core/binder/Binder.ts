@@ -4,7 +4,7 @@ import WatchCallback from "../../definitions/types/WatchCallback";
 import Bouer from "../../instance/Bouer";
 import Constants from "../../shared/helpers/Constants";
 import Extend from "../../shared/helpers/Extend";
-import IoC from "../../shared/helpers/IoC";
+import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import Task from "../../shared/helpers/Task";
 import {
 	createEl,
@@ -44,9 +44,9 @@ export default class Binder extends Base {
 		super();
 
 		this.bouer = bouer;
-		this.evaluator = IoC.Resolve(this.bouer, Evaluator)!;
+		this.evaluator = ServiceProvider.get(this.bouer, 'Evaluator')!;
 
-		IoC.Register(this);
+		ServiceProvider.add('Binder', this);
 		this.cleanup();
 	}
 
@@ -55,7 +55,7 @@ export default class Binder extends Base {
 		const originalValue = trim(node.nodeValue ?? '');
 		const originalName = node.nodeName;
 		const ownerNode = (node as any).ownerElement || node.parentNode;
-		const middleware = IoC.Resolve<Middleware>(this.bouer, Middleware)!;
+		const middleware = ServiceProvider.get<Middleware>(this.bouer, 'Middleware')!;
 		const onUpdate = options.onUpdate || ((v: any, n: Node) => { });
 
 		// Clousure cache property settings
@@ -133,7 +133,7 @@ export default class Binder extends Base {
 						el.innerHTML = valueToSet;
 					}).build().children[0];
 					ownerNode.appendChild(htmlSnippet);
-					IoC.Resolve<Compiler>(this.bouer, Compiler)!.compile({
+					ServiceProvider.get<Compiler>(this.bouer, 'Compiler')!.compile({
 						el: htmlSnippet,
 						data: data,
 						context: context

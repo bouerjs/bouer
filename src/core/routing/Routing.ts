@@ -1,6 +1,6 @@
 import IComponentOptions from "../../definitions/interfaces/IComponentOptions";
 import Bouer from "../../instance/Bouer";
-import IoC from "../../shared/helpers/IoC";
+import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import { createAnyEl, DOM, forEach, GLOBAL, isNull, toArray, trim, urlCombine, urlResolver } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Base from "../Base";
@@ -23,7 +23,7 @@ export default class Routing extends Base {
 		this.bouer = bouer;
 		this.routeView = this.bouer.el.querySelector('[route-view]');
 
-		IoC.Register(this);
+		ServiceProvider.add('Routing', this);
 	}
 
 	init() {
@@ -92,7 +92,7 @@ export default class Routing extends Base {
 			this.pushState(resolver.href, DOM.title);
 
 		const routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route!);
-		IoC.Resolve<ComponentHandler>(this.bouer, ComponentHandler)!
+		ServiceProvider.get<ComponentHandler>(this.bouer, 'ComponentHandler')!
 			.order(componentElement, this.bouer.data , component => {
 				component.on('loaded', () => {
 					this.markActiveAnchorsWithRoute(routeToSet);
@@ -119,7 +119,7 @@ export default class Routing extends Base {
 		}
 
 		// Search for the right page
-		return IoC.Resolve<ComponentHandler>(this.bouer, ComponentHandler)!
+		return ServiceProvider.get<ComponentHandler>(this.bouer, 'ComponentHandler')!
 			.find(component => {
 				if (!component.route) return false;
 

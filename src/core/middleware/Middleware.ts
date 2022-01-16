@@ -2,7 +2,7 @@ import IMiddleware from "../../definitions/interfaces/IMiddleware";
 import MiddlewareConfigActions from "../../definitions/types/MiddlewareConfigActions";
 import IMiddlewareObject from "../../definitions/interfaces/IMiddlewareObject";
 import Bouer from "../../instance/Bouer";
-import IoC from "../../shared/helpers/IoC";
+import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import Base from "../Base";
 
 export default class Middleware extends Base {
@@ -13,7 +13,7 @@ export default class Middleware extends Base {
 		super();
 
 		this.bouer = bouer;
-		IoC.Register(this);
+		ServiceProvider.add('Middleware', this);
 	}
 
 	run = (directive: string, runnable: {

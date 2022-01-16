@@ -1,7 +1,7 @@
 import Bouer from "../instance/Bouer";
 import IDelimiter from "../definitions/interfaces/IDelimiter";
 import IDelimiterResponse from "../definitions/interfaces/IDelimiterResponse";
-import IoC from "../shared/helpers/IoC";
+import ServiceProvider from "../shared/helpers/ServiceProvider";
 import { isNull, trim } from "../shared/helpers/Utils";
 import Base from "./Base";
 
@@ -14,7 +14,7 @@ export default class DelimiterHandler extends Base {
 
 		this.bouer = bouer;
     this.delimiters = delimiters;
-    IoC.Register(this);
+    ServiceProvider.add('DelimiterHandler', this);
   }
 
   add(item: IDelimiter) {

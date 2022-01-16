@@ -1,6 +1,6 @@
 import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
-import IoC from "../../shared/helpers/IoC";
+import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import Logger from "../../shared/logger/Logger";
 import Base from "../Base";
 
@@ -14,21 +14,21 @@ export default class DataStore extends Base {
 		super();
 
 		this.bouer = bouer;
-		IoC.Register(this);
+		ServiceProvider.add('DataStore', this);
 	}
 
   set<TKey extends keyof DataStore>(key: TKey, dataKey: string, data: object) {
     if (key === 'wait') return Logger.warn("Only “get” is allowed for type of data");
-    IoC.Resolve<any>(this.bouer, DataStore)[key][dataKey] = data;
+    ServiceProvider.get<any>(this.bouer, 'DataStore')[key][dataKey] = data;
   }
 
   get<TKey extends keyof DataStore>(key: TKey, dataKey: string, once?: boolean) {
-    const result = IoC.Resolve<any>(this.bouer, DataStore)[key][dataKey];
+    const result = ServiceProvider.get<any>(this.bouer, 'DataStore')[key][dataKey];
     if (once === true) this.unset(key, dataKey);
     return result;
   }
 
   unset<TKey extends keyof DataStore>(key: TKey, dataKey: string) {
-    delete IoC.Resolve<any>(this.bouer, DataStore)[key][dataKey]
+    delete ServiceProvider.get<any>(this.bouer, 'DataStore')[key][dataKey]
   }
 }
