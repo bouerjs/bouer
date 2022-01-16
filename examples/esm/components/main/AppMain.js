@@ -2,7 +2,7 @@ import { Component } from "../../../../dist/bouer.esm.js";
 
 export default class AppMain extends Component {
 	constructor() {
-		super("/components/main/main.html");
+		super("/components/main/AppMain.html");
 	}
 
 	data = {
@@ -32,7 +32,7 @@ export default class AppMain extends Component {
 
 	init() {
 		this.addAssets([{
-			src: "./main.css"
+			src: "./AppMain.css"
 		}]);
 	}
 }

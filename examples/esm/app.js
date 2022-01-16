@@ -1,7 +1,7 @@
 import Bouer from "../../dist/bouer.esm.js";
-import AppHeader from "./components/header/header.js";
-import AppMain from "./components/main/main.js";
-import AppFooter from "./components/footer/footer.js";
+import AppHeader from "./components/header/AppHeader.js";
+import AppMain from "./components/main/AppMain.js";
+import AppFooter from "./components/footer/AppFooter.js";
 
 new Bouer('#app', {
   data: {

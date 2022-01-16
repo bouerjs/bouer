@@ -48,7 +48,8 @@ const builds = {
 }
 
 const rollupConfigBuilder = (key, config) => {
-  const format = key.split('-')[0];
+	const keySplitted = key.split('-');
+  const format = keySplitted.shift();
 
   config.output.name = 'Bouer';
   config.output.format = format;
