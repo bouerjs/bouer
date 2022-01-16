@@ -27,6 +27,7 @@ export default class Binder extends Base {
 	bouer: Bouer;
 	evaluator: Evaluator;
 	binds: { isConnected: () => boolean, watch: Watch<any, any> }[] = [];
+	serviceProvider: ServiceProvider;
 
 	private DEFAULT_BINDER_PROPERTIES: any = {
 		text: 'value',
@@ -42,11 +43,11 @@ export default class Binder extends Base {
 
 	constructor(bouer: Bouer) {
 		super();
-
 		this.bouer = bouer;
-		this.evaluator = ServiceProvider.get(this.bouer, 'Evaluator')!;
+		this.serviceProvider = new ServiceProvider(bouer);
+		this.evaluator = this.serviceProvider.get('Evaluator')!;
 
-		ServiceProvider.add('Binder', this);
+		this.serviceProvider.add('Binder', this);
 		this.cleanup();
 	}
 
@@ -55,7 +56,7 @@ export default class Binder extends Base {
 		const originalValue = trim(node.nodeValue ?? '');
 		const originalName = node.nodeName;
 		const ownerNode = (node as any).ownerElement || node.parentNode;
-		const middleware = ServiceProvider.get<Middleware>(this.bouer, 'Middleware')!;
+		const middleware = this.serviceProvider.get<Middleware>('Middleware')!;
 		const onUpdate = options.onUpdate || ((v: any, n: Node) => { });
 
 		// Clousure cache property settings
@@ -133,7 +134,7 @@ export default class Binder extends Base {
 						el.innerHTML = valueToSet;
 					}).build().children[0];
 					ownerNode.appendChild(htmlSnippet);
-					ServiceProvider.get<Compiler>(this.bouer, 'Compiler')!.compile({
+					this.serviceProvider.get<Compiler>('Compiler')!.compile({
 						el: htmlSnippet,
 						data: data,
 						context: context

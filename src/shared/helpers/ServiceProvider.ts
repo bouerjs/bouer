@@ -15,7 +15,7 @@ export default class ServiceProvider {
 	}
 
 	/**
-	 * Register an instance into the servicce collection
+	 * Register an instance into the service collection
 	 * @param instance the instance to be store
 	 */
 	add<Service>(name: string, instance: Service) {

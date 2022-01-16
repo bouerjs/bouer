@@ -25,6 +25,7 @@ export default class Compiler extends Base {
 	eventHandler: EventHandler;
 	component: ComponentHandler;
 	directives: CustomDirective;
+	serviceProvider: ServiceProvider;
 
 	private NODES_TO_IGNORE_IN_COMPILATION = {
 		'SCRIPT': 1,
@@ -35,11 +36,13 @@ export default class Compiler extends Base {
 		super();
 
 		this.bouer = bouer;
+		this.serviceProvider = new ServiceProvider(bouer);
 		this.directives = directives;
-		this.binder = ServiceProvider.get(this.bouer, 'Binder')!;
-		this.delimiter = ServiceProvider.get(this.bouer, 'DelimiterHandler')!;
-		this.eventHandler = ServiceProvider.get(this.bouer, 'EventHandler')!;
-		this.component = ServiceProvider.get(this.bouer, 'ComponentHandler')!;
+
+		this.binder = this.serviceProvider.get('Binder')!;
+		this.delimiter = this.serviceProvider.get('DelimiterHandler')!;
+		this.eventHandler = this.serviceProvider.get('EventHandler')!;
+		this.component = this.serviceProvider.get('ComponentHandler')!;
 
 		ServiceProvider.add('Compiler', this);
 	}

@@ -25,12 +25,14 @@ export default class EventHandler extends Base {
 	evaluator: Evaluator;
 	$events: { [key: string]: IEventSubscription[] } = {};
 	input = createEl('input').build();
+	serviceProvider: ServiceProvider;
 
 	constructor(bouer: Bouer) {
 		super();
 
 		this.bouer = bouer;
-		this.evaluator = ServiceProvider.get(this.bouer, 'Evaluator')!;
+		this.serviceProvider = new ServiceProvider(bouer);
+		this.evaluator = this.serviceProvider.get('Evaluator')!;
 
 		ServiceProvider.add('EventHandler', this);
 		this.cleanup();

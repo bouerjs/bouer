@@ -112,7 +112,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 		eventName: TKey,
 		init?: CustomEventInit
 	) {
-		ServiceProvider.get<EventHandler>(this.bouer!, 'EventHandler')!.emit({
+		new ServiceProvider(this.bouer!).get<EventHandler>('EventHandler')!.emit({
 			eventName: eventName,
 			attachedNode: this.el!,
 			init: init
@@ -124,7 +124,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 		callback: (event: CustomEvent) => void
 	) {
 		const context = (eventName == 'requested' || eventName == 'failed' || eventName == 'blocked') ? this.bouer! : this;
-		const evt = ServiceProvider.get<EventHandler>(this.bouer!, 'EventHandler')!.on({
+		const evt = new ServiceProvider(this.bouer!).get<EventHandler>('EventHandler')!.on({
 			eventName,
 			callback: callback as any,
 			attachedNode: this.el!,
@@ -137,7 +137,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 	off<TKey extends keyof ILifeCycleHooks>(
 		eventName: TKey, callback: (event: CustomEvent) => void
 	) {
-		ServiceProvider.get<EventHandler>(this.bouer!, 'EventHandler')!.off({
+		new ServiceProvider(this.bouer!).get<EventHandler>('EventHandler')!.off({
 			eventName,
 			callback: callback as any,
 			attachedNode: this.el!

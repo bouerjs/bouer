@@ -244,7 +244,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 						context: this,
 						inputObject: data
 					});
-				return ServiceProvider.get<DataStore>(this, 'DataStore')!.set('data', key, data);
+				return new ServiceProvider(this).get<DataStore>('DataStore')!.set('data', key, data);
 			},
 			unset: key => delete dataStore.data[key]
 		};
@@ -260,7 +260,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 					return mWait.data;
 				}
 
-				const output:dynamic = {};
+				const output: dynamic = {};
 				forEach(Object.keys(dataStore.wait), k => output[k] = dataStore.wait[k].data);
 				return output;
 			},
@@ -467,7 +467,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		},
 		onSet?: (builtObjectLayer: object, propName: string, value: any, element: Element) => void
 	) {
-		return ServiceProvider.get<Converter>(this, 'Converter')!.htmlToJsObj(input, options, onSet);
+		return new ServiceProvider(this).get<Converter>('Converter')!.htmlToJsObj(input, options, onSet);
 	}
 
 	/**
@@ -482,7 +482,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		callback: (valueNew: TargetObject[Key], valueOld: TargetObject[Key]) => void,
 		targetObject: TargetObject | Data = this.data
 	) {
-		return ServiceProvider.get<Binder>(this, 'Binder')!.onPropertyChange<TargetObject[Key], TargetObject | Data>(
+		return new ServiceProvider(this).get<Binder>('Binder')!.onPropertyChange<TargetObject[Key], TargetObject | Data>(
 			propertyName, callback as WatchCallback, targetObject || this.data
 		);
 	}
@@ -495,7 +495,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 	react(
 		watchableScope: (app: Bouer) => void
 	) {
-		return ServiceProvider.get<Binder>(this, 'Binder')!
+		return new ServiceProvider(this).get<Binder>('Binder')!
 			.onPropertyInScopeChange(watchableScope);
 	}
 
@@ -520,7 +520,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 			}
 		}
 	) {
-		return ServiceProvider.get<EventHandler>(this, 'EventHandler')!.
+		return new ServiceProvider(this).get<EventHandler>('EventHandler')!.
 			on({
 				eventName,
 				callback,
@@ -541,7 +541,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		callback: (event: CustomEvent | Event) => void,
 		attachedNode?: Node
 	) {
-		return ServiceProvider.get<EventHandler>(this, 'EventHandler')!.
+		return new ServiceProvider(this).get<EventHandler>('EventHandler')!.
 			off({
 				eventName,
 				callback,
@@ -562,7 +562,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		}
 	) {
 		const mOptions = (options || {});
-		return ServiceProvider.get<EventHandler>(this, 'EventHandler')!.
+		return new ServiceProvider(this).get<EventHandler>('EventHandler')!.
 			emit({
 				eventName: eventName,
 				attachedNode: mOptions.element,
@@ -613,7 +613,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		/** The function that should be fired when the compilation is done */
 		onDone?: (element: Element, data?: Data | undefined) => void
 	}) {
-		return ServiceProvider.get<Compiler>(this, 'Compiler')!.
+		return new ServiceProvider(this).get<Compiler>('Compiler')!.
 			compile({
 				el: options.el,
 				data: options.data,
@@ -624,7 +624,8 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 
 	destroy() {
 		const el = this.el!;
-		const $events = ServiceProvider.get<EventHandler>(this, 'EventHandler')!.$events;
+		const serviceProvider = new ServiceProvider(this);
+		const $events = serviceProvider.get<EventHandler>('EventHandler')!.$events;
 		const destroyedEvents = ($events['destroyed'] || []).concat(($events['component:destroyed'] || []));
 
 		this.emit('destroyed', { element: this.el! });
@@ -639,7 +640,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 			el.parentElement!.removeChild(el);
 
 		this.isDestroyed = true;
-		ServiceProvider.clear(this);
+		serviceProvider.clear();
 	}
 
 	// Hooks

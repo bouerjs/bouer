@@ -44,6 +44,7 @@ export default class Directive extends Base {
 	delimiter: DelimiterHandler;
 	$custom: CustomDirective = {};
 	context: RenderContext;
+	serviceProvider: ServiceProvider;
 
 	constructor(
 		customDirective: CustomDirective,
@@ -57,10 +58,12 @@ export default class Directive extends Base {
 		this.bouer = compiler.bouer;
 		this.$custom = customDirective;
 
-		this.evaluator = ServiceProvider.get(this.bouer, 'Evaluator')!;
-		this.delimiter = ServiceProvider.get(this.bouer, 'DelimiterHandler')!;
-		this.binder = ServiceProvider.get(this.bouer, 'Binder')!;
-		this.eventHandler = ServiceProvider.get(this.bouer, 'EventHandler')!;
+		this.serviceProvider = new ServiceProvider(this.bouer);
+
+		this.evaluator = this.serviceProvider.get('Evaluator')!;
+		this.delimiter = this.serviceProvider.get('DelimiterHandler')!;
+		this.binder = this.serviceProvider.get('Binder')!;
+		this.eventHandler = this.serviceProvider.get('EventHandler')!;
 
 		this.comment = new CommentHandler(this.bouer);
 	}
@@ -643,7 +646,7 @@ export default class Directive extends Base {
 		let dataKey = node.nodeName.split(':')[1];
 		if (dataKey) {
 			dataKey = dataKey.replace(/\[|\]/g, '');
-			ServiceProvider.get<DataStore>(this.bouer, 'DataStore')!.set('data', dataKey, inputData);
+			this.serviceProvider.get<DataStore>('DataStore')!.set('data', dataKey, inputData);
 		}
 
 		Reactive.transform({
@@ -686,7 +689,7 @@ export default class Directive extends Base {
 			.addEventListener('click', event => {
 				event.preventDefault();
 
-				ServiceProvider.get<Routing>(this.bouer, 'Routing')!
+				this.serviceProvider.get<Routing>('Routing')!
 					.navigate(href.value);
 			}, false);
 	}
@@ -702,7 +705,7 @@ export default class Directive extends Base {
 			return Logger.error(this.errorMsgNodeValue(node));
 
 		ownerNode.removeAttribute(node.nodeName);
-		ServiceProvider.get<ComponentHandler>(this.bouer, 'ComponentHandler')!
+		this.serviceProvider.get<ComponentHandler>('ComponentHandler')!
 			.prepare([
 				{
 					name: nodeValue,
@@ -746,7 +749,7 @@ export default class Directive extends Base {
 				.appendTo(ownerNode)
 				.build();
 
-			ServiceProvider.get<ComponentHandler>(this.bouer, 'ComponentHandler')!
+				this.serviceProvider.get<ComponentHandler>('ComponentHandler')!
 				.order(componentElement, data);
 		})();
 	}
@@ -862,7 +865,7 @@ export default class Directive extends Base {
 			return true;
 		}
 
-		const middleware = ServiceProvider.get<Middleware>(this.bouer, 'Middleware')!;
+		const middleware = this.serviceProvider.get<Middleware>('Middleware')!;
 		const dataKey = (node.nodeName.split(':')[1] || '').replace(/\[|\]/g, '');
 
 		if (!middleware.has('req'))
@@ -879,7 +882,7 @@ export default class Directive extends Base {
 					inputObject: response
 				});
 
-				if (dataKey) ServiceProvider.get<DataStore>(this.bouer, 'DataStore')!.set('req', dataKey, response);
+				if (dataKey) this.serviceProvider.get<DataStore>('DataStore')!.set('req', dataKey, response);
 
 				subcribeEvent(Constants.builtInEvents.response).emit({
 					response: response
@@ -1002,7 +1005,7 @@ export default class Directive extends Base {
 			return Logger.error(this.errorMsgNodeValue(node));
 
 		ownerNode.removeAttribute(node.nodeName);
-		const dataStore = ServiceProvider.get<DataStore>(this.bouer, 'DataStore')!;
+		const dataStore = this.serviceProvider.get<DataStore>('DataStore')!;
 		const mWait = dataStore.wait[nodeValue];
 
 		if (mWait) {

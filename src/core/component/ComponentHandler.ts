@@ -38,13 +38,15 @@ export default class ComponentHandler extends Base {
 	components: { [key: string]: (Component<any> | IComponentOptions<any>) } = {};
 	// Avoids to add multiple styles of the same component if it's already in use
 	stylesController: { [key: string]: { styles: Element[], elements: Element[] }, } = {};
+	serviceProvider: ServiceProvider;
 
 	constructor(bouer: Bouer) {
 		super();
 
 		this.bouer = bouer;
-		this.delimiter = ServiceProvider.get(this.bouer, 'DelimiterHandler')!;
-		this.eventHandler = ServiceProvider.get(this.bouer, 'EventHandler')!;
+		this.serviceProvider = new ServiceProvider(bouer);
+		this.delimiter = this.serviceProvider.get('DelimiterHandler')!;
+		this.eventHandler = this.serviceProvider.get('EventHandler')!;
 
 		ServiceProvider.add('ComponentHandler', this);
 	}
@@ -123,7 +125,7 @@ export default class ComponentHandler extends Base {
 			if (Array.isArray(component.children))
 				this.prepare(component.children, component);
 
-			ServiceProvider.get<Routing>(this.bouer, 'Routing')!
+			this.serviceProvider.get<Routing>('Routing')!
 				.configure(this.components[component.name!] = component);
 
 			const getContent = (path?: string) => {
@@ -353,7 +355,7 @@ export default class ComponentHandler extends Base {
 					inputData = Extend.obj(this.bouer.data);
 				else {
 					// Other wise, compiles the object provided
-					const mInputData = ServiceProvider.get<Evaluator>(this.bouer, 'Evaluator')!
+					const mInputData = this.serviceProvider.get<Evaluator>('Evaluator')!
 						.exec({
 							data: mData,
 							expression: attr.value,
@@ -474,7 +476,7 @@ export default class ComponentHandler extends Base {
 		const compile = (scriptContent?: string) => {
 			try {
 				// Executing the mixed scripts
-				ServiceProvider.get<Evaluator>(this.bouer, 'Evaluator')!
+				this.serviceProvider.get<Evaluator>('Evaluator')!
 					.execRaw((scriptContent || ''), component);
 
 				this.addComponentEventAndEmitGlobalEvent('mounted', component.el!, component);
@@ -485,7 +487,7 @@ export default class ComponentHandler extends Base {
 				this.addComponentEventAndEmitGlobalEvent('beforeLoad', component.el!, component)
 				component.emit('beforeLoad');
 
-				ServiceProvider.get<Compiler>(this.bouer, 'Compiler')!
+				this.serviceProvider.get<Compiler>('Compiler')!
 					.compile({
 						data: Reactive.transform({
 							context: component,

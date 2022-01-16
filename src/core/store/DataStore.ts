@@ -9,26 +9,28 @@ export default class DataStore extends Base {
   data: dynamic = {};
   req: dynamic = {};
 	bouer: Bouer;
+	serviceProvider: ServiceProvider;
 
   constructor(bouer: Bouer) {
 		super();
 
 		this.bouer = bouer;
-		ServiceProvider.add('DataStore', this);
+		this.serviceProvider = new ServiceProvider(bouer);
+		this.serviceProvider.add('DataStore', this);
 	}
 
   set<TKey extends keyof DataStore>(key: TKey, dataKey: string, data: object) {
     if (key === 'wait') return Logger.warn("Only “get” is allowed for type of data");
-    ServiceProvider.get<any>(this.bouer, 'DataStore')[key][dataKey] = data;
+    this.serviceProvider.get<any>('DataStore')[key][dataKey] = data;
   }
 
   get<TKey extends keyof DataStore>(key: TKey, dataKey: string, once?: boolean) {
-    const result = ServiceProvider.get<any>(this.bouer, 'DataStore')[key][dataKey];
+    const result = this.serviceProvider.get<any>('DataStore')[key][dataKey];
     if (once === true) this.unset(key, dataKey);
     return result;
   }
 
   unset<TKey extends keyof DataStore>(key: TKey, dataKey: string) {
-    delete ServiceProvider.get<any>(this.bouer, 'DataStore')[key][dataKey]
+    delete this.serviceProvider.get<any>('DataStore')[key][dataKey]
   }
 }

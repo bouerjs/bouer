@@ -422,7 +422,7 @@ var ServiceProvider = /** @class */ (function () {
         this.app = app;
     }
     /**
-     * Register an instance into the servicce collection
+     * Register an instance into the service collection
      * @param instance the instance to be store
      */
     ServiceProvider.prototype.add = function (name, instance) {
@@ -592,8 +592,9 @@ var Binder = /** @class */ (function (_super) {
             fromDataToInput: 'fromDataToInput'
         };
         _this.bouer = bouer;
-        _this.evaluator = ServiceProvider.get(_this.bouer, 'Evaluator');
-        ServiceProvider.add('Binder', _this);
+        _this.serviceProvider = new ServiceProvider(bouer);
+        _this.evaluator = _this.serviceProvider.get('Evaluator');
+        _this.serviceProvider.add('Binder', _this);
         _this.cleanup();
         return _this;
     }
@@ -604,7 +605,7 @@ var Binder = /** @class */ (function (_super) {
         var originalValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
         var originalName = node.nodeName;
         var ownerNode = node.ownerElement || node.parentNode;
-        var middleware = ServiceProvider.get(this.bouer, 'Middleware');
+        var middleware = this.serviceProvider.get('Middleware');
         var onUpdate = options.onUpdate || (function (v, n) { });
         // Clousure cache property settings
         var propertyBindConfig = {
@@ -669,7 +670,7 @@ var Binder = /** @class */ (function (_super) {
                         el.innerHTML = valueToSet;
                     }).build().children[0];
                     ownerNode.appendChild(htmlSnippet);
-                    ServiceProvider.get(_this.bouer, 'Compiler').compile({
+                    _this.serviceProvider.get('Compiler').compile({
                         el: htmlSnippet,
                         data: data,
                         context: context
@@ -1078,10 +1079,11 @@ var Directive = /** @class */ (function (_super) {
         _this.context = compilerContext;
         _this.bouer = compiler.bouer;
         _this.$custom = customDirective;
-        _this.evaluator = ServiceProvider.get(_this.bouer, 'Evaluator');
-        _this.delimiter = ServiceProvider.get(_this.bouer, 'DelimiterHandler');
-        _this.binder = ServiceProvider.get(_this.bouer, 'Binder');
-        _this.eventHandler = ServiceProvider.get(_this.bouer, 'EventHandler');
+        _this.serviceProvider = new ServiceProvider(_this.bouer);
+        _this.evaluator = _this.serviceProvider.get('Evaluator');
+        _this.delimiter = _this.serviceProvider.get('DelimiterHandler');
+        _this.binder = _this.serviceProvider.get('Binder');
+        _this.eventHandler = _this.serviceProvider.get('EventHandler');
         _this.comment = new CommentHandler(_this.bouer);
         return _this;
     }
@@ -1583,7 +1585,7 @@ var Directive = /** @class */ (function (_super) {
         var dataKey = node.nodeName.split(':')[1];
         if (dataKey) {
             dataKey = dataKey.replace(/\[|\]/g, '');
-            ServiceProvider.get(this.bouer, 'DataStore').set('data', dataKey, inputData);
+            this.serviceProvider.get('DataStore').set('data', dataKey, inputData);
         }
         Reactive.transform({
             context: this.context,
@@ -1619,7 +1621,7 @@ var Directive = /** @class */ (function (_super) {
         ownerNode
             .addEventListener('click', function (event) {
             event.preventDefault();
-            ServiceProvider.get(_this.bouer, 'Routing')
+            _this.serviceProvider.get('Routing')
                 .navigate(href.value);
         }, false);
     };
@@ -1632,7 +1634,7 @@ var Directive = /** @class */ (function (_super) {
         if (this.delimiter.run(nodeValue).length !== 0)
             return Logger.error(this.errorMsgNodeValue(node));
         ownerNode.removeAttribute(node.nodeName);
-        ServiceProvider.get(this.bouer, 'ComponentHandler')
+        this.serviceProvider.get('ComponentHandler')
             .prepare([
             {
                 name: nodeValue,
@@ -1671,7 +1673,7 @@ var Directive = /** @class */ (function (_super) {
             var componentElement = createAnyEl(nodeValue)
                 .appendTo(ownerNode)
                 .build();
-            ServiceProvider.get(_this.bouer, 'ComponentHandler')
+            _this.serviceProvider.get('ComponentHandler')
                 .order(componentElement, data);
         })();
     };
@@ -1764,7 +1766,7 @@ var Directive = /** @class */ (function (_super) {
             }
             return true;
         };
-        var middleware = ServiceProvider.get(this.bouer, 'Middleware');
+        var middleware = this.serviceProvider.get('Middleware');
         var dataKey = (node.nodeName.split(':')[1] || '').replace(/\[|\]/g, '');
         if (!middleware.has('req'))
             return Logger.error("There is no “req” middleware provided for the “e-req” directive requests.");
@@ -1779,7 +1781,7 @@ var Directive = /** @class */ (function (_super) {
                     inputObject: response
                 });
                 if (dataKey)
-                    ServiceProvider.get(_this.bouer, 'DataStore').set('req', dataKey, response);
+                    _this.serviceProvider.get('DataStore').set('req', dataKey, response);
                 subcribeEvent(Constants.builtInEvents.response).emit({
                     response: response
                 });
@@ -1886,7 +1888,7 @@ var Directive = /** @class */ (function (_super) {
         if (this.delimiter.run(nodeValue).length !== 0)
             return Logger.error(this.errorMsgNodeValue(node));
         ownerNode.removeAttribute(node.nodeName);
-        var dataStore = ServiceProvider.get(this.bouer, 'DataStore');
+        var dataStore = this.serviceProvider.get('DataStore');
         var mWait = dataStore.wait[nodeValue];
         if (mWait) {
             mWait.nodes.push(ownerNode);
@@ -1958,11 +1960,12 @@ var Compiler = /** @class */ (function (_super) {
             '#comment': 8
         };
         _this.bouer = bouer;
+        _this.serviceProvider = new ServiceProvider(bouer);
         _this.directives = directives;
-        _this.binder = ServiceProvider.get(_this.bouer, 'Binder');
-        _this.delimiter = ServiceProvider.get(_this.bouer, 'DelimiterHandler');
-        _this.eventHandler = ServiceProvider.get(_this.bouer, 'EventHandler');
-        _this.component = ServiceProvider.get(_this.bouer, 'ComponentHandler');
+        _this.binder = _this.serviceProvider.get('Binder');
+        _this.delimiter = _this.serviceProvider.get('DelimiterHandler');
+        _this.eventHandler = _this.serviceProvider.get('EventHandler');
+        _this.component = _this.serviceProvider.get('ComponentHandler');
         ServiceProvider.add('Compiler', _this);
         return _this;
     }
@@ -2397,7 +2400,7 @@ var Component = /** @class */ (function (_super) {
         return new UriHandler().params(this.route);
     };
     Component.prototype.emit = function (eventName, init) {
-        ServiceProvider.get(this.bouer, 'EventHandler').emit({
+        new ServiceProvider(this.bouer).get('EventHandler').emit({
             eventName: eventName,
             attachedNode: this.el,
             init: init
@@ -2405,7 +2408,7 @@ var Component = /** @class */ (function (_super) {
     };
     Component.prototype.on = function (eventName, callback) {
         var context = (eventName == 'requested' || eventName == 'failed' || eventName == 'blocked') ? this.bouer : this;
-        var evt = ServiceProvider.get(this.bouer, 'EventHandler').on({
+        var evt = new ServiceProvider(this.bouer).get('EventHandler').on({
             eventName: eventName,
             callback: callback,
             attachedNode: this.el,
@@ -2415,7 +2418,7 @@ var Component = /** @class */ (function (_super) {
         return evt;
     };
     Component.prototype.off = function (eventName, callback) {
-        ServiceProvider.get(this.bouer, 'EventHandler').off({
+        new ServiceProvider(this.bouer).get('EventHandler').off({
             eventName: eventName,
             callback: callback,
             attachedNode: this.el
@@ -2479,8 +2482,9 @@ var ComponentHandler = /** @class */ (function (_super) {
         // Avoids to add multiple styles of the same component if it's already in use
         _this.stylesController = {};
         _this.bouer = bouer;
-        _this.delimiter = ServiceProvider.get(_this.bouer, 'DelimiterHandler');
-        _this.eventHandler = ServiceProvider.get(_this.bouer, 'EventHandler');
+        _this.serviceProvider = new ServiceProvider(bouer);
+        _this.delimiter = _this.serviceProvider.get('DelimiterHandler');
+        _this.eventHandler = _this.serviceProvider.get('EventHandler');
         ServiceProvider.add('ComponentHandler', _this);
         return _this;
     }
@@ -2542,7 +2546,7 @@ var ComponentHandler = /** @class */ (function (_super) {
             }
             if (Array.isArray(component.children))
                 _this.prepare(component.children, component);
-            ServiceProvider.get(_this.bouer, 'Routing')
+            _this.serviceProvider.get('Routing')
                 .configure(_this.components[component.name] = component);
             var getContent = function (path) {
                 if (!path)
@@ -2738,7 +2742,7 @@ var ComponentHandler = /** @class */ (function (_super) {
                     inputData_1 = Extend.obj(_this.bouer.data);
                 else {
                     // Other wise, compiles the object provided
-                    var mInputData_1 = ServiceProvider.get(_this.bouer, 'Evaluator')
+                    var mInputData_1 = _this.serviceProvider.get('Evaluator')
                         .exec({
                         data: mData,
                         expression: attr.value,
@@ -2837,14 +2841,14 @@ var ComponentHandler = /** @class */ (function (_super) {
         var compile = function (scriptContent) {
             try {
                 // Executing the mixed scripts
-                ServiceProvider.get(_this.bouer, 'Evaluator')
+                _this.serviceProvider.get('Evaluator')
                     .execRaw((scriptContent || ''), component);
                 _this.addComponentEventAndEmitGlobalEvent('mounted', component.el, component);
                 component.emit('mounted');
                 // TODO: Something between this two events
                 _this.addComponentEventAndEmitGlobalEvent('beforeLoad', component.el, component);
                 component.emit('beforeLoad');
-                ServiceProvider.get(_this.bouer, 'Compiler')
+                _this.serviceProvider.get('Compiler')
                     .compile({
                     data: Reactive.transform({
                         context: component,
@@ -3065,7 +3069,8 @@ var EventHandler = /** @class */ (function (_super) {
         _this.$events = {};
         _this.input = createEl('input').build();
         _this.bouer = bouer;
-        _this.evaluator = ServiceProvider.get(_this.bouer, 'Evaluator');
+        _this.serviceProvider = new ServiceProvider(bouer);
+        _this.evaluator = _this.serviceProvider.get('Evaluator');
         ServiceProvider.add('EventHandler', _this);
         _this.cleanup();
         return _this;
@@ -3335,7 +3340,7 @@ var Routing = /** @class */ (function (_super) {
         if ((changeUrl !== null && changeUrl !== void 0 ? changeUrl : true))
             this.pushState(resolver.href, DOM.title);
         var routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route);
-        ServiceProvider.get(this.bouer, 'ComponentHandler')
+        new ServiceProvider(this.bouer).get('ComponentHandler')
             .order(componentElement, this.bouer.data, function (component) {
             component.on('loaded', function () {
                 _this.markActiveAnchorsWithRoute(routeToSet);
@@ -3360,7 +3365,7 @@ var Routing = /** @class */ (function (_super) {
             return this.defaultPage;
         }
         // Search for the right page
-        return ServiceProvider.get(this.bouer, 'ComponentHandler')
+        return new ServiceProvider(this.bouer).get('ComponentHandler')
             .find(function (component) {
             if (!component.route)
                 return false;
@@ -3485,22 +3490,23 @@ var DataStore = /** @class */ (function (_super) {
         _this.data = {};
         _this.req = {};
         _this.bouer = bouer;
-        ServiceProvider.add('DataStore', _this);
+        _this.serviceProvider = new ServiceProvider(bouer);
+        _this.serviceProvider.add('DataStore', _this);
         return _this;
     }
     DataStore.prototype.set = function (key, dataKey, data) {
         if (key === 'wait')
             return Logger.warn("Only “get” is allowed for type of data");
-        ServiceProvider.get(this.bouer, 'DataStore')[key][dataKey] = data;
+        this.serviceProvider.get('DataStore')[key][dataKey] = data;
     };
     DataStore.prototype.get = function (key, dataKey, once) {
-        var result = ServiceProvider.get(this.bouer, 'DataStore')[key][dataKey];
+        var result = this.serviceProvider.get('DataStore')[key][dataKey];
         if (once === true)
             this.unset(key, dataKey);
         return result;
     };
     DataStore.prototype.unset = function (key, dataKey) {
-        delete ServiceProvider.get(this.bouer, 'DataStore')[key][dataKey];
+        delete this.serviceProvider.get('DataStore')[key][dataKey];
     };
     return DataStore;
 }(Base));
@@ -3581,7 +3587,7 @@ var Bouer = /** @class */ (function (_super) {
                         context: _this_1,
                         inputObject: data
                     });
-                return ServiceProvider.get(_this_1, 'DataStore').set('data', key, data);
+                return new ServiceProvider(_this_1).get('DataStore').set('data', key, data);
             },
             unset: function (key) { return delete dataStore.data[key]; }
         };
@@ -3764,7 +3770,7 @@ var Bouer = /** @class */ (function (_super) {
      * @returns the Object Compiled from the HTML
      */
     Bouer.prototype.toJsObj = function (input, options, onSet) {
-        return ServiceProvider.get(this, 'Converter').htmlToJsObj(input, options, onSet);
+        return new ServiceProvider(this).get('Converter').htmlToJsObj(input, options, onSet);
     };
     /**
      * Provides the possibility to watch a property change
@@ -3775,7 +3781,7 @@ var Bouer = /** @class */ (function (_super) {
      */
     Bouer.prototype.watch = function (propertyName, callback, targetObject) {
         if (targetObject === void 0) { targetObject = this.data; }
-        return ServiceProvider.get(this, 'Binder').onPropertyChange(propertyName, callback, targetObject || this.data);
+        return new ServiceProvider(this).get('Binder').onPropertyChange(propertyName, callback, targetObject || this.data);
     };
     /**
      * Watch all reactive properties in the provided scope.
@@ -3783,7 +3789,7 @@ var Bouer = /** @class */ (function (_super) {
      * @returns an object having all the watches and the method to destroy watches at once
      */
     Bouer.prototype.react = function (watchableScope) {
-        return ServiceProvider.get(this, 'Binder')
+        return new ServiceProvider(this).get('Binder')
             .onPropertyInScopeChange(watchableScope);
     };
     /**
@@ -3795,7 +3801,7 @@ var Bouer = /** @class */ (function (_super) {
      * @returns The event added
      */
     Bouer.prototype.on = function (eventName, callback, options) {
-        return ServiceProvider.get(this, 'EventHandler').
+        return new ServiceProvider(this).get('EventHandler').
             on({
             eventName: eventName,
             callback: callback,
@@ -3811,7 +3817,7 @@ var Bouer = /** @class */ (function (_super) {
      * @param attachedNode A node to attach the event
      */
     Bouer.prototype.off = function (eventName, callback, attachedNode) {
-        return ServiceProvider.get(this, 'EventHandler').
+        return new ServiceProvider(this).get('EventHandler').
             off({
             eventName: eventName,
             callback: callback,
@@ -3824,7 +3830,7 @@ var Bouer = /** @class */ (function (_super) {
      */
     Bouer.prototype.emit = function (eventName, options) {
         var mOptions = (options || {});
-        return ServiceProvider.get(this, 'EventHandler').
+        return new ServiceProvider(this).get('EventHandler').
             emit({
             eventName: eventName,
             attachedNode: mOptions.element,
@@ -3863,7 +3869,7 @@ var Bouer = /** @class */ (function (_super) {
      * @returns
      */
     Bouer.prototype.compile = function (options) {
-        return ServiceProvider.get(this, 'Compiler').
+        return new ServiceProvider(this).get('Compiler').
             compile({
             el: options.el,
             data: options.data,
@@ -3873,7 +3879,8 @@ var Bouer = /** @class */ (function (_super) {
     };
     Bouer.prototype.destroy = function () {
         var el = this.el;
-        var $events = ServiceProvider.get(this, 'EventHandler').$events;
+        var serviceProvider = new ServiceProvider(this);
+        var $events = serviceProvider.get('EventHandler').$events;
         var destroyedEvents = ($events['destroyed'] || []).concat(($events['component:destroyed'] || []));
         this.emit('destroyed', { element: this.el });
         // Dispatching all the destroy events
@@ -3885,7 +3892,7 @@ var Bouer = /** @class */ (function (_super) {
         else if (DOM.contains(el))
             el.parentElement.removeChild(el);
         this.isDestroyed = true;
-        ServiceProvider.clear(this);
+        serviceProvider.clear();
     };
     // Hooks
     Bouer.prototype.beforeLoad = function (event) { };

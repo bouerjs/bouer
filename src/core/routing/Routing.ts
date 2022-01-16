@@ -92,7 +92,7 @@ export default class Routing extends Base {
 			this.pushState(resolver.href, DOM.title);
 
 		const routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route!);
-		ServiceProvider.get<ComponentHandler>(this.bouer, 'ComponentHandler')!
+		new ServiceProvider(this.bouer).get<ComponentHandler>('ComponentHandler')!
 			.order(componentElement, this.bouer.data , component => {
 				component.on('loaded', () => {
 					this.markActiveAnchorsWithRoute(routeToSet);
@@ -119,7 +119,7 @@ export default class Routing extends Base {
 		}
 
 		// Search for the right page
-		return ServiceProvider.get<ComponentHandler>(this.bouer, 'ComponentHandler')!
+		return new ServiceProvider(this.bouer).get<ComponentHandler>('ComponentHandler')!
 			.find(component => {
 				if (!component.route) return false;
 
