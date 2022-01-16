@@ -2,7 +2,7 @@ import IComponentOptions from "../../definitions/interfaces/IComponentOptions";
 import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
 import Extend from "../../shared/helpers/Extend";
-import IoC from "../../shared/helpers/IoC";
+import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import Prop from "../../shared/helpers/Prop";
 import Task from "../../shared/helpers/Task";
 import {
@@ -43,10 +43,10 @@ export default class ComponentHandler extends Base {
 		super();
 
 		this.bouer = bouer;
-		this.delimiter = IoC.Resolve(this.bouer, DelimiterHandler)!;
-		this.eventHandler = IoC.Resolve(this.bouer, EventHandler)!;
+		this.delimiter = ServiceProvider.get(this.bouer, 'DelimiterHandler')!;
+		this.eventHandler = ServiceProvider.get(this.bouer, 'EventHandler')!;
 
-		IoC.Register(this);
+		ServiceProvider.add('ComponentHandler', this);
 	}
 
 	check(nodeName: string) {
@@ -92,34 +92,38 @@ export default class ComponentHandler extends Base {
 	prepare(components: (Component<any> | IComponentOptions<any>)[], parent?: (Component<any> | IComponentOptions<any>)) {
 		forEach(components, component => {
 			const ctorName = component.constructor.name;
-			const isBuitInClass = ctorName === "IComponent" || ctorName === "Component" || ctorName === "Object";
 
-			if (isNull(component.name)) {
-				if (isBuitInClass)
-					component.name = toLower(code(9, 'component-'));
-				else
-					component.name = toLower(component.constructor.name);
-			}
+			const isBuitInClass = ctorName === "IComponent" || ctorName === "Component" || ctorName === "Object";
 
 			if (isNull(component.path) && isNull(component.template))
 				return Logger.warn("The component with name “" + component.name + "”" +
 					(component.route ? (" and route “" + component.route + "”") : "") +
 					" has not “path” or “template” property defined, " + "then it was ignored.");
 
-			if (!isNull((this.components as any)[component.name!]))
-				return Logger.warn("The component name “" + component.name + "” is already define, try changing the name.");
+			if (isNull(component.name) || !component.name) {
+				const pathSplitted = component.path!.toLowerCase().split('/');
+				let generatedComponentName = pathSplitted[pathSplitted.length-1].replace('.html', '');
 
-			if (!isNull(parent)) { // TODO: Inherit the parent info
+				// If the component name already exists generate a new one
+				if (this.components[generatedComponentName])
+					generatedComponentName = toLower(code(8, generatedComponentName + '-component-'));
+
+				component.name = generatedComponentName;
 			}
 
-			if (!isNull(component.route)) { // Completing the API
+			if (this.components[component.name!])
+				return Logger.warn("The component name “" + component.name + "” is already define, try changing the name.");
+
+			if (!isNull(parent)) { /** TODO: Inherit the parent info */ }
+
+			if (!isNull(component.route)) { // Completing the route
 				component.route = "/" + urlCombine((isNull(parent) ? "" : parent!.route!), component.route!);
 			}
 
 			if (Array.isArray(component.children))
 				this.prepare(component.children, component);
 
-			IoC.Resolve<Routing>(this.bouer, Routing)!
+			ServiceProvider.get<Routing>(this.bouer, 'Routing')!
 				.configure(this.components[component.name!] = component);
 
 			const getContent = (path?: string) => {
@@ -349,7 +353,7 @@ export default class ComponentHandler extends Base {
 					inputData = Extend.obj(this.bouer.data);
 				else {
 					// Other wise, compiles the object provided
-					const mInputData = IoC.Resolve<Evaluator>(this.bouer, Evaluator)!
+					const mInputData = ServiceProvider.get<Evaluator>(this.bouer, 'Evaluator')!
 						.exec({
 							data: mData,
 							expression: attr.value,
@@ -470,7 +474,7 @@ export default class ComponentHandler extends Base {
 		const compile = (scriptContent?: string) => {
 			try {
 				// Executing the mixed scripts
-				IoC.Resolve<Evaluator>(this.bouer, Evaluator)!
+				ServiceProvider.get<Evaluator>(this.bouer, 'Evaluator')!
 					.execRaw((scriptContent || ''), component);
 
 				this.addComponentEventAndEmitGlobalEvent('mounted', component.el!, component);
@@ -481,7 +485,7 @@ export default class ComponentHandler extends Base {
 				this.addComponentEventAndEmitGlobalEvent('beforeLoad', component.el!, component)
 				component.emit('beforeLoad');
 
-				IoC.Resolve<Compiler>(this.bouer, Compiler)!
+				ServiceProvider.get<Compiler>(this.bouer, 'Compiler')!
 					.compile({
 						data: Reactive.transform({
 							context: component,
