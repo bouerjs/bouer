@@ -1,4 +1,5 @@
 {
   "name": "bouer",
-  "main": "index.d.ts"
+  "main": "index.d.ts",
+	"homepage": "https://bouerjs.github.io/"
 }
