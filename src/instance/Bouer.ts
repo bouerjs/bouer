@@ -54,7 +54,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		 * @param key the data:[`key`]="..." directive key value or the app.$data.set(`key`) key provided.
 		 * @returns the expected object | null
 		 */
-		get: (key?: string) => object | undefined,
+		get: (key: string) => object | undefined,
 		/**
 		 * Sets a value into a storage the used anywhere of the application.
 		 * @param key the key of the data to be stored.
@@ -77,7 +77,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		 * @param key the e-req:[`key`]="..." directive key value.
 		 * @returns the expected object | null
 		 */
-		get: (key?: string) => { data: any, [key: string]: any } | null
+		get: (key: string) => { data: any, [key: string]: any } | null
 		/**
 		 * Destroy stored req (request)
 		 * @param key the e-req:[`key`]="..." directive key value.
@@ -234,7 +234,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 			get: () => delimiter.delimiters.slice()
 		};
 		this.$data = {
-			get: key => key ? dataStore.data[key] : dataStore.data,
+			get: key => key ? dataStore.data[key] : null,
 			set: (key, data, toReactive) => {
 				if (key in dataStore.data)
 					return Logger.log("There is already a data stored with this key “" + key + "”.");
@@ -249,21 +249,11 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 			unset: key => delete dataStore.data[key]
 		};
 		this.$req = {
-			get: key => key ? dataStore.req[key] : dataStore.req,
+			get: key => key ? dataStore.req[key] : undefined,
 			unset: key => delete dataStore.req[key],
 		};
 		this.$wait = {
-			get: key => {
-				if (key) {
-					const mWait = dataStore.wait[key];
-					if (!mWait) return undefined;
-					return mWait.data;
-				}
-
-				const output: dynamic = {};
-				forEach(Object.keys(dataStore.wait), k => output[k] = dataStore.wait[k].data);
-				return output;
-			},
+			get: key => key ? (dataStore.wait[key] || {}).data : undefined,
 			set: (key: string, data: object) => {
 				if (!(key in dataStore.wait))
 					return dataStore.wait[key] = { data: data, nodes: [] };

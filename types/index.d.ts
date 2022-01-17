@@ -117,7 +117,7 @@ interface Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
 	}
 
 	readonly $req: {
-		get: (key?: string) => { data: any, [key: string]: any } | null
+		get: (key: string) => { data: any, [key: string]: any } | undefined
 		unset: (key: string) => boolean,
 	}
 
@@ -152,7 +152,8 @@ interface Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
 		navigate: (route: string, changeUrl?: boolean) => void;
 		popState: (times?: number) => void;
 		pushState: (url: string, title?: string) => void;
-		markActiveAnchors: (route: string) => void
+		markActiveAnchor: (anchor: HTMLAnchorElement) => void;
+		markActiveAnchorsWithRoute: (route: string) => void;
 	}
 
 	set<InputData, TargetObject>(

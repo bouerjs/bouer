@@ -3578,7 +3578,7 @@ var Bouer = /** @class */ (function (_super) {
             get: function () { return delimiter.delimiters.slice(); }
         };
         _this_1.$data = {
-            get: function (key) { return key ? dataStore.data[key] : dataStore.data; },
+            get: function (key) { return key ? dataStore.data[key] : null; },
             set: function (key, data, toReactive) {
                 if (key in dataStore.data)
                     return Logger.log("There is already a data stored with this key “" + key + "”.");
@@ -3592,21 +3592,11 @@ var Bouer = /** @class */ (function (_super) {
             unset: function (key) { return delete dataStore.data[key]; }
         };
         _this_1.$req = {
-            get: function (key) { return key ? dataStore.req[key] : dataStore.req; },
+            get: function (key) { return key ? dataStore.req[key] : undefined; },
             unset: function (key) { return delete dataStore.req[key]; },
         };
         _this_1.$wait = {
-            get: function (key) {
-                if (key) {
-                    var mWait = dataStore.wait[key];
-                    if (!mWait)
-                        return undefined;
-                    return mWait.data;
-                }
-                var output = {};
-                forEach(Object.keys(dataStore.wait), function (k) { return output[k] = dataStore.wait[k].data; });
-                return output;
-            },
+            get: function (key) { return key ? (dataStore.wait[key] || {}).data : undefined; },
             set: function (key, data) {
                 if (!(key in dataStore.wait))
                     return dataStore.wait[key] = { data: data, nodes: [] };
