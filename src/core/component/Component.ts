@@ -4,11 +4,11 @@ import IEventSubscription from "../../definitions/interfaces/IEventSubscription"
 import ILifeCycleHooks from "../../definitions/interfaces/ILifeCycleHooks";
 import dynamic from "../../definitions/types/Dynamic";
 import Bouer from "../../instance/Bouer";
-import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import Prop from "../../shared/helpers/Prop";
+import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import UriHandler from "../../shared/helpers/UriHandler";
 import {
-	createAnyEl, forEach, isObject, isString, toLower, trim, where
+	createAnyEl, forEach, isObject, isString, toLower, trim, urlCombine, urlResolver, where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Base from "../Base";
@@ -72,14 +72,14 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 	failed?(event: CustomEvent) { }
 
 	export<ExportableData>(
-		exportedData: ExportableData
+		data: ExportableData
 	) {
-		if (!isObject(exportedData))
+		if (!isObject(data))
 			return Logger.log("Invalid object for component.export(...), only \"Object Literal\" is allowed.");
 
-		return forEach(Object.keys(exportedData), key => {
-			(this.data as any)[key] = (exportedData as any)[key];
-			Prop.transfer(this.data, exportedData, key);
+		return forEach(Object.keys(data), key => {
+			(this.data as any)[key] = (data as any)[key];
+			Prop.transfer(this.data, data, key);
 		});
 	}
 
@@ -145,47 +145,74 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 		this.events = where(this.events, evt => !(evt.eventName == eventName && evt.callback == callback));
 	}
 
-	addAssets(assets: IAsset[]) {
-		const $assets: any[] = [];
+	addAssets(assets: (IAsset | string)[]) {
+		const $Assets: any[] = [];
 		const assetsTypeMapper: dynamic = {
 			js: 'script',
 			css: 'link',
 			style: 'link'
 		}
+
+		const isValidAssetSrc = function (src: string, index: number) {
+			const isValid = (src || trim(src)) ? true : false;
+			if (!isValid) Logger.error('Invalid asset “src”, in assets[' + index + '].src');
+			return isValid;
+		}
+
+		const assetTypeGetter = function (src: string, index: number) {
+			const srcSplitted = src.split('.');
+			const type = assetsTypeMapper[toLower(srcSplitted[srcSplitted.length - 1])];
+
+			if (!type) return Logger.error("Couldn't find out what type of asset it is, provide " +
+				"the “type” explicitly at assets[" + index + "].type");
+
+			return type;
+		}
+
 		forEach(assets, (asset, index) => {
-			if (!asset.src || !trim(asset.src))
-				return Logger.error('Invalid asset “src”, in assets[' + index + '].src');
-			let type = '';
+			let type = '', src = '', scoped = true;
 
-			if (!asset.type) {
-				const srcSplitted = asset.src.split('.');
-				type = assetsTypeMapper[toLower(srcSplitted[srcSplitted.length - 1])];
+			if (typeof asset === 'string') { // String type
+				if (!isValidAssetSrc(asset, index)) return;
+				type = assetTypeGetter(trim(src = asset), index);
+			} else { // Object Type
+				if (!isValidAssetSrc(trim(src = asset.src), index)) return;
 
-				if (!type) return Logger.error("Couldn't find out what type of asset it is, provide " +
-					"the “type” explicitly at assets[" + index + "].type");
-			} else {
-				asset.type = toLower(asset.type);
-				type = assetsTypeMapper[asset.type] || asset.type;
+				if (!asset.type) {
+					if (!(type = assetTypeGetter(src, index))) return;
+				} else {
+					type = assetsTypeMapper[toLower(asset.type)] || asset.type;
+				}
+
+				scoped = asset.scoped ?? true;
 			}
 
-			const $asset = createAnyEl(type, el => {
-				if (asset.scoped ?? true)
+			if ((src[0] !== '.')) { // The src begins with dot (.)
+				const resolver = urlResolver(src);
+				const hasBaseURIInURL = resolver.baseURI === src.substring(0, resolver.baseURI.length);
+				// Building the URL according to the main path
+				src = urlCombine(hasBaseURIInURL ? resolver.origin : resolver.baseURI, resolver.pathname);
+			}
+
+			const $Asset = createAnyEl(type, el => {
+				if (scoped ?? true)
 					el.setAttribute('scoped', 'true');
 
 				switch (toLower(type)) {
-					case 'script': el.setAttribute('src', asset.src); break;
+					case 'script': el.setAttribute('src', src); break;
 					case 'link':
-						el.setAttribute('href', asset.src);
+						el.setAttribute('href', src);
 						el.setAttribute('rel', 'stylesheet');
 						el.setAttribute('type', 'text/css');
 						break;
-					default: el.setAttribute('src', asset.src); break;
+					default: el.setAttribute('src', src); break;
 				}
 			}).build();
 
-			$assets.push($asset);
+			$Assets.push($Asset);
+
 		});
 
-		this.assets.push.apply(this.assets, $assets);
+		this.assets.push.apply(this.assets, $Assets);
 	}
 }
