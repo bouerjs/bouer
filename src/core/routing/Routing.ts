@@ -1,7 +1,7 @@
 import IComponentOptions from "../../definitions/interfaces/IComponentOptions";
 import Bouer from "../../instance/Bouer";
 import ServiceProvider from "../../shared/helpers/ServiceProvider";
-import { createAnyEl, DOM, forEach, GLOBAL, isNull, toArray, trim, urlCombine, urlResolver } from "../../shared/helpers/Utils";
+import { createAnyEl, DOM, forEach, GLOBAL, isNull, isObject, toArray, trim, urlCombine, urlResolver } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Base from "../Base";
 import Component from "../component/Component";
@@ -45,16 +45,16 @@ export default class Routing extends Base {
 		// Listening to the page navigation
 		GLOBAL.addEventListener('popstate', evt => {
 			evt.preventDefault();
-			this.navigate((evt.state || location.href), false);
+			this.navigate((evt.state || location.href), {
+				setURL: false
+			});
 		});
 	}
 
-	/**
-	 * Navigates to a certain page without reloading all the page
-	 * @param route the route to navigate to
-	 * @param changeUrl allow to change the url after the navigation, default value is `true`
-	 */
-	navigate(route: string, changeUrl?: boolean) {
+	navigate(route: string, options: {
+		setURL?: boolean,
+		data?: object
+	} = {}) {
 		if (!this.routeView)
 			return;
 
@@ -81,19 +81,19 @@ export default class Routing extends Base {
 
 		const componentElement = createAnyEl(page.name!, el => {
 			// Inherit the data scope by default
-			el.setAttribute('data', '$data');
+			el.setAttribute('data', isObject(options.data) ? JSON.stringify(options.data) : '$data');
 		}).appendTo(this.routeView!)
 			.build();
 
 		// Document info configuration
 		DOM.title = page.title || DOM.title;
 
-		if ((changeUrl ?? true))
+		if ((options.setURL ?? true))
 			this.pushState(resolver.href, DOM.title);
 
 		const routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route!);
 		new ServiceProvider(this.bouer).get<ComponentHandler>('ComponentHandler')!
-			.order(componentElement, this.bouer.data , component => {
+			.order(componentElement, this.bouer.data, component => {
 				component.on('loaded', () => {
 					this.markActiveAnchorsWithRoute(routeToSet);
 				});

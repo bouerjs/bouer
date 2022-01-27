@@ -32,7 +32,7 @@ export default interface IComponentOptions<Data> extends ILifeCycleHooks {
   /** The children of the component that should inherit the `route` of the father */
   children?: (Component | IComponentOptions<Data>)[];
 
-  /** restrictions of this component */
+  /** restrictions functions of the component */
   restrictions?: ((component: (Component | IComponentOptions<Data>)) => boolean | Promise<boolean>)[];
 
   /** Allow to set this component as the `default page` when the application loads */

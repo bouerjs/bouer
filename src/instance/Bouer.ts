@@ -54,82 +54,82 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		 * @param key the data:[`key`]="..." directive key value or the app.$data.set(`key`) key provided.
 		 * @returns the expected object | null
 		 */
-		get: (key: string) => object | undefined,
+		get(key: string): object | undefined,
 		/**
 		 * Sets a value into a storage the used anywhere of the application.
 		 * @param key the key of the data to be stored.
 		 * @param data the data to be stored.
 		 * @param toReactive allow to transform the data to a reactive one after being setted. By default is `false`.
 		 */
-		set: (key: string, data: object | any[], toReactive?: boolean) => void,
+		set(key: string, data: object | any[], toReactive?: boolean): void,
 		/**
 		 * Destroy the stored data
 		 * @param key the data:[`key`]="..." directive value or the app.$data.set(`key`) key provided.
 		 * @returns `true` for item deleted or `false` for item not deleted.
 		 */
-		unset: (key: string) => boolean,
+		unset(key: string): boolean,
 	}
 
-	/** Requests handler */
+	/** (e-req) Requests handler */
 	readonly $req: {
 		/**
 		 * Gets the `e-req` directive response value
 		 * @param key the e-req:[`key`]="..." directive key value.
 		 * @returns the expected object | null
 		 */
-		get: (key: string) => { data: any, [key: string]: any } | null
+		get(key: string): { data: any, [key: string]: any } | null
 		/**
 		 * Destroy stored req (request)
 		 * @param key the e-req:[`key`]="..." directive key value.
 		 * @returns `true` for item deleted or `false` for item not deleted.
 		 */
-		unset: (key: string) => boolean,
+		unset(key: string): boolean,
 	}
 
-	/** Waiting data Handler */
+	/** Data Waits Handler */
 	readonly $wait: {
 		/**
 		 * Gets the elements and data of the `wait-data` directive.
 		 * @param key the wait-data="`key`" directive value or the app.$wait.set(`key`) key provided.
 		 * @returns the expected object | null
 		 */
-		get: (key: string) => object | undefined,
+		get(key: string): object | undefined,
 		/**
 		 * Provides data for `wait-data` directive elements.
 		 * @param key the key of `wait-data` directive value.
 		 * @param data the data provide to the elements waiting
 		 */
-		set: (key: string, data: object) => void,
+		set(key: string, data: object): void,
 		/**
 		 * Destroy stored wait
 		 * @param key the wait-data="`key`" directive value or the app.$wait.set(`key`) key provided.
 		 * @returns `true` for item deleted or `false` for item not deleted.
 		 */
-		unset: (key: string) => boolean,
+		unset(key: string): boolean,
 	}
 
 	/** Delimiters handler */
 	readonly $delimiters: {
 		/** Adds a delimiter into the instance */
-		add: (item: IDelimiter) => void
+		add(item: IDelimiter): void
 		/** Removes a delimiter from the instance */
-		remove: (name: string) => void;
+		remove(name: string): void;
 		/** Retrieve all the delimiters */
-		get: () => IDelimiter[];
-	};
+		get(): IDelimiter[];
+	}
 
 	/** Skeleton handler */
 	readonly $skeleton: {
 		/** Removes skeletons havining the `id` provided */
-		clear: (id?: string) => void,
+		clear(id?: string): void,
 		/** Set Color of the Wave and/or the Background */
-		set: (color?: { wave?: string, background?: string }) => void
+		set(color?: { wave?: string, background?: string }): void
 	}
 
 	/** Components Handler */
 	readonly $components: {
-		add: <Data>(component: IComponentOptions<Data>) => void
-		get: <Data>(name: string) => (Component<Data> | IComponentOptions<Data>)
+		add<Data>(component: Component<Data> | IComponentOptions<Data>): void
+		get<Data>(name: string): (Component<Data> | IComponentOptions<Data>)
 	}
 
 	/** Routing Handler */
@@ -150,19 +150,22 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		base?: string | null;
 
 		/** Navigates to a certain page without reloading all the page */
-		navigate: (route: string, changeUrl?: boolean) => void;
+		navigate(route: string, options?: {
+			setURL?: boolean,
+			data?: object
+		}): void;
 
-		/** Navigates to previous page according to a number of go back */
-		popState: (times?: number) => void;
+		/** Navigates to previous page according to the number of times */
+		popState(times?: number): void;
 
 		/** Changes the current url to a new one provided */
-		pushState: (url: string, title?: string) => void;
+		pushState(url: string, title?: string): void;
 
 		/** Mark an anchor as active */
-		markActiveAnchor: (anchor: HTMLAnchorElement) => void
+		markActiveAnchor(anchor: HTMLAnchorElement): void
 
 		/** Mark all anchors having the route provided as active */
-		markActiveAnchorsWithRoute: (route: string) => void
+		markActiveAnchorsWithRoute(route: string): void
 	}
 
 	/**
@@ -435,7 +438,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 	}
 
 	/**
-	 * Compiles a `HTML snippet` to a `Object Literal`
+	 * Compiles a `HTML snippet` to an `Object Literal`
 	 * @param input the input element
 	 * @param options the options of the compilation
 	 * @param onSet a function that should be fired when a value is setted
@@ -482,9 +485,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 	 * @param watchableScope the function that should be called when the any reactive property change
 	 * @returns an object having all the watches and the method to destroy watches at once
 	 */
-	react(
-		watchableScope: (app: Bouer) => void
-	) {
+	react(watchableScope: (app: Bouer) => void) {
 		return new ServiceProvider(this).get<Binder>('Binder')!
 			.onPropertyInScopeChange(watchableScope);
 	}
@@ -567,10 +568,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 	 * @param wait milliseconds to the be waited before the single execution
 	 * @returns executable function
 	 */
-	lazy(
-		callback: (...args: any[]) => void,
-		wait?: number
-	) {
+	lazy(callback: (...args: any[]) => void, wait?: number) {
 		const _this = this;
 		let timeout: any; wait = isNull(wait) ? 500 : wait;
 		const immediate = arguments[2];
@@ -591,7 +589,6 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 	/**
 	 * Compiles an html element
 	 * @param options the options of the compilation process
-	 * @returns
 	 */
 	compile<Data>(options: {
 		/** The element that wil be compiled */
