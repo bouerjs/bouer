@@ -612,14 +612,14 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 	destroy() {
 		const el = this.el!;
 		const serviceProvider = new ServiceProvider(this);
-		const $events = serviceProvider.get<EventHandler>('EventHandler')!.$events;
-		const destroyedEvents = ($events['destroyed'] || []).concat(($events['component:destroyed'] || []));
+		const $Events = serviceProvider.get<EventHandler>('EventHandler')!.$events;
+		const destroyedEvents = ($Events['destroyed'] || []).concat(($Events['component:destroyed'] || []));
 
 		this.emit('destroyed', { element: this.el! });
 		// Dispatching all the destroy events
 		forEach(destroyedEvents, es => es.emit({ once: true }));
-		$events['destroyed'] = [];
-		$events['component:destroyed'] = [];
+		$Events['destroyed'] = [];
+		$Events['component:destroyed'] = [];
 
 		if (el.tagName == 'BODY')
 			el.innerHTML = '';

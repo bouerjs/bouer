@@ -70,7 +70,7 @@ export default class Binder extends Base {
 			value: ''
 		};
 
-		const $runDirectiveMiddlewares = (type: 'bind' | 'update') => {
+		const $RunDirectiveMiddlewares = (type: 'bind' | 'update') => {
 			middleware.run(originalName, {
 				type: type,
 				action: middleware => {
@@ -149,7 +149,7 @@ export default class Binder extends Base {
 						watch: reactive.onChange(value => {
 							setter();
 							onUpdate(value, node);
-							$runDirectiveMiddlewares('update');
+							$RunDirectiveMiddlewares('update');
 						}, node)
 					});
 				}
@@ -158,7 +158,7 @@ export default class Binder extends Base {
 			});
 
 			propertyBindConfig.node = nodeToBind;
-			$runDirectiveMiddlewares('bind');
+			$RunDirectiveMiddlewares('bind');
 			return propertyBindConfig;
 		}
 
@@ -192,7 +192,7 @@ export default class Binder extends Base {
 						", provide a model as it follows: value=\"String-Model\" or :value=\"Object-Model\".");
 				}
 
-				const $set: { [key: string]: Function } = {
+				const $Setter: { [key: string]: Function } = {
 					fromDataToInput: () => {
 						// Normal Property Set
 						if (!Array.isArray(boundPropertyValue)) {
@@ -266,7 +266,7 @@ export default class Binder extends Base {
 					}
 				}
 
-				return $set[direction]();
+				return $Setter[direction]();
 			}
 
 			ReactiveEvent.once('AfterGet', evt => {
@@ -278,7 +278,7 @@ export default class Binder extends Base {
 						watch: reactive.onChange(value => {
 							callback(this.BindingDirection.fromDataToInput, value);
 							onUpdate(value, node);
-							$runDirectiveMiddlewares('update');
+							$RunDirectiveMiddlewares('update');
 						}, node)
 					});
 				}
@@ -308,7 +308,7 @@ export default class Binder extends Base {
 
 			// Removing the e-bind attr
 			ownerNode.removeAttribute(node.nodeName);
-			$runDirectiveMiddlewares('bind');
+			$RunDirectiveMiddlewares('bind');
 			return propertyBindConfig; // Stop Two-Way Data Binding Process
 		}
 

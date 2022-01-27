@@ -87,16 +87,16 @@ export default class Compiler extends Base {
 					&& options.componentSlot) {
 					const componentSlot = options.componentSlot;
 					const insertSlot = (slot: Element, reference: Node) => {
-						const $walker = (child: Node) => {
+						const $Walker = (child: Node) => {
 							const cloned = child.cloneNode(true);
 							reference.parentNode!.insertBefore(cloned, reference);
 							walker(cloned, data);
 						}
 
 						if (slot.nodeName === 'SLOTCONTAINER' || slot.nodeName === 'SLOT')
-							forEach(toArray(slot.childNodes), (child: Node) => $walker(child));
+							forEach(toArray(slot.childNodes), (child: Node) => $Walker(child));
 						else
-							$walker(slot);
+							$Walker(slot);
 
 							reference.parentNode!.removeChild(reference);
 					}
