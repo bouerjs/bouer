@@ -13,6 +13,7 @@ import {
 	forEach,
 	isNull,
 	isObject,
+	removeEl,
 	toLower,
 	toStr,
 	trim,
@@ -227,10 +228,27 @@ export default class Directive extends Base {
 
 		if (!container) return;
 
+		type ListedItemsHandler = {
+			el: Element,
+			data: dynamic
+		};
+		type ExpObject = {
+			type: string,
+			filters: string[],
+			isForOf: boolean,
+			leftHand: string,
+			rightHand: string,
+			sourceValue: any,
+			leftHandParts: string[],
+			iterableExpression: string
+		}
+
 		const comment = this.comment.create();
 		const nodeName = node.nodeName;
 		let nodeValue = trim(node.nodeValue ?? '');
-		let listedItems: Element[] = [];
+		let listedItemsHandler: ListedItemsHandler[] = [];
+		let hasWhereFilter = false;
+		let hasOrderFilter = false;
 		let execute = () => { };
 
 		if (nodeValue === '')
@@ -254,10 +272,15 @@ export default class Directive extends Base {
 			});
 
 		ownerNode.removeAttribute(nodeName);
+
+		// Cloning the element
 		const forItem = ownerNode.cloneNode(true);
+		// Replacing the comment reference
 		container.replaceChild(comment, ownerNode);
 
+		// Filters the list of items
 		const $where = (list: any[], filterConfigParts: string[]) => {
+			hasWhereFilter = true;
 			let whereValue = filterConfigParts[1];
 			let whereKeys = filterConfigParts[2];
 
@@ -306,7 +329,9 @@ export default class Directive extends Base {
 			return list;
 		}
 
+		// Order the list of items
 		const $order = (list: any[], type: string, prop: string | null) => {
+			hasOrderFilter = true;
 			if (!type) type = 'asc';
 			return list.sort(function (a, b) {
 				const comparison = function (asc: boolean | null, desc: boolean | null) {
@@ -324,19 +349,67 @@ export default class Directive extends Base {
 			});
 		}
 
-		type ExpObject = {
-			type: string,
-			filters: string[],
-			isForOf: boolean,
-			leftHand: string,
-			rightHand: string,
-			sourceValue: any,
-			leftHandParts: string[],
-			iterableExpression: string
+		// Prepare the item before to insert
+		const $prepareForItem = (item: any, index: number) => {
+			expObj = expObj || $builder(trim(node.nodeValue ?? ''));
+
+			let leftHandParts = expObj.leftHandParts
+				, sourceValue = expObj.sourceValue
+				, isForOf = expObj.isForOf;
+
+			let forData: any = Extend.obj(data);
+			const _item_key = leftHandParts[0];
+			const _index_or_value = leftHandParts[1] || '_index_or_value';
+			const _index = leftHandParts[2] || '_for_in_index';
+
+			forData[_item_key] = item;
+			forData[_index_or_value] = isForOf ? index : sourceValue[item];
+			forData[_index] = index;
+
+			return Reactive.transform({
+				inputObject: forData,
+				context: this.context
+			});
 		}
 
-		// Builds the expression to object
-		const builder = (expression: string): ExpObject => {
+		// Inserts an element in the DOM
+		const $insertForItem = (options: {
+			item: any,
+			index: number,
+			reference?: Element,
+			method: 'push' | 'unshift'
+		}) => {
+			// Preparing the data to be inserted
+			const forData = $prepareForItem(options.item, options.index);
+
+			// Inserting in the DOM
+			const forClonedItem = container.insertBefore(
+				forItem.cloneNode(true) as Element,
+				options.reference || comment
+			);
+
+			// Compiling the inserted data
+			this.compiler.compile({
+				el: forClonedItem,
+				data: forData,
+				context: this.context,
+				onDone: el => this.eventHandler.emit({
+					eventName: Constants.builtInEvents.add,
+					attachedNode: el,
+					once: true
+				})
+			});
+
+			// Addin
+			listedItemsHandler[options.method]({
+				el: forClonedItem,
+				data: forData
+			});
+			return forClonedItem;
+		}
+
+		// Builds the expression to an object
+		const $builder = (expression: string): ExpObject => {
 			const filters = expression.split('|').map(item => trim(item));
 			let forExpression = filters[0].replace(/\(|\)/g, '');
 			filters.shift();
@@ -375,31 +448,101 @@ export default class Directive extends Base {
 			}
 		}
 
+		// Handler the UI when the Array changes
+		const $onArrayChanges = (detail: any) => {
+			if (hasWhereFilter || hasOrderFilter)
+				return execute(); // Reorganize re-insert all the items
+
+			detail = detail || {};
+			const method = detail!.method;
+			const args = detail!.args;
+			const mListedItems = (listedItemsHandler as any);
+
+			const reOrganizeIndexes = function () {
+				// In case of unshift re-organize the indexes
+				// Was wrapped into a promise in case of large amount of data
+				return Promise.resolve((array: ListedItemsHandler[]) => {
+					expObj = expObj || $builder(trim(node.nodeValue ?? ''));
+					const leftHandParts = expObj.leftHandParts;
+					const _index_or_value = leftHandParts[1] || '_index_or_value';
+
+					forEach(array, (item, index) => {
+						item.data[_index_or_value] = index;
+					});
+				}).then(mCaller => mCaller(listedItemsHandler));
+			}
+
+			switch (method) {
+				case 'pop': case 'shift': { // First or Last item removal handler
+					const item = mListedItems[method]();
+					if (!item) return;
+					removeEl(item.el);
+
+					if (method === 'pop') return;
+					return reOrganizeIndexes();
+				}
+				case 'splice': { // Indexed removal handler
+					const removedItems = mListedItems[method].apply(mListedItems, args);
+					forEach(removedItems, (item: any) => removeEl(item.el));
+
+					let index = args[0] as number;
+					expObj = expObj || $builder(trim(node.nodeValue ?? ''));
+
+					const leftHandParts = expObj.leftHandParts;
+					const _index_or_value = leftHandParts[1] || '_index_or_value';
+
+					// Fixing the index value
+					for (; index < listedItemsHandler.length; index++) {
+						const item = listedItemsHandler[index].data;
+						if (typeof item[_index_or_value] === 'number')
+							item[_index_or_value] = index;
+					}
+					return;
+				}
+				case 'push': case 'unshift': { // Addition handler
+					// Gets the last item as default
+					let indexRef = mListedItems.length;
+					let isUnshift = method == 'unshift';
+					let reference = isUnshift ? listedItemsHandler[0].el : undefined;
+					// Adding the itens to the dom
+					forEach([].slice.call(args), item => {
+						const ref = $insertForItem({
+							index: indexRef++,
+							reference,
+							method,
+							item,
+						});
+						if (isUnshift) reference = ref;
+					});
+
+					if (!isUnshift) return;
+					return reOrganizeIndexes();
+				}
+				default: return execute();
+			}
+		}
+
 		const reactivePropertyEvent = ReactiveEvent.on('AfterGet',
 			reactive => {
 				this.binder.binds.push({
 					isConnected: () => comment.isConnected,
-					watch: reactive.onChange(() => execute(), node)
+					watch: reactive.onChange((_n, _o, detail) =>
+						$onArrayChanges(detail), node)
 				});
 			});
-		let expObj: ExpObject | null = builder(nodeValue);
+		let expObj: ExpObject | null = $builder(nodeValue);
 		reactivePropertyEvent.off();
 
 		(execute = () => {
-			expObj = expObj || builder(trim(node.nodeValue ?? ''));
-
-			let iterable = expObj.iterableExpression
-				, leftHandParts = expObj.leftHandParts
-				, sourceValue = expObj.sourceValue
-				, isForOf = expObj.isForOf
-				, filters = expObj.filters;
+			expObj = expObj || $builder(trim(node.nodeValue ?? ''));
+			const iterable = expObj.iterableExpression, filters = expObj.filters;
 
 			// Cleaning the
-			forEach(listedItems, item => {
-				if (!item.parentElement) return;
-				container.removeChild(item);
+			forEach(listedItemsHandler, item => {
+				if (!item.el.parentElement) return;
+				container.removeChild(item.el);
 			});
-			listedItems = [];
+			listedItemsHandler = [];
 
 			this.evaluator.exec({
 				data: data,
@@ -409,31 +552,14 @@ export default class Directive extends Base {
 					"__f(__fl(" + iterable + "), function($$itm, $$idx) { __e($$itm, $$idx); })",
 				aditional: {
 					_for: forEach,
-					_each: (item: any, index: any) => {
-						const forData: any = Extend.obj(data);
-						const _item_key = leftHandParts[0];
-						const _index_or_value = leftHandParts[1] || '_index_or_value';
-						const _index = leftHandParts[2] || '_for_in_index';
-
-						forData[_item_key] = item;
-						forData[_index_or_value] = isForOf ? index : sourceValue[item];
-						forData[_index] = index;
-
-						const clonedItem = container.insertBefore(forItem.cloneNode(true) as Element, comment);
-						this.compiler.compile({
-							el: clonedItem,
-							data: forData,
-							context: this.context,
-							onDone: el => this.eventHandler.emit({
-								eventName: Constants.builtInEvents.add,
-								attachedNode: el,
-								once: true
-							})
-						});
-
-						listedItems.push(clonedItem);
+					_each(item: any, index: number) {
+						$insertForItem({
+							index,
+							item,
+							method: 'push'
+						})
 					},
-					_filters: (list: any[]) => {
+					_filters(list: any[]) {
 						let listCopy = Extend.array(list);
 
 						const findFilter = (fName: string) =>
@@ -749,7 +875,7 @@ export default class Directive extends Base {
 				.appendTo(ownerNode)
 				.build();
 
-				this.serviceProvider.get<ComponentHandler>('ComponentHandler')!
+			this.serviceProvider.get<ComponentHandler>('ComponentHandler')!
 				.order(componentElement, data);
 		})();
 	}
