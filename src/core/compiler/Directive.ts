@@ -279,7 +279,7 @@ export default class Directive extends Base {
 		container.replaceChild(comment, ownerNode);
 
 		// Filters the list of items
-		const $where = (list: any[], filterConfigParts: string[]) => {
+		const $Where = (list: any[], filterConfigParts: string[]) => {
 			hasWhereFilter = true;
 			let whereValue = filterConfigParts[1];
 			let whereKeys = filterConfigParts[2];
@@ -330,7 +330,7 @@ export default class Directive extends Base {
 		}
 
 		// Order the list of items
-		const $order = (list: any[], type: string, prop: string | null) => {
+		const $Order = (list: any[], type: string, prop: string | null) => {
 			hasOrderFilter = true;
 			if (!type) type = 'asc';
 			return list.sort(function (a, b) {
@@ -350,8 +350,8 @@ export default class Directive extends Base {
 		}
 
 		// Prepare the item before to insert
-		const $prepareForItem = (item: any, index: number) => {
-			expObj = expObj || $builder(trim(node.nodeValue ?? ''));
+		const $PrepareForItem = (item: any, index: number) => {
+			expObj = expObj || $ExpressionBuilder(trim(node.nodeValue ?? ''));
 
 			let leftHandParts = expObj.leftHandParts
 				, sourceValue = expObj.sourceValue
@@ -373,14 +373,14 @@ export default class Directive extends Base {
 		}
 
 		// Inserts an element in the DOM
-		const $insertForItem = (options: {
+		const $InsertForItem = (options: {
 			item: any,
 			index: number,
 			reference?: Element,
 			method: 'push' | 'unshift'
 		}) => {
 			// Preparing the data to be inserted
-			const forData = $prepareForItem(options.item, options.index);
+			const forData = $PrepareForItem(options.item, options.index);
 
 			// Inserting in the DOM
 			const forClonedItem = container.insertBefore(
@@ -409,7 +409,7 @@ export default class Directive extends Base {
 		}
 
 		// Builds the expression to an object
-		const $builder = (expression: string): ExpObject => {
+		const $ExpressionBuilder = (expression: string): ExpObject => {
 			const filters = expression.split('|').map(item => trim(item));
 			let forExpression = filters[0].replace(/\(|\)/g, '');
 			filters.shift();
@@ -449,7 +449,7 @@ export default class Directive extends Base {
 		}
 
 		// Handler the UI when the Array changes
-		const $onArrayChanges = (detail: any) => {
+		const $OnArrayChanges = (detail: any) => {
 			if (hasWhereFilter || hasOrderFilter)
 				return execute(); // Reorganize re-insert all the items
 
@@ -462,7 +462,7 @@ export default class Directive extends Base {
 				// In case of unshift re-organize the indexes
 				// Was wrapped into a promise in case of large amount of data
 				return Promise.resolve((array: ListedItemsHandler[]) => {
-					expObj = expObj || $builder(trim(node.nodeValue ?? ''));
+					expObj = expObj || $ExpressionBuilder(trim(node.nodeValue ?? ''));
 					const leftHandParts = expObj.leftHandParts;
 					const _index_or_value = leftHandParts[1] || '_index_or_value';
 
@@ -486,7 +486,7 @@ export default class Directive extends Base {
 					forEach(removedItems, (item: any) => removeEl(item.el));
 
 					let index = args[0] as number;
-					expObj = expObj || $builder(trim(node.nodeValue ?? ''));
+					expObj = expObj || $ExpressionBuilder(trim(node.nodeValue ?? ''));
 
 					const leftHandParts = expObj.leftHandParts;
 					const _index_or_value = leftHandParts[1] || '_index_or_value';
@@ -506,7 +506,7 @@ export default class Directive extends Base {
 					let reference = isUnshift ? listedItemsHandler[0].el : undefined;
 					// Adding the itens to the dom
 					forEach([].slice.call(args), item => {
-						const ref = $insertForItem({
+						const ref = $InsertForItem({
 							index: indexRef++,
 							reference,
 							method,
@@ -527,14 +527,14 @@ export default class Directive extends Base {
 				this.binder.binds.push({
 					isConnected: () => comment.isConnected,
 					watch: reactive.onChange((_n, _o, detail) =>
-						$onArrayChanges(detail), node)
+						$OnArrayChanges(detail), node)
 				});
 			});
-		let expObj: ExpObject | null = $builder(nodeValue);
+		let expObj: ExpObject | null = $ExpressionBuilder(nodeValue);
 		reactivePropertyEvent.off();
 
 		(execute = () => {
-			expObj = expObj || $builder(trim(node.nodeValue ?? ''));
+			expObj = expObj || $ExpressionBuilder(trim(node.nodeValue ?? ''));
 			const iterable = expObj.iterableExpression, filters = expObj.filters;
 
 			// Cleaning the
@@ -553,7 +553,7 @@ export default class Directive extends Base {
 				aditional: {
 					_for: forEach,
 					_each(item: any, index: number) {
-						$insertForItem({
+						$InsertForItem({
 							index,
 							item,
 							method: 'push'
@@ -574,7 +574,7 @@ export default class Directive extends Base {
 								Logger.error(("Invalid “" + nodeName + "” where expression “" + nodeValue +
 									"”, at least a where-value and where-keys, or a filter-function must be provided"));
 							} else {
-								listCopy = $where(listCopy, whereConfigParts);
+								listCopy = $Where(listCopy, whereConfigParts);
 							}
 						}
 
@@ -586,7 +586,7 @@ export default class Directive extends Base {
 								Logger.error(("Invalid “" + nodeName + "” order  expression “" + nodeValue +
 									"”, at least the order type must be provided"));
 							} else {
-								listCopy = $order(listCopy, orderConfigParts[1], orderConfigParts[2]);
+								listCopy = $Order(listCopy, orderConfigParts[1], orderConfigParts[2]);
 							}
 						}
 
@@ -1160,7 +1160,7 @@ export default class Directive extends Base {
 		const nodeName = node.nodeName;
 		const nodeValue = trim(node.nodeValue ?? '');
 		const delimiters = this.delimiter.run(nodeValue);
-		const $directiveConfig = this.$custom[nodeName];
+		const $DirectiveConfig = this.$custom[nodeName];
 
 		const bindConfig = this.binder.create({
 			data: data,
@@ -1170,12 +1170,12 @@ export default class Directive extends Base {
 			context: this.context,
 			isConnected: () => ownerNode.isConnected,
 			onUpdate: () => {
-				if (typeof $directiveConfig.update === 'function')
-					$directiveConfig.update(node, bindConfig);
+				if (typeof $DirectiveConfig.update === 'function')
+					$DirectiveConfig.update(node, bindConfig);
 			}
 		});
 
-		if ($directiveConfig.removable ?? true)
+		if ($DirectiveConfig.removable ?? true)
 			ownerNode.removeAttribute(nodeName);
 
 		const modifiers = nodeName.split('.');
@@ -1186,8 +1186,8 @@ export default class Directive extends Base {
 		bindConfig.modifiers = modifiers;
 		bindConfig.argument = argument;
 
-		if (typeof $directiveConfig.bind === 'function')
-			return $directiveConfig.bind(node, bindConfig) ?? false;
+		if (typeof $DirectiveConfig.bind === 'function')
+			return $DirectiveConfig.bind(node, bindConfig) ?? false;
 
 		return false;
 	}
