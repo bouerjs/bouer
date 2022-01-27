@@ -239,6 +239,11 @@ export function createEl<TKey extends keyof HTMLElementTagNameMap>(
 	return returnObj;
 }
 
+export function removeEl(el: Element) {
+	const parent = el.parentNode;
+	if (parent) parent.removeChild(el);
+}
+
 export function mapper(source: dynamic, destination: dynamic) {
 	forEach(Object.keys(source), key => {
 		const sourceValue = source[key];
@@ -261,7 +266,7 @@ export function urlResolver(url: string) {
 		href = anchor.href;
 	}
 
-	anchor.setAttribute('href', href);
+	anchor.href = href;
 	let hostname = anchor.hostname;
 	const ipv6InBrackets = anchor.hostname === '[::1]'
 
