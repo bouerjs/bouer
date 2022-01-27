@@ -158,18 +158,21 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
 					// changing to the reactive one
 					prototype[method] = function reactive() {
 						const oldArrayValue = inputArray.slice();
-
+						const args = [].slice.call(arguments);
 						switch (method) {
 							case 'push': case 'unshift':
-								forEach(toArray(arguments), (arg: any) => {
+								forEach(toArray(args), (arg: any) => {
 									if (!isObject(arg) && !Array.isArray(arg)) return;
 									executer(arg, visiting, visited);
 								});
 						}
 
-						const result = reference[method].apply(inputArray, arguments);
+						const result = reference[method].apply(inputArray, args);
 
-						forEach(reactiveObj.watches, watch => watch.callback(inputArray, oldArrayValue));
+						forEach(reactiveObj.watches, watch => watch.callback(inputArray, oldArrayValue, {
+							method: method,
+							args: args
+						}));
 						return result;
 					}
 				});
