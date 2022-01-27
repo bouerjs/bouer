@@ -31,7 +31,7 @@ const Constants = {
 
   on: 'on:',
 
-  silent: 'silent',
+  silent: '--s',
   slot: 'slot',
   ref: 'ref',
   put: 'e-put',
