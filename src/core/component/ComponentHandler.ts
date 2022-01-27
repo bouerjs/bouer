@@ -55,39 +55,41 @@ export default class ComponentHandler extends Base {
 		return (nodeName in this.components);
 	}
 
-	request(url: string, response: {
+	request(path: string, response: {
 		success: (content: string, url: string) => void,
 		fail: (error: any, url: string) => void
 	}) {
-		if (!isNull(this.requests[url]))
-			return this.requests[url].push(response);
+		if (!isNull(this.requests[path]))
+			return this.requests[path].push(response);
 
-		this.requests[url] = [response];
+		this.requests[path] = [response];
 
-		const resolver = urlResolver(anchor.baseURI);
+		const resolver = urlResolver(path);
 		const hasBaseElement = DOM.head.querySelector('base') != null;
-		const baseURI = hasBaseElement ? resolver.baseURI : resolver.origin;
-		const urlPath = urlCombine(baseURI, url);
+		const hasBaseURIInURL = resolver.baseURI === path.substring(0, resolver.baseURI.length);
 
-		webRequest(urlPath, { headers: { 'Content-Type': 'text/plain' } })
+		// Building the URL according to the main path
+		const componentPath = urlCombine(hasBaseURIInURL ? resolver.origin : resolver.baseURI, resolver.pathname);
+
+		webRequest(componentPath, { headers: { 'Content-Type': 'text/plain' } })
 			.then(response => {
 				if (!response.ok) throw new Error(response.statusText);
 				return response.text();
 			})
 			.then(content => {
-				forEach(this.requests[url], (request: dynamic) => {
-					request.success(content, url);
+				forEach(this.requests[path], (request: dynamic) => {
+					request.success(content, path);
 				});
-				delete this.requests[url];
+				delete this.requests[path];
 			})
 			.catch(error => {
 				if (!hasBaseElement)
 					Logger.warn("It seems like you are not using the “<base href=\"/base/components/path/\" />” " +
 						"element, try to add as the first child into “<head></head>” element.");
-				forEach(this.requests[url], (request: dynamic) => {
-					request.fail(error, url);
+				forEach(this.requests[path], (request: dynamic) => {
+					request.fail(error, path);
 				});
-				delete this.requests[url];
+				delete this.requests[path];
 			})
 	}
 
