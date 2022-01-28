@@ -150,6 +150,9 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 		const assetsTypeMapper: dynamic = {
 			js: 'script',
 			css: 'link',
+			scss: 'link',
+			sass: 'link',
+			less: 'link',
 			style: 'link'
 		}
 
@@ -174,9 +177,9 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 
 			if (typeof asset === 'string') { // String type
 				if (!isValidAssetSrc(asset, index)) return;
-				type = assetTypeGetter(trim(src = asset), index);
+				type = assetTypeGetter(trim(src = asset.replace(/\.less|.s[ac]ss/i, '.css')), index);
 			} else { // Object Type
-				if (!isValidAssetSrc(trim(src = asset.src), index)) return;
+				if (!isValidAssetSrc(trim(src = asset.src.replace(/\.less|.s[ac]ss/i, '.css')), index)) return;
 
 				if (!asset.type) {
 					if (!(type = assetTypeGetter(src, index))) return;
