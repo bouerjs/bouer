@@ -98,7 +98,7 @@ export default class Compiler extends Base {
 						else
 							$Walker(slot);
 
-							reference.parentNode!.removeChild(reference);
+						reference.parentNode!.removeChild(reference);
 					}
 
 					if (node.hasAttribute('default')) {
@@ -111,7 +111,7 @@ export default class Compiler extends Base {
 						// In case of target slot insertion
 						const target = node.attributes.getNamedItem('name') as Attr
 
-						return (function innerWalker(element: Element) {
+						return (function $Walker(element: Element) {
 							const slotValue = element.getAttribute(Constants.slot);
 							if (slotValue && slotValue === target.value) {
 								element.removeAttribute(Constants.slot);
@@ -122,7 +122,7 @@ export default class Compiler extends Base {
 								return null;
 
 							forEach(toArray(element.children), (child: Element) => {
-								innerWalker(child);
+								$Walker(child);
 							});
 						})(componentSlot);
 					}
@@ -240,7 +240,7 @@ export default class Compiler extends Base {
 		if (rootElement.hasAttribute(Constants.silent))
 			rootElement.removeAttribute(Constants.silent)
 
-		if (isFunction(options.onDone)){
+		if (isFunction(options.onDone)) {
 			options.onDone!.call(context, rootElement);
 		}
 

@@ -86,7 +86,7 @@ export default class Binder extends Base {
 			});
 		}
 
-		const bindOneWay = () => {
+		const $BindOneWay = () => {
 			// One-Way Data Binding
 			let nodeToBind = node;
 
@@ -128,18 +128,18 @@ export default class Binder extends Base {
 				propertyBindConfig.value = valueToSet;
 
 				if (!isHtml)
-					nodeToBind.nodeValue = valueToSet;
-				else {
-					const htmlSnippet = createEl('div', el => {
-						el.innerHTML = valueToSet;
-					}).build().children[0];
-					ownerNode.appendChild(htmlSnippet);
-					this.serviceProvider.get<Compiler>('Compiler')!.compile({
-						el: htmlSnippet,
-						data: data,
-						context: context
-					})
-				}
+					return nodeToBind.nodeValue = valueToSet;
+
+				const htmlSnippet = createEl('div', el => {
+					el.innerHTML = valueToSet;
+				}).build().children[0];
+
+				ownerNode.appendChild(htmlSnippet);
+				this.serviceProvider.get<Compiler>('Compiler')!.compile({
+					el: htmlSnippet,
+					data: data,
+					context: context
+				});
 			}
 
 			ReactiveEvent.once('AfterGet', event => {
@@ -153,8 +153,8 @@ export default class Binder extends Base {
 						}, node)
 					});
 				}
-				setter();
 
+				setter();
 			});
 
 			propertyBindConfig.node = nodeToBind;
@@ -162,7 +162,7 @@ export default class Binder extends Base {
 			return propertyBindConfig;
 		}
 
-		const bindTwoWay = () => {
+		const $BindTwoWay = () => {
 			let propertyNameToBind = '';
 			const binderTarget = ownerNode.type || ownerNode.localName;
 
@@ -313,8 +313,8 @@ export default class Binder extends Base {
 		}
 
 		if (originalName.substring(0, Constants.bind.length) === Constants.bind)
-			return bindTwoWay();
-		return bindOneWay();
+			return $BindTwoWay();
+		return $BindOneWay();
 	}
 
 	onPropertyChange<Value, TargetObject>(
@@ -344,7 +344,7 @@ export default class Binder extends Base {
 		return watches;
 	}
 
-	/** Creates a process for unbind properties when it does not exists anymore in the DOM */
+	/** Creates a process to unbind properties that is not connected to the DOM anymone */
 	private cleanup() {
 		Task.run(() => {
 			this.binds = where(this.binds, bind => {

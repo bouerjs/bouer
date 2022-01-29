@@ -144,6 +144,7 @@ export default class Directive extends Base {
 
 		forEach(reactives, item => {
 			this.binder.binds.push({
+				// Binder is connected if at least one of the chain and the comment is still connected
 				isConnected: () => !isNull(Extend.array(conditions.map(x => x.element), comment).find(el => el.isConnected)),
 				watch: item.reactive.onChange(() => execute(), item.attr)
 			})
@@ -191,22 +192,13 @@ export default class Directive extends Base {
 	show(node: Node, data: object) {
 		const ownerNode = this.toOwnerNode(node);
 		const nodeValue = trim(node.nodeValue ?? '');
+		let execute = (el: HTMLElement) => {};
 
 		if (nodeValue === '')
 			return Logger.error(this.errorMsgEmptyNode(node));
 
 		if (this.delimiter.run(nodeValue).length !== 0)
 			return Logger.error(this.errorMsgNodeValue(node));
-
-		const execute = (element: HTMLElement) => {
-			const value = this.evaluator.exec({
-				data: data,
-				expression: nodeValue,
-				context: this.context,
-			});
-
-			element.style.display = value ? '' : 'none';
-		}
 
 		const bindResult = this.binder.create({
 			data: data,
@@ -217,7 +209,15 @@ export default class Directive extends Base {
 			onUpdate: () => execute(ownerNode)
 		});
 
-		execute(ownerNode);
+		(execute = (element: HTMLElement) => {
+			const value = this.evaluator.exec({
+				data: data,
+				expression: nodeValue,
+				context: this.context,
+			});
+
+			element.style.display = value ? '' : 'none';
+		})(ownerNode);
 
 		ownerNode.removeAttribute(bindResult.node.nodeName);
 	}
@@ -795,7 +795,7 @@ export default class Directive extends Base {
 
 		ownerNode.removeAttribute(node.nodeName);
 
-		const usehash = (this.bouer.config || {}).usehash ?? true;
+		const usehash = this.bouer.config.usehash ?? true;
 		const routeToSet = urlCombine((usehash ? '#' : ''), nodeValue);
 
 		ownerNode.setAttribute('href', routeToSet);
@@ -1088,10 +1088,8 @@ export default class Directive extends Base {
 			const expObject = builder(trim(node.nodeValue || ''));
 			middleware.run('req', {
 				type: 'update',
-				default: () => {
-					onInsertOrUpdate();
-				},
-				action: middleware => {
+				default: () => onInsertOrUpdate(),
+				action: middlewareRequest => {
 					const context = {
 						binder: binderConfig,
 						detail: {
@@ -1114,7 +1112,7 @@ export default class Directive extends Base {
 						done: () => subcribeEvent(Constants.builtInEvents.done).emit()
 					};
 
-					middleware(context, cbs);
+					middlewareRequest(context, cbs);
 				}
 			});
 		}
@@ -1160,7 +1158,7 @@ export default class Directive extends Base {
 		const nodeName = node.nodeName;
 		const nodeValue = trim(node.nodeValue ?? '');
 		const delimiters = this.delimiter.run(nodeValue);
-		const $DirectiveConfig = this.$custom[nodeName];
+		const $CustomDirective = this.$custom[nodeName];
 
 		const bindConfig = this.binder.create({
 			data: data,
@@ -1170,12 +1168,12 @@ export default class Directive extends Base {
 			context: this.context,
 			isConnected: () => ownerNode.isConnected,
 			onUpdate: () => {
-				if (typeof $DirectiveConfig.onUpdate === 'function')
-					$DirectiveConfig.onUpdate(node, bindConfig);
+				if (typeof $CustomDirective.onUpdate === 'function')
+					$CustomDirective.onUpdate(node, bindConfig);
 			}
 		});
 
-		if ($DirectiveConfig.removable ?? true)
+		if ($CustomDirective.removable ?? true)
 			ownerNode.removeAttribute(nodeName);
 
 		const modifiers = nodeName.split('.');
@@ -1186,8 +1184,8 @@ export default class Directive extends Base {
 		bindConfig.modifiers = modifiers;
 		bindConfig.argument = argument;
 
-		if (typeof $DirectiveConfig.onBind === 'function')
-			return $DirectiveConfig.onBind(node, bindConfig) ?? false;
+		if (typeof $CustomDirective.onBind === 'function')
+			return $CustomDirective.onBind(node, bindConfig) ?? false;
 
 		return false;
 	}
