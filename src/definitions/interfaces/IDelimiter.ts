@@ -9,5 +9,5 @@ export default interface IDelimiter {
     close: string
   },
 	/** fires when the element updates */
-  update?: (valueToSet: string, node: Node, data: object) => string,
+  onUpdate?: (valueToSet: string, node: Node, data: object) => string,
 }

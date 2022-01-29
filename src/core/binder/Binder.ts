@@ -121,8 +121,8 @@ export default class Binder extends Base {
 					result = isNull(result) ? '' : result;
 					valueToSet = valueToSet.replace(field.field, toStr(result));
 
-					if (delimiter && typeof delimiter.update === 'function')
-						valueToSet = delimiter.update(valueToSet, node, data);
+					if (delimiter && typeof delimiter.onUpdate === 'function')
+						valueToSet = delimiter.onUpdate(valueToSet, node, data);
 				});
 
 				propertyBindConfig.value = valueToSet;

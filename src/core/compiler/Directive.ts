@@ -1170,8 +1170,8 @@ export default class Directive extends Base {
 			context: this.context,
 			isConnected: () => ownerNode.isConnected,
 			onUpdate: () => {
-				if (typeof $DirectiveConfig.update === 'function')
-					$DirectiveConfig.update(node, bindConfig);
+				if (typeof $DirectiveConfig.onUpdate === 'function')
+					$DirectiveConfig.onUpdate(node, bindConfig);
 			}
 		});
 
@@ -1186,8 +1186,8 @@ export default class Directive extends Base {
 		bindConfig.modifiers = modifiers;
 		bindConfig.argument = argument;
 
-		if (typeof $DirectiveConfig.bind === 'function')
-			return $DirectiveConfig.bind(node, bindConfig) ?? false;
+		if (typeof $DirectiveConfig.onBind === 'function')
+			return $DirectiveConfig.onBind(node, bindConfig) ?? false;
 
 		return false;
 	}
