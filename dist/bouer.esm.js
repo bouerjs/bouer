@@ -234,6 +234,11 @@ function createEl(elName, callback) {
     };
     return returnObj;
 }
+function removeEl(el) {
+    var parent = el.parentNode;
+    if (parent)
+        parent.removeChild(el);
+}
 function mapper(source, destination) {
     forEach(Object.keys(source), function (key) {
         var sourceValue = source[key];
@@ -252,7 +257,7 @@ function urlResolver(url) {
         anchor.setAttribute('href', href);
         href = anchor.href;
     }
-    anchor.setAttribute('href', href);
+    anchor.href = href;
     var hostname = anchor.hostname;
     var ipv6InBrackets = anchor.hostname === '[::1]';
     if (!ipv6InBrackets && hostname.indexOf(':') > -1)
@@ -346,7 +351,7 @@ var Constants = {
     href: ':href',
     entry: 'e-entry',
     on: 'on:',
-    silent: 'silent',
+    silent: '--s',
     slot: 'slot',
     ref: 'ref',
     put: 'e-put',
@@ -617,7 +622,7 @@ var Binder = /** @class */ (function (_super) {
             parent: ownerNode,
             value: ''
         };
-        var $runDirectiveMiddlewares = function (type) {
+        var $RunDirectiveMiddlewares = function (type) {
             middleware.run(originalName, {
                 type: type,
                 action: function (middleware) {
@@ -632,7 +637,7 @@ var Binder = /** @class */ (function (_super) {
                 }
             });
         };
-        var bindOneWay = function () {
+        var $BindOneWay = function () {
             // One-Way Data Binding
             var nodeToBind = node;
             // If definable property e-[?]="..."
@@ -659,23 +664,21 @@ var Binder = /** @class */ (function (_super) {
                     });
                     result = isNull(result) ? '' : result;
                     valueToSet = valueToSet.replace(field.field, toStr(result));
-                    if (delimiter && typeof delimiter.update === 'function')
-                        valueToSet = delimiter.update(valueToSet, node, data);
+                    if (delimiter && typeof delimiter.onUpdate === 'function')
+                        valueToSet = delimiter.onUpdate(valueToSet, node, data);
                 });
                 propertyBindConfig.value = valueToSet;
                 if (!isHtml)
-                    nodeToBind.nodeValue = valueToSet;
-                else {
-                    var htmlSnippet = createEl('div', function (el) {
-                        el.innerHTML = valueToSet;
-                    }).build().children[0];
-                    ownerNode.appendChild(htmlSnippet);
-                    _this.serviceProvider.get('Compiler').compile({
-                        el: htmlSnippet,
-                        data: data,
-                        context: context
-                    });
-                }
+                    return nodeToBind.nodeValue = valueToSet;
+                var htmlSnippet = createEl('div', function (el) {
+                    el.innerHTML = valueToSet;
+                }).build().children[0];
+                ownerNode.appendChild(htmlSnippet);
+                _this.serviceProvider.get('Compiler').compile({
+                    el: htmlSnippet,
+                    data: data,
+                    context: context
+                });
             };
             ReactiveEvent.once('AfterGet', function (event) {
                 event.onemit = function (reactive) {
@@ -684,17 +687,17 @@ var Binder = /** @class */ (function (_super) {
                         watch: reactive.onChange(function (value) {
                             setter();
                             onUpdate(value, node);
-                            $runDirectiveMiddlewares('update');
+                            $RunDirectiveMiddlewares('update');
                         }, node)
                     });
                 };
                 setter();
             });
             propertyBindConfig.node = nodeToBind;
-            $runDirectiveMiddlewares('bind');
+            $RunDirectiveMiddlewares('bind');
             return propertyBindConfig;
         };
-        var bindTwoWay = function () {
+        var $BindTwoWay = function () {
             var propertyNameToBind = '';
             var binderTarget = ownerNode.type || ownerNode.localName;
             if (Constants.bind === originalName)
@@ -718,7 +721,7 @@ var Binder = /** @class */ (function (_super) {
                     return Logger.error("Since it's an array binding it expects a model but it has not been defined" +
                         ", provide a model as it follows: value=\"String-Model\" or :value=\"Object-Model\".");
                 }
-                var $set = {
+                var $Setter = {
                     fromDataToInput: function () {
                         // Normal Property Set
                         if (!Array.isArray(boundPropertyValue)) {
@@ -788,7 +791,7 @@ var Binder = /** @class */ (function (_super) {
                             boundPropertyValue.splice(boundPropertyValue.indexOf(boundModelValue), 1);
                     }
                 };
-                return $set[direction]();
+                return $Setter[direction]();
             };
             ReactiveEvent.once('AfterGet', function (evt) {
                 // Adding the event on emittion
@@ -798,7 +801,7 @@ var Binder = /** @class */ (function (_super) {
                         watch: reactive.onChange(function (value) {
                             callback(_this.BindingDirection.fromDataToInput, value);
                             onUpdate(value, node);
-                            $runDirectiveMiddlewares('update');
+                            $RunDirectiveMiddlewares('update');
                         }, node)
                     });
                 };
@@ -823,12 +826,12 @@ var Binder = /** @class */ (function (_super) {
             });
             // Removing the e-bind attr
             ownerNode.removeAttribute(node.nodeName);
-            $runDirectiveMiddlewares('bind');
+            $RunDirectiveMiddlewares('bind');
             return propertyBindConfig; // Stop Two-Way Data Binding Process
         };
         if (originalName.substring(0, Constants.bind.length) === Constants.bind)
-            return bindTwoWay();
-        return bindOneWay();
+            return $BindTwoWay();
+        return $BindOneWay();
     };
     Binder.prototype.onPropertyChange = function (propertyName, callback, targetObject) {
         var mWatch;
@@ -849,7 +852,7 @@ var Binder = /** @class */ (function (_super) {
         });
         return watches;
     };
-    /** Creates a process for unbind properties when it does not exists anymore in the DOM */
+    /** Creates a process to unbind properties that is not connected to the DOM anymone */
     Binder.prototype.cleanup = function () {
         var _this = this;
         Task.run(function () {
@@ -1012,17 +1015,21 @@ var Reactive = /** @class */ (function (_super) {
                     // changing to the reactive one
                     prototype_1[method] = function reactive() {
                         var oldArrayValue = inputArray_1.slice();
+                        var args = [].slice.call(arguments);
                         switch (method) {
                             case 'push':
                             case 'unshift':
-                                forEach(toArray(arguments), function (arg) {
+                                forEach(toArray(args), function (arg) {
                                     if (!isObject(arg) && !Array.isArray(arg))
                                         return;
                                     executer(arg, visiting, visited);
                                 });
                         }
-                        var result = reference_1[method].apply(inputArray_1, arguments);
-                        forEach(reactiveObj.watches, function (watch) { return watch.callback(inputArray_1, oldArrayValue); });
+                        var result = reference_1[method].apply(inputArray_1, args);
+                        forEach(reactiveObj.watches, function (watch) { return watch.callback(inputArray_1, oldArrayValue, {
+                            method: method,
+                            args: args
+                        }); });
                         return result;
                     };
                 });
@@ -1154,6 +1161,7 @@ var Directive = /** @class */ (function (_super) {
         } while (currentEl = currentEl.nextElementSibling);
         forEach(reactives, function (item) {
             _this.binder.binds.push({
+                // Binder is connected if at least one of the chain and the comment is still connected
                 isConnected: function () { return !isNull(Extend.array(conditions.map(function (x) { return x.element; }), comment).find(function (el) { return el.isConnected; })); },
                 watch: item.reactive.onChange(function () { return execute(); }, item.attr)
             });
@@ -1199,18 +1207,11 @@ var Directive = /** @class */ (function (_super) {
         var _a;
         var ownerNode = this.toOwnerNode(node);
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
+        var execute = function (el) { };
         if (nodeValue === '')
             return Logger.error(this.errorMsgEmptyNode(node));
         if (this.delimiter.run(nodeValue).length !== 0)
             return Logger.error(this.errorMsgNodeValue(node));
-        var execute = function (element) {
-            var value = _this.evaluator.exec({
-                data: data,
-                expression: nodeValue,
-                context: _this.context,
-            });
-            element.style.display = value ? '' : 'none';
-        };
         var bindResult = this.binder.create({
             data: data,
             node: node,
@@ -1219,7 +1220,14 @@ var Directive = /** @class */ (function (_super) {
             context: this.context,
             onUpdate: function () { return execute(ownerNode); }
         });
-        execute(ownerNode);
+        (execute = function (element) {
+            var value = _this.evaluator.exec({
+                data: data,
+                expression: nodeValue,
+                context: _this.context,
+            });
+            element.style.display = value ? '' : 'none';
+        })(ownerNode);
         ownerNode.removeAttribute(bindResult.node.nodeName);
     };
     Directive.prototype.for = function (node, data) {
@@ -1232,7 +1240,9 @@ var Directive = /** @class */ (function (_super) {
         var comment = this.comment.create();
         var nodeName = node.nodeName;
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
-        var listedItems = [];
+        var listedItemsHandler = [];
+        var hasWhereFilter = false;
+        var hasOrderFilter = false;
         var execute = function () { };
         if (nodeValue === '')
             return Logger.error(this.errorMsgEmptyNode(node));
@@ -1252,9 +1262,13 @@ var Directive = /** @class */ (function (_super) {
                 onUpdate: function () { return execute(); }
             });
         ownerNode.removeAttribute(nodeName);
+        // Cloning the element
         var forItem = ownerNode.cloneNode(true);
+        // Replacing the comment reference
         container.replaceChild(comment, ownerNode);
-        var $where = function (list, filterConfigParts) {
+        // Filters the list of items
+        var $Where = function (list, filterConfigParts) {
+            hasWhereFilter = true;
             var whereValue = filterConfigParts[1];
             var whereKeys = filterConfigParts[2];
             if (isNull(whereValue) || whereValue === '') {
@@ -1299,7 +1313,9 @@ var Directive = /** @class */ (function (_super) {
             }
             return list;
         };
-        var $order = function (list, type, prop) {
+        // Order the list of items
+        var $Order = function (list, type, prop) {
+            hasOrderFilter = true;
             if (!type)
                 type = 'asc';
             return list.sort(function (a, b) {
@@ -1320,8 +1336,49 @@ var Directive = /** @class */ (function (_super) {
                 return comparison(a[prop] > b[prop], b[prop] < a[prop]);
             });
         };
-        // Builds the expression to object
-        var builder = function (expression) {
+        // Prepare the item before to insert
+        var $PrepareForItem = function (item, index) {
+            var _a;
+            expObj = expObj || $ExpressionBuilder(trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : ''));
+            var leftHandParts = expObj.leftHandParts, sourceValue = expObj.sourceValue, isForOf = expObj.isForOf;
+            var forData = Extend.obj(data);
+            var _item_key = leftHandParts[0];
+            var _index_or_value = leftHandParts[1] || '_index_or_value';
+            var _index = leftHandParts[2] || '_for_in_index';
+            forData[_item_key] = item;
+            forData[_index_or_value] = isForOf ? index : sourceValue[item];
+            forData[_index] = index;
+            return Reactive.transform({
+                inputObject: forData,
+                context: _this.context
+            });
+        };
+        // Inserts an element in the DOM
+        var $InsertForItem = function (options) {
+            // Preparing the data to be inserted
+            var forData = $PrepareForItem(options.item, options.index);
+            // Inserting in the DOM
+            var forClonedItem = container.insertBefore(forItem.cloneNode(true), options.reference || comment);
+            // Compiling the inserted data
+            _this.compiler.compile({
+                el: forClonedItem,
+                data: forData,
+                context: _this.context,
+                onDone: function (el) { return _this.eventHandler.emit({
+                    eventName: Constants.builtInEvents.add,
+                    attachedNode: el,
+                    once: true
+                }); }
+            });
+            // Addin
+            listedItemsHandler[options.method]({
+                el: forClonedItem,
+                data: forData
+            });
+            return forClonedItem;
+        };
+        // Builds the expression to an object
+        var $ExpressionBuilder = function (expression) {
             var filters = expression.split('|').map(function (item) { return trim(item); });
             var forExpression = filters[0].replace(/\(|\)/g, '');
             filters.shift();
@@ -1354,25 +1411,99 @@ var Directive = /** @class */ (function (_super) {
                 isForOf: trim(forSeparator) === 'of',
             };
         };
+        // Handler the UI when the Array changes
+        var $OnArrayChanges = function (detail) {
+            var _a;
+            if (hasWhereFilter || hasOrderFilter)
+                return execute(); // Reorganize re-insert all the items
+            detail = detail || {};
+            var method = detail.method;
+            var args = detail.args;
+            var mListedItems = listedItemsHandler;
+            var reOrganizeIndexes = function () {
+                // In case of unshift re-organize the indexes
+                // Was wrapped into a promise in case of large amount of data
+                return Promise.resolve(function (array) {
+                    var _a;
+                    expObj = expObj || $ExpressionBuilder(trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : ''));
+                    var leftHandParts = expObj.leftHandParts;
+                    var _index_or_value = leftHandParts[1] || '_index_or_value';
+                    forEach(array, function (item, index) {
+                        item.data[_index_or_value] = index;
+                    });
+                }).then(function (mCaller) { return mCaller(listedItemsHandler); });
+            };
+            switch (method) {
+                case 'pop':
+                case 'shift': { // First or Last item removal handler
+                    var item = mListedItems[method]();
+                    if (!item)
+                        return;
+                    removeEl(item.el);
+                    if (method === 'pop')
+                        return;
+                    return reOrganizeIndexes();
+                }
+                case 'splice': { // Indexed removal handler
+                    var removedItems = mListedItems[method].apply(mListedItems, args);
+                    forEach(removedItems, function (item) { return removeEl(item.el); });
+                    var index = args[0];
+                    expObj = expObj || $ExpressionBuilder(trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : ''));
+                    var leftHandParts = expObj.leftHandParts;
+                    var _index_or_value = leftHandParts[1] || '_index_or_value';
+                    // Fixing the index value
+                    for (; index < listedItemsHandler.length; index++) {
+                        var item = listedItemsHandler[index].data;
+                        if (typeof item[_index_or_value] === 'number')
+                            item[_index_or_value] = index;
+                    }
+                    return;
+                }
+                case 'push':
+                case 'unshift': { // Addition handler
+                    // Gets the last item as default
+                    var indexRef_1 = mListedItems.length;
+                    var isUnshift_1 = method == 'unshift';
+                    var reference_1 = isUnshift_1 ? listedItemsHandler[0].el : undefined;
+                    // Adding the itens to the dom
+                    forEach([].slice.call(args), function (item) {
+                        var ref = $InsertForItem({
+                            index: indexRef_1++,
+                            reference: reference_1,
+                            method: method,
+                            item: item,
+                        });
+                        if (isUnshift_1)
+                            reference_1 = ref;
+                    });
+                    if (!isUnshift_1)
+                        return;
+                    return reOrganizeIndexes();
+                }
+                default: return execute();
+            }
+        };
         var reactivePropertyEvent = ReactiveEvent.on('AfterGet', function (reactive) {
             _this.binder.binds.push({
                 isConnected: function () { return comment.isConnected; },
-                watch: reactive.onChange(function () { return execute(); }, node)
+                watch: reactive.onChange(function (_n, _o, detail) {
+                    return $OnArrayChanges(detail);
+                }, node)
             });
         });
-        var expObj = builder(nodeValue);
+        var expObj = $ExpressionBuilder(nodeValue);
         reactivePropertyEvent.off();
         (execute = function () {
             var _a;
-            expObj = expObj || builder(trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : ''));
-            var iterable = expObj.iterableExpression, leftHandParts = expObj.leftHandParts, sourceValue = expObj.sourceValue, isForOf = expObj.isForOf, filters = expObj.filters;
+            expObj = expObj || $ExpressionBuilder(trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : ''));
+            var iterable = expObj.iterableExpression, filters = expObj.filters;
             // Cleaning the
-            forEach(listedItems, function (item) {
-                if (!item.parentElement)
+            forEach(listedItemsHandler, function (item) {
+                if (!item.el.parentElement)
                     return;
-                container.removeChild(item);
+                container.removeChild(item.el);
             });
-            listedItems = [];
+            listedItemsHandler = [];
             _this.evaluator.exec({
                 data: data,
                 isReturn: false,
@@ -1382,25 +1513,11 @@ var Directive = /** @class */ (function (_super) {
                 aditional: {
                     _for: forEach,
                     _each: function (item, index) {
-                        var forData = Extend.obj(data);
-                        var _item_key = leftHandParts[0];
-                        var _index_or_value = leftHandParts[1] || '_index_or_value';
-                        var _index = leftHandParts[2] || '_for_in_index';
-                        forData[_item_key] = item;
-                        forData[_index_or_value] = isForOf ? index : sourceValue[item];
-                        forData[_index] = index;
-                        var clonedItem = container.insertBefore(forItem.cloneNode(true), comment);
-                        _this.compiler.compile({
-                            el: clonedItem,
-                            data: forData,
-                            context: _this.context,
-                            onDone: function (el) { return _this.eventHandler.emit({
-                                eventName: Constants.builtInEvents.add,
-                                attachedNode: el,
-                                once: true
-                            }); }
+                        $InsertForItem({
+                            index: index,
+                            item: item,
+                            method: 'push'
                         });
-                        listedItems.push(clonedItem);
                     },
                     _filters: function (list) {
                         var listCopy = Extend.array(list);
@@ -1416,7 +1533,7 @@ var Directive = /** @class */ (function (_super) {
                                     "”, at least a where-value and where-keys, or a filter-function must be provided"));
                             }
                             else {
-                                listCopy = $where(listCopy, whereConfigParts);
+                                listCopy = $Where(listCopy, whereConfigParts);
                             }
                         }
                         // applying order:
@@ -1428,7 +1545,7 @@ var Directive = /** @class */ (function (_super) {
                                     "”, at least the order type must be provided"));
                             }
                             else {
-                                listCopy = $order(listCopy, orderConfigParts[1], orderConfigParts[2]);
+                                listCopy = $Order(listCopy, orderConfigParts[1], orderConfigParts[2]);
                             }
                         }
                         return listCopy;
@@ -1605,7 +1722,7 @@ var Directive = /** @class */ (function (_super) {
         if (nodeValue === '')
             return Logger.error(this.errorMsgEmptyNode(node));
         ownerNode.removeAttribute(node.nodeName);
-        var usehash = (_b = (this.bouer.config || {}).usehash) !== null && _b !== void 0 ? _b : true;
+        var usehash = (_b = this.bouer.config.usehash) !== null && _b !== void 0 ? _b : true;
         var routeToSet = urlCombine((usehash ? '#' : ''), nodeValue);
         ownerNode.setAttribute('href', routeToSet);
         var href = ownerNode.attributes['href'];
@@ -1850,10 +1967,8 @@ var Directive = /** @class */ (function (_super) {
             var expObject = builder(trim(node.nodeValue || ''));
             middleware.run('req', {
                 type: 'update',
-                default: function () {
-                    onInsertOrUpdate();
-                },
-                action: function (middleware) {
+                default: function () { return onInsertOrUpdate(); },
+                action: function (middlewareRequest) {
                     var context = {
                         binder: binderConfig,
                         detail: {
@@ -1873,7 +1988,7 @@ var Directive = /** @class */ (function (_super) {
                         }); },
                         done: function () { return subcribeEvent(Constants.builtInEvents.done).emit(); }
                     };
-                    middleware(context, cbs);
+                    middlewareRequest(context, cbs);
                 }
             });
         };
@@ -1915,7 +2030,7 @@ var Directive = /** @class */ (function (_super) {
         var nodeName = node.nodeName;
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
         var delimiters = this.delimiter.run(nodeValue);
-        var $directiveConfig = this.$custom[nodeName];
+        var $CustomDirective = this.$custom[nodeName];
         var bindConfig = this.binder.create({
             data: data,
             node: node,
@@ -1924,11 +2039,11 @@ var Directive = /** @class */ (function (_super) {
             context: this.context,
             isConnected: function () { return ownerNode.isConnected; },
             onUpdate: function () {
-                if (typeof $directiveConfig.update === 'function')
-                    $directiveConfig.update(node, bindConfig);
+                if (typeof $CustomDirective.onUpdate === 'function')
+                    $CustomDirective.onUpdate(node, bindConfig);
             }
         });
-        if ((_b = $directiveConfig.removable) !== null && _b !== void 0 ? _b : true)
+        if ((_b = $CustomDirective.removable) !== null && _b !== void 0 ? _b : true)
             ownerNode.removeAttribute(nodeName);
         var modifiers = nodeName.split('.');
         modifiers.shift();
@@ -1936,8 +2051,8 @@ var Directive = /** @class */ (function (_super) {
         var argument = (nodeName.split(':')[1] || '').split('.')[0];
         bindConfig.modifiers = modifiers;
         bindConfig.argument = argument;
-        if (typeof $directiveConfig.bind === 'function')
-            return (_c = $directiveConfig.bind(node, bindConfig)) !== null && _c !== void 0 ? _c : false;
+        if (typeof $CustomDirective.onBind === 'function')
+            return (_c = $CustomDirective.onBind(node, bindConfig)) !== null && _c !== void 0 ? _c : false;
         return false;
     };
     Directive.prototype.skeleton = function (node) {
@@ -1989,15 +2104,15 @@ var Compiler = /** @class */ (function (_super) {
                     && options.componentSlot) {
                     var componentSlot = options.componentSlot;
                     var insertSlot_1 = function (slot, reference) {
-                        var $walker = function (child) {
+                        var $Walker = function (child) {
                             var cloned = child.cloneNode(true);
                             reference.parentNode.insertBefore(cloned, reference);
                             walker(cloned, data);
                         };
                         if (slot.nodeName === 'SLOTCONTAINER' || slot.nodeName === 'SLOT')
-                            forEach(toArray(slot.childNodes), function (child) { return $walker(child); });
+                            forEach(toArray(slot.childNodes), function (child) { return $Walker(child); });
                         else
-                            $walker(slot);
+                            $Walker(slot);
                         reference.parentNode.removeChild(reference);
                     };
                     if (node.hasAttribute('default')) {
@@ -2009,7 +2124,7 @@ var Compiler = /** @class */ (function (_super) {
                     else if (node.hasAttribute('name')) {
                         // In case of target slot insertion
                         var target_1 = node.attributes.getNamedItem('name');
-                        return (function innerWalker(element) {
+                        return (function $Walker(element) {
                             var slotValue = element.getAttribute(Constants.slot);
                             if (slotValue && slotValue === target_1.value) {
                                 element.removeAttribute(Constants.slot);
@@ -2018,7 +2133,7 @@ var Compiler = /** @class */ (function (_super) {
                             if (element.children.length === 0)
                                 return null;
                             forEach(toArray(element.children), function (child) {
-                                innerWalker(child);
+                                $Walker(child);
                             });
                         })(componentSlot);
                     }
@@ -2171,9 +2286,7 @@ var Converter = /** @class */ (function (_super) {
         };
         var tryGetValue = function (el) {
             var val = undefined;
-            mValues.find(function (field) {
-                return (val = getter(el, field)) ? true : false;
-            });
+            mValues.find(function (field) { return (val = getter(el, field)) ? true : false; });
             return val;
         };
         var objBuilder = function (element) {
@@ -2221,11 +2334,11 @@ var Converter = /** @class */ (function (_super) {
         var builds = toArray(element.querySelectorAll("[" + Constants.build + "]"));
         forEach(builds, function (buildElement) {
             // Getting the e-build attr value
-            var fullPath = getter(buildElement, Constants.build);
+            var buildPath = getter(buildElement, Constants.build);
             var isBuildAsArray = buildElement.hasAttribute(Constants.array);
-            var builderObjValue = objBuilder(buildElement);
+            var builtObjValue = objBuilder(buildElement);
             // If the object is empty (has all fields with `null` value)
-            if (!isFilledObj(builderObjValue))
+            if (!isFilledObj(builtObjValue))
                 return;
             (function objStructurer(remainPath, lastLayer) {
                 var splittedPath = remainPath.split('.');
@@ -2240,24 +2353,24 @@ var Converter = /** @class */ (function (_super) {
                     if (isBuildAsArray) {
                         // Handle Array
                         if (isObject(objPropertyValue) && !isEmptyObject(objPropertyValue)) {
-                            lastLayer[leadElement] = [Extend.obj(objPropertyValue, builderObjValue)];
+                            lastLayer[leadElement] = [Extend.obj(objPropertyValue, builtObjValue)];
                         }
                         else if (Array.isArray(objPropertyValue)) {
-                            objPropertyValue.push(builderObjValue);
+                            objPropertyValue.push(builtObjValue);
                         }
                         else {
-                            lastLayer[leadElement] = [builderObjValue];
+                            lastLayer[leadElement] = [builtObjValue];
                         }
                     }
                     else {
                         isNull(objPropertyValue) ?
                             // Set the new property
-                            lastLayer[leadElement] = builderObjValue :
+                            lastLayer[leadElement] = builtObjValue :
                             // Spread and add the new fields into the object
-                            lastLayer[leadElement] = Extend.obj(objPropertyValue, builderObjValue);
+                            lastLayer[leadElement] = Extend.obj(objPropertyValue, builtObjValue);
                     }
                     if (isFunction(onSet))
-                        onSet.call(instance.bouer, lastLayer, leadElement, builderObjValue, buildElement);
+                        onSet.call(instance.bouer, lastLayer, leadElement, builtObjValue, buildElement);
                     return;
                 }
                 if (Array.isArray(objPropertyValue)) {
@@ -2266,7 +2379,7 @@ var Converter = /** @class */ (function (_super) {
                     });
                 }
                 objStructurer(splittedPath.join('.'), lastLayer[leadElement]);
-            })(fullPath, builtObject);
+            })(buildPath, builtObject);
         });
         return builtObject;
     };
@@ -2370,13 +2483,13 @@ var Component = /** @class */ (function (_super) {
     Component.prototype.destroyed = function (event) { };
     Component.prototype.blocked = function (event) { };
     Component.prototype.failed = function (event) { };
-    Component.prototype.export = function (exportedData) {
+    Component.prototype.export = function (data) {
         var _this = this;
-        if (!isObject(exportedData))
+        if (!isObject(data))
             return Logger.log("Invalid object for component.export(...), only \"Object Literal\" is allowed.");
-        return forEach(Object.keys(exportedData), function (key) {
-            _this.data[key] = exportedData[key];
-            Prop.transfer(_this.data, exportedData, key);
+        return forEach(Object.keys(data), function (key) {
+            _this.data[key] = data[key];
+            Prop.transfer(_this.data, data, key);
         });
     };
     Component.prototype.destroy = function () {
@@ -2426,48 +2539,75 @@ var Component = /** @class */ (function (_super) {
         this.events = where(this.events, function (evt) { return !(evt.eventName == eventName && evt.callback == callback); });
     };
     Component.prototype.addAssets = function (assets) {
-        var $assets = [];
+        var $Assets = [];
         var assetsTypeMapper = {
             js: 'script',
             css: 'link',
+            scss: 'link',
+            sass: 'link',
+            less: 'link',
             style: 'link'
         };
+        var isValidAssetSrc = function (src, index) {
+            var isValid = (src || trim(src)) ? true : false;
+            if (!isValid)
+                Logger.error('Invalid asset “src”, in assets[' + index + '].src');
+            return isValid;
+        };
+        var assetTypeGetter = function (src, index) {
+            var srcSplitted = src.split('.');
+            var type = assetsTypeMapper[toLower(srcSplitted[srcSplitted.length - 1])];
+            if (!type)
+                return Logger.error("Couldn't find out what type of asset it is, provide " +
+                    "the “type” explicitly at assets[" + index + "].type");
+            return type;
+        };
         forEach(assets, function (asset, index) {
-            if (!asset.src || !trim(asset.src))
-                return Logger.error('Invalid asset “src”, in assets[' + index + '].src');
-            var type = '';
-            if (!asset.type) {
-                var srcSplitted = asset.src.split('.');
-                type = assetsTypeMapper[toLower(srcSplitted[srcSplitted.length - 1])];
-                if (!type)
-                    return Logger.error("Couldn't find out what type of asset it is, provide " +
-                        "the “type” explicitly at assets[" + index + "].type");
+            var _a;
+            var type = '', src = '', scoped = true;
+            if (typeof asset === 'string') { // String type
+                if (!isValidAssetSrc(asset, index))
+                    return;
+                type = assetTypeGetter(trim(src = asset.replace(/\.less|.s[ac]ss/i, '.css')), index);
             }
-            else {
-                asset.type = toLower(asset.type);
-                type = assetsTypeMapper[asset.type] || asset.type;
+            else { // Object Type
+                if (!isValidAssetSrc(trim(src = asset.src.replace(/\.less|.s[ac]ss/i, '.css')), index))
+                    return;
+                if (!asset.type) {
+                    if (!(type = assetTypeGetter(src, index)))
+                        return;
+                }
+                else {
+                    type = assetsTypeMapper[toLower(asset.type)] || asset.type;
+                }
+                scoped = (_a = asset.scoped) !== null && _a !== void 0 ? _a : true;
             }
-            var $asset = createAnyEl(type, function (el) {
-                var _a;
-                if ((_a = asset.scoped) !== null && _a !== void 0 ? _a : true)
+            if ((src[0] !== '.')) { // The src begins with dot (.)
+                var resolver = urlResolver(src);
+                var hasBaseURIInURL = resolver.baseURI === src.substring(0, resolver.baseURI.length);
+                // Building the URL according to the main path
+                src = urlCombine(hasBaseURIInURL ? resolver.origin : resolver.baseURI, resolver.pathname);
+            }
+            var $Asset = createAnyEl(type, function (el) {
+                if (scoped !== null && scoped !== void 0 ? scoped : true)
                     el.setAttribute('scoped', 'true');
                 switch (toLower(type)) {
                     case 'script':
-                        el.setAttribute('src', asset.src);
+                        el.setAttribute('src', src);
                         break;
                     case 'link':
-                        el.setAttribute('href', asset.src);
+                        el.setAttribute('href', src);
                         el.setAttribute('rel', 'stylesheet');
                         el.setAttribute('type', 'text/css');
                         break;
                     default:
-                        el.setAttribute('src', asset.src);
+                        el.setAttribute('src', src);
                         break;
                 }
             }).build();
-            $assets.push($asset);
+            $Assets.push($Asset);
         });
-        this.assets.push.apply(this.assets, $assets);
+        this.assets.push.apply(this.assets, $Assets);
     };
     return Component;
 }(Base));
@@ -2491,35 +2631,36 @@ var ComponentHandler = /** @class */ (function (_super) {
     ComponentHandler.prototype.check = function (nodeName) {
         return (nodeName in this.components);
     };
-    ComponentHandler.prototype.request = function (url, response) {
+    ComponentHandler.prototype.request = function (path, response) {
         var _this = this;
-        if (!isNull(this.requests[url]))
-            return this.requests[url].push(response);
-        this.requests[url] = [response];
-        var resolver = urlResolver(anchor.baseURI);
+        if (!isNull(this.requests[path]))
+            return this.requests[path].push(response);
+        this.requests[path] = [response];
+        var resolver = urlResolver(path);
         var hasBaseElement = DOM.head.querySelector('base') != null;
-        var baseURI = hasBaseElement ? resolver.baseURI : resolver.origin;
-        var urlPath = urlCombine(baseURI, url);
-        webRequest(urlPath, { headers: { 'Content-Type': 'text/plain' } })
+        var hasBaseURIInURL = resolver.baseURI === path.substring(0, resolver.baseURI.length);
+        // Building the URL according to the main path
+        var componentPath = urlCombine(hasBaseURIInURL ? resolver.origin : resolver.baseURI, resolver.pathname);
+        webRequest(componentPath, { headers: { 'Content-Type': 'text/plain' } })
             .then(function (response) {
             if (!response.ok)
                 throw new Error(response.statusText);
             return response.text();
         })
             .then(function (content) {
-            forEach(_this.requests[url], function (request) {
-                request.success(content, url);
+            forEach(_this.requests[path], function (request) {
+                request.success(content, path);
             });
-            delete _this.requests[url];
+            delete _this.requests[path];
         })
             .catch(function (error) {
             if (!hasBaseElement)
                 Logger.warn("It seems like you are not using the “<base href=\"/base/components/path/\" />” " +
                     "element, try to add as the first child into “<head></head>” element.");
-            forEach(_this.requests[url], function (request) {
-                request.fail(error, url);
+            forEach(_this.requests[path], function (request) {
+                request.fail(error, path);
             });
-            delete _this.requests[url];
+            delete _this.requests[path];
         });
     };
     ComponentHandler.prototype.prepare = function (components, parent) {
@@ -3301,17 +3442,15 @@ var Routing = /** @class */ (function (_super) {
         // Listening to the page navigation
         GLOBAL.addEventListener('popstate', function (evt) {
             evt.preventDefault();
-            _this.navigate((evt.state || location.href), false);
+            _this.navigate((evt.state || location.href), {
+                setURL: false
+            });
         });
     };
-    /**
-     * Navigates to a certain page without reloading all the page
-     * @param route the route to navigate to
-     * @param changeUrl allow to change the url after the navigation, default value is `true`
-     */
-    Routing.prototype.navigate = function (route, changeUrl) {
+    Routing.prototype.navigate = function (route, options) {
         var _this = this;
-        var _a;
+        var _a, _b;
+        if (options === void 0) { options = {}; }
         if (!this.routeView)
             return;
         if (isNull(route))
@@ -3332,12 +3471,12 @@ var Routing = /** @class */ (function (_super) {
             return;
         var componentElement = createAnyEl(page.name, function (el) {
             // Inherit the data scope by default
-            el.setAttribute('data', '$data');
+            el.setAttribute('data', isObject(options.data) ? JSON.stringify(options.data) : '$data');
         }).appendTo(this.routeView)
             .build();
         // Document info configuration
         DOM.title = page.title || DOM.title;
-        if ((changeUrl !== null && changeUrl !== void 0 ? changeUrl : true))
+        if (((_b = options.setURL) !== null && _b !== void 0 ? _b : true))
             this.pushState(resolver.href, DOM.title);
         var routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route);
         new ServiceProvider(this.bouer).get('ComponentHandler')
@@ -3462,7 +3601,7 @@ var Skeleton = /** @class */ (function (_super) {
             this.reset();
         }
         var rules = [
-            '[silent]{ display: none!important; }',
+            '[--s]{ display: none!important; }',
             '[' + dir + '] { background-color: ' + this.backgroudColor + '!important; position: relative!important; overflow: hidden; }',
             '[' + dir + '],[' + dir + '] * { color: transparent!important; }',
             '[' + dir + ']::before, [' + dir + ']::after { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: block; }',
@@ -3753,7 +3892,7 @@ var Bouer = /** @class */ (function (_super) {
         return targetObject;
     };
     /**
-     * Compiles a `HTML snippet` to a `Object Literal`
+     * Compiles a `HTML snippet` to an `Object Literal`
      * @param input the input element
      * @param options the options of the compilation
      * @param onSet a function that should be fired when a value is setted
@@ -3856,7 +3995,6 @@ var Bouer = /** @class */ (function (_super) {
     /**
      * Compiles an html element
      * @param options the options of the compilation process
-     * @returns
      */
     Bouer.prototype.compile = function (options) {
         return new ServiceProvider(this).get('Compiler').
@@ -3870,13 +4008,13 @@ var Bouer = /** @class */ (function (_super) {
     Bouer.prototype.destroy = function () {
         var el = this.el;
         var serviceProvider = new ServiceProvider(this);
-        var $events = serviceProvider.get('EventHandler').$events;
-        var destroyedEvents = ($events['destroyed'] || []).concat(($events['component:destroyed'] || []));
+        var $Events = serviceProvider.get('EventHandler').$events;
+        var destroyedEvents = ($Events['destroyed'] || []).concat(($Events['component:destroyed'] || []));
         this.emit('destroyed', { element: this.el });
         // Dispatching all the destroy events
         forEach(destroyedEvents, function (es) { return es.emit({ once: true }); });
-        $events['destroyed'] = [];
-        $events['component:destroyed'] = [];
+        $Events['destroyed'] = [];
+        $Events['component:destroyed'] = [];
         if (el.tagName == 'BODY')
             el.innerHTML = '';
         else if (DOM.contains(el))
