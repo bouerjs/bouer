@@ -65,66 +65,6 @@ declare class Component<Data = {}> {
 	readonly restrictions?: ((component: (Component | IComponentOptions<Data>)) => boolean | Promise<boolean>)[];
 
 	/**
-	 * The hook that should be called when the component is requested
-	 * @param event the Event Object that was emitted
-	 */
-	requested(event: CustomEvent): void;
-
-	/**
-	 * The hook that should be called when the component is created
-	 * @param event the Event Object that was emitted
-	 */
-	created(event: CustomEvent): void;
-
-	/**
-	 * The hook that should be called before the component is mounted
-	 * @param event the Event Object that was emitted
-	 */
-	beforeMount(event: CustomEvent): void;
-
-	/**
-	 * The hook that should be called after the component is mounted
-	 * @param event the Event Object that was emitted
-	 */
-	mounted(event: CustomEvent): void;
-
-	/**
-	 * The hook that should be called before the component is loaded
-	 * @param event the Event Object that was emitted
-	 */
-	beforeLoad(event: CustomEvent): void;
-
-	/**
-	 * The hook that should be called after the component is loaded (Compiled)
-	 * @param event the Event Object that was emitted
-	 */
-	loaded(event: CustomEvent): void;
-
-	/**
-	 * The hook that should be called before the component is destroyed
-	 * @param event the Event Object that was emitted
-	 */
-	beforeDestroy(event: CustomEvent): void;
-
-	/**
-	 * The hook that should be called after the component is destroyed
-	 * @param event the Event Object that was emitted
-	 */
-	destroyed(event: CustomEvent): void;
-
-	/**
-	 * The hook that should be called when the component was blocked by restrictions
-	 * @param event the Event Object that was emitted
-	 */
-	blocked(event: CustomEvent): void;
-
-	/**
-	 * The hook that should be called after the component request is failed
-	 * @param event the Event Object that was emitted
-	 */
-	failed(event: CustomEvent): void;
-
-	/**
 	 * The data the should be exported from the `<script>` tag
 	 * @param data the data to export
 	 */
@@ -526,30 +466,6 @@ declare class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
 	 * Destroys the application
 	 */
 	destroy(): void;
-
-	/**
-	 * The hook that should be called before the component is loaded
-	 * @param event the Event Object that was emitted
-	 */
-	beforeLoad(event: CustomEvent): void;
-
-	/**
-	 * The hook that should be called after the component is loaded (Compiled)
-	 * @param event the Event Object that was emitted
-	 */
-	loaded(event: CustomEvent): void;
-
-	/**
-	 * The hook that should be called before the component is destroyed
-	 * @param event the Event Object that was emitted
-	 */
-	beforeDestroy(event: CustomEvent): void;
-
-	/**
-	 * The hook that should be called after the component is destroyed
-	 * @param event the Event Object that was emitted
-	 */
-	destroyed(event: CustomEvent): void;
 
 	/**
 	 * Default constructor
