@@ -88,8 +88,8 @@
 			},
 			middleware: (configure, app) => {
 
-				configure('req', (bind, update) => {
-					bind(context => {
+				configure('req', (onBind, onUpdate) => {
+					onBind(context => {
 						const path = context.detail.requestPath;
 
 						return fetch("https://jsonplaceholder.typicode.com/" + path, {

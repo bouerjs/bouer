@@ -70,7 +70,7 @@ export default class Binder extends Base {
 			value: ''
 		};
 
-		const $RunDirectiveMiddlewares = (type: 'bind' | 'update') => {
+		const $RunDirectiveMiddlewares = (type: 'onBind' | 'onUpdate') => {
 			middleware.run(originalName, {
 				type: type,
 				action: middleware => {
@@ -78,9 +78,9 @@ export default class Binder extends Base {
 						binder: propertyBindConfig,
 						detail: {}
 					}, {
-						success: () => { },
-						fail: () => { },
-						done: () => { }
+						success() { },
+						fail() { },
+						done() { }
 					})
 				}
 			});
@@ -149,7 +149,7 @@ export default class Binder extends Base {
 						watch: reactive.onChange(value => {
 							setter();
 							onUpdate(value, node);
-							$RunDirectiveMiddlewares('update');
+							$RunDirectiveMiddlewares('onUpdate');
 						}, node)
 					});
 				}
@@ -158,7 +158,7 @@ export default class Binder extends Base {
 			});
 
 			propertyBindConfig.node = nodeToBind;
-			$RunDirectiveMiddlewares('bind');
+			$RunDirectiveMiddlewares('onBind');
 			return propertyBindConfig;
 		}
 
@@ -278,7 +278,7 @@ export default class Binder extends Base {
 						watch: reactive.onChange(value => {
 							callback(this.BindingDirection.fromDataToInput, value);
 							onUpdate(value, node);
-							$RunDirectiveMiddlewares('update');
+							$RunDirectiveMiddlewares('onUpdate');
 						}, node)
 					});
 				}
@@ -308,7 +308,7 @@ export default class Binder extends Base {
 
 			// Removing the e-bind attr
 			ownerNode.removeAttribute(node.nodeName);
-			$RunDirectiveMiddlewares('bind');
+			$RunDirectiveMiddlewares('onBind');
 			return propertyBindConfig; // Stop Two-Way Data Binding Process
 		}
 

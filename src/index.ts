@@ -4,7 +4,6 @@ import IBouerOptions from "./definitions/interfaces/IBouerOptions";
 import IComponentOptions from "./definitions/interfaces/IComponentOptions";
 import Watch from "./core/binder/Watch";
 import Reactive from "./core/reactive/Reactive";
-import MiddlewareConfigActions from "./definitions/types/MiddlewareConfigActions";
 import IBinderConfig from "./definitions/interfaces/IBinderConfig";
 import IDelimiter from "./definitions/interfaces/IDelimiter";
 import IDelimiterResponse from "./definitions/interfaces/IDelimiterResponse";
@@ -14,6 +13,7 @@ import CustomDirective from "./definitions/types/CustomDirective";
 import IEventModifiers from "./definitions/interfaces/IEventModifiers";
 import IEventSubscription from "./definitions/interfaces/IEventSubscription";
 import IAsset from "./definitions/interfaces/IAsset";
+import MiddlewareResult from "./core/middleware/MiddlewareResult";
 
 export {
 	Bouer as default,
@@ -26,8 +26,8 @@ export {
 	WatchCallback,
 	Reactive,
 
-	MiddlewareConfigActions,
 	IMiddleware,
+	MiddlewareResult,
 
 	IBinderConfig,
 
