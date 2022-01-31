@@ -59,18 +59,6 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 		});
 	}
 
-	// Hooks
-	requested?(event: CustomEvent) { }
-	created?(event: CustomEvent) { }
-	beforeMount?(event: CustomEvent) { }
-	mounted?(event: CustomEvent) { }
-	beforeLoad?(event: CustomEvent) { }
-	loaded?(event: CustomEvent) { }
-	beforeDestroy?(event: CustomEvent) { }
-	destroyed?(event: CustomEvent) { }
-	blocked?(event: CustomEvent) { }
-	failed?(event: CustomEvent) { }
-
 	export<ExportableData>(
 		data: ExportableData
 	) {

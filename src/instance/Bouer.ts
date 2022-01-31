@@ -629,10 +629,4 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		this.isDestroyed = true;
 		serviceProvider.clear();
 	}
-
-	// Hooks
-	beforeLoad?(event: CustomEvent) { }
-	loaded?(event: CustomEvent) { }
-	beforeDestroy?(event: CustomEvent) { }
-	destroyed?(event: CustomEvent) { }
 }
