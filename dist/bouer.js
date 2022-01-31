@@ -693,14 +693,14 @@ var Binder = /** @class */ (function (_super) {
                         watch: reactive.onChange(function (value) {
                             setter();
                             onUpdate(value, node);
-                            $RunDirectiveMiddlewares('update');
+                            $RunDirectiveMiddlewares('onUpdate');
                         }, node)
                     });
                 };
                 setter();
             });
             propertyBindConfig.node = nodeToBind;
-            $RunDirectiveMiddlewares('bind');
+            $RunDirectiveMiddlewares('onBind');
             return propertyBindConfig;
         };
         var $BindTwoWay = function () {
@@ -807,7 +807,7 @@ var Binder = /** @class */ (function (_super) {
                         watch: reactive.onChange(function (value) {
                             callback(_this.BindingDirection.fromDataToInput, value);
                             onUpdate(value, node);
-                            $RunDirectiveMiddlewares('update');
+                            $RunDirectiveMiddlewares('onUpdate');
                         }, node)
                     });
                 };
@@ -832,7 +832,7 @@ var Binder = /** @class */ (function (_super) {
             });
             // Removing the e-bind attr
             ownerNode.removeAttribute(node.nodeName);
-            $RunDirectiveMiddlewares('bind');
+            $RunDirectiveMiddlewares('onBind');
             return propertyBindConfig; // Stop Two-Way Data Binding Process
         };
         if (originalName.substring(0, Constants.bind.length) === Constants.bind)
@@ -1946,7 +1946,7 @@ var Directive = /** @class */ (function (_super) {
             };
             subcribeEvent(Constants.builtInEvents.request).emit();
             middleware.run('req', {
-                type: 'bind',
+                type: 'onBind',
                 action: function (middlewareRequest) {
                     var context = {
                         binder: binderConfig,
@@ -1972,7 +1972,7 @@ var Directive = /** @class */ (function (_super) {
         onUpdate = function () {
             var expObject = builder(trim(node.nodeValue || ''));
             middleware.run('req', {
-                type: 'update',
+                type: 'onUpdate',
                 default: function () { return onInsertOrUpdate(); },
                 action: function (middlewareRequest) {
                     var context = {
@@ -2478,17 +2478,6 @@ var Component = /** @class */ (function (_super) {
         });
         return _this;
     }
-    // Hooks
-    Component.prototype.requested = function (event) { };
-    Component.prototype.created = function (event) { };
-    Component.prototype.beforeMount = function (event) { };
-    Component.prototype.mounted = function (event) { };
-    Component.prototype.beforeLoad = function (event) { };
-    Component.prototype.loaded = function (event) { };
-    Component.prototype.beforeDestroy = function (event) { };
-    Component.prototype.destroyed = function (event) { };
-    Component.prototype.blocked = function (event) { };
-    Component.prototype.failed = function (event) { };
     Component.prototype.export = function (data) {
         var _this = this;
         if (!isObject(data))
@@ -2552,7 +2541,8 @@ var Component = /** @class */ (function (_super) {
             scss: 'link',
             sass: 'link',
             less: 'link',
-            style: 'link'
+            styl: 'link',
+            style: 'link',
         };
         var isValidAssetSrc = function (src, index) {
             var isValid = (src || trim(src)) ? true : false;
@@ -2574,10 +2564,10 @@ var Component = /** @class */ (function (_super) {
             if (typeof asset === 'string') { // String type
                 if (!isValidAssetSrc(asset, index))
                     return;
-                type = assetTypeGetter(trim(src = asset.replace(/\.less|.s[ac]ss/i, '.css')), index);
+                type = assetTypeGetter(trim(src = asset.replace(/\.less|\.s[ac]ss|\.styl/i, '.css')), index);
             }
             else { // Object Type
-                if (!isValidAssetSrc(trim(src = asset.src.replace(/\.less|.s[ac]ss/i, '.css')), index))
+                if (!isValidAssetSrc(trim(src = asset.src.replace(/\.less|\.s[ac]ss\.styl/i, '.css')), index))
                     return;
                 if (!asset.type) {
                     if (!(type = assetTypeGetter(src, index)))
@@ -3399,7 +3389,7 @@ var Middleware = /** @class */ (function (_super) {
             if (!_this.middlewareConfigContainer[directive])
                 _this.middlewareConfigContainer[directive] = [];
             var middleware = {};
-            actions(function (bind) { return middleware.bind = bind; }, function (update) { return middleware.update = update; });
+            actions(function (onBind) { return middleware.onBind = onBind; }, function (onUpdate) { return middleware.onUpdate = onUpdate; });
             _this.middlewareConfigContainer[directive].push(middleware);
         };
         _this.has = function (directive) {
@@ -4028,11 +4018,6 @@ var Bouer = /** @class */ (function (_super) {
         this.isDestroyed = true;
         serviceProvider.clear();
     };
-    // Hooks
-    Bouer.prototype.beforeLoad = function (event) { };
-    Bouer.prototype.loaded = function (event) { };
-    Bouer.prototype.beforeDestroy = function (event) { };
-    Bouer.prototype.destroyed = function (event) { };
     return Bouer;
 }(Base));
 
