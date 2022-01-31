@@ -1,9 +1,9 @@
 import IMiddleware from "../../definitions/interfaces/IMiddleware";
-import MiddlewareConfigActions from "../../definitions/types/MiddlewareConfigActions";
 import IMiddlewareObject from "../../definitions/interfaces/IMiddlewareObject";
 import Bouer from "../../instance/Bouer";
 import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import Base from "../Base";
+import MiddlewareResult from "./MiddlewareResult";
 
 export default class Middleware extends Base {
 	private middlewareConfigContainer: { [key: string]: IMiddlewareObject[] } = {};
@@ -17,7 +17,7 @@ export default class Middleware extends Base {
 	}
 
 	run = (directive: string, runnable: {
-		type: 'bind' | 'update',
+		type: 'onBind' | 'onUpdate',
 		action: (middleware: (context: IMiddleware, callbacks: {
 			success: (response: any) => void,
 			fail: (error: any) => void,
@@ -62,15 +62,18 @@ export default class Middleware extends Base {
 		}
 	}
 
-	register = (directive: string, actions: MiddlewareConfigActions) => {
+	register = (directive: string, actions: (
+		onBind: (configure: (context: IMiddleware) => MiddlewareResult | Promise<MiddlewareResult>) => void,
+		onUpdate: (configure: (context: IMiddleware) => MiddlewareResult | Promise<MiddlewareResult>) => void
+	) => void) => {
 		if (!this.middlewareConfigContainer[directive])
 			this.middlewareConfigContainer[directive] = [];
 
 		const middleware: IMiddlewareObject = {};
 
 		actions(
-			bind => middleware.bind = bind,
-			update => middleware.update = update
+			onBind => middleware.onBind = onBind,
+			onUpdate => middleware.onUpdate = onUpdate
 		);
 
 		this.middlewareConfigContainer[directive].push(middleware);

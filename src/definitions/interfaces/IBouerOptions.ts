@@ -1,10 +1,11 @@
 import Component from "../../core/component/Component";
+import MiddlewareResult from "../../core/middleware/MiddlewareResult";
 import Bouer from "../../instance/Bouer";
 import CustomDirective from "../types/CustomDirective";
-import MiddlewareConfigActions from "../types/MiddlewareConfigActions";
 import IBouerConfig from "./IBouerConfig";
 import IComponentOptions from "./IComponentOptions";
 import IDelimiter from "./IDelimiter";
+import IMiddleware from "./IMiddleware";
 
 export default interface IBouerOptions<Data, GlobalData, Dependencies> {
 	/** The data of the instance */
@@ -30,7 +31,18 @@ export default interface IBouerOptions<Data, GlobalData, Dependencies> {
 
 	/** Middlewares that should be used in the application */
 	middleware?: (
-		configure: (directive: string, actions: MiddlewareConfigActions) => void,
+		/** Configures the middleware to a directive according to a specific action */
+		configure: (
+			/** The directive to be applied */
+			directive: string,
+			/** The actions where it should be applied */
+			actions: (
+				/** Actions that will be performed on bind */
+				onBind: (configure: (context: IMiddleware) => MiddlewareResult | Promise<MiddlewareResult>) => void,
+				/** Actions that will be performed on update */
+				onUpdate: (configure: (context: IMiddleware) => MiddlewareResult | Promise<MiddlewareResult>) => void
+			) => void) => void,
+			/** The application instance */
 		app: Bouer
 	) => void,
 

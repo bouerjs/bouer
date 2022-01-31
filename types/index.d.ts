@@ -1,21 +1,21 @@
-import IDelimiter from "../src/definitions/interfaces/IDelimiter";
-import IBouerConfig from "../src/definitions/interfaces/IBouerConfig";
-import IComponentOptions from "../src/definitions/interfaces/IComponentOptions";
-import dynamic from "../src/definitions/types/Dynamic";
-import IEventSubscription from "../src/definitions/interfaces/IEventSubscription";
-import RenderContext from "../src/definitions/types/RenderContext";
+import MiddlewareResult from "../src/core/middleware/MiddlewareResult";
 import IAsset from "../src/definitions/interfaces/IAsset";
-import ILifeCycleHooks from "../src/definitions/interfaces/ILifeCycleHooks";
-import IBouerOptions from "../src/definitions/interfaces/IBouerOptions";
-import WatchCallback from "../src/definitions/types/WatchCallback";
-import MiddlewareConfigActions from "../src/definitions/types/MiddlewareConfigActions";
-import IMiddleware from "../src/definitions/interfaces/IMiddleware";
 import IBinderConfig from "../src/definitions/interfaces/IBinderConfig";
+import IBouerConfig from "../src/definitions/interfaces/IBouerConfig";
+import IBouerOptions from "../src/definitions/interfaces/IBouerOptions";
+import IComponentOptions from "../src/definitions/interfaces/IComponentOptions";
+import IDelimiter from "../src/definitions/interfaces/IDelimiter";
 import IDelimiterResponse from "../src/definitions/interfaces/IDelimiterResponse";
-import CustomDirective from "../src/definitions/types/CustomDirective";
 import IEventModifiers from "../src/definitions/interfaces/IEventModifiers";
+import IEventSubscription from "../src/definitions/interfaces/IEventSubscription";
+import ILifeCycleHooks from "../src/definitions/interfaces/ILifeCycleHooks";
+import IMiddleware from "../src/definitions/interfaces/IMiddleware";
+import CustomDirective from "../src/definitions/types/CustomDirective";
+import dynamic from "../src/definitions/types/Dynamic";
+import RenderContext from "../src/definitions/types/RenderContext";
+import WatchCallback from "../src/definitions/types/WatchCallback";
 
-interface Component<Data = {}> {
+declare class Component<Data = {}> {
 	/** The name of the component */
 	name: string;
 
@@ -164,9 +164,15 @@ interface Component<Data = {}> {
 	 * @param assets the list of assets to be included
 	 */
 	addAssets(assets: (string | IAsset)[]): void;
+
+	/**
+	 * Default constructor
+	 * @param optionsOrPath the path of the component or the compponent options
+	 */
+	constructor(optionsOrPath: string | IComponentOptions<Data>);
 }
 
-interface Reactive<Value, TObject> {
+declare class Reactive<Value, TObject> {
 	propertyName: string;
 	propertyValue: Value;
 	propertySource: TObject;
@@ -184,7 +190,7 @@ interface Reactive<Value, TObject> {
 	onChange(callback: WatchCallback, node?: Node): Watch<Value, TObject>;
 }
 
-interface Watch<Value, TObject> {
+declare class Watch<Value, TObject> {
 	readonly property: string;
 	readonly node: Node | undefined;
 	readonly reactive: Reactive<Value, TObject>;
@@ -197,7 +203,7 @@ interface Watch<Value, TObject> {
 	destroy(): void;
 }
 
-interface Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
+declare class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
 	/** Application Id */
 	readonly __id__: number;
 
@@ -544,6 +550,13 @@ interface Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
 	 * @param event the Event Object that was emitted
 	 */
 	destroyed(event: CustomEvent): void;
+
+	/**
+	 * Default constructor
+	 * @param selector the root application element selector
+	 * @param options the options of the instance
+	 */
+	constructor(selector: string, options?: IBouerOptions<Data, GlobalData, Dependencies>);
 }
 
 export {
@@ -554,10 +567,11 @@ export {
 	IComponentOptions,
 
 	Watch,
+	WatchCallback,
 	Reactive,
 
-	MiddlewareConfigActions,
 	IMiddleware,
+	MiddlewareResult,
 
 	IBinderConfig,
 
@@ -570,4 +584,4 @@ export {
 	IEventSubscription,
 
 	IAsset
-}
+};

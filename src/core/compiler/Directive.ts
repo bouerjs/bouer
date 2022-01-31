@@ -34,6 +34,7 @@ import DataStore from "../store/DataStore";
 import Compiler from "./Compiler";
 import Base from "../Base";
 import Prop from "../../shared/helpers/Prop";
+import MiddlewareResult from "../middleware/MiddlewareResult";
 
 export default class Directive extends Base {
 	bouer: Bouer;
@@ -963,7 +964,7 @@ export default class Directive extends Base {
 			}
 		}
 
-		const isValidResponse = (response: any, requestType: string) => {
+		const isValidResponse = (response: MiddlewareResult, requestType: string) => {
 			if (!response) {
 				Logger.error(("the return must be an object containing " +
 					"“data” property. Example: { data: {} | [] }"));
@@ -999,7 +1000,7 @@ export default class Directive extends Base {
 
 		(onInsertOrUpdate = () => {
 			const expObject = builder(trim(node.nodeValue || ''));
-			const responseHandler = (response: any) => {
+			const responseHandler = (response: MiddlewareResult) => {
 				if (!isValidResponse(response, expObject.type))
 					return;
 
@@ -1058,7 +1059,7 @@ export default class Directive extends Base {
 			subcribeEvent(Constants.builtInEvents.request).emit();
 
 			middleware.run('req', {
-				type: 'bind',
+				type: 'onBind',
 				action: middlewareRequest => {
 					const context = {
 						binder: binderConfig,
@@ -1070,7 +1071,7 @@ export default class Directive extends Base {
 					};
 
 					const cbs = {
-						success: (response: any) => {
+						success: (response: MiddlewareResult) => {
 							responseHandler(response);
 						},
 						fail: (error: any) => subcribeEvent(Constants.builtInEvents.fail).emit({
@@ -1087,7 +1088,7 @@ export default class Directive extends Base {
 		onUpdate = () => {
 			const expObject = builder(trim(node.nodeValue || ''));
 			middleware.run('req', {
-				type: 'update',
+				type: 'onUpdate',
 				default: () => onInsertOrUpdate(),
 				action: middlewareRequest => {
 					const context = {
@@ -1100,7 +1101,7 @@ export default class Directive extends Base {
 					};
 
 					const cbs = {
-						success: (response: any) => {
+						success: (response: MiddlewareResult) => {
 							if (!isValidResponse(response, expObject.type))
 								return;
 

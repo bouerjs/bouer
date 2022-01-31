@@ -153,7 +153,8 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 			scss: 'link',
 			sass: 'link',
 			less: 'link',
-			style: 'link'
+			styl: 'link',
+			style: 'link',
 		}
 
 		const isValidAssetSrc = function (src: string, index: number) {
@@ -177,9 +178,9 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 
 			if (typeof asset === 'string') { // String type
 				if (!isValidAssetSrc(asset, index)) return;
-				type = assetTypeGetter(trim(src = asset.replace(/\.less|.s[ac]ss/i, '.css')), index);
+				type = assetTypeGetter(trim(src = asset.replace(/\.less|\.s[ac]ss|\.styl/i, '.css')), index);
 			} else { // Object Type
-				if (!isValidAssetSrc(trim(src = asset.src.replace(/\.less|.s[ac]ss/i, '.css')), index)) return;
+				if (!isValidAssetSrc(trim(src = asset.src.replace(/\.less|\.s[ac]ss\.styl/i, '.css')), index)) return;
 
 				if (!asset.type) {
 					if (!(type = assetTypeGetter(src, index))) return;

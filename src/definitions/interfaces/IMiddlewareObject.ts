@@ -1,6 +1,7 @@
+import MiddlewareResult from "../../core/middleware/MiddlewareResult";
 import IMiddleware from "./IMiddleware";
 
 export default interface IMiddlewareObject {
-	bind?: (context: IMiddleware, next: () => void) => Promise<any>,
-	update?: (context: IMiddleware, next: () => void) => Promise<any>
+	onBind?: (context: IMiddleware, next: () => void) => MiddlewareResult | Promise<MiddlewareResult>,
+	onUpdate?: (context: IMiddleware, next: () => void) => MiddlewareResult | Promise<MiddlewareResult>
 }
