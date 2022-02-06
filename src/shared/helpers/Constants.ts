@@ -18,7 +18,7 @@ const Constants = {
   def: 'e-def',
   wait: 'wait-data',
 
-  content: 'e-content',
+  text: 'e-text',
   bind: 'e-bind',
   property: 'e-',
 
