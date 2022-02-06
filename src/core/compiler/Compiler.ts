@@ -192,9 +192,9 @@ export default class Compiler extends Base {
 			if (Constants.check(node, Constants.href))
 				return directive.href(node, data);
 
-			// e-content="..." directive
-			if (Constants.check(node, Constants.content))
-				return directive.content(node);
+			// e-text="..." directive
+			if (Constants.check(node, Constants.text))
+				return directive.text(node);
 
 			// e-bind:[?]="..." directive
 			if (Constants.check(node, Constants.bind))
