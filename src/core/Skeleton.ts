@@ -1,7 +1,7 @@
 import Bouer from "../instance/Bouer";
 import Constants from "../shared/helpers/Constants";
 import ServiceProvider from "../shared/helpers/ServiceProvider";
-import { createEl, DOM, forEach, toArray } from "../shared/helpers/Utils";
+import { $CreateEl, DOM, forEach, toArray } from "../shared/helpers/Utils";
 import Base from "./Base";
 
 export default class Skeleton extends Base {
@@ -18,7 +18,7 @@ export default class Skeleton extends Base {
 
 		this.reset();
     this.bouer = bouer;
-    this.style = createEl('style', el => el.id = this.identifier).build();
+    this.style = $CreateEl('style', el => el.id = this.identifier).build();
 
     ServiceProvider.add('Skeleton', this);
   }

@@ -1,7 +1,7 @@
 import IComponentOptions from "../../definitions/interfaces/IComponentOptions";
 import Bouer from "../../instance/Bouer";
 import ServiceProvider from "../../shared/helpers/ServiceProvider";
-import { createAnyEl, DOM, forEach, GLOBAL, isNull, isObject, toArray, trim, urlCombine, urlResolver } from "../../shared/helpers/Utils";
+import { $CreateAnyEl, DOM, forEach, GLOBAL, isNull, isObject, toArray, trim, urlCombine, urlResolver } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Base from "../Base";
 import Component from "../component/Component";
@@ -79,7 +79,7 @@ export default class Routing extends Base {
 		// If it's not found and the url matches .html do nothing
 		if (!page && route.endsWith('.html')) return;
 
-		const componentElement = createAnyEl(page.name!, el => {
+		const componentElement = $CreateAnyEl(page.name!, el => {
 			// Inherit the data scope by default
 			el.setAttribute('data', isObject(options.data) ? JSON.stringify(options.data) : '$data');
 		}).appendTo(this.routeView!)

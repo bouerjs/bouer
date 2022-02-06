@@ -9,7 +9,7 @@ import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import Task from "../../shared/helpers/Task";
 import {
 	buildError,
-	createEl,
+	$CreateEl,
 	forEach,
 	isFunction,
 	isNull,
@@ -24,7 +24,7 @@ export default class EventHandler extends Base {
 	bouer: Bouer;
 	evaluator: Evaluator;
 	$events: { [key: string]: IEventSubscription[] } = {};
-	input = createEl('input').build();
+	input = $CreateEl('input').build();
 	serviceProvider: ServiceProvider;
 
 	constructor(bouer: Bouer) {

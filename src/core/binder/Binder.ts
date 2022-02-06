@@ -7,7 +7,7 @@ import Extend from "../../shared/helpers/Extend";
 import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import Task from "../../shared/helpers/Task";
 import {
-	createEl,
+	$CreateEl,
 	findAttribute,
 	forEach, isNull,
 	isObject,
@@ -130,7 +130,7 @@ export default class Binder extends Base {
 				if (!isHtml)
 					return nodeToBind.nodeValue = valueToSet;
 
-				const htmlSnippet = createEl('div', el => {
+				const htmlSnippet = $CreateEl('div', el => {
 					el.innerHTML = valueToSet;
 				}).build().children[0];
 

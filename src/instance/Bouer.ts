@@ -22,7 +22,7 @@ import Constants from "../shared/helpers/Constants";
 import ServiceProvider from "../shared/helpers/ServiceProvider";
 import Task from "../shared/helpers/Task";
 import {
-	createEl, DOM, forEach,
+	$CreateEl, DOM, forEach,
 	GLOBAL,
 	isNull, isObject, toArray, trim
 } from "../shared/helpers/Utils";
@@ -370,7 +370,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		routing.init();
 
 		if (!DOM.head.querySelector("link[rel~='icon']")) {
-			createEl('link', (favicon) => {
+			$CreateEl('link', (favicon) => {
 				favicon.rel = 'icon';
 				favicon.type = 'image/png';
 				favicon.href = 'https://afonsomatelias.github.io/assets/bouer/img/short.png';

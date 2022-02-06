@@ -54,7 +54,7 @@ export default class ReactiveEvent {
 		callback: (event: { onemit?: CallbackReactiveProperty }) => void
 	): void {
 		const event: { onemit?: CallbackReactiveProperty } = {}
-		const mEvent = ReactiveEvent.on(eventName, (reactive: any, method?: any, options?: any) => {
+		const mEvent = ReactiveEvent.on(eventName, (reactive: any) => {
 			if (event.onemit) event.onemit(reactive);
 		});
 		try {

@@ -9,8 +9,8 @@ import {
 	anchor,
 	buildError,
 	code,
-	createAnyEl,
-	createEl,
+	$CreateAnyEl,
+	$CreateEl,
 	DOM,
 	forEach, isFunction,
 	isNull,
@@ -289,7 +289,7 @@ export default class ComponentHandler extends Base {
 		if (isNull(component.template))
 			return Logger.error("The <" + $name + "></" + $name + "> component is not ready yet to be inserted.");
 
-		const elementSlots = createAnyEl('SlotContainer', el => {
+		const elementSlots = $CreateAnyEl('SlotContainer', el => {
 			el.innerHTML = componentElement.innerHTML
 			componentElement.innerHTML = "";
 		}).build();
@@ -297,7 +297,7 @@ export default class ComponentHandler extends Base {
 		const isKeepAlive = componentElement.hasAttribute('keep-alive') || (component.keepAlive ?? false);
 		// Component Creation
 		if (isKeepAlive === false || isNull(component.el)) {
-			createEl('body', htmlSnippet => {
+			$CreateEl('body', htmlSnippet => {
 				htmlSnippet.innerHTML = component.template!;
 
 				forEach([].slice.call(htmlSnippet.children), (asset: any) => {

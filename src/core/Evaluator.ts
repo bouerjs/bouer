@@ -5,7 +5,7 @@ import Extend from "../shared/helpers/Extend";
 import ServiceProvider from "../shared/helpers/ServiceProvider";
 import {
 	buildError,
-	createEl, forEach, GLOBAL
+	$CreateEl, forEach, GLOBAL
 } from "../shared/helpers/Utils";
 import Logger from "../shared/logger/Logger";
 import Base from "./Base";
@@ -27,7 +27,7 @@ export default class Evaluator extends Base {
 	private createWindow() {
 		let mWindow: Window | null;
 
-		createEl('iframe', (frame, dom) => {
+		$CreateEl('iframe', (frame, dom) => {
 			frame.style.display = 'none!important';
 			dom.body.appendChild(frame);
 			mWindow = frame.contentWindow;
