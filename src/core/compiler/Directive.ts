@@ -8,20 +8,20 @@ import Extend from "../../shared/helpers/Extend";
 import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import {
 	code,
-	createAnyEl,
+	$CreateAnyEl,
 	findAttribute,
 	forEach,
 	isNull,
 	isObject,
-	removeEl,
+	$RemoveEl,
 	toLower,
 	toStr,
 	trim,
-	urlCombine
+	urlCombine,
+	$CreateComment
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Binder from "../binder/Binder";
-import CommentHandler from "../CommentHandler";
 import ComponentHandler from "../component/ComponentHandler";
 import DelimiterHandler from "../DelimiterHandler";
 import Evaluator from "../Evaluator";
@@ -41,7 +41,6 @@ export default class Directive extends Base {
 	binder: Binder;
 	evaluator: Evaluator;
 	compiler: Compiler;
-	comment: CommentHandler;
 	eventHandler: EventHandler;
 	delimiter: DelimiterHandler;
 	$custom: CustomDirective = {};
@@ -66,8 +65,6 @@ export default class Directive extends Base {
 		this.delimiter = this.serviceProvider.get('DelimiterHandler')!;
 		this.binder = this.serviceProvider.get('Binder')!;
 		this.eventHandler = this.serviceProvider.get('EventHandler')!;
-
-		this.comment = new CommentHandler(this.bouer);
 	}
 
 	// Helper functions
@@ -92,7 +89,7 @@ export default class Directive extends Base {
 		if (!container) return;
 
 		const conditions: { node: Attr, element: Element }[] = [];
-		const comment = this.comment.create();
+		const comment = $CreateComment();
 		const nodeName = node.nodeName;
 		let execute = () => { };
 
@@ -244,7 +241,7 @@ export default class Directive extends Base {
 			iterableExpression: string
 		}
 
-		const comment = this.comment.create();
+		const comment = $CreateComment();
 		const nodeName = node.nodeName;
 		let nodeValue = trim(node.nodeValue ?? '');
 		let listedItemsHandler: ListedItemsHandler[] = [];
@@ -477,14 +474,14 @@ export default class Directive extends Base {
 				case 'pop': case 'shift': { // First or Last item removal handler
 					const item = mListedItems[method]();
 					if (!item) return;
-					removeEl(item.el);
+					$RemoveEl(item.el);
 
 					if (method === 'pop') return;
 					return reOrganizeIndexes();
 				}
 				case 'splice': { // Indexed removal handler
 					const removedItems = mListedItems[method].apply(mListedItems, args);
-					forEach(removedItems, (item: any) => removeEl(item.el));
+					forEach(removedItems, (item: any) => $RemoveEl(item.el));
 
 					let index = args[0] as number;
 					expObj = expObj || $ExpressionBuilder(trim(node.nodeValue ?? ''));
@@ -639,7 +636,7 @@ export default class Directive extends Base {
 		ownerNode.removeAttribute(node.nodeName);
 	}
 
-	content(node: Node) {
+	text(node: Node) {
 		const ownerNode = this.toOwnerNode(node);
 		const nodeValue = trim(node.nodeValue ?? '');
 
@@ -872,7 +869,7 @@ export default class Directive extends Base {
 			nodeValue = trim(node.nodeValue ?? '');
 			if (nodeValue === '') return;
 
-			const componentElement = createAnyEl(nodeValue)
+			const componentElement = $CreateAnyEl(nodeValue)
 				.appendTo(ownerNode)
 				.build();
 
