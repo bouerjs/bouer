@@ -208,7 +208,12 @@ function toArray(array) {
         return [];
     return [].slice.call(array);
 }
-function createAnyEl(elName, callback) {
+function $CreateComment(id) {
+    var comment = DOM.createComment('e');
+    comment.id = id || code(8);
+    return comment;
+}
+function $CreateAnyEl(elName, callback) {
     var el = DOM.createElement(elName);
     if (isFunction(callback))
         callback(el, DOM);
@@ -221,7 +226,7 @@ function createAnyEl(elName, callback) {
     };
     return returnObj;
 }
-function createEl(elName, callback) {
+function $CreateEl(elName, callback) {
     var el = DOM.createElement(elName);
     if (isFunction(callback))
         callback(el, DOM);
@@ -234,7 +239,7 @@ function createEl(elName, callback) {
     };
     return returnObj;
 }
-function removeEl(el) {
+function $RemoveEl(el) {
     var parent = el.parentNode;
     if (parent)
         parent.removeChild(el);
@@ -328,7 +333,7 @@ function buildError(error) {
 }
 var DOM = document;
 var GLOBAL = globalThis;
-var anchor = createEl('a').build();
+var anchor = $CreateEl('a').build();
 
 var Constants = {
     skip: 'e-skip',
@@ -343,7 +348,7 @@ var Constants = {
     data: 'data',
     def: 'e-def',
     wait: 'wait-data',
-    content: 'e-content',
+    text: 'e-text',
     bind: 'e-bind',
     property: 'e-',
     skeleton: 'e-skeleton',
@@ -552,7 +557,7 @@ var ReactiveEvent = /** @class */ (function () {
     };
     ReactiveEvent.once = function (eventName, callback) {
         var event = {};
-        var mEvent = ReactiveEvent.on(eventName, function (reactive, method, options) {
+        var mEvent = ReactiveEvent.on(eventName, function (reactive) {
             if (event.onemit)
                 event.onemit(reactive);
         });
@@ -670,7 +675,7 @@ var Binder = /** @class */ (function (_super) {
                 propertyBindConfig.value = valueToSet;
                 if (!isHtml)
                     return nodeToBind.nodeValue = valueToSet;
-                var htmlSnippet = createEl('div', function (el) {
+                var htmlSnippet = $CreateEl('div', function (el) {
                     el.innerHTML = valueToSet;
                 }).build().children[0];
                 ownerNode.appendChild(htmlSnippet);
@@ -864,23 +869,6 @@ var Binder = /** @class */ (function (_super) {
         });
     };
     return Binder;
-}(Base));
-
-var CommentHandler = /** @class */ (function (_super) {
-    __extends(CommentHandler, _super);
-    function CommentHandler(bouer) {
-        var _this = _super.call(this) || this;
-        _this.bouer = bouer;
-        ServiceProvider.add('CommentHandler', _this);
-        return _this;
-    }
-    /** Creates a comment with some identifier */
-    CommentHandler.prototype.create = function (id) {
-        var comment = DOM.createComment('e');
-        comment.id = id || code(8);
-        return comment;
-    };
-    return CommentHandler;
 }(Base));
 
 var Watch = /** @class */ (function (_super) {
@@ -1091,7 +1079,6 @@ var Directive = /** @class */ (function (_super) {
         _this.delimiter = _this.serviceProvider.get('DelimiterHandler');
         _this.binder = _this.serviceProvider.get('Binder');
         _this.eventHandler = _this.serviceProvider.get('EventHandler');
-        _this.comment = new CommentHandler(_this.bouer);
         return _this;
     }
     // Helper functions
@@ -1110,7 +1097,7 @@ var Directive = /** @class */ (function (_super) {
         if (!container)
             return;
         var conditions = [];
-        var comment = this.comment.create();
+        var comment = $CreateComment();
         var nodeName = node.nodeName;
         var execute = function () { };
         if (nodeName === Constants.elseif || nodeName === Constants.else)
@@ -1237,7 +1224,7 @@ var Directive = /** @class */ (function (_super) {
         var container = ownerNode.parentElement;
         if (!container)
             return;
-        var comment = this.comment.create();
+        var comment = $CreateComment();
         var nodeName = node.nodeName;
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
         var listedItemsHandler = [];
@@ -1439,14 +1426,14 @@ var Directive = /** @class */ (function (_super) {
                     var item = mListedItems[method]();
                     if (!item)
                         return;
-                    removeEl(item.el);
+                    $RemoveEl(item.el);
                     if (method === 'pop')
                         return;
                     return reOrganizeIndexes();
                 }
                 case 'splice': { // Indexed removal handler
                     var removedItems = mListedItems[method].apply(mListedItems, args);
-                    forEach(removedItems, function (item) { return removeEl(item.el); });
+                    forEach(removedItems, function (item) { return $RemoveEl(item.el); });
                     var index = args[0];
                     expObj = expObj || $ExpressionBuilder(trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : ''));
                     var leftHandParts = expObj.leftHandParts;
@@ -1586,7 +1573,7 @@ var Directive = /** @class */ (function (_super) {
         this.bouer.set(inputData, data);
         ownerNode.removeAttribute(node.nodeName);
     };
-    Directive.prototype.content = function (node) {
+    Directive.prototype.text = function (node) {
         var _a;
         var ownerNode = this.toOwnerNode(node);
         var nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
@@ -1787,7 +1774,7 @@ var Directive = /** @class */ (function (_super) {
             nodeValue = trim((_a = node.nodeValue) !== null && _a !== void 0 ? _a : '');
             if (nodeValue === '')
                 return;
-            var componentElement = createAnyEl(nodeValue)
+            var componentElement = $CreateAnyEl(nodeValue)
                 .appendTo(ownerNode)
                 .build();
             _this.serviceProvider.get('ComponentHandler')
@@ -2189,9 +2176,9 @@ var Compiler = /** @class */ (function (_super) {
             // :href="..." or !href="..." directive
             if (Constants.check(node, Constants.href))
                 return directive.href(node, data);
-            // e-content="..." directive
-            if (Constants.check(node, Constants.content))
-                return directive.content(node);
+            // e-text="..." directive
+            if (Constants.check(node, Constants.text))
+                return directive.text(node);
             // e-bind:[?]="..." directive
             if (Constants.check(node, Constants.bind))
                 return directive.bind(node, data);
@@ -2441,13 +2428,7 @@ var Component = /** @class */ (function (_super) {
     function Component(optionsOrPath) {
         var _this = _super.call(this) || this;
         _this.prefetch = false;
-        _this.title = undefined;
-        _this.route = undefined;
-        _this.isDefault = undefined;
-        _this.isNotFound = undefined;
         _this.isDestroyed = false;
-        _this.el = undefined;
-        _this.bouer = undefined;
         _this.children = [];
         _this.assets = [];
         // Store temporarily this component UI orders
@@ -2578,7 +2559,7 @@ var Component = /** @class */ (function (_super) {
                 // Building the URL according to the main path
                 src = urlCombine(hasBaseURIInURL ? resolver.origin : resolver.baseURI, resolver.pathname);
             }
-            var $Asset = createAnyEl(type, function (el) {
+            var $Asset = $CreateAnyEl(type, function (el) {
                 if (scoped !== null && scoped !== void 0 ? scoped : true)
                     el.setAttribute('scoped', 'true');
                 switch (toLower(type)) {
@@ -2819,14 +2800,14 @@ var ComponentHandler = /** @class */ (function (_super) {
             return; //Logger.warn("Insert location of component <" + $name + "></" + $name + "> not found.");
         if (isNull(component.template))
             return Logger.error("The <" + $name + "></" + $name + "> component is not ready yet to be inserted.");
-        var elementSlots = createAnyEl('SlotContainer', function (el) {
+        var elementSlots = $CreateAnyEl('SlotContainer', function (el) {
             el.innerHTML = componentElement.innerHTML;
             componentElement.innerHTML = "";
         }).build();
         var isKeepAlive = componentElement.hasAttribute('keep-alive') || ((_a = component.keepAlive) !== null && _a !== void 0 ? _a : false);
         // Component Creation
         if (isKeepAlive === false || isNull(component.el)) {
-            createEl('body', function (htmlSnippet) {
+            $CreateEl('body', function (htmlSnippet) {
                 htmlSnippet.innerHTML = component.template;
                 forEach([].slice.call(htmlSnippet.children), function (asset) {
                     if (['SCRIPT', 'LINK', 'STYLE'].indexOf(asset.nodeName) === -1)
@@ -2943,6 +2924,7 @@ var ComponentHandler = /** @class */ (function (_super) {
             if (mStyle instanceof HTMLLinkElement) {
                 var path = component.path[0] === '/' ? component.path.substring(1) : component.path;
                 mStyle.href = pathResolver(path, mStyle.getAttribute('href') || '');
+                mStyle.rel = "stylesheet";
             }
             //Checking if this component already have styles added
             if (_this.stylesController[$name]) {
@@ -3128,7 +3110,7 @@ var Evaluator = /** @class */ (function (_super) {
     }
     Evaluator.prototype.createWindow = function () {
         var mWindow;
-        createEl('iframe', function (frame, dom) {
+        $CreateEl('iframe', function (frame, dom) {
             frame.style.display = 'none!important';
             dom.body.appendChild(frame);
             mWindow = frame.contentWindow;
@@ -3198,7 +3180,7 @@ var EventHandler = /** @class */ (function (_super) {
     function EventHandler(bouer) {
         var _this = _super.call(this) || this;
         _this.$events = {};
-        _this.input = createEl('input').build();
+        _this.input = $CreateEl('input').build();
         _this.bouer = bouer;
         _this.serviceProvider = new ServiceProvider(bouer);
         _this.evaluator = _this.serviceProvider.get('Evaluator');
@@ -3403,8 +3385,6 @@ var Routing = /** @class */ (function (_super) {
     __extends(Routing, _super);
     function Routing(bouer) {
         var _this = _super.call(this) || this;
-        _this.defaultPage = undefined;
-        _this.notFoundPage = undefined;
         _this.routeView = null;
         _this.activeAnchors = [];
         // Store `href` value of the <base /> tag
@@ -3459,7 +3439,7 @@ var Routing = /** @class */ (function (_super) {
         // If it's not found and the url matches .html do nothing
         if (!page && route.endsWith('.html'))
             return;
-        var componentElement = createAnyEl(page.name, function (el) {
+        var componentElement = $CreateAnyEl(page.name, function (el) {
             // Inherit the data scope by default
             el.setAttribute('data', isObject(options.data) ? JSON.stringify(options.data) : '$data');
         }).appendTo(this.routeView)
@@ -3564,7 +3544,7 @@ var Skeleton = /** @class */ (function (_super) {
         _this.identifier = "bouer";
         _this.reset();
         _this.bouer = bouer;
-        _this.style = createEl('style', function (el) { return el.id = _this.identifier; }).build();
+        _this.style = $CreateEl('style', function (el) { return el.id = _this.identifier; }).build();
         ServiceProvider.add('Skeleton', _this);
         return _this;
     }
@@ -3823,7 +3803,7 @@ var Bouer = /** @class */ (function (_super) {
         // Initializing Routing
         routing.init();
         if (!DOM.head.querySelector("link[rel~='icon']")) {
-            createEl('link', function (favicon) {
+            $CreateEl('link', function (favicon) {
                 favicon.rel = 'icon';
                 favicon.type = 'image/png';
                 favicon.href = 'https://afonsomatelias.github.io/assets/bouer/img/short.png';
