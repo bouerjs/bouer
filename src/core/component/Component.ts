@@ -8,7 +8,7 @@ import Prop from "../../shared/helpers/Prop";
 import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import UriHandler from "../../shared/helpers/UriHandler";
 import {
-	createAnyEl, forEach, isObject, isString, toLower, trim, urlCombine, urlResolver, where
+	$CreateAnyEl, forEach, isObject, isString, toLower, trim, urlCombine, urlResolver, where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Base from "../Base";
@@ -21,10 +21,10 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 	template?: string;
 	keepAlive?: boolean;
 	prefetch?: boolean = false;
-	title?: string = undefined;
-	route?: string = undefined;
-	isDefault?: boolean = undefined;
-	isNotFound?: boolean = undefined;
+	title?: string;
+	route?: string;
+	isDefault?: boolean;
+	isNotFound?: boolean;
 	isDestroyed: boolean = false;
 
 	el?: Element = undefined;
@@ -186,7 +186,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 				src = urlCombine(hasBaseURIInURL ? resolver.origin : resolver.baseURI, resolver.pathname);
 			}
 
-			const $Asset = createAnyEl(type, el => {
+			const $Asset = $CreateAnyEl(type, el => {
 				if (scoped ?? true)
 					el.setAttribute('scoped', 'true');
 
