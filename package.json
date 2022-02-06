@@ -2,8 +2,8 @@
   "name": "bouerjs",
   "version": "3.0.0",
   "description": "A library that provides a fastest and easy way to bind data to your pages",
-  "main": "dist/bouer.common.js",
-  "module": "dist/bouer.esm.js",
+  "main": "dist/bouer.common.min.js",
+  "module": "dist/bouer.esm.min.js",
   "typings": "types/index.d.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
