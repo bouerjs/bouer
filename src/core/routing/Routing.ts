@@ -9,8 +9,8 @@ import ComponentHandler from "../component/ComponentHandler";
 
 export default class Routing extends Base {
 	bouer: Bouer;
-	defaultPage?: Component | IComponentOptions<any> = undefined;
-	notFoundPage?: Component | IComponentOptions<any> = undefined;
+	defaultPage?: Component | IComponentOptions<any>;
+	notFoundPage?: Component | IComponentOptions<any>;
 	routeView: Element | null = null;
 	activeAnchors: HTMLAnchorElement[] = [];
 

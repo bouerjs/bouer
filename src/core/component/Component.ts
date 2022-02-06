@@ -27,8 +27,8 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 	isNotFound?: boolean;
 	isDestroyed: boolean = false;
 
-	el?: Element = undefined;
-	bouer?: Bouer = undefined;
+	el?: Element;
+	bouer?: Bouer;
 	readonly children?: (Component | IComponentOptions<Data>)[] = [];
 	readonly assets: (HTMLScriptElement | HTMLStyleElement | HTMLLinkElement)[] = [];
 	readonly restrictions?: ((component: (Component | IComponentOptions<Data>)) => boolean | Promise<boolean>)[];
