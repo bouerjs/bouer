@@ -208,7 +208,13 @@ export function toArray(array: any) {
 	return [].slice.call(array);
 }
 
-export function createAnyEl(elName: string,
+export function $CreateComment(id?: string) {
+	const comment = DOM.createComment('e');
+	(comment as any).id = id || code(8);
+	return comment;
+}
+
+export function $CreateAnyEl(elName: string,
 	callback?: (element: HTMLElement, dom: Document) => void) {
 	const el = DOM.createElement(elName);
 	if (isFunction(callback)) callback!(el, DOM);
@@ -223,7 +229,7 @@ export function createAnyEl(elName: string,
 	return returnObj;
 }
 
-export function createEl<TKey extends keyof HTMLElementTagNameMap>(
+export function $CreateEl<TKey extends keyof HTMLElementTagNameMap>(
 	elName: TKey,
 	callback?: (element: HTMLElementTagNameMap[TKey], dom: Document) => void) {
 	const el = DOM.createElement(elName);
@@ -239,7 +245,7 @@ export function createEl<TKey extends keyof HTMLElementTagNameMap>(
 	return returnObj;
 }
 
-export function removeEl(el: Element) {
+export function $RemoveEl(el: Element) {
 	const parent = el.parentNode;
 	if (parent) parent.removeChild(el);
 }
@@ -351,4 +357,4 @@ export function buildError(error: any) {
 
 export const DOM = document;
 export const GLOBAL = globalThis;
-export const anchor = createEl('a').build();
+export const anchor = $CreateEl('a').build();
