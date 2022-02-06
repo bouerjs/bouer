@@ -31,7 +31,7 @@
 								on:click="next">Next</button>
 			</nav>
 
-			<div>Status: {{ requestStatus }} </div>
+			<div e-text="{{ requestStatus }}">Status: {{ requestStatus }} </div>
 
 			<ul>
 				<li e-req="user of users?_start={{ start }}&_limit={{ limit }}" on:request="requested"
