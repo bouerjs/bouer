@@ -441,6 +441,7 @@ export default class ComponentHandler extends Base {
 			if (mStyle instanceof HTMLLinkElement) {
 				const path = component.path[0] === '/' ? component.path.substring(1) : component.path;
 				mStyle.href = pathResolver(path, mStyle.getAttribute('href') || '');
+				mStyle.rel = "stylesheet";
 			}
 
 			//Checking if this component already have styles added
