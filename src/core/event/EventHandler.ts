@@ -145,10 +145,12 @@ export default class EventHandler extends Base {
 			return;
 
 		this.$events[eventName] = where(this.$events[eventName], evt => {
-			if (attachedNode)
-				return (evt.attachedNode === attachedNode)
+			const isEqual = (evt.eventName === eventName && callback == evt.callback);
 
-			return !(evt.eventName === eventName && callback == evt.callback);
+			if (attachedNode && (evt.attachedNode === attachedNode) && isEqual)
+				return false;
+
+			return !isEqual;
 		});
 	}
 
@@ -187,10 +189,11 @@ export default class EventHandler extends Base {
 		Task.run(() => {
 			forEach(Object.keys(this.$events), key => {
 				this.$events[key] = where(this.$events[key], event => {
+					if ((event.modifiers||{}).autodestroy === false) return true;
 					if (!event.attachedNode) return true;
 					if (event.attachedNode.isConnected) return true;
 				});
 			});
-		}, 1000);
+		});
 	}
 }
