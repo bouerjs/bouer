@@ -68,6 +68,9 @@ export default class Compiler extends Base {
 		const context = options.context || this.bouer;
 		const data = (options.data || this.bouer.data!);
 
+		if (!rootElement)
+			return Logger.error("Invalid element provided to the compiler.")
+
 		if (!this.analize(rootElement.outerHTML))
 			return rootElement;
 
