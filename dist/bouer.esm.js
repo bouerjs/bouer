@@ -2429,7 +2429,6 @@ var Component = /** @class */ (function (_super) {
     __extends(Component, _super);
     function Component(optionsOrPath) {
         var _this = _super.call(this) || this;
-        _this.prefetch = false;
         _this.isDestroyed = false;
         _this.children = [];
         _this.assets = [];
@@ -2476,10 +2475,10 @@ var Component = /** @class */ (function (_super) {
         var container = this.el.parentElement;
         if (container)
             container.removeChild(this.el);
+        this.emit('destroyed');
         // Destroying all the events attached to the this instance
         forEach(this.events, function (evt) { return _this.off(evt.eventName, evt.callback); });
         this.events = [];
-        this.emit('destroyed');
     };
     Component.prototype.params = function () {
         return new UriHandler().params(this.route);
@@ -2497,7 +2496,8 @@ var Component = /** @class */ (function (_super) {
             eventName: eventName,
             callback: callback,
             attachedNode: this.el,
-            context: context
+            context: context,
+            modifiers: { once: true, autodestroy: false },
         });
         this.events.push(evt);
         return evt;
@@ -2640,7 +2640,6 @@ var ComponentHandler = /** @class */ (function (_super) {
         var _this = this;
         forEach(components, function (component) {
             var _a;
-            component.constructor.name;
             if (isNull(component.path) && isNull(component.template))
                 return Logger.warn("The component with name “" + component.name + "”" +
                     (component.route ? (" and route “" + component.route + "”") : "") +
@@ -2679,8 +2678,7 @@ var ComponentHandler = /** @class */ (function (_super) {
                     return getContent(component.path);
                 return;
             }
-            var prefetch = (_a = _this.bouer.config.prefetch) !== null && _a !== void 0 ? _a : true;
-            if (!prefetch)
+            if (!(component.prefetch = (_a = _this.bouer.config.prefetch) !== null && _a !== void 0 ? _a : true))
                 return;
             return getContent(component.path);
         });
@@ -3272,9 +3270,10 @@ var EventHandler = /** @class */ (function (_super) {
         if (!this.$events[eventName])
             return;
         this.$events[eventName] = where(this.$events[eventName], function (evt) {
-            if (attachedNode)
-                return (evt.attachedNode === attachedNode);
-            return !(evt.eventName === eventName && callback == evt.callback);
+            var isEqual = (evt.eventName === eventName && callback == evt.callback);
+            if (attachedNode && (evt.attachedNode === attachedNode) && isEqual)
+                return false;
+            return !isEqual;
         });
     };
     EventHandler.prototype.emit = function (options) {
@@ -3309,13 +3308,15 @@ var EventHandler = /** @class */ (function (_super) {
         Task.run(function () {
             forEach(Object.keys(_this.$events), function (key) {
                 _this.$events[key] = where(_this.$events[key], function (event) {
+                    if ((event.modifiers || {}).autodestroy === false)
+                        return true;
                     if (!event.attachedNode)
                         return true;
                     if (event.attachedNode.isConnected)
                         return true;
                 });
             });
-        }, 1000);
+        });
     };
     return EventHandler;
 }(Base));
