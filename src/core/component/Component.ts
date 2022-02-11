@@ -20,7 +20,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 	data: Data;
 	template?: string;
 	keepAlive?: boolean;
-	prefetch?: boolean = false;
+	prefetch?: boolean;
 	title?: string;
 	route?: string;
 	isDefault?: boolean;
@@ -85,11 +85,11 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 		let container = this.el.parentElement;
 		if (container) container.removeChild(this.el);
 
+		this.emit('destroyed');
+
 		// Destroying all the events attached to the this instance
 		forEach(this.events, evt => this.off((evt.eventName as any), evt.callback));
-
 		this.events = [];
-		this.emit('destroyed');
 	}
 
 	params() {
@@ -116,7 +116,8 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 			eventName,
 			callback: callback as any,
 			attachedNode: this.el!,
-			context: context as any
+			context: context as any,
+			modifiers: { once: true, autodestroy: false },
 		});
 		this.events.push(evt);
 		return evt;
