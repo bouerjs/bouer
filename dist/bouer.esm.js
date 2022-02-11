@@ -2076,6 +2076,8 @@ var Compiler = /** @class */ (function (_super) {
         var rootElement = options.el;
         var context = options.context || this.bouer;
         var data = (options.data || this.bouer.data);
+        if (!rootElement)
+            return Logger.error("Invalid element provided to the compiler.");
         if (!this.analize(rootElement.outerHTML))
             return rootElement;
         var directive = new Directive(this.directives || {}, this, context);
