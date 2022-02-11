@@ -504,6 +504,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 		options?: {
 			attachedNode?: Node,
 			modifiers?: {
+				autodestroy?: boolean;
 				capture?: boolean;
 				once?: boolean;
 				passive?: boolean;

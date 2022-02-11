@@ -406,6 +406,7 @@ declare class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
 			attachedNode?: Node,
 			/** Modifiers of the event | AddEventListenerOptions */
 			modifiers?: {
+				autodestroy?: boolean;
 				capture?: boolean;
 				once?: boolean;
 				passive?: boolean;
