@@ -95,9 +95,6 @@ export default class ComponentHandler extends Base {
 
 	prepare(components: (Component<any> | IComponentOptions<any>)[], parent?: (Component<any> | IComponentOptions<any>)) {
 		forEach(components, component => {
-			const ctorName = component.constructor.name;
-
-			const isBuitInClass = ctorName === "IComponent" || ctorName === "Component" || ctorName === "Object";
 
 			if (isNull(component.path) && isNull(component.template))
 				return Logger.warn("The component with name “" + component.name + "”" +
@@ -149,8 +146,8 @@ export default class ComponentHandler extends Base {
 				return;
 			}
 
-			const prefetch = this.bouer.config.prefetch ?? true;
-			if (!prefetch) return;
+			if (!(component.prefetch = this.bouer.config.prefetch ?? true))
+				return;
 
 			return getContent(component.path);
 		});
