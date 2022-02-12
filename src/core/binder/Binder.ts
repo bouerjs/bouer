@@ -336,7 +336,18 @@ export default class Binder extends Base {
 
 		ReactiveEvent.once('AfterGet', evt => {
 			evt.onemit = reactive => {
-				watches.push(reactive.onChange(() => watchable.call(this.bouer, this.bouer)));
+				// Do not watch the same property twice
+				if (watches.find(w => w.property === reactive.propertyName &&
+					w.reactive.propertySource === reactive.propertySource)) return;
+
+				// Execution handler
+				let isExecuting = false;
+				watches.push(reactive.onChange(() => {
+					if (isExecuting) return;
+					isExecuting = true;
+					watchable.call(this.bouer, this.bouer);
+					isExecuting = false;
+				}));
 			}
 			watchable.call(this.bouer, this.bouer);
 		});
