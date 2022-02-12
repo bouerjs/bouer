@@ -855,7 +855,19 @@ var Binder = /** @class */ (function (_super) {
         var watches = [];
         ReactiveEvent.once('AfterGet', function (evt) {
             evt.onemit = function (reactive) {
-                watches.push(reactive.onChange(function () { return watchable.call(_this.bouer, _this.bouer); }));
+                // Do not watch the same property twice
+                if (watches.find(function (w) { return w.property === reactive.propertyName &&
+                    w.reactive.propertySource === reactive.propertySource; }))
+                    return;
+                // Execution handler
+                var isExecuting = false;
+                watches.push(reactive.onChange(function () {
+                    if (isExecuting)
+                        return;
+                    isExecuting = true;
+                    watchable.call(_this.bouer, _this.bouer);
+                    isExecuting = false;
+                }));
             };
             watchable.call(_this.bouer, _this.bouer);
         });
@@ -912,7 +924,7 @@ var Reactive = /** @class */ (function (_super) {
         };
         _this.set = function (value) {
             _this.propertyValueOld = _this.propertyValue;
-            if (_this.propertyValueOld === value)
+            if (_this.propertyValueOld === value || (Number.isNaN(_this.propertyValueOld) && Number.isNaN(value)))
                 return;
             ReactiveEvent.emit('BeforeSet', _this);
             if (isObject(value) || Array.isArray(value)) {
@@ -979,7 +991,7 @@ var Reactive = /** @class */ (function (_super) {
     Reactive.prototype.notify = function () {
         var _this = this;
         // Running all the watches
-        forEach(this.watches, function (watch) { return watch.callback(_this.propertyValue, _this.propertyValueOld); });
+        forEach(this.watches, function (watch) { return watch.callback.call(_this.context, _this.propertyValue, _this.propertyValueOld); });
     };
     Reactive.prototype.onChange = function (callback, node) {
         var w = new Watch(this, callback, { node: node });
