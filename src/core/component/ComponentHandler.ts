@@ -103,7 +103,7 @@ export default class ComponentHandler extends Base {
 
 			if (isNull(component.name) || !component.name) {
 				const pathSplitted = component.path!.toLowerCase().split('/');
-				let generatedComponentName = pathSplitted[pathSplitted.length-1].replace('.html', '');
+				let generatedComponentName = pathSplitted[pathSplitted.length - 1].replace('.html', '');
 
 				// If the component name already exists generate a new one
 				if (this.components[generatedComponentName])
@@ -175,10 +175,13 @@ export default class ComponentHandler extends Base {
 				return;
 			}
 
+			if (!component.path)
+				return Logger.error("Expected a valid value in `path` or `template` got invalid value at “" + $name + "” component.");
+
 			const requestedEvent = this.addComponentEventAndEmitGlobalEvent('requested', componentElement, component, this.bouer);
 			if (requestedEvent) requestedEvent.emit();
 			// Make or Add request
-			this.request(component.path!, {
+			this.request(component.path, {
 				success: content => {
 					const newComponent = (component instanceof Component) ? component : new Component(component);
 					icomponent.template = newComponent.template = content;
