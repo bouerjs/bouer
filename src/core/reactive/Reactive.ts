@@ -76,7 +76,9 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
 
 	set = (value: Value) => {
 		this.propertyValueOld = this.propertyValue;
-		if (this.propertyValueOld === value) return;
+		if (this.propertyValueOld === value || (Number.isNaN(this.propertyValueOld) && Number.isNaN(value)))
+			return;
+
 		ReactiveEvent.emit('BeforeSet', this);
 
 		if (isObject(value) || Array.isArray(value)) {
@@ -121,7 +123,7 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
 
 	notify() {
 		// Running all the watches
-		forEach(this.watches, watch => watch.callback(this.propertyValue, this.propertyValueOld));
+		forEach(this.watches, watch => watch.callback.call(this.context, this.propertyValue, this.propertyValueOld));
 	}
 
 	onChange(callback: WatchCallback, node?: Node): Watch<Value, TObject> {
