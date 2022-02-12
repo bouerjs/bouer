@@ -2719,6 +2719,8 @@ var ComponentHandler = /** @class */ (function (_super) {
                     mComponents[$name] = component;
                 return;
             }
+            if (!component.path)
+                return Logger.error("Expected a valid value in `path` or `template` got invalid value at “" + $name + "” component.");
             var requestedEvent = _this.addComponentEventAndEmitGlobalEvent('requested', componentElement, component, _this.bouer);
             if (requestedEvent)
                 requestedEvent.emit();
