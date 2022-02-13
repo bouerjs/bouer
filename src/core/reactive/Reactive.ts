@@ -198,7 +198,7 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
 
 				const propertyValue = mInputObject[key];
 
-				if ((propertyValue instanceof Object) && ((propertyValue.$irt) || (propertyValue instanceof Node)))
+				if ((propertyValue instanceof Object) && ((propertyValue._IRT_) || (propertyValue instanceof Node)))
 					return;
 
 				const reactive = new Reactive({

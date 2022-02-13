@@ -1,4 +1,4 @@
 export default class Base {
-	/** irt -> Ignore Reactive Transformation */
-	readonly $irt = true;
+	/** IRT -> Ignore Reactive Transformation */
+	readonly _IRT_ = true;
 }
