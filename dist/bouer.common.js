@@ -536,8 +536,8 @@ var Logger = /** @class */ (function () {
 
 var Base = /** @class */ (function () {
     function Base() {
-        /** irt -> Ignore Reactive Transformation */
-        this.$irt = true;
+        /** IRT -> Ignore Reactive Transformation */
+        this._IRT_ = true;
     }
     return Base;
 }());
@@ -972,16 +972,16 @@ var Reactive = /** @class */ (function (_super) {
         _this.propertyValue = _this.propertyDescriptor.value;
         _this.isComputed = typeof _this.propertyValue === 'function' && _this.propertyValue.name === '$computed';
         if (_this.isComputed) {
-            var computedResult = _this.propertyValue.call(_this.context);
-            if ('get' in computedResult || isFunction(computedResult)) {
-                _this.computedGetter = computedResult.get || computedResult;
+            var computedResult_1 = _this.propertyValue.call(_this.context);
+            if ('get' in computedResult_1 || !isNull(computedResult_1)) {
+                _this.computedGetter = computedResult_1.get || (function () { return computedResult_1; });
             }
-            if ('set' in computedResult) {
-                _this.computedSetter = computedResult.set;
+            if ('set' in computedResult_1) {
+                _this.computedSetter = computedResult_1.set;
             }
-            if (!_this.computedGetter)
-                throw new Error("Computed property must be a function “function $computed(){...}” " +
-                    "that returns a function for “getter only” or an object with a “get” and/or “set” function");
+            if (isNull(_this.computedGetter))
+                throw new Error("Computed property must be a function “function $computed(){...}” that returns " +
+                    "a valid value to infer “getter only” or an object with a “get” and/or “set” function");
             _this.propertyValue = undefined;
         }
         if (typeof _this.propertyValue === 'function' && !_this.isComputed)
@@ -1050,7 +1050,7 @@ var Reactive = /** @class */ (function (_super) {
                 if (!('value' in Prop.descriptor(inputObject, key)))
                     return;
                 var propertyValue = mInputObject[key];
-                if ((propertyValue instanceof Object) && ((propertyValue.$irt) || (propertyValue instanceof Node)))
+                if ((propertyValue instanceof Object) && ((propertyValue._IRT_) || (propertyValue instanceof Node)))
                     return;
                 var reactive = new Reactive({
                     propertyName: key,
