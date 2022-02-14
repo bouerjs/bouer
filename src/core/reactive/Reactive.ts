@@ -47,17 +47,17 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
 		if (this.isComputed) {
 			const computedResult = (this.propertyValue as any).call(this.context);
 
-			if ('get' in computedResult || isFunction(computedResult)) {
-				this.computedGetter = computedResult.get || computedResult;
+			if ('get' in computedResult || !isNull(computedResult)) {
+				this.computedGetter = computedResult.get || (() => computedResult);
 			}
 
 			if ('set' in computedResult) {
 				this.computedSetter = computedResult.set;
 			}
 
-			if (!this.computedGetter)
-				throw new Error("Computed property must be a function “function $computed(){...}” " +
-					"that returns a function for “getter only” or an object with a “get” and/or “set” function");
+			if (isNull(this.computedGetter))
+				throw new Error("Computed property must be a function “function $computed(){...}” that returns " +
+					"a valid value to infer “getter only” or an object with a “get” and/or “set” function");
 
 			(this.propertyValue as any) = undefined;
 		}
