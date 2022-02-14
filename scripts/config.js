@@ -69,7 +69,6 @@ const rollupConfigBuilder = (key, config) => {
       babel({
         exclude: ["node_modules/**"],
         babelHelpers: 'bundled',
-        presets: ['@babel/preset-env', '@babel/preset-typescript'],
       }),
       typescript({
         lib: ["es5", "es6", "dom"],
