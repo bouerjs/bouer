@@ -60,7 +60,7 @@ export default class Evaluator extends Base {
 		const noConfigurableProperties: dynamic = {};
 		context = context || this.bouer;
 
-		let dataToUse: dynamic = Extend.obj(aditional || {});
+		let dataToUse: dynamic = Extend.obj(aditional || {}, { $root: this.bouer.data, $mixin: Extend.mixin });
 		// Defining the scope data
 		forEach(Object.keys(data), key => {
 			Prop.transfer(dataToUse, data, key);
