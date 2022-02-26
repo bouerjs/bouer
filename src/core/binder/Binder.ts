@@ -9,7 +9,7 @@ import Task from "../../shared/helpers/Task";
 import {
 	$CreateEl,
 	findAttribute,
-	forEach, isNull,
+	forEach, ifNullReturn, isNull,
 	isObject,
 	toArray, toStr,
 	trim,
@@ -53,7 +53,7 @@ export default class Binder extends Base {
 
 	create(options: IBinderOptions) {
 		const { node, data, fields, isReplaceProperty, context } = options;
-		const originalValue = trim(node.nodeValue ?? '');
+		const originalValue = trim(ifNullReturn(node.nodeValue, ''));
 		const originalName = node.nodeName;
 		const ownerNode = (node as any).ownerElement || node.parentNode;
 		const middleware = this.serviceProvider.get<Middleware>('Middleware')!;
@@ -270,12 +270,19 @@ export default class Binder extends Base {
 			}
 
 			ReactiveEvent.once('AfterGet', evt => {
+				const getValue = () => this.evaluator.exec({
+					data: data,
+					expression: dataBindProperty,
+					context: context
+				});
+
 				// Adding the event on emittion
 				evt.onemit = reactive => {
 
 					this.binds.push({
 						isConnected: options.isConnected,
-						watch: reactive.onChange(value => {
+						watch: reactive.onChange(() => {
+							var value = getValue();
 							callback(this.BindingDirection.fromDataToInput, value);
 							onUpdate(value, node);
 							$RunDirectiveMiddlewares('onUpdate');
@@ -284,11 +291,7 @@ export default class Binder extends Base {
 				}
 
 				// calling the main event
-				boundPropertyValue = this.evaluator.exec({
-					data: data,
-					expression: dataBindProperty,
-					context: context
-				});
+				boundPropertyValue = getValue();
 			});
 
 			callback(this.BindingDirection.fromDataToInput, boundPropertyValue);
@@ -337,8 +340,8 @@ export default class Binder extends Base {
 		ReactiveEvent.once('AfterGet', evt => {
 			evt.onemit = reactive => {
 				// Do not watch the same property twice
-				if (watches.find(w => w.property === reactive.propertyName &&
-					w.reactive.propertySource === reactive.propertySource)) return;
+				if (watches.find(w => w.property === reactive.propName &&
+					w.reactive.propSource === reactive.propSource)) return;
 
 				// Execution handler
 				let isExecuting = false;
