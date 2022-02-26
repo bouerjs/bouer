@@ -14,6 +14,7 @@ import IEventModifiers from "./definitions/interfaces/IEventModifiers";
 import IEventSubscription from "./definitions/interfaces/IEventSubscription";
 import IAsset from "./definitions/interfaces/IAsset";
 import MiddlewareResult from "./core/middleware/MiddlewareResult";
+import Extend from "./shared/helpers/Extend";
 
 export {
 	Bouer as default,
@@ -39,5 +40,7 @@ export {
 	IEventModifiers,
 	IEventSubscription,
 
-	IAsset
+	IAsset,
+
+	Extend
 }
