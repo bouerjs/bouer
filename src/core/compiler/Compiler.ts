@@ -221,7 +221,26 @@ export default class Compiler extends Base {
 			if (Constants.check(node, Constants.on))
 				return this.eventHandler.handle(node, data, context);
 
-			// Property binding
+			let delimiterField: IDelimiterResponse | null;
+			if ((delimiterField = this.delimiter.shorthand(node.nodeName))) {
+				const element = ((node as any).ownerElement || node.parentNode) as Element;
+				const attr = DOM.createAttribute("e-"+ delimiterField.expression);
+
+				attr.value = "{{ "+ delimiterField.expression +" }}";
+
+				element.attributes.setNamedItem(attr);
+				element.attributes.removeNamedItem(delimiterField.field);
+
+				return this.binder.create({
+					node: attr,
+					isConnected: () => rootElement.isConnected,
+					fields: [ { expression: delimiterField.expression, field: attr.value} ],
+					context: context,
+					data: data
+				});
+			}
+
+				// Property binding
 			let delimitersFields: IDelimiterResponse[];
 			if (isString(node.nodeValue) && (delimitersFields = this.delimiter.run(node.nodeValue!))
 				&& delimitersFields.length !== 0) {

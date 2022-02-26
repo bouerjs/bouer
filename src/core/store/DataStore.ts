@@ -5,7 +5,7 @@ import Logger from "../../shared/logger/Logger";
 import Base from "../Base";
 
 export default class DataStore extends Base {
-  wait: { [key: string]: { nodes: Element[], data?: object } } = {};
+  wait: { [key: string]: { nodes: Element[], data?: object, once?: boolean } } = {};
   data: dynamic = {};
   req: dynamic = {};
 	bouer: Bouer;

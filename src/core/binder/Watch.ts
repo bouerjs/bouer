@@ -16,7 +16,7 @@ export default class Watch<Value, TObject> extends Base {
 		super();
 
     this.reactive = reactive;
-    this.property = reactive.propertyName;
+    this.property = reactive.propName;
     this.callback = callback;
 
     if (options) {

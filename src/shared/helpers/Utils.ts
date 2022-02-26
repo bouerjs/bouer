@@ -144,6 +144,10 @@ export function isFunction(input: any) {
 	return typeof input === 'function';
 }
 
+export function ifNullReturn<T>(v: any, _return: T) {
+	return isNull(v) ? _return : v;
+}
+
 export function trim(value: string) {
 	return value ? value.trim() : value;
 }

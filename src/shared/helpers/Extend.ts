@@ -3,8 +3,8 @@ import Prop from "./Prop";
 import { forEach, isNull } from "./Utils";
 
 export default class Extend {
-  // join objects into one
-  static obj(...args: object[]) {
+  /** joins objects into one */
+  static obj<ExtendObjectType = dynamic>(...args: ExtendObjectType[]) {
     let out: dynamic = {};
 
     forEach(args, arg => {
@@ -14,11 +14,28 @@ export default class Extend {
       })
     });
 
-    return out as object;
+    return out as dynamic;
   }
 
-  /** join arrays into one */
-  static array(...args: Array<any>) {
+	/** add properties to the first object provided */
+  static mixin<MixinObjectType = dynamic>(out: MixinObjectType, ...args: object[]) {
+		// Props to mix with out object
+		const props = Extend.obj.apply(this, args) as any;
+		forEach(Object.keys(props), key => {
+			const hasOwnProp = key in out;
+			Prop.transfer(out, props, key);
+
+			if (hasOwnProp) {
+				const mOut = (out as any);
+				mOut[key] = mOut[key];
+			}
+		});
+
+    return out as MixinObjectType;
+  }
+
+  /** joins arrays into one */
+  static array<ExtendArrayObjectType = any>(...args: Array<ExtendArrayObjectType>) {
     const out: any[] = [];
     forEach(args, arg => {
       if (isNull(arg)) return;

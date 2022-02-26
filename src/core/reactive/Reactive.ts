@@ -16,11 +16,11 @@ import Watch from "../binder/Watch";
 import ReactiveEvent from "../event/ReactiveEvent";
 
 export default class Reactive<Value, TObject extends {}> extends Base implements PropertyDescriptor {
-	propertyName: string;
-	propertyValue: Value;
-	propertyValueOld?: Value;
-	propertySource: TObject;
-	propertyDescriptor: PropertyDescriptor | undefined;
+	propName: string;
+	propValue: Value;
+	propValueOld?: Value;
+	propSource: TObject;
+	propDescriptor: PropertyDescriptor | undefined;
 	watches: Array<Watch<Value, TObject>> = [];
 	isComputed: boolean;
 	context: RenderContext;
@@ -29,23 +29,23 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
 	computedSetter?: (value: Value) => void
 
 	constructor(options: {
-		propertyName: string,
-		sourceObject: TObject,
+		propName: string,
+		srcObject: TObject,
 		context: RenderContext
 	}) {
 		super();
 
-		this.propertyName = options.propertyName;
-		this.propertySource = options.sourceObject;
+		this.propName = options.propName;
+		this.propSource = options.srcObject;
 		this.context = options.context;
 		// Setting the value of the property
 
-		this.propertyDescriptor = Prop.descriptor(this.propertySource, this.propertyName);
+		this.propDescriptor = Prop.descriptor(this.propSource, this.propName);
 
-		this.propertyValue = this.propertyDescriptor!.value as Value;
-		this.isComputed = typeof this.propertyValue === 'function' && this.propertyValue.name === '$computed';
+		this.propValue = this.propDescriptor!.value as Value;
+		this.isComputed = typeof this.propValue === 'function' && this.propValue.name === '$computed';
 		if (this.isComputed) {
-			const computedResult = (this.propertyValue as any).call(this.context);
+			const computedResult = (this.propValue as any).call(this.context);
 
 			if ('get' in computedResult || !isNull(computedResult)) {
 				this.computedGetter = computedResult.get || (() => computedResult);
@@ -59,59 +59,59 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
 				throw new Error("Computed property must be a function “function $computed(){...}” that returns " +
 					"a valid value to infer “getter only” or an object with a “get” and/or “set” function");
 
-			(this.propertyValue as any) = undefined;
+			(this.propValue as any) = undefined;
 		}
 
-		if (typeof this.propertyValue === 'function' && !this.isComputed)
-			this.propertyValue = this.propertyValue.bind(this.context);
+		if (typeof this.propValue === 'function' && !this.isComputed)
+			this.propValue = this.propValue.bind(this.context);
 	}
 
 	get = () => {
 		ReactiveEvent.emit('BeforeGet', this);
-		this.propertyValue = this.isComputed ? this.computedGetter!() : this.propertyValue;
-		const value = this.propertyValue;
+		this.propValue = this.isComputed ? this.computedGetter!() : this.propValue;
+		const value = this.propValue;
 		ReactiveEvent.emit('AfterGet', this);
 		return value;
 	}
 
 	set = (value: Value) => {
-		this.propertyValueOld = this.propertyValue;
-		if (this.propertyValueOld === value || (Number.isNaN(this.propertyValueOld) && Number.isNaN(value)))
+		this.propValueOld = this.propValue;
+		if (this.propValueOld === value || (Number.isNaN(this.propValueOld) && Number.isNaN(value)))
 			return;
 
 		ReactiveEvent.emit('BeforeSet', this);
 
 		if (isObject(value) || Array.isArray(value)) {
-			if ((typeof this.propertyValue) !== (typeof value))
+			if ((typeof this.propValue) !== (typeof value))
 				return Logger.error(("Cannot set “" + (typeof value) + "” in “" +
-					this.propertyName + "” property."));
+					this.propName + "” property."));
 
 			if (Array.isArray(value)) {
 				Reactive.transform({
-					inputObject: value,
+					data: value,
 					reactiveObj: this,
 					context: this.context
 				});
-				const propValueAsAny = this.propertyValue as any;
+				const propValueAsAny = this.propValue as any;
 
 				propValueAsAny.splice(0, propValueAsAny.length);
 				propValueAsAny.push.apply(propValueAsAny, (value as any));
 			} else if (isObject(value)) {
 				if ((value instanceof Node)) // If some html element
-					this.propertyValue = value;
+					this.propValue = value;
 				else {
 					Reactive.transform({
-						inputObject: value,
+						data: value,
 						context: this.context
 					});
-					if (!isNull(this.propertyValue))
-						mapper(value, this.propertyValue);
+					if (!isNull(this.propValue))
+						mapper(value, this.propValue);
 					else
-						this.propertyValue = value;
+						this.propValue = value;
 				}
 			}
 		} else {
-			this.propertyValue = value;
+			this.propValue = value;
 		}
 
 		if (this.isComputed && this.computedSetter)
@@ -123,7 +123,7 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
 
 	notify() {
 		// Running all the watches
-		forEach(this.watches, watch => watch.callback.call(this.context, this.propertyValue, this.propertyValueOld));
+		forEach(this.watches, watch => watch.callback.call(this.context, this.propValue, this.propValueOld));
 	}
 
 	onChange(callback: WatchCallback, node?: Node): Watch<Value, TObject> {
@@ -134,23 +134,23 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
 
 	static transform = <InputObject>(options: {
 		context: RenderContext,
-		inputObject: InputObject,
+		data: InputObject,
 		reactiveObj?: Reactive<any, any>,
 	}) => {
 		const context = options.context;
-		const executer = (inputObject: InputObject, visiting: any[], visited: any[], reactiveObj?: Reactive<any, any>) => {
-			if (Array.isArray(inputObject)) {
+		const executer = (data: InputObject, visiting: any[], visited: any[], reactiveObj?: Reactive<any, any>) => {
+			if (Array.isArray(data)) {
 				if (reactiveObj == null) {
 					Logger.warn('Cannot transform this array to a reactive one because no reactive objecto was provided');
-					return inputObject;
+					return data;
 				}
 
-				if (visiting.indexOf(inputObject) !== -1)
-					return inputObject;
-				visiting.push(inputObject);
+				if (visiting.indexOf(data) !== -1)
+					return data;
+				visiting.push(data);
 
 				const REACTIVE_ARRAY_METHODS = ['push', 'pop', 'unshift', 'shift', 'splice']
-				const inputArray = inputObject as any;
+				const inputArray = data as any;
 				const reference: dynamic = {}; // Using clousure to cache the array methods
 				const prototype = inputArray.__proto__ = Object.create(Array.prototype);
 
@@ -182,18 +182,18 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
 				return inputArray;
 			}
 
-			if (!isObject(inputObject))
-				return inputObject;
+			if (!isObject(data))
+				return data;
 
-			if (visiting!.indexOf(inputObject) !== -1)
-				return inputObject;
-			visiting.push(inputObject);
+			if (visiting!.indexOf(data) !== -1)
+				return data;
+			visiting.push(data);
 
-			forEach(Object.keys(inputObject), key => {
-				const mInputObject = inputObject as dynamic;
+			forEach(Object.keys(data), key => {
+				const mInputObject = data as dynamic;
 
 				// Already a reactive property, do nothing
-				if (!('value' in Prop.descriptor(inputObject, key)!))
+				if (!('value' in Prop.descriptor(data, key)!))
 					return;
 
 				const propertyValue = mInputObject[key];
@@ -202,12 +202,12 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
 					return;
 
 				const reactive = new Reactive({
-					propertyName: key,
-					sourceObject: inputObject,
+					propName: key,
+					srcObject: data,
 					context: context
 				});
 
-				Prop.set(inputObject, key, reactive);
+				Prop.set(data, key, reactive);
 				if (Array.isArray(propertyValue)) {
 					executer(propertyValue as any, visiting, visited, reactive); // Transform the array to a reactive one
 					forEach(propertyValue, (item: object) => executer(item as any, visiting, visited));
@@ -215,12 +215,12 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
 					executer(propertyValue, visiting, visited);
 			});
 
-			visiting.splice(visiting.indexOf(inputObject), 1);
-			visited.push(inputObject);
+			visiting.splice(visiting.indexOf(data), 1);
+			visited.push(data);
 
-			return inputObject;
+			return data;
 		}
 
-		return executer(options.inputObject, [], [], options.reactiveObj);
+		return executer(options.data, [], [], options.reactiveObj);
 	}
 }

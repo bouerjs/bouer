@@ -4,6 +4,7 @@ import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import Logger from "../../shared/logger/Logger";
 import Bouer from "../../instance/Bouer";
 import {
+	buildError,
 	findAttribute,
 	forEach,
 	isEmptyObject,
@@ -42,17 +43,21 @@ export default class Converter extends Base {
 		else if (typeof input === 'string') {
 			try {
 				const $el = this.bouer.el.querySelector(input);
-				if (!$el) return null;
+				if (!$el) {
+					Logger.error("Element with \""+ input +"\" selector Not Found.");
+					return null;
+				}
 				element = $el;
-			} catch {
-				// Unknown element type
+			} catch (error) {
+				// Unknown error
+				Logger.error(buildError(error));
 				return null;
 			}
 		}
 
 		// If the element is not
 		if (isNull(element))
-			throw Logger.error("Invalid element passed in app.toJsObj(...).");
+			throw Logger.error("Invalid element provided at app.toJsObj(> \""+ input +"\" <).");
 
 		options = options || {};
 

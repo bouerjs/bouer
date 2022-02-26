@@ -1,7 +1,7 @@
 import IComponentOptions from "../../definitions/interfaces/IComponentOptions";
 import Bouer from "../../instance/Bouer";
 import ServiceProvider from "../../shared/helpers/ServiceProvider";
-import { $CreateAnyEl, DOM, forEach, GLOBAL, isNull, isObject, toArray, trim, urlCombine, urlResolver } from "../../shared/helpers/Utils";
+import { $CreateAnyEl, DOM, forEach, GLOBAL, ifNullReturn, isNull, isObject, toArray, trim, urlCombine, urlResolver } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Base from "../Base";
 import Component from "../component/Component";
@@ -64,7 +64,7 @@ export default class Routing extends Base {
 		route = trim(route);
 
 		const resolver = urlResolver(route);
-		const usehash = this.bouer.config.usehash ?? true;
+		const usehash = ifNullReturn(this.bouer.config.usehash, true);
 		let navigatoTo = (usehash ? resolver.hash : resolver.pathname).split('?')[0];
 
 		// In case of: /about/me/, remove the last forward slash
@@ -88,7 +88,7 @@ export default class Routing extends Base {
 		// Document info configuration
 		DOM.title = page.title || DOM.title;
 
-		if ((options.setURL ?? true))
+		if (ifNullReturn(options.setURL, true))
 			this.pushState(resolver.href, DOM.title);
 
 		const routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route!);
@@ -136,6 +136,8 @@ export default class Routing extends Base {
 		const className = this.bouer.config.activeClassName || 'active-link';
 		const anchors = this.bouer.el.querySelectorAll('a');
 
+		if (isNull(route)) return;
+
 		forEach(this.activeAnchors, anchor =>
 			anchor.classList.remove(className));
 
@@ -155,6 +157,7 @@ export default class Routing extends Base {
 
 	markActiveAnchor(anchor: HTMLAnchorElement) {
 		const className = this.bouer.config.activeClassName || 'active-link';
+		if (isNull(anchor)) return;
 
 		forEach(this.activeAnchors, anchor =>
 			anchor.classList.remove(className));

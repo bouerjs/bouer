@@ -24,7 +24,8 @@ import Task from "../shared/helpers/Task";
 import {
 	$CreateEl, DOM, forEach,
 	GLOBAL,
-	isNull, isObject, toArray, trim
+	ifNullReturn,
+	isNull, isObject, toArray, trim,
 } from "../shared/helpers/Utils";
 import Logger from "../shared/logger/Logger";
 import Base from "../core/Base";
@@ -207,11 +208,11 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 
 		// Transform the data properties into a reative
 		this.data = Reactive.transform({
-			inputObject: options.data || {},
+			data: options.data || {},
 			context: this
 		});
 		this.globalData = Reactive.transform({
-			inputObject: options.globalData || {},
+			data: options.globalData || {},
 			context: this
 		});
 
@@ -242,10 +243,10 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 				if (key in dataStore.data)
 					return Logger.log("There is already a data stored with this key “" + key + "”.");
 
-				if ((toReactive ?? false) === true)
+				if (ifNullReturn(toReactive, false) === true)
 					Reactive.transform({
 						context: this,
-						inputObject: data
+						data: data
 					});
 				return new ServiceProvider(this).get<DataStore>('DataStore')!.set('data', key, data);
 			},
@@ -256,25 +257,37 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 			unset: key => delete dataStore.req[key],
 		};
 		this.$wait = {
-			get: key => key ? (dataStore.wait[key] || {}).data : undefined,
-			set: (key: string, data: object) => {
+			get: key => {
+				if (key) return undefined;
+
+				const waitedData = dataStore.wait[key];
+				if (!waitedData) return undefined;
+
+				if (ifNullReturn(waitedData.once, true))
+					this.$wait.unset(key);
+
+				return waitedData.data;
+			},
+			set: (key: string, data: object, once?: boolean) => {
 				if (!(key in dataStore.wait))
-					return dataStore.wait[key] = { data: data, nodes: [] };
+					return dataStore.wait[key] = { data: data, nodes: [], once: ifNullReturn(once, false) };
 
 				const mWait = dataStore.wait[key];
 				mWait.data = data;
-
-				return forEach(mWait.nodes, node => {
-					if (!node) return;
+				forEach(mWait.nodes, nodeWaiting => {
+					if (!nodeWaiting) return;
 					compiler.compile({
-						el: node,
+						el: nodeWaiting,
 						data: Reactive.transform({
 							context: this,
-							inputObject: mWait.data
+							data: mWait.data
 						}),
 						context: this
 					})
 				});
+
+				if (ifNullReturn(once, false))
+					this.$wait.unset(key);
 			},
 			unset: key => delete dataStore.wait[key],
 		};
@@ -401,7 +414,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 
 		// Transforming the input
 		Reactive.transform({
-			inputObject: inputData,
+			data: inputData,
 			context: this
 		});
 

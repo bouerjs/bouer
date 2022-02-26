@@ -8,7 +8,7 @@ import Prop from "../../shared/helpers/Prop";
 import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import UriHandler from "../../shared/helpers/UriHandler";
 import {
-	$CreateAnyEl, forEach, isObject, isString, toLower, trim, urlCombine, urlResolver, where
+	$CreateAnyEl, forEach, ifNullReturn, isObject, isString, toLower, trim, urlCombine, urlResolver, where
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Base from "../Base";
@@ -55,7 +55,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 		this.path = _path;
 		this.data = Reactive.transform({
 			context: this as any,
-			inputObject: _data || {}
+			data: _data || {}
 		});
 	}
 
@@ -177,7 +177,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 					type = assetsTypeMapper[toLower(asset.type)] || asset.type;
 				}
 
-				scoped = asset.scoped ?? true;
+				scoped = ifNullReturn(asset.scoped, true);
 			}
 
 			if ((src[0] !== '.')) { // The src begins with dot (.)
@@ -188,7 +188,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 			}
 
 			const $Asset = $CreateAnyEl(type, el => {
-				if (scoped ?? true)
+				if (ifNullReturn(scoped, true))
 					el.setAttribute('scoped', 'true');
 
 				switch (toLower(type)) {

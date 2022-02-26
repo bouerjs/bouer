@@ -14,7 +14,8 @@ import {
 	isFunction,
 	isNull,
 	trim,
-	where
+	where,
+	ifNullReturn
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Evaluator from "../Evaluator";
@@ -46,7 +47,7 @@ export default class EventHandler extends Base {
 			return Logger.error("Invalid ParentElement of “" + nodeName + "”");
 
 		// <button on:submit.once.stopPropagation="times++"></button>
-		const nodeValue = trim(node.nodeValue ?? '');
+		const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 
 		const eventNameWithModifiers = nodeName.substring(Constants.on.length);
 		let allModifiers = eventNameWithModifiers.split('.');
@@ -180,7 +181,7 @@ export default class EventHandler extends Base {
 
 			// Otherwise, dispatch the event
 			evt.callback.call(this.bouer, new CustomEvent(eventName, init));
-			if ((once ?? false) === true)
+			if (ifNullReturn(once, false) === true)
 				events.splice(events.indexOf(evt), 1);
 		});
 	}

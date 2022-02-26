@@ -18,7 +18,8 @@ import {
 	toStr,
 	trim,
 	urlCombine,
-	$CreateComment
+	$CreateComment,
+	ifNullReturn
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Binder from "../binder/Binder";
@@ -75,7 +76,7 @@ export default class Directive extends Base {
 	errorMsgEmptyNode = (node: Node) => ("Expected an expression in “" + node.nodeName +
 		"” and got an <empty string>.");
 	errorMsgNodeValue = (node: Node) => ("Expected an expression in “" + node.nodeName +
-		"” and got “" + (node.nodeValue ?? '') + "”.");
+		"” and got “" + (ifNullReturn(node.nodeValue, '')) + "”.");
 
 	// Directives
 	skip(node: Element) {
@@ -108,10 +109,10 @@ export default class Directive extends Base {
 			if (attr.name === 'e-if' && firstCondition && (attr.name === firstCondition.node.name))
 				break;
 
-			if ((attr.nodeName !== 'e-else') && (trim(attr.nodeValue ?? '') === ''))
+			if ((attr.nodeName !== 'e-else') && (trim(ifNullReturn(attr.nodeValue, '')) === ''))
 				return Logger.error(this.errorMsgEmptyNode(attr));
 
-			if (this.delimiter.run(attr.nodeValue ?? '').length !== 0)
+			if (this.delimiter.run(ifNullReturn(attr.nodeValue, '')).length !== 0)
 				return Logger.error(this.errorMsgNodeValue(attr));
 
 			conditions.push({ node: attr, element: currentEl });
@@ -125,7 +126,7 @@ export default class Directive extends Base {
 			ReactiveEvent.once('AfterGet', event => {
 				event.onemit = reactive => {
 					// Avoiding multiple binding in the same property
-					if (reactives.findIndex(item => item.reactive.propertyName == reactive.propertyName) !== -1)
+					if (reactives.findIndex(item => item.reactive.propName == reactive.propName) !== -1)
 						return;
 					reactives.push({ attr: attr, reactive: reactive });
 				}
@@ -143,7 +144,7 @@ export default class Directive extends Base {
 		forEach(reactives, item => {
 			this.binder.binds.push({
 				// Binder is connected if at least one of the chain and the comment is still connected
-				isConnected: () => !isNull(Extend.array(conditions.map(x => x.element), comment).find(el => el.isConnected)),
+				isConnected: () => !isNull(Extend.array(conditions.map(x => x.element), comment as any).find(el => el.isConnected)),
 				watch: item.reactive.onChange(() => execute(), item.attr)
 			})
 		});
@@ -189,7 +190,7 @@ export default class Directive extends Base {
 
 	show(node: Node, data: object) {
 		const ownerNode = this.toOwnerNode(node);
-		const nodeValue = trim(node.nodeValue ?? '');
+		const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 		let execute = (el: HTMLElement) => {};
 
 		if (nodeValue === '')
@@ -243,7 +244,7 @@ export default class Directive extends Base {
 
 		const comment = $CreateComment();
 		const nodeName = node.nodeName;
-		let nodeValue = trim(node.nodeValue ?? '');
+		let nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 		let listedItemsHandler: ListedItemsHandler[] = [];
 		let hasWhereFilter = false;
 		let hasOrderFilter = false;
@@ -349,7 +350,7 @@ export default class Directive extends Base {
 
 		// Prepare the item before to insert
 		const $PrepareForItem = (item: any, index: number) => {
-			expObj = expObj || $ExpressionBuilder(trim(node.nodeValue ?? ''));
+			expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
 
 			let leftHandParts = expObj.leftHandParts
 				, sourceValue = expObj.sourceValue
@@ -365,7 +366,7 @@ export default class Directive extends Base {
 			forData[_index] = index;
 
 			return Reactive.transform({
-				inputObject: forData,
+				data: forData,
 				context: this.context
 			});
 		}
@@ -460,7 +461,7 @@ export default class Directive extends Base {
 				// In case of unshift re-organize the indexes
 				// Was wrapped into a promise in case of large amount of data
 				return Promise.resolve((array: ListedItemsHandler[]) => {
-					expObj = expObj || $ExpressionBuilder(trim(node.nodeValue ?? ''));
+					expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
 					const leftHandParts = expObj.leftHandParts;
 					const _index_or_value = leftHandParts[1] || '_index_or_value';
 
@@ -484,7 +485,7 @@ export default class Directive extends Base {
 					forEach(removedItems, (item: any) => $RemoveEl(item.el));
 
 					let index = args[0] as number;
-					expObj = expObj || $ExpressionBuilder(trim(node.nodeValue ?? ''));
+					expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
 
 					const leftHandParts = expObj.leftHandParts;
 					const _index_or_value = leftHandParts[1] || '_index_or_value';
@@ -532,7 +533,7 @@ export default class Directive extends Base {
 		reactivePropertyEvent.off();
 
 		(execute = () => {
-			expObj = expObj || $ExpressionBuilder(trim(node.nodeValue ?? ''));
+			expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
 			const iterable = expObj.iterableExpression, filters = expObj.filters;
 
 			// Cleaning the
@@ -599,7 +600,7 @@ export default class Directive extends Base {
 
 	def(node: Node, data: object) {
 		const ownerNode = this.toOwnerNode(node);
-		const nodeValue = trim(node.nodeValue ?? '');
+		const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 
 		if (nodeValue === '')
 			return Logger.error(this.errorMsgEmptyNode(node));
@@ -609,9 +610,9 @@ export default class Directive extends Base {
 
 		let inputData: dynamic = {};
 		const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
-			if (!(reactive.propertyName in inputData))
-				inputData[reactive.propertyName] = undefined;
-			Prop.set(inputData, reactive.propertyName, reactive);
+			if (!(reactive.propName in inputData))
+				inputData[reactive.propName] = undefined;
+			Prop.set(inputData, reactive.propName, reactive);
 		});
 
 		const mInputData = this.evaluator.exec({
@@ -638,7 +639,7 @@ export default class Directive extends Base {
 
 	text(node: Node) {
 		const ownerNode = this.toOwnerNode(node);
-		const nodeValue = trim(node.nodeValue ?? '');
+		const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 
 		if (nodeValue === '')
 			return Logger.error(this.errorMsgEmptyNode(node));
@@ -649,7 +650,7 @@ export default class Directive extends Base {
 
 	bind(node: Node, data: object) {
 		const ownerNode = this.toOwnerNode(node);
-		const nodeValue = trim(node.nodeValue ?? '');
+		const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 
 		if (nodeValue === '')
 			return Logger.error(this.errorMsgEmptyNode(node));
@@ -670,12 +671,12 @@ export default class Directive extends Base {
 
 	property(node: Node, data: object) {
 		const ownerNode = this.toOwnerNode(node) as Element;
-		const nodeValue = trim(node.nodeValue ?? '');
+		const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 		let execute = (obj: object) => { };
 
 		const errorInvalidValue = (node: Node) =>
 		("Invalid value, expected an Object/Object Literal in “" + node.nodeName
-			+ "” and got “" + (node.nodeValue ?? '') + "”.");
+			+ "” and got “" + (ifNullReturn(node.nodeValue, '')) + "”.");
 
 		if (nodeValue === '')
 			return Logger.error(errorInvalidValue(node));
@@ -728,7 +729,7 @@ export default class Directive extends Base {
 
 	data(node: Node, data: object) {
 		const ownerNode = this.toOwnerNode(node);
-		const nodeValue = trim(node.nodeValue ?? '');
+		const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 
 		if (this.delimiter.run(nodeValue).length !== 0)
 			return Logger.error("The “data” attribute cannot contain delimiter.");
@@ -738,9 +739,9 @@ export default class Directive extends Base {
 		let inputData: dynamic = {};
 		const mData = Extend.obj(data, { $data: data });
 		const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
-			if (!(reactive.propertyName in inputData))
-				inputData[reactive.propertyName] = undefined;
-			Prop.set(inputData, reactive.propertyName, reactive);
+			if (!(reactive.propName in inputData))
+				inputData[reactive.propName] = undefined;
+			Prop.set(inputData, reactive.propName, reactive);
 		});
 
 		// If data value is empty gets the main scope value
@@ -775,7 +776,7 @@ export default class Directive extends Base {
 
 		Reactive.transform({
 			context: this.context,
-			inputObject: inputData
+			data: inputData
 		});
 		return this.compiler.compile({
 			data: inputData,
@@ -786,14 +787,14 @@ export default class Directive extends Base {
 
 	href(node: Node, data: object) {
 		const ownerNode = this.toOwnerNode(node);
-		const nodeValue = trim(node.nodeValue ?? '');
+		const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 
 		if (nodeValue === '')
 			return Logger.error(this.errorMsgEmptyNode(node));
 
 		ownerNode.removeAttribute(node.nodeName);
 
-		const usehash = this.bouer.config.usehash ?? true;
+		const usehash = ifNullReturn(this.bouer.config.usehash, true);
 		const routeToSet = urlCombine((usehash ? '#' : ''), nodeValue);
 
 		ownerNode.setAttribute('href', routeToSet);
@@ -820,7 +821,7 @@ export default class Directive extends Base {
 
 	entry(node: Node, data: object) {
 		const ownerNode = this.toOwnerNode(node) as Element;
-		const nodeValue = trim(node.nodeValue ?? '');
+		const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 
 		if (nodeValue === '')
 			return Logger.error(this.errorMsgEmptyNode(node));
@@ -841,7 +842,7 @@ export default class Directive extends Base {
 
 	put(node: Node, data: object) {
 		const ownerNode = this.toOwnerNode(node) as Element;
-		let nodeValue = trim(node.nodeValue ?? '');
+		let nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 		let execute = () => { };
 
 		if (nodeValue === '')
@@ -850,7 +851,7 @@ export default class Directive extends Base {
 
 		if (this.delimiter.run(nodeValue).length !== 0)
 			return Logger.error("Expected an expression with no delimiter in “"
-				+ node.nodeName + "” and got “" + (node.nodeValue ?? '') + "”.");
+				+ node.nodeName + "” and got “" + (ifNullReturn(node.nodeValue, '')) + "”.");
 
 		this.binder.create({
 			data: data,
@@ -866,7 +867,7 @@ export default class Directive extends Base {
 
 		(execute = () => {
 			ownerNode.innerHTML = '';
-			nodeValue = trim(node.nodeValue ?? '');
+			nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 			if (nodeValue === '') return;
 
 			const componentElement = $CreateAnyEl(nodeValue)
@@ -882,7 +883,7 @@ export default class Directive extends Base {
 		const ownerNode = this.toOwnerNode(node) as Element;
 		const container = this.toOwnerNode(ownerNode) as Element;
 		const nodeName = node.nodeName;
-		const nodeValue = trim(node.nodeValue ?? '');
+		const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 
 		if (!nodeValue.includes(' of ') && !nodeValue.includes(' as '))
 			return Logger.error(("Expected a valid “for” expression in “" + nodeName
@@ -1003,7 +1004,7 @@ export default class Directive extends Base {
 
 				Reactive.transform({
 					context: this.context,
-					inputObject: response
+					data: response
 				});
 
 				if (dataKey) this.serviceProvider.get<DataStore>('DataStore')!.set('req', dataKey, response);
@@ -1033,7 +1034,7 @@ export default class Directive extends Base {
 					(data as any)[variable] = response.data;
 					return this.compiler.compile({
 						el: ownerNode,
-						data: Reactive.transform({ context: this.context, inputObject: data }),
+						data: Reactive.transform({ context: this.context, data: data }),
 						context: this.context
 					});
 				}
@@ -1118,7 +1119,7 @@ export default class Directive extends Base {
 
 	wait(node: Node) {
 		const ownerNode = this.toOwnerNode(node);
-		const nodeValue = trim(node.nodeValue ?? '');
+		const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 
 		if (nodeValue === '')
 			return Logger.error(this.errorMsgEmptyNode(node));
@@ -1134,18 +1135,20 @@ export default class Directive extends Base {
 			mWait.nodes.push(ownerNode);
 			// No data exposed yet
 			if (!mWait.data) return;
-
 			// Compile all the waiting nodes
-			return forEach(mWait.nodes, nodeWaiting => {
+			forEach(mWait.nodes, (nodeWaiting) => {
 				this.compiler.compile({
 					el: nodeWaiting,
 					data: Reactive.transform({
 						context: this.context,
-						inputObject: mWait.data
+						data: mWait.data
 					}),
-					context: this.context,
+					context: this.context
 				});
 			});
+
+			if (ifNullReturn(mWait.once, false))
+				delete dataStore.wait[nodeValue];
 		}
 
 		return dataStore.wait[nodeValue] = { nodes: [ownerNode] };
@@ -1154,7 +1157,7 @@ export default class Directive extends Base {
 	custom(node: Node, data: object): boolean {
 		const ownerNode = this.toOwnerNode(node);
 		const nodeName = node.nodeName;
-		const nodeValue = trim(node.nodeValue ?? '');
+		const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 		const delimiters = this.delimiter.run(nodeValue);
 		const $CustomDirective = this.$custom[nodeName];
 
@@ -1171,7 +1174,7 @@ export default class Directive extends Base {
 			}
 		});
 
-		if ($CustomDirective.removable ?? true)
+		if (ifNullReturn($CustomDirective.removable, true))
 			ownerNode.removeAttribute(nodeName);
 
 		const modifiers = nodeName.split('.');
@@ -1183,13 +1186,13 @@ export default class Directive extends Base {
 		bindConfig.argument = argument;
 
 		if (typeof $CustomDirective.onBind === 'function')
-			return $CustomDirective.onBind(node, bindConfig) ?? false;
+			return ifNullReturn($CustomDirective.onBind(node, bindConfig), false);
 
 		return false;
 	}
 
 	skeleton(node: Node) {
-		const nodeValue = trim(node.nodeValue ?? '');
+		const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 
 		if (nodeValue !== '') return;
 

@@ -14,6 +14,7 @@ import CustomDirective from "../src/definitions/types/CustomDirective";
 import dynamic from "../src/definitions/types/Dynamic";
 import RenderContext from "../src/definitions/types/RenderContext";
 import WatchCallback from "../src/definitions/types/WatchCallback";
+import Extend from "../src/shared/helpers/Extend";
 
 declare class Component<Data = {}> {
 	/** The name of the component */
@@ -229,7 +230,7 @@ declare class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
 		 * @param key the key of `wait-data` directive value.
 		 * @param data the data provide to the elements waiting
 		 */
-		set(key: string, data: object): void,
+		set(key: string, data: object, once?: boolean): void,
 		/**
 		 * Destroy stored wait
 		 * @param key the wait-data="`key`" directive value or the app.$wait.set(`key`) key provided.
@@ -500,5 +501,7 @@ export {
 	IEventModifiers,
 	IEventSubscription,
 
-	IAsset
+	IAsset,
+
+	Extend
 };

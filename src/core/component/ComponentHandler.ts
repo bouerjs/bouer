@@ -16,7 +16,7 @@ import {
 	isNull,
 	isObject, pathResolver, toArray,
 	toLower, urlCombine,
-	urlResolver, webRequest, where
+	urlResolver, webRequest, where, ifNullReturn
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Base from "../Base";
@@ -28,6 +28,7 @@ import ReactiveEvent from "../event/ReactiveEvent";
 import Reactive from "../reactive/Reactive";
 import Routing from "../routing/Routing";
 import Component from "./Component";
+import Constants from "../../shared/helpers/Constants";
 
 export default class ComponentHandler extends Base {
 	private bouer: Bouer;
@@ -146,7 +147,7 @@ export default class ComponentHandler extends Base {
 				return;
 			}
 
-			if (!(component.prefetch = this.bouer.config.prefetch ?? true))
+			if (!(component.prefetch = ifNullReturn(this.bouer.config.prefetch, true)))
 				return;
 
 			return getContent(component.path);
@@ -294,7 +295,7 @@ export default class ComponentHandler extends Base {
 			componentElement.innerHTML = "";
 		}).build();
 
-		const isKeepAlive = componentElement.hasAttribute('keep-alive') || (component.keepAlive ?? false);
+		const isKeepAlive = componentElement.hasAttribute('keep-alive') || ifNullReturn(component.keepAlive, false);
 		// Component Creation
 		if (isKeepAlive === false || isNull(component.el)) {
 			$CreateEl('body', htmlSnippet => {
@@ -347,9 +348,9 @@ export default class ComponentHandler extends Base {
 				const mData = Extend.obj(data, { $data: data });
 
 				const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
-					if (!(reactive.propertyName in inputData))
-						inputData[reactive.propertyName] = undefined;
-					Prop.set(inputData, reactive.propertyName, reactive);
+					if (!(reactive.propName in inputData))
+						inputData[reactive.propName] = undefined;
+					Prop.set(inputData, reactive.propName, reactive);
 				});
 
 				// If data value is empty gets the main scope value
@@ -378,7 +379,7 @@ export default class ComponentHandler extends Base {
 				reactiveEvent.off();
 				Reactive.transform({
 					context: component,
-					inputObject: inputData
+					data: inputData
 				});
 
 				return forEach(Object.keys(inputData), key => {
@@ -412,9 +413,11 @@ export default class ComponentHandler extends Base {
 				const rule = cssRules.item(i);
 				if (!rule) continue;
 				const mRule = rule as dynamic;
-
-				if (mRule.selectorText) {
-					const selector = (mRule.selectorText as string).substring(1);
+				const ruleText = mRule.selectorText;
+				if (ruleText) {
+					const firstOrDefaultRule = (ruleText as string).split(' ')[0];
+					const selector = (firstOrDefaultRule[0] == '.' || firstOrDefaultRule[0] == '#')
+						? firstOrDefaultRule.substring(1) : firstOrDefaultRule;
 					const separation = rootClassList[selector] ? "" : " ";
 					const uniqueIdentifier = "." + styleId;
 					const selectorTextSplitted = mRule.selectorText.split(' ');
@@ -494,7 +497,7 @@ export default class ComponentHandler extends Base {
 					.compile({
 						data: Reactive.transform({
 							context: component,
-							inputObject: component.data
+							data: component.data
 						}),
 						el: rootElement,
 						componentSlot: elementSlots,
