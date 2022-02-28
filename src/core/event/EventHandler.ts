@@ -167,22 +167,26 @@ export default class EventHandler extends Base {
 			node.dispatchEvent(new CustomEvent(eventName, init));
 		}
 
-		forEach(events, evt => {
+		this.$events[eventName] = where(events, evt => {
 			const node = evt.attachedNode;
+			const isOnceEvent = ifNullReturn((evt.modifiers || {}).once, false) || ifNullReturn(once, false);
 
 			// If a node was provided, just dispatch the events in this node
 			if (attachedNode) {
-				if (node !== attachedNode) return;
-				return emitter(node, evt.callback);
+				if (node !== attachedNode) return true;
+				emitter(node, evt.callback);
+				return !isOnceEvent;
 			}
 
 			// Otherwise, if this events has a node, dispatch the node event
-			if (node) return emitter(node, evt.callback);
+			if (node) {
+				emitter(node, evt.callback);
+				return !isOnceEvent;
+			}
 
 			// Otherwise, dispatch the event
 			evt.callback.call(this.bouer, new CustomEvent(eventName, init));
-			if (ifNullReturn(once, false) === true)
-				events.splice(events.indexOf(evt), 1);
+			return !isOnceEvent;
 		});
 	}
 
@@ -190,7 +194,7 @@ export default class EventHandler extends Base {
 		Task.run(() => {
 			forEach(Object.keys(this.$events), key => {
 				this.$events[key] = where(this.$events[key], event => {
-					if ((event.modifiers||{}).autodestroy === false) return true;
+					if ((event.modifiers || {}).autodestroy === false) return true;
 					if (!event.attachedNode) return true;
 					if (event.attachedNode.isConnected) return true;
 				});
