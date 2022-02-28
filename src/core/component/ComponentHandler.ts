@@ -6,16 +6,16 @@ import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import Prop from "../../shared/helpers/Prop";
 import Task from "../../shared/helpers/Task";
 import {
-	anchor,
-	buildError,
-	code,
-	$CreateAnyEl,
-	$CreateEl,
 	DOM,
-	forEach, isFunction,
+	code,
+	forEach,
 	isNull,
-	isObject, pathResolver, toArray,
+	$CreateEl,
+	buildError,
+	isFunction,
 	toLower, urlCombine,
+	$CreateAnyEl,
+	isObject, pathResolver, toArray,
 	urlResolver, webRequest, where, ifNullReturn
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
@@ -28,7 +28,7 @@ import ReactiveEvent from "../event/ReactiveEvent";
 import Reactive from "../reactive/Reactive";
 import Routing from "../routing/Routing";
 import Component from "./Component";
-import Constants from "../../shared/helpers/Constants";
+import ILifeCycleHooks from "../../definitions/interfaces/ILifeCycleHooks";
 
 export default class ComponentHandler extends Base {
 	private bouer: Bouer;
@@ -87,9 +87,7 @@ export default class ComponentHandler extends Base {
 				if (!hasBaseElement)
 					Logger.warn("It seems like you are not using the “<base href=\"/base/components/path/\" />” " +
 						"element, try to add as the first child into “<head></head>” element.");
-				forEach(this.requests[path], (request: dynamic) => {
-					request.fail(error, path);
-				});
+				forEach(this.requests[path], (request: dynamic) => request.fail(error, path));
 				delete this.requests[path];
 			})
 	}
@@ -154,22 +152,22 @@ export default class ComponentHandler extends Base {
 		});
 	}
 
-	order(componentElement: Element, data: object, callback?: (component: Component<any>) => void) {
+	order(componentElement: Element, data: object, onComponent?: (component: Component<any>) => void) {
 		const $name = toLower(componentElement.nodeName);
 		const mComponents = this.components as dynamic;
-		let hasComponent = mComponents[$name];
-		if (!hasComponent)
-			return Logger.error("No component with name “" + $name + "” registered.");
+		const inComponent = mComponents[$name];
 
-		const component = (hasComponent as (Component<any> | IComponentOptions<any>));
-		const icomponent = (component as IComponentOptions<any>);
+		if (!inComponent) return Logger.error("No component with name “" + $name + "” registered.");
+
+		const component = (inComponent as (Component<any> | IComponentOptions<any>));
+		const iComponent = (component as IComponentOptions<any>);
 
 		const mainExecutionWrapper = () => {
 			if (component.template) {
 				const newComponent = (component instanceof Component) ? component : new Component(component);
 				newComponent.bouer = this.bouer;
 
-				this.insert(componentElement, newComponent, data, callback);
+				this.insert(componentElement, newComponent, data, onComponent);
 
 				if (component.keepAlive === true)
 					mComponents[$name] = component;
@@ -179,16 +177,17 @@ export default class ComponentHandler extends Base {
 			if (!component.path)
 				return Logger.error("Expected a valid value in `path` or `template` got invalid value at “" + $name + "” component.");
 
-			const requestedEvent = this.addComponentEventAndEmitGlobalEvent('requested', componentElement, component, this.bouer);
-			if (requestedEvent) requestedEvent.emit();
-			// Make or Add request
+			this.addEvent('requested', componentElement, component, this.bouer)
+				.emit();
+
+			// Make component request or Add
 			this.request(component.path, {
 				success: content => {
 					const newComponent = (component instanceof Component) ? component : new Component(component);
-					icomponent.template = newComponent.template = content;
+					iComponent.template = newComponent.template = content;
 					newComponent.bouer = this.bouer;
 
-					this.insert(componentElement, newComponent, data, callback);
+					this.insert(componentElement, newComponent, data, onComponent);
 
 					if (component.keepAlive === true)
 						mComponents[$name] = component;
@@ -197,16 +196,15 @@ export default class ComponentHandler extends Base {
 					Logger.error("Failed to request <" + $name + "></" + $name + "> component with path “" + component.path + "”.");
 					Logger.error(buildError(error));
 
-					if (typeof icomponent.failed !== 'function') return;
-					icomponent.failed(new CustomEvent('failed'));
+					this.addEvent('failed', componentElement, component, this.bouer).emit();
 				}
 			});
 		}
 
 		// Checking the restrictions
-		if (icomponent.restrictions && icomponent.restrictions!.length > 0) {
+		if (iComponent.restrictions && iComponent.restrictions!.length > 0) {
 			const blockedRestrictions: any[] = [];
-			const restrictions = icomponent.restrictions.map(restriction => {
+			const restrictions = iComponent.restrictions.map(restriction => {
 				const restrictionResult = restriction.call(this.bouer, component) as any;
 
 				if (restrictionResult === false)
@@ -222,7 +220,7 @@ export default class ComponentHandler extends Base {
 				return restrictionResult;
 			});
 
-			const blockedEvent = this.addComponentEventAndEmitGlobalEvent('blocked', componentElement, component, this.bouer);
+			const blockedEvent = this.addEvent('blocked', componentElement, component, this.bouer);
 			const emitter = () => blockedEvent.emit({
 				detail: {
 					component: component.name,
@@ -244,44 +242,48 @@ export default class ComponentHandler extends Base {
 		return mainExecutionWrapper();
 	}
 
-	find(callback: (item: (Component<any> | IComponentOptions<any>)) => boolean) {
+	find(predicate: (item: (Component<any> | IComponentOptions<any>)) => boolean) {
 		const keys = Object.keys(this.components);
 		for (let i = 0; i < keys.length; i++) {
 			const component = this.components[keys[i]];
-			if (callback(component)) return component;
+			if (predicate(component)) return component;
 		}
 		return null;
 	}
 
 	/** Subscribe the hooks of the instance */
-	addComponentEventAndEmitGlobalEvent(eventName: string, element: Element, component: any, context?: object) {
-		const callback = component[eventName];
-		this.eventHandler.emit({
-			eventName: 'component:' + eventName,
-			init: {
-				detail: { component: component }
-			}
-		});
+	addEvent<Key extends keyof ILifeCycleHooks>(eventName: Key, element: Element, component: any, context?: object) {
+		const callback = (component as any)[eventName];
 
-		if (typeof callback !== 'function')
-			return { emit: (() => { }) }
+		if (typeof callback === 'function')
+			this.eventHandler.on({
+				eventName,
+				callback: evt => callback.call(context || component, evt),
+				attachedNode: element,
+				modifiers: { once: true },
+				context: context || component
+			});
 
-		const emitter = this.eventHandler.on({
-			eventName,
-			callback: evt => callback.call(component, evt),
-			attachedNode: element,
-			modifiers: { once: true },
-			context: context || component
-		}).emit;
-
-		return {
-			emit: (init?: CustomEventInit) => emitter({
-				init: init
+		const emitter = (init: any) => {
+			this.eventHandler.emit({
+				attachedNode: element,
+				once: true,
+				eventName,
+				init
 			})
+
+			this.eventHandler.emit({
+				eventName: 'component:' + eventName,
+				init: { detail: { component: component } },
+				once: true
+			});
+		}
+		return {
+			emit: (init?: CustomEventInit) => emitter(init)
 		}
 	}
 
-	private insert(componentElement: Element, component: Component<any>, data: object, callback?: <Data>(component: Component<Data>) => void) {
+	insert(componentElement: Element, component: Component<any>, data: object, onComponent?: <Data>(component: Component<Data>) => void) {
 		const $name = toLower(componentElement.nodeName);
 		const container = componentElement.parentElement;
 		if (!componentElement.isConnected || !container)
@@ -318,166 +320,26 @@ export default class ComponentHandler extends Base {
 						"seems to have multiple root element, it must have only one root."));
 
 				component.el = htmlSnippet.children[0];
-
-				this.addComponentEventAndEmitGlobalEvent('created', component.el!, component, this.bouer);
-				component.emit('created');
 			});
 		}
 
 		if (isNull(component.el)) return;
 
-		if (isFunction(callback))
-			callback!(component);
-
-		let rootElement = component.el!;
-
-		// tranfering the attributes
-		forEach(toArray(componentElement.attributes), (attr: Attr) => {
-			componentElement.removeAttribute(attr.name);
-			if (attr.nodeName === 'class')
-				return componentElement.classList.forEach(cls => {
-					rootElement.classList.add(cls);
-				});
-
-			if (attr.nodeName === 'data') {
-				if (this.delimiter.run(attr.value).length !== 0)
-					return Logger.error(("The “data” attribute cannot contain delimiter, " +
-						"source element: <" + $name + "></" + $name + ">."));
-
-				let inputData: dynamic = {};
-				const mData = Extend.obj(data, { $data: data });
-
-				const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
-					if (!(reactive.propName in inputData))
-						inputData[reactive.propName] = undefined;
-					Prop.set(inputData, reactive.propName, reactive);
-				});
-
-				// If data value is empty gets the main scope value
-				if (attr.value === '')
-					inputData = Extend.obj(this.bouer.data);
-				else {
-					// Other wise, compiles the object provided
-					const mInputData = this.serviceProvider.get<Evaluator>('Evaluator')!
-						.exec({
-							data: mData,
-							expression: attr.value,
-							context: this.bouer
-						});
-
-					if (!isObject(mInputData))
-						return Logger.error(("Expected a valid Object Literal expression in “"
-							+ attr.nodeName + "” and got “" + attr.value + "”."));
-
-					// Adding all non-existing properties
-					forEach(Object.keys(mInputData), key => {
-						if (!(key in inputData))
-							inputData[key] = mInputData[key];
-					});
-				}
-
-				reactiveEvent.off();
-				Reactive.transform({
-					context: component,
-					data: inputData
-				});
-
-				return forEach(Object.keys(inputData), key => {
-					Prop.transfer(component.data, inputData, key);
-				});
-			}
-
-			rootElement.attributes.setNamedItem(attr);
-		});
-
-		const initializer = (component as any).init;
-		if (isFunction(initializer))
-			initializer.call(component);
-
-		this.addComponentEventAndEmitGlobalEvent('beforeMount', component.el!, component)
-		component.emit('beforeMount');
-
-		container.replaceChild(rootElement, componentElement);
-
-		let rootClassList: any = {};
-		// Retrieving all the classes of the retu elements
-		rootElement.classList.forEach(key => rootClassList[key] = true);
-
-		// Changing each selector to avoid conflits
-		const changeSelector = (style: HTMLStyleElement | HTMLLinkElement, styleId: string) => {
-			const isStyle = (style.nodeName === 'STYLE'), rules: string[] = [];
-			if (!style.sheet) return;
-
-			const cssRules = style.sheet.cssRules;
-			for (let i = 0; i < cssRules.length; i++) {
-				const rule = cssRules.item(i);
-				if (!rule) continue;
-				const mRule = rule as dynamic;
-				const ruleText = mRule.selectorText;
-				if (ruleText) {
-					const firstOrDefaultRule = (ruleText as string).split(' ')[0];
-					const selector = (firstOrDefaultRule[0] == '.' || firstOrDefaultRule[0] == '#')
-						? firstOrDefaultRule.substring(1) : firstOrDefaultRule;
-					const separation = rootClassList[selector] ? "" : " ";
-					const uniqueIdentifier = "." + styleId;
-					const selectorTextSplitted = mRule.selectorText.split(' ');
-
-					if (selectorTextSplitted[0] === toLower(rootElement.tagName))
-						selectorTextSplitted.shift();
-
-					mRule.selectorText = uniqueIdentifier + separation + selectorTextSplitted.join(' ');
-				}
-
-				if (isStyle) rules.push(mRule.cssText);
-			}
-			if (isStyle) style.innerText = rules.join(' ');
-		}
+		const rootElement = component.el!;
+		// Adding the listeners
+		const createdEvent = this.addEvent('created', component.el!, component);
+		const beforeMountEvent = this.addEvent('beforeMount', component.el!, component);
+		const mountedEvent = this.addEvent('mounted', component.el!, component);
+		const beforeLoadEvent = this.addEvent('beforeLoad', component.el!, component);
+		const loadedEvent = this.addEvent('loaded', component.el!, component);
+		this.addEvent('beforeDestroy', component.el!, component);
+		this.addEvent('destroyed', component.el!, component);
 
 		const scriptsAssets = where(component.assets, asset => toLower(asset.nodeName) === 'script');
-		const stylesAssets = where(component.assets, asset => toLower(asset.nodeName) !== 'script');
+		const initializer = (component as any).init;
 
-		const styleAttrName = 'component-style';
-		// Configuring the styles
-		forEach(stylesAssets, asset => {
-			const mStyle = asset.cloneNode(true) as Element;
-
-			if (mStyle instanceof HTMLLinkElement) {
-				const path = component.path[0] === '/' ? component.path.substring(1) : component.path;
-				mStyle.href = pathResolver(path, mStyle.getAttribute('href') || '');
-				mStyle.rel = "stylesheet";
-			}
-
-			//Checking if this component already have styles added
-			if (this.stylesController[$name]) {
-
-				const controller = this.stylesController[$name];
-				if (controller.elements.indexOf(rootElement) === -1) {
-					controller.elements.push(rootElement);
-					forEach(controller.styles, $style => {
-						rootElement.classList.add($style.getAttribute(styleAttrName) as string);
-					})
-				}
-
-				return;
-			};
-
-			const styleId = code(7, 'bouer-s');
-			mStyle.setAttribute(styleAttrName, styleId);
-
-			if ((mStyle instanceof HTMLLinkElement) && mStyle.hasAttribute('scoped'))
-				mStyle.onload = evt => changeSelector((evt.target! as HTMLLinkElement), styleId);
-
-			this.stylesController[$name] = {
-				styles: [DOM.head.appendChild(mStyle)],
-				elements: [rootElement]
-			};
-
-			if (!mStyle.hasAttribute('scoped')) return;
-
-			rootElement.classList.add(styleId);
-			if (mStyle instanceof HTMLStyleElement)
-				return changeSelector(mStyle, styleId);
-		});
+		if (isFunction(initializer))
+			initializer.call(component);
 
 		const compile = (scriptContent?: string) => {
 			try {
@@ -485,27 +347,160 @@ export default class ComponentHandler extends Base {
 				this.serviceProvider.get<Evaluator>('Evaluator')!
 					.execRaw((scriptContent || ''), component);
 
-				this.addComponentEventAndEmitGlobalEvent('mounted', component.el!, component);
-				component.emit('mounted');
+				createdEvent.emit();
 
-				// TODO: Something between this two events
+				// tranfering the attributes
+				forEach(toArray(componentElement.attributes), (attr: Attr) => {
+					componentElement.removeAttribute(attr.name);
+					if (attr.nodeName === 'class')
+						return componentElement.classList.forEach(cls => {
+							rootElement.classList.add(cls);
+						});
 
-				this.addComponentEventAndEmitGlobalEvent('beforeLoad', component.el!, component)
-				component.emit('beforeLoad');
+					if (attr.nodeName === 'data') {
+						if (this.delimiter.run(attr.value).length !== 0)
+							return Logger.error(("The “data” attribute cannot contain delimiter, " +
+								"source element: <" + $name + "></" + $name + ">."));
 
+						let inputData: dynamic = {};
+						const mData = Extend.obj(data, { $data: data });
+
+						const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
+							if (!(reactive.propName in inputData))
+								inputData[reactive.propName] = undefined;
+							Prop.set(inputData, reactive.propName, reactive);
+						});
+
+						// If data value is empty gets the main scope value
+						if (attr.value === '')
+							inputData = Extend.obj(this.bouer.data);
+						else {
+							// Other wise, compiles the object provided
+							const mInputData = this.serviceProvider.get<Evaluator>('Evaluator')!
+								.exec({
+									data: mData,
+									expression: attr.value,
+									context: this.bouer
+								});
+
+							if (!isObject(mInputData))
+								return Logger.error(("Expected a valid Object Literal expression in “"
+									+ attr.nodeName + "” and got “" + attr.value + "”."));
+
+							// Adding all non-existing properties
+							forEach(Object.keys(mInputData), key => {
+								if (!(key in inputData))
+									inputData[key] = mInputData[key];
+							});
+						}
+
+						reactiveEvent.off();
+						Reactive.transform({
+							context: component,
+							data: inputData
+						});
+
+						return forEach(Object.keys(inputData), key => {
+							Prop.transfer(component.data, inputData, key);
+						});
+					}
+
+					rootElement.attributes.setNamedItem(attr);
+				});
+
+				beforeMountEvent.emit();
+				container.replaceChild(rootElement, componentElement);
+				mountedEvent.emit();
+
+				const rootClassList: any = {};
+				// Retrieving all the classes of the root element
+				rootElement.classList.forEach(key => rootClassList[key] = true);
+				// Changing each selector to avoid conflits
+				const changeSelector = (style: HTMLStyleElement | HTMLLinkElement, styleId: string) => {
+					const isStyle = (style.nodeName === 'STYLE'), rules: string[] = [];
+					if (!style.sheet) return;
+
+					const cssRules = style.sheet.cssRules;
+					for (let i = 0; i < cssRules.length; i++) {
+						const rule = cssRules.item(i);
+						if (!rule) continue;
+						const mRule = rule as dynamic;
+						const ruleText = mRule.selectorText;
+						if (ruleText) {
+							const firstRule = (ruleText as string).split(' ')[0];
+							const selector = (firstRule[0] == '.' || firstRule[0] == '#')
+								? firstRule.substring(1) : firstRule;
+							const separator = rootClassList[selector] ? "" : " ";
+							const uniqueIdentifier = "." + styleId;
+							const selectorTextSplitted = mRule.selectorText.split(' ');
+
+							if (selectorTextSplitted[0] === toLower(rootElement.tagName))
+								selectorTextSplitted.shift();
+
+							mRule.selectorText = uniqueIdentifier + separator + selectorTextSplitted.join(' ');
+						}
+
+						if (isStyle) rules.push(mRule.cssText);
+					}
+					if (isStyle) style.innerText = rules.join(' ');
+				}
+				const stylesAssets = where(component.assets, asset => toLower(asset.nodeName) !== 'script');
+				const styleAttrName = 'component-style';
+
+				// Configuring the styles
+				forEach(stylesAssets, asset => {
+					const mStyle = asset.cloneNode(true) as Element;
+
+					if (mStyle instanceof HTMLLinkElement) {
+						const path = component.path[0] === '/' ? component.path.substring(1) : component.path;
+						mStyle.href = pathResolver(path, mStyle.getAttribute('href') || '');
+						mStyle.rel = "stylesheet";
+					}
+
+					// Checking if this component already have styles added
+					if (this.stylesController[$name]) {
+
+						const controller = this.stylesController[$name];
+						if (controller.elements.indexOf(rootElement) === -1) {
+							controller.elements.push(rootElement);
+							forEach(controller.styles, $style => {
+								rootElement.classList.add($style.getAttribute(styleAttrName) as string);
+							})
+						}
+
+						return;
+					};
+
+					const styleId = code(7, 'bouer-s');
+					mStyle.setAttribute(styleAttrName, styleId);
+
+					if ((mStyle instanceof HTMLLinkElement) && mStyle.hasAttribute('scoped'))
+						mStyle.onload = evt => changeSelector((evt.target! as HTMLLinkElement), styleId);
+
+					this.stylesController[$name] = {
+						styles: [DOM.head.appendChild(mStyle)],
+						elements: [rootElement]
+					};
+
+					if (!mStyle.hasAttribute('scoped')) return;
+
+					rootElement.classList.add(styleId);
+					if (mStyle instanceof HTMLStyleElement)
+						return changeSelector(mStyle, styleId);
+				});
+
+				beforeLoadEvent.emit();
 				this.serviceProvider.get<Compiler>('Compiler')!
 					.compile({
-						data: Reactive.transform({
-							context: component,
-							data: component.data
-						}),
-						el: rootElement,
+						data: Reactive.transform({ context: component, data: component.data }),
+						onDone: () => {
+							if (isFunction(onComponent))
+								onComponent!(component);
+							loadedEvent.emit();
+						},
 						componentSlot: elementSlots,
 						context: component,
-						onDone: () => {
-							this.addComponentEventAndEmitGlobalEvent('loaded', component.el!, component);
-							component.emit('loaded');
-						}
+						el: rootElement,
 					});
 
 				Task.run(stopTask => {
@@ -588,9 +583,6 @@ export default class ComponentHandler extends Base {
 				Logger.error(("Error loading the <script src=\"" + url + "\"></script> in " +
 					"<" + $name + "></" + $name + "> component, remove it in order to be compiled."));
 				Logger.log(error);
-
-				this.addComponentEventAndEmitGlobalEvent('failed', componentElement, component, this.bouer)
-					.emit();
 			});
 		});
 	}
