@@ -111,13 +111,19 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 		eventName: TKey,
 		callback: (event: CustomEvent) => void
 	) {
-		const context = (eventName == 'requested' || eventName == 'failed' || eventName == 'blocked') ? this.bouer! : this;
+		const set = new Set<String>(['mounted', 'beforeLoad', 'loaded', 'beforeDestroy', 'destroyed']);
+		const registerHooks = new Set<String>(['requested', 'created', 'beforeMount', 'blocked', 'failed']);
+
+		if (registerHooks.has(eventName))
+			Logger.warn("The “" + eventName + "” Event is called before the component is mounted, to be dispatched" +
+				"it needs to be on registration object: { " + eventName + ": function(){ ... }, ... }.");
+
 		const evt = new ServiceProvider(this.bouer!).get<EventHandler>('EventHandler')!.on({
 			eventName,
 			callback: callback as any,
 			attachedNode: this.el!,
-			context: context as any,
-			modifiers: { once: true, autodestroy: false },
+			context: this as any,
+			modifiers: { once: set.has(eventName), autodestroy: false },
 		});
 		this.events.push(evt);
 		return evt;
