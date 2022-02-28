@@ -111,10 +111,10 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 		eventName: TKey,
 		callback: (event: CustomEvent) => void
 	) {
-		const set = new Set<String>(['mounted', 'beforeLoad', 'loaded', 'beforeDestroy', 'destroyed']);
-		const registerHooks = new Set<String>(['requested', 'created', 'beforeMount', 'blocked', 'failed']);
+		const instanceHooksSet = new Set<String>(['created', 'beforeMount', 'mounted', 'beforeLoad', 'loaded', 'beforeDestroy', 'destroyed']);
+		const registerHooksSet = new Set<String>(['requested', 'blocked', 'failed']);
 
-		if (registerHooks.has(eventName))
+		if (registerHooksSet.has(eventName))
 			Logger.warn("The “" + eventName + "” Event is called before the component is mounted, to be dispatched" +
 				"it needs to be on registration object: { " + eventName + ": function(){ ... }, ... }.");
 
@@ -123,7 +123,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 			callback: callback as any,
 			attachedNode: this.el!,
 			context: this as any,
-			modifiers: { once: set.has(eventName), autodestroy: false },
+			modifiers: { once: instanceHooksSet.has(eventName), autodestroy: false },
 		});
 		this.events.push(evt);
 		return evt;
