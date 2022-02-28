@@ -7,6 +7,31 @@ It's **easy.js** v3.0.0 upgrade with a new name, that extends for a javascript l
 ## So, Why Bouer.js?
 It's a javascript library really easy to use that provides to you a simple way to interact with your HTML by using Reactive Properties, reusable components written in pure HTML, api calls using only attribute, and so on... It's very good and simple to build Single Page Application. **No Virtual DOM is used**, it uses the **Real DOM** to handle all the data changes.
 
+## Examples
+### 1. An **Api** Call using a simple attribute (directive) 
+```html
+<li e-req="user of users">
+	<span> {{ user.name }} </span>
+</li>
+```
+
+### 2. Parsing **Form Element** to an **Object Literal**
+```html
+<form on:submit="submit">
+	<input type="text" name="name"/>
+	<input type="number" name="age"/>
+</form>
+```
+
+```js
+const obj = app.toJsObj('form');
+// Result `obj`:
+{
+	name: '',
+	age: ''
+}
+```
+
 ## Prerequisites
 
 To start using it, you need to know:
@@ -20,8 +45,8 @@ To start using it, you need to know:
 Let's learn more about **Bouer**, checkout our [website](https://bouerjs.github.io)
 
 * [Get Started](https://bouerjs.github.io/docs/introduction.html)
-* [Playground (Pending)](https://bouerjs.github.io/play.html) 
-* [Tutorial (Pending)](https://bouerjs.github.io/tutorial.html) 
+* [Playground](https://bouerjs.github.io/play.html) 
+* [Tutorial](https://bouerjs.github.io/tutorial/introduction.html) 
 
 ## Contributing
 
