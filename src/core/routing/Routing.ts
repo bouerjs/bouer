@@ -45,7 +45,7 @@ export default class Routing extends Base {
 		// Listening to the page navigation
 		GLOBAL.addEventListener('popstate', evt => {
 			evt.preventDefault();
-			this.navigate((evt.state || location.href), {
+			this.navigate(((evt.state || {}).url || location.href), {
 				setURL: false
 			});
 		});
@@ -93,17 +93,15 @@ export default class Routing extends Base {
 
 		const routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route!);
 		new ServiceProvider(this.bouer).get<ComponentHandler>('ComponentHandler')!
-			.order(componentElement, this.bouer.data, component => {
-				component.on('loaded', () => {
-					this.markActiveAnchorsWithRoute(routeToSet);
-				});
+			.order(componentElement, this.bouer.data, () => {
+				this.markActiveAnchorsWithRoute(routeToSet);
 			});
 	}
 
 	pushState(url: string, title?: string) {
 		url = urlResolver(url).href;
 		if (DOM.location.href === url) return;
-		GLOBAL.history.pushState(url, (title || ''), url);
+		GLOBAL.history.pushState({ url, title }, (title || ''), url);
 	}
 
 	popState(times?: number) {
