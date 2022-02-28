@@ -68,7 +68,7 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
 
 	get = () => {
 		ReactiveEvent.emit('BeforeGet', this);
-		this.propValue = this.isComputed ? this.computedGetter!() : this.propValue;
+		this.propValue = this.isComputed ? this.computedGetter!.call(this.context) : this.propValue;
 		const value = this.propValue;
 		ReactiveEvent.emit('AfterGet', this);
 		return value;
@@ -115,7 +115,7 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
 		}
 
 		if (this.isComputed && this.computedSetter)
-			this.computedSetter(value);
+			this.computedSetter.call(this.context, value);
 
 		ReactiveEvent.emit('AfterSet', this);
 		this.notify();
