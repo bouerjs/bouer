@@ -1,11 +1,19 @@
 import dynamic from "../../definitions/types/Dynamic";
+import RenderContext from "../../definitions/types/RenderContext";
 import Bouer from "../../instance/Bouer";
 import ServiceProvider from "../../shared/helpers/ServiceProvider";
 import Logger from "../../shared/logger/Logger";
 import Base from "../Base";
 
 export default class DataStore extends Base {
-  wait: { [key: string]: { nodes: Element[], data?: object, once?: boolean } } = {};
+  wait: {
+		[key: string]: {
+			nodes: Element[],
+			data?: object,
+			once?: boolean,
+			context: RenderContext
+		}
+	} = {};
   data: dynamic = {};
   req: dynamic = {};
 	bouer: Bouer;

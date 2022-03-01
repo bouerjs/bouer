@@ -270,7 +270,12 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 			},
 			set: (key: string, data: object, once?: boolean) => {
 				if (!(key in dataStore.wait))
-					return dataStore.wait[key] = { data: data, nodes: [], once: ifNullReturn(once, false) };
+					return dataStore.wait[key] = {
+						data: data,
+						nodes: [],
+						once: ifNullReturn(once, false),
+						context: this
+					};
 
 				const mWait = dataStore.wait[key];
 				mWait.data = data;
@@ -278,11 +283,11 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 					if (!nodeWaiting) return;
 					compiler.compile({
 						el: nodeWaiting,
+						context: mWait.context,
 						data: Reactive.transform({
-							context: this,
+							context: mWait.context,
 							data: mWait.data
 						}),
-						context: this
 					})
 				});
 

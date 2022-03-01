@@ -1139,11 +1139,11 @@ export default class Directive extends Base {
 			forEach(mWait.nodes, (nodeWaiting) => {
 				this.compiler.compile({
 					el: nodeWaiting,
+					context: mWait.context,
 					data: Reactive.transform({
-						context: this.context,
+						context: mWait.context,
 						data: mWait.data
 					}),
-					context: this.context
 				});
 			});
 
@@ -1151,7 +1151,7 @@ export default class Directive extends Base {
 				delete dataStore.wait[nodeValue];
 		}
 
-		return dataStore.wait[nodeValue] = { nodes: [ownerNode] };
+		return dataStore.wait[nodeValue] = { nodes: [ownerNode], context: this.context };
 	}
 
 	custom(node: Node, data: object): boolean {
