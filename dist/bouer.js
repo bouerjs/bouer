@@ -653,6 +653,7 @@ var Binder = /** @class */ (function (_super) {
             parent: ownerNode,
             value: ''
         };
+        // Middleware that runs before the bind or update is made
         var $RunDirectiveMiddlewares = function (type) {
             middleware.run(originalName, {
                 type: type,
@@ -715,17 +716,17 @@ var Binder = /** @class */ (function (_super) {
                 event.onemit = function (reactive) {
                     _this.binds.push({
                         isConnected: options.isConnected,
-                        watch: reactive.onChange(function (value) {
-                            setter();
-                            onUpdate(value, node);
+                        watch: reactive.onChange(function () {
                             $RunDirectiveMiddlewares('onUpdate');
+                            setter();
+                            onUpdate(reactive.propValue, node);
                         }, node)
                     });
                 };
                 setter();
             });
-            propertyBindConfig.node = nodeToBind;
             $RunDirectiveMiddlewares('onBind');
+            propertyBindConfig.node = nodeToBind;
             return propertyBindConfig;
         };
         var $BindTwoWay = function () {
@@ -835,16 +836,17 @@ var Binder = /** @class */ (function (_super) {
                     _this.binds.push({
                         isConnected: options.isConnected,
                         watch: reactive.onChange(function () {
+                            $RunDirectiveMiddlewares('onUpdate');
                             var value = getValue();
                             callback(_this.BindingDirection.fromDataToInput, value);
                             onUpdate(value, node);
-                            $RunDirectiveMiddlewares('onUpdate');
                         }, node)
                     });
                 };
                 // calling the main event
                 boundPropertyValue = getValue();
             });
+            $RunDirectiveMiddlewares('onBind');
             callback(_this.BindingDirection.fromDataToInput, boundPropertyValue);
             var listeners = ['input', 'propertychange', 'change'];
             if (listeners.indexOf(ownerNode.localName) === -1)
@@ -859,7 +861,6 @@ var Binder = /** @class */ (function (_super) {
             });
             // Removing the e-bind attr
             ownerNode.removeAttribute(node.nodeName);
-            $RunDirectiveMiddlewares('onBind');
             return propertyBindConfig; // Stop Two-Way Data Binding Process
         };
         if (originalName.substring(0, Constants.bind.length) === Constants.bind)
