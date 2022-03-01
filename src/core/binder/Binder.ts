@@ -70,6 +70,7 @@ export default class Binder extends Base {
 			value: ''
 		};
 
+		// Middleware that runs before the bind or update is made
 		const $RunDirectiveMiddlewares = (type: 'onBind' | 'onUpdate') => {
 			middleware.run(originalName, {
 				type: type,
@@ -146,10 +147,10 @@ export default class Binder extends Base {
 				event.onemit = reactive => {
 					this.binds.push({
 						isConnected: options.isConnected,
-						watch: reactive.onChange(value => {
-							setter();
-							onUpdate(value, node);
+						watch: reactive.onChange(() => {
 							$RunDirectiveMiddlewares('onUpdate');
+							setter();
+							onUpdate(reactive.propValue, node);
 						}, node)
 					});
 				}
@@ -157,8 +158,8 @@ export default class Binder extends Base {
 				setter();
 			});
 
-			propertyBindConfig.node = nodeToBind;
 			$RunDirectiveMiddlewares('onBind');
+			propertyBindConfig.node = nodeToBind;
 			return propertyBindConfig;
 		}
 
@@ -278,14 +279,13 @@ export default class Binder extends Base {
 
 				// Adding the event on emittion
 				evt.onemit = reactive => {
-
 					this.binds.push({
 						isConnected: options.isConnected,
 						watch: reactive.onChange(() => {
+							$RunDirectiveMiddlewares('onUpdate');
 							var value = getValue();
 							callback(this.BindingDirection.fromDataToInput, value);
 							onUpdate(value, node);
-							$RunDirectiveMiddlewares('onUpdate');
 						}, node)
 					});
 				}
@@ -294,6 +294,7 @@ export default class Binder extends Base {
 				boundPropertyValue = getValue();
 			});
 
+			$RunDirectiveMiddlewares('onBind');
 			callback(this.BindingDirection.fromDataToInput, boundPropertyValue);
 
 			const listeners = ['input', 'propertychange', 'change'];
@@ -311,7 +312,6 @@ export default class Binder extends Base {
 
 			// Removing the e-bind attr
 			ownerNode.removeAttribute(node.nodeName);
-			$RunDirectiveMiddlewares('onBind');
 			return propertyBindConfig; // Stop Two-Way Data Binding Process
 		}
 
