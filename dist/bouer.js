@@ -2019,17 +2019,17 @@ var Directive = /** @class */ (function (_super) {
             forEach(mWait.nodes, function (nodeWaiting) {
                 _this.compiler.compile({
                     el: nodeWaiting,
+                    context: mWait.context,
                     data: Reactive.transform({
-                        context: _this.context,
+                        context: mWait.context,
                         data: mWait.data
                     }),
-                    context: _this.context
                 });
             });
             if (ifNullReturn(mWait.once, false))
                 delete dataStore.wait[nodeValue];
         }
-        return dataStore.wait[nodeValue] = { nodes: [ownerNode] };
+        return dataStore.wait[nodeValue] = { nodes: [ownerNode], context: this.context };
     };
     Directive.prototype.custom = function (node, data) {
         var ownerNode = this.toOwnerNode(node);
@@ -3774,7 +3774,12 @@ var Bouer = /** @class */ (function (_super) {
             },
             set: function (key, data, once) {
                 if (!(key in dataStore.wait))
-                    return dataStore.wait[key] = { data: data, nodes: [], once: ifNullReturn(once, false) };
+                    return dataStore.wait[key] = {
+                        data: data,
+                        nodes: [],
+                        once: ifNullReturn(once, false),
+                        context: _this_1
+                    };
                 var mWait = dataStore.wait[key];
                 mWait.data = data;
                 forEach(mWait.nodes, function (nodeWaiting) {
@@ -3782,11 +3787,11 @@ var Bouer = /** @class */ (function (_super) {
                         return;
                     compiler.compile({
                         el: nodeWaiting,
+                        context: mWait.context,
                         data: Reactive.transform({
-                            context: _this_1,
+                            context: mWait.context,
                             data: mWait.data
                         }),
-                        context: _this_1
                     });
                 });
                 if (ifNullReturn(once, false))
