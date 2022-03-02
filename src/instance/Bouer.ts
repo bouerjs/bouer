@@ -23,7 +23,7 @@ import ServiceProvider from "../shared/helpers/ServiceProvider";
 import Task from "../shared/helpers/Task";
 import {
 	$CreateEl, DOM, forEach,
-	GLOBAL,
+	WIN,
 	ifNullReturn,
 	isNull, isObject, toArray, trim,
 } from "../shared/helpers/Utils";
@@ -360,7 +360,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 			})
 		});
 
-		GLOBAL.addEventListener('beforeunload', () => {
+		WIN.addEventListener('beforeunload', () => {
 			if (this.isDestroyed) return;
 
 			eventHandler.emit({

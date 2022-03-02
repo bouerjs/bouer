@@ -173,11 +173,8 @@ export default class Compiler extends Base {
 				let dataNode: any = null;
 				if (dataNode = toArray(node.attributes).find((attr: Attr) => {
 					const attrName = attr.name;
-					// In case of data="..."
-					if (attrName === Constants.data) return true;
-
-					// In case of data:[data-id]="..."
-					return startWith(attrName, Constants.data + ':');
+					// In case of data="..." or data:[data-id]="..."
+					return (attrName === Constants.data || startWith(attrName, Constants.data + ':'));
 				}))
 					return directive.data(dataNode, data);
 

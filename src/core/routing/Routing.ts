@@ -1,7 +1,7 @@
 import IComponentOptions from "../../definitions/interfaces/IComponentOptions";
 import Bouer from "../../instance/Bouer";
 import ServiceProvider from "../../shared/helpers/ServiceProvider";
-import { $CreateAnyEl, DOM, forEach, GLOBAL, ifNullReturn, isNull, isObject, toArray, trim, urlCombine, urlResolver } from "../../shared/helpers/Utils";
+import { $CreateAnyEl, DOM, forEach, WIN, ifNullReturn, isNull, isObject, toArray, trim, urlCombine, urlResolver } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Base from "../Base";
 import Component from "../component/Component";
@@ -43,7 +43,7 @@ export default class Routing extends Base {
 			this.navigate(DOM.location.href);
 
 		// Listening to the page navigation
-		GLOBAL.addEventListener('popstate', evt => {
+		WIN.addEventListener('popstate', evt => {
 			evt.preventDefault();
 			this.navigate(((evt.state || {}).url || location.href), {
 				setURL: false
@@ -101,12 +101,12 @@ export default class Routing extends Base {
 	pushState(url: string, title?: string) {
 		url = urlResolver(url).href;
 		if (DOM.location.href === url) return;
-		GLOBAL.history.pushState({ url, title }, (title || ''), url);
+		WIN.history.pushState({ url, title }, (title || ''), url);
 	}
 
 	popState(times?: number) {
 		if (isNull(times)) times = -1;
-		GLOBAL.history.go(times);
+		WIN.history.go(times);
 	}
 
 	private toPage(url: string) {

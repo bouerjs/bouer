@@ -12,10 +12,10 @@ export function webRequest(url: string, options?: {
 	if (!url) return Promise.reject(new Error("Invalid Url"));
 
 	const createXhr = (method: string) => {
-		if ((DOM as any).documentMode && (!method.match(/^(get|post)$/i) || !GLOBAL.XMLHttpRequest)) {
-			return new (GLOBAL as any).ActiveXObject("Microsoft.XMLHTTP");
-		} else if (GLOBAL.XMLHttpRequest) {
-			return new GLOBAL.XMLHttpRequest();
+		if ((DOM as any).documentMode && (!method.match(/^(get|post)$/i) || !WIN.XMLHttpRequest)) {
+			return new (WIN as any).ActiveXObject("Microsoft.XMLHTTP");
+		} else if (WIN.XMLHttpRequest) {
+			return new WIN.XMLHttpRequest();
 		}
 		throw new Error("This browser does not support XMLHttpRequest.");
 	}
@@ -334,23 +334,19 @@ export function pathResolver(relative: string, path: string) {
 	if (isCurrentDir(path))
 		return toDirPath(relative).relative + path.substring(1);
 
-	if (isParentDir(path)) {
-		const parts = toDirPath(relative).parts;
+	if (!isParentDir(path))
+		return path;
 
-		parts.push(
-			(function pathLookUp(value: string): string {
-				if (!isParentDir(value))
-					return value;
+	const parts = toDirPath(relative).parts;
+	parts.push((function pathLookUp(value: string): string {
+		if (!isParentDir(value))
+			return value;
 
-				parts.pop();
-				return pathLookUp(value.substring(3));
-			})(path)
-		);
+		parts.pop();
+		return pathLookUp(value.substring(3));
+	})(path));
 
-		return parts.join('/');
-	}
-
-	return path;
+	return parts.join('/');
 }
 
 export function buildError(error: any) {
@@ -359,6 +355,6 @@ export function buildError(error: any) {
 	return error;
 }
 
+export const WIN = window;
 export const DOM = document;
-export const GLOBAL = globalThis;
 export const anchor = $CreateEl('a').build();

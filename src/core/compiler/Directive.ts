@@ -133,7 +133,7 @@ export default class Directive extends Base {
 
 				this.evaluator.exec({
 					data: data,
-					expression: attr.value,
+					code: attr.value,
 					context: this.context
 				});
 			});
@@ -171,7 +171,7 @@ export default class Directive extends Base {
 			this.evaluator.exec({
 				data: data,
 				isReturn: false,
-				expression: conditionalExpression,
+				code: conditionalExpression,
 				context: this.context,
 				aditional: {
 					_cb: (chainIndex: number) => {
@@ -211,7 +211,7 @@ export default class Directive extends Base {
 		(execute = (element: HTMLElement) => {
 			const value = this.evaluator.exec({
 				data: data,
-				expression: nodeValue,
+				code: nodeValue,
 				context: this.context,
 			});
 
@@ -290,7 +290,7 @@ export default class Directive extends Base {
 
 			whereValue = this.evaluator.exec({
 				data: data,
-				expression: whereValue,
+				code: whereValue,
 				context: this.context
 			});
 
@@ -311,7 +311,7 @@ export default class Directive extends Base {
 					for (const prop of whereKeys.split(',').map(m => trim(m))) {
 						let propValue = this.evaluator.exec({
 							data: item,
-							expression: prop,
+							code: prop,
 							context: this.context
 						});
 
@@ -431,7 +431,7 @@ export default class Directive extends Base {
 			const iterable = isForOf ? rightHand : "Object.keys(" + rightHand + ")";
 			const sourceValue = this.evaluator.exec({
 				data: data,
-				expression: rightHand,
+				code: rightHand,
 				context: this.context
 			});
 
@@ -547,7 +547,7 @@ export default class Directive extends Base {
 				data: data,
 				isReturn: false,
 				context: this.context,
-				expression: "var __e = _each, __fl = _filters, __f = _for; " +
+				code: "var __e = _each, __fl = _filters, __f = _for; " +
 					"__f(__fl(" + iterable + "), function($$itm, $$idx) { __e($$itm, $$idx); })",
 				aditional: {
 					_for: forEach,
@@ -617,7 +617,7 @@ export default class Directive extends Base {
 
 		const mInputData = this.evaluator.exec({
 			data: data,
-			expression: nodeValue,
+			code: nodeValue,
 			context: this.context
 		});
 
@@ -685,7 +685,7 @@ export default class Directive extends Base {
 
 		let inputData = this.evaluator.exec({
 			data: data,
-			expression: nodeValue,
+			code: nodeValue,
 			context: this.context
 		});
 
@@ -701,7 +701,7 @@ export default class Directive extends Base {
 			context: this.context,
 			onUpdate: () => execute(this.evaluator.exec({
 				data: data,
-				expression: nodeValue,
+				code: nodeValue,
 				context: this.context
 			}))
 		});
@@ -751,7 +751,7 @@ export default class Directive extends Base {
 			// Other wise, compiles the object provided
 			const mInputData = this.evaluator.exec({
 				data: mData,
-				expression: nodeValue,
+				code: nodeValue,
 				context: this.context
 			});
 

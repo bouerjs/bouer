@@ -75,7 +75,7 @@ export default class EventHandler extends Base {
 			const mArguments = [evt];
 			const isResultFunction = this.evaluator.exec({
 				data: data,
-				expression: nodeValue,
+				code: nodeValue,
 				args: mArguments,
 				aditional: { event: evt },
 				context: context

@@ -16,7 +16,7 @@ import {
 	toLower, urlCombine,
 	$CreateAnyEl,
 	isObject, pathResolver, toArray,
-	urlResolver, webRequest, where, ifNullReturn
+	urlResolver, webRequest, where, ifNullReturn, startWith
 } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Base from "../Base";
@@ -29,6 +29,7 @@ import Reactive from "../reactive/Reactive";
 import Routing from "../routing/Routing";
 import Component from "./Component";
 import ILifeCycleHooks from "../../definitions/interfaces/ILifeCycleHooks";
+import Constants from "../../shared/helpers/Constants";
 
 export default class ComponentHandler extends Base {
 	private bouer: Bouer;
@@ -349,6 +350,12 @@ export default class ComponentHandler extends Base {
 
 				createdEvent.emit();
 
+				// If the component has the e-for directive
+				// And Does not have the data directive assigned, create it implicitly
+				if (componentElement.hasAttribute(Constants.for) && !(toArray(componentElement.attributes).find((attr: Attr) =>
+					(attr.name === Constants.data || startWith(attr.name, Constants.data + ':')))))
+					componentElement.setAttribute('data', '$data');
+
 				// tranfering the attributes
 				forEach(toArray(componentElement.attributes), (attr: Attr) => {
 					componentElement.removeAttribute(attr.name);
@@ -379,7 +386,7 @@ export default class ComponentHandler extends Base {
 							const mInputData = this.serviceProvider.get<Evaluator>('Evaluator')!
 								.exec({
 									data: mData,
-									expression: attr.value,
+									code: attr.value,
 									context: this.bouer
 								});
 

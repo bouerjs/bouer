@@ -115,7 +115,7 @@ export default class Binder extends Base {
 
 					let result = this.evaluator.exec({
 						data: data,
-						expression: field.expression,
+						code: field.expression,
 						context: context
 					});
 
@@ -209,7 +209,7 @@ export default class Binder extends Base {
 
 						boundModelValue = boundModelValue || this.evaluator.exec({
 							data: data,
-							expression: dataBindModel,
+							code: dataBindModel,
 							context: context
 						});
 
@@ -237,14 +237,14 @@ export default class Binder extends Base {
 								isReturn: false,
 								context: context,
 								data: Extend.obj(data, { $vl: value }),
-								expression: dataBindProperty + '=$vl'
+								code: dataBindProperty + '=$vl'
 							});
 						}
 
 						// Array Set
 						boundModelValue = boundModelValue || this.evaluator.exec({
 							data: data,
-							expression: dataBindModel,
+							code: dataBindModel,
 							context: context
 						});
 
@@ -273,7 +273,7 @@ export default class Binder extends Base {
 			ReactiveEvent.once('AfterGet', evt => {
 				const getValue = () => this.evaluator.exec({
 					data: data,
-					expression: dataBindProperty,
+					code: dataBindProperty,
 					context: context
 				});
 
