@@ -866,6 +866,19 @@ var Binder = /** @class */ (function (_super) {
             return $BindTwoWay();
         return $BindOneWay();
     };
+    Binder.prototype.remove = function (boundNode, boundAttrName, boundPropName) {
+        this.binds = where(this.binds, function (bind) {
+            var node = bind.watch.node;
+            if ((node.ownerElement || node.parentElement) !== boundNode)
+                return true;
+            if (isNull(boundAttrName))
+                return bind.watch.destroy();
+            if (node.nodeName === boundAttrName &&
+                (boundPropName === bind.watch.property || isNull(boundPropName)))
+                return bind.watch.destroy();
+            return true;
+        });
+    };
     Binder.prototype.onPropertyChange = function (propertyName, callback, targetObject) {
         var mWatch;
         ReactiveEvent.once('AfterGet', function (event) {
@@ -900,6 +913,9 @@ var Binder = /** @class */ (function (_super) {
     /** Creates a process to unbind properties that is not connected to the DOM anymone */
     Binder.prototype.cleanup = function () {
         var _this = this;
+        var autoUnbind = ifNullReturn(this.bouer.config.autoUnbind, true);
+        if (autoUnbind == false)
+            return;
         Task.run(function () {
             _this.binds = where(_this.binds, function (bind) {
                 if (bind.isConnected())
@@ -1390,8 +1406,8 @@ var Directive = /** @class */ (function (_super) {
                     once: true
                 }); }
             });
-            // Addin
-            listedItemsHandler[options.method]({
+            // Updating the handler
+            listedItemsHandler.splice(options.index, 0, {
                 el: forClonedItem,
                 data: forData
             });
@@ -1446,6 +1462,8 @@ var Directive = /** @class */ (function (_super) {
                     expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
                     var leftHandParts = expObj.leftHandParts;
                     var _index_or_value = leftHandParts[1] || '_index_or_value';
+                    if (_index_or_value === '_index_or_value')
+                        return;
                     forEach(array, function (item, index) {
                         item.data[_index_or_value] = index;
                     });
@@ -1463,40 +1481,53 @@ var Directive = /** @class */ (function (_super) {
                     return reOrganizeIndexes();
                 }
                 case 'splice': { // Indexed removal handler
-                    var removedItems = mListedItems[method].apply(mListedItems, args);
+                    var index_1 = args[0];
+                    var deleteCount = args[1];
+                    var removedItems = mListedItems.splice(index_1, deleteCount);
                     forEach(removedItems, function (item) { return $RemoveEl(item.el); });
-                    var index = args[0];
                     expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
                     var leftHandParts = expObj.leftHandParts;
                     var _index_or_value = leftHandParts[1] || '_index_or_value';
+                    var _insert_args = [].slice.call(args, 2);
+                    // Adding the items to the dom
+                    forEach(_insert_args, function (item) {
+                        index_1++;
+                        $InsertForItem({
+                            // Getting the next reference
+                            reference: listedItemsHandler[index_1].el || comment,
+                            index: index_1,
+                            item: item,
+                        });
+                    });
+                    if (_index_or_value === '_index_or_value')
+                        return;
                     // Fixing the index value
-                    for (; index < listedItemsHandler.length; index++) {
-                        var item = listedItemsHandler[index].data;
+                    for (; index_1 < listedItemsHandler.length; index_1++) {
+                        var item = listedItemsHandler[index_1].data;
                         if (typeof item[_index_or_value] === 'number')
-                            item[_index_or_value] = index;
+                            item[_index_or_value] = index_1;
                     }
                     return;
                 }
                 case 'push':
                 case 'unshift': { // Addition handler
                     // Gets the last item as default
-                    var indexRef_1 = mListedItems.length;
                     var isUnshift_1 = method == 'unshift';
-                    var reference_1 = isUnshift_1 ? listedItemsHandler[0].el : undefined;
-                    // Adding the itens to the dom
+                    var indexRef_1 = isUnshift_1 ? 0 : mListedItems.length;
+                    var reference_1 = isUnshift_1 ? listedItemsHandler[0].el : comment;
+                    // Adding the items to the dom
                     forEach([].slice.call(args), function (item) {
                         var ref = $InsertForItem({
                             index: indexRef_1++,
                             reference: reference_1,
-                            method: method,
                             item: item,
                         });
                         if (isUnshift_1)
                             reference_1 = ref;
                     });
-                    if (!isUnshift_1)
-                        return;
-                    return reOrganizeIndexes();
+                    if (isUnshift_1)
+                        reOrganizeIndexes();
+                    return;
                 }
                 default: return execute();
             }
@@ -1514,7 +1545,7 @@ var Directive = /** @class */ (function (_super) {
         (execute = function () {
             expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
             var iterable = expObj.iterableExpression, filters = expObj.filters;
-            // Cleaning the
+            // Cleaning the existing items
             forEach(listedItemsHandler, function (item) {
                 if (!item.el.parentElement)
                     return;
@@ -1532,8 +1563,7 @@ var Directive = /** @class */ (function (_super) {
                     _each: function (item, index) {
                         $InsertForItem({
                             index: index,
-                            item: item,
-                            method: 'push'
+                            item: item
                         });
                     },
                     _filters: function (list) {
@@ -3287,6 +3317,12 @@ var EventHandler = /** @class */ (function (_super) {
             var isEqual = (evt.eventName === eventName && callback == evt.callback);
             if (attachedNode && (evt.attachedNode === attachedNode) && isEqual)
                 return false;
+            // In this case remove all
+            var isRemoveAll = (evt.eventName === eventName &&
+                evt.attachedNode === attachedNode &&
+                isNull(callback));
+            if (isRemoveAll)
+                return;
             return !isEqual;
         });
     };
@@ -3322,6 +3358,9 @@ var EventHandler = /** @class */ (function (_super) {
     };
     EventHandler.prototype.cleanup = function () {
         var _this = this;
+        var autoOffEvent = ifNullReturn(this.bouer.config.autoOffEvent, true);
+        if (autoOffEvent == false)
+            return;
         Task.run(function () {
             forEach(Object.keys(_this.$events), function (key) {
                 _this.$events[key] = where(_this.$events[key], function (event) {
@@ -3959,6 +3998,16 @@ var Bouer = /** @class */ (function (_super) {
             callback: callback,
             attachedNode: attachedNode
         });
+    };
+    /**
+     * Removes the bind from an element
+     * @param boundNode the node having the bind
+     * @param boundAttrName the bound attribute name
+     * @param boundPropName the bound property name
+     */
+    Bouer.prototype.unbind = function (boundNode, boundAttrName, boundPropName) {
+        return new ServiceProvider(this).get('Binder').
+            remove(boundNode, boundPropName, boundAttrName);
     };
     /**
      * Dispatch an event
