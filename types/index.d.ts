@@ -424,9 +424,21 @@ declare class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
 	 */
 	off(
 		eventName: string,
-		callback: (event: CustomEvent | Event) => void,
+		callback?: (event: CustomEvent | Event) => void,
 		attachedNode?: Node
 	): void;
+
+	/**
+	 * Removes the bind from an element
+	 * @param boundNode the node having the bind
+	 * @param boundAttrName the bound attribute name
+	 * @param boundPropName the bound property name
+	 */
+	 unbind(
+		 boundNode: Node,
+		 boundAttrName?: string,
+		 boundPropName?: string,
+		): void;
 
 	/**
 	 * Dispatch an event
