@@ -92,8 +92,8 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
 					reactiveObj: this,
 					context: this.context
 				});
-				const propValueAsAny = this.propValue as any;
 
+				const propValueAsAny = this.propValue as any;
 				propValueAsAny.splice(0, propValueAsAny.length);
 				propValueAsAny.push.apply(propValueAsAny, (value as any));
 			} else if (isObject(value)) {
