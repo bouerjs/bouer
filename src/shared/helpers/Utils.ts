@@ -212,8 +212,8 @@ export function toArray(array: any) {
 	return [].slice.call(array);
 }
 
-export function $CreateComment(id?: string) {
-	const comment = DOM.createComment('e');
+export function $CreateComment(id?: string, content?: string) {
+	const comment = DOM.createComment(content || ' e ');
 	(comment as any).id = id || code(8);
 	return comment;
 }
