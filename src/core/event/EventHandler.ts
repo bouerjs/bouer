@@ -137,10 +137,9 @@ export default class EventHandler extends Base {
 
 	off(options: {
 		eventName: string,
-		callback: (event: CustomEvent | Event) => void,
+		callback?: (event: CustomEvent | Event) => void,
 		attachedNode?: Node
 	}) {
-
 		const { eventName, callback, attachedNode } = options;
 		if (!this.$events[eventName])
 			return;
@@ -150,6 +149,12 @@ export default class EventHandler extends Base {
 
 			if (attachedNode && (evt.attachedNode === attachedNode) && isEqual)
 				return false;
+
+			// In this case remove all
+			const isRemoveAll = (evt.eventName === eventName &&
+													evt.attachedNode === attachedNode &&
+													isNull(callback));
+			if (isRemoveAll) return;
 
 			return !isEqual;
 		});
@@ -191,6 +196,8 @@ export default class EventHandler extends Base {
 	}
 
 	private cleanup() {
+		const autoOffEvent = ifNullReturn(this.bouer.config.autoOffEvent, true);
+		if (autoOffEvent == false) return;
 		Task.run(() => {
 			forEach(Object.keys(this.$events), key => {
 				this.$events[key] = where(this.$events[key], event => {
