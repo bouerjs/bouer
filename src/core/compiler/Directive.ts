@@ -191,7 +191,7 @@ export default class Directive extends Base {
 	show(node: Node, data: object) {
 		const ownerNode = this.toOwnerNode(node);
 		const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-		let execute = (el: HTMLElement) => {};
+		let execute = (el: HTMLElement) => { };
 
 		if (nodeValue === '')
 			return Logger.error(this.errorMsgEmptyNode(node));
@@ -375,8 +375,8 @@ export default class Directive extends Base {
 		const $InsertForItem = (options: {
 			item: any,
 			index: number,
-			reference?: Element,
-			method: 'push' | 'unshift'
+			deleteCount?: number,
+			reference?: Element | Comment
 		}) => {
 			// Preparing the data to be inserted
 			const forData = $PrepareForItem(options.item, options.index);
@@ -399,8 +399,8 @@ export default class Directive extends Base {
 				})
 			});
 
-			// Addin
-			listedItemsHandler[options.method]({
+			// Updating the handler
+			listedItemsHandler.splice(options.index, 0, {
 				el: forClonedItem,
 				data: forData
 			});
@@ -453,8 +453,8 @@ export default class Directive extends Base {
 				return execute(); // Reorganize re-insert all the items
 
 			detail = detail || {};
-			const method = detail!.method;
-			const args = detail!.args;
+			const method = detail.method;
+			const args = detail.args;
 			const mListedItems = (listedItemsHandler as any);
 
 			const reOrganizeIndexes = function () {
@@ -464,6 +464,9 @@ export default class Directive extends Base {
 					expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
 					const leftHandParts = expObj.leftHandParts;
 					const _index_or_value = leftHandParts[1] || '_index_or_value';
+
+					if (_index_or_value === '_index_or_value')
+						return;
 
 					forEach(array, (item, index) => {
 						item.data[_index_or_value] = index;
@@ -481,14 +484,31 @@ export default class Directive extends Base {
 					return reOrganizeIndexes();
 				}
 				case 'splice': { // Indexed removal handler
-					const removedItems = mListedItems[method].apply(mListedItems, args);
+					let index = args[0] as number;
+					let deleteCount = args[1] as number;
+
+					const removedItems = mListedItems.splice(index, deleteCount);
 					forEach(removedItems, (item: any) => $RemoveEl(item.el));
 
-					let index = args[0] as number;
 					expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
 
 					const leftHandParts = expObj.leftHandParts;
 					const _index_or_value = leftHandParts[1] || '_index_or_value';
+					const _insert_args = [].slice.call(args, 2);
+
+					// Adding the items to the dom
+					forEach(_insert_args, item => {
+						index++;
+						$InsertForItem({
+							// Getting the next reference
+							reference: listedItemsHandler[index].el || comment,
+							index: index,
+							item,
+						});
+					});
+
+					if (_index_or_value === '_index_or_value')
+						return;
 
 					// Fixing the index value
 					for (; index < listedItemsHandler.length; index++) {
@@ -500,22 +520,22 @@ export default class Directive extends Base {
 				}
 				case 'push': case 'unshift': { // Addition handler
 					// Gets the last item as default
-					let indexRef = mListedItems.length;
 					let isUnshift = method == 'unshift';
-					let reference = isUnshift ? listedItemsHandler[0].el : undefined;
-					// Adding the itens to the dom
+					let indexRef = isUnshift ? 0 : mListedItems.length;
+					let reference = isUnshift ? listedItemsHandler[0].el : comment;
+					// Adding the items to the dom
 					forEach([].slice.call(args), item => {
 						const ref = $InsertForItem({
 							index: indexRef++,
 							reference,
-							method,
 							item,
 						});
 						if (isUnshift) reference = ref;
 					});
 
-					if (!isUnshift) return;
-					return reOrganizeIndexes();
+					if (isUnshift)
+						reOrganizeIndexes();
+					return;
 				}
 				default: return execute();
 			}
@@ -536,7 +556,7 @@ export default class Directive extends Base {
 			expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
 			const iterable = expObj.iterableExpression, filters = expObj.filters;
 
-			// Cleaning the
+			// Cleaning the existing items
 			forEach(listedItemsHandler, item => {
 				if (!item.el.parentElement) return;
 				container.removeChild(item.el);
@@ -554,8 +574,7 @@ export default class Directive extends Base {
 					_each(item: any, index: number) {
 						$InsertForItem({
 							index,
-							item,
-							method: 'push'
+							item
 						})
 					},
 					_filters(list: any[]) {
