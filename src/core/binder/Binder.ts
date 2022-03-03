@@ -320,6 +320,24 @@ export default class Binder extends Base {
 		return $BindOneWay();
 	}
 
+	remove(boundNode: Node, boundAttrName?: string, boundPropName?: string) {
+		this.binds = where(this.binds, bind => {
+			const node = bind.watch.node!;
+
+			if (((node as any).ownerElement || node.parentElement) !== boundNode)
+				return true;
+
+			if (isNull(boundAttrName))
+				return bind.watch.destroy();
+
+			if (node.nodeName === boundAttrName &&
+				(boundPropName === bind.watch.property || isNull(boundPropName)))
+				return bind.watch.destroy();
+
+			return true;
+		});
+	}
+
 	onPropertyChange<Value, TargetObject>(
 		propertyName: string | number | symbol,
 		callback: WatchCallback, targetObject: TargetObject
@@ -360,6 +378,8 @@ export default class Binder extends Base {
 
 	/** Creates a process to unbind properties that is not connected to the DOM anymone */
 	private cleanup() {
+		const autoUnbind = ifNullReturn(this.bouer.config.autoUnbind, true);
+		if (autoUnbind == false) return;
 		Task.run(() => {
 			this.binds = where(this.binds, bind => {
 				if (bind.isConnected()) return true;
