@@ -53,7 +53,6 @@ export default class EventHandler extends Base {
 		let allModifiers = eventNameWithModifiers.split('.');
 		const eventName = allModifiers[0];
 		allModifiers.shift();
-		const modifierFunctions = [];
 
 		if (nodeValue === '')
 			return Logger.error("Expected an expression in the “" + nodeName + "” and got an <empty string>.");
@@ -96,8 +95,6 @@ export default class EventHandler extends Base {
 			md = md.toLocaleLowerCase();
 			if (addEventListenerOptions.indexOf(md) !== -1) {
 				modifiersObject[md] = true;
-			} else {
-				modifierFunctions.push(md);
 			}
 		});
 
@@ -152,8 +149,8 @@ export default class EventHandler extends Base {
 
 			// In this case remove all
 			const isRemoveAll = (evt.eventName === eventName &&
-													evt.attachedNode === attachedNode &&
-													isNull(callback));
+				evt.attachedNode === attachedNode &&
+				isNull(callback));
 			if (isRemoveAll) return;
 
 			return !isEqual;
