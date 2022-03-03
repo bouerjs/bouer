@@ -217,8 +217,8 @@ function toArray(array) {
         return [];
     return [].slice.call(array);
 }
-function $CreateComment(id) {
-    var comment = DOM.createComment('e');
+function $CreateComment(id, content) {
+    var comment = DOM.createComment(content || ' e ');
     comment.id = id || code(8);
     return comment;
 }
@@ -1842,6 +1842,8 @@ var Directive = /** @class */ (function (_super) {
                 + "” and got “" + nodeValue + "”." + "\nValid: e-req=\"item of [url]\"."));
         var delimiters = this.delimiter.run(nodeValue);
         var localDataStore = {};
+        var dataKey = (node.nodeName.split(':')[1] || '').replace(/\[|\]/g, '');
+        var comment = $CreateComment(undefined, "request-" + (dataKey || code(6)));
         var onInsertOrUpdate = function () { };
         var onUpdate = function () { };
         var binderConfig = {
@@ -1853,6 +1855,8 @@ var Directive = /** @class */ (function (_super) {
             parent: ownerNode,
             value: nodeValue,
         };
+        // Inserting the comment node
+        container.insertBefore(comment, ownerNode);
         if (delimiters.length !== 0)
             binderConfig = this.binder.create({
                 data: data,
@@ -1860,10 +1864,12 @@ var Directive = /** @class */ (function (_super) {
                 fields: delimiters,
                 context: this.context,
                 isReplaceProperty: false,
-                isConnected: function () { return container.isConnected; },
+                isConnected: function () { return comment.isConnected; },
                 onUpdate: function () { return onUpdate(); }
             });
         ownerNode.removeAttribute(node.nodeName);
+        // Mutating the `isConnected` property of the e-req node
+        Prop.set(ownerNode, 'isConnected', { get: function () { return comment.isConnected; } });
         var subcribeEvent = function (eventName) {
             var attr = ownerNode.attributes.getNamedItem(Constants.on + eventName);
             if (attr)
@@ -1920,7 +1926,6 @@ var Directive = /** @class */ (function (_super) {
             return true;
         };
         var middleware = this.serviceProvider.get('Middleware');
-        var dataKey = (node.nodeName.split(':')[1] || '').replace(/\[|\]/g, '');
         if (!middleware.has('req'))
             return Logger.error("There is no “req” middleware provided for the “e-req” directive requests.");
         (onInsertOrUpdate = function () {
