@@ -910,6 +910,8 @@ export default class Directive extends Base {
 
 		const delimiters = this.delimiter.run(nodeValue);
 		const localDataStore: dynamic = {};
+		const dataKey = (node.nodeName.split(':')[1] || '').replace(/\[|\]/g, '');
+		const comment = $CreateComment(undefined, "request-" + (dataKey || code(6)));
 
 		let onInsertOrUpdate = () => { };
 		let onUpdate = () => { };
@@ -924,6 +926,9 @@ export default class Directive extends Base {
 			value: nodeValue,
 		};
 
+		// Inserting the comment node
+		container.insertBefore(comment, ownerNode);
+
 		if (delimiters.length !== 0)
 			binderConfig = this.binder.create({
 				data: data,
@@ -931,11 +936,13 @@ export default class Directive extends Base {
 				fields: delimiters,
 				context: this.context,
 				isReplaceProperty: false,
-				isConnected: () => container.isConnected,
+				isConnected: () => comment.isConnected,
 				onUpdate: () => onUpdate()
 			});
 
 		ownerNode.removeAttribute(node.nodeName);
+		// Mutating the `isConnected` property of the e-req node
+		Prop.set(ownerNode, 'isConnected', { get: () => comment.isConnected });
 
 		const subcribeEvent = (eventName: string) => {
 			const attr = ownerNode.attributes.getNamedItem(Constants.on + eventName);
@@ -1010,7 +1017,6 @@ export default class Directive extends Base {
 		}
 
 		const middleware = this.serviceProvider.get<Middleware>('Middleware')!;
-		const dataKey = (node.nodeName.split(':')[1] || '').replace(/\[|\]/g, '');
 
 		if (!middleware.has('req'))
 			return Logger.error("There is no “req” middleware provided for the “e-req” directive requests.");
