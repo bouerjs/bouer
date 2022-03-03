@@ -548,7 +548,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 	 */
 	off(
 		eventName: string,
-		callback: (event: CustomEvent | Event) => void,
+		callback?: (event: CustomEvent | Event) => void,
 		attachedNode?: Node
 	) {
 		return new ServiceProvider(this).get<EventHandler>('EventHandler')!.
@@ -557,6 +557,17 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> extend
 				callback,
 				attachedNode
 			});
+	}
+
+	/**
+	 * Removes the bind from an element
+	 * @param boundNode the node having the bind
+	 * @param boundAttrName the bound attribute name
+	 * @param boundPropName the bound property name
+	 */
+	unbind(boundNode: Node, boundAttrName?: string, boundPropName?: string) {
+		return new ServiceProvider(this).get<Binder>('Binder')!.
+			remove(boundNode, boundPropName, boundAttrName);
 	}
 
 	/**
