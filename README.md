@@ -11,15 +11,15 @@ It's a javascript library really easy to use that provides to you a simple way t
 ### 1. An **Api** Call using a simple attribute (directive) 
 ```html
 <li e-req="user of users">
-	<span> {{ user.name }} </span>
+  <span> {{ user.name }} </span>
 </li>
 ```
 
 ### 2. Parsing **Form Element** to an **Object Literal**
 ```html
 <form on:submit="submit">
-	<input type="text" name="name"/>
-	<input type="number" name="age"/>
+  <input type="text" name="name"/>
+  <input type="number" name="age"/>
 </form>
 ```
 
@@ -27,8 +27,8 @@ It's a javascript library really easy to use that provides to you a simple way t
 const obj = app.toJsObj('form');
 // Result `obj`:
 {
-	name: '',
-	age: ''
+  name: '',
+  age: ''
 }
 ```
 
