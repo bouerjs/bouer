@@ -141,10 +141,12 @@ export default class Directive extends Base {
 			currentEl.removeAttribute(attr.nodeName);
 		} while (currentEl = currentEl.nextElementSibling);
 
+		const isChainConnected = () => !isNull(Extend.array(conditions.map(x => x.element), comment as any).find(el => el.isConnected));
+
 		forEach(reactives, item => {
 			this.binder.binds.push({
 				// Binder is connected if at least one of the chain and the comment is still connected
-				isConnected: () => !isNull(Extend.array(conditions.map(x => x.element), comment as any).find(el => el.isConnected)),
+				isConnected: isChainConnected,
 				watch: item.reactive.onChange(() => execute(), item.attr)
 			})
 		});
@@ -181,6 +183,7 @@ export default class Directive extends Base {
 							el: element,
 							data: data,
 							context: this.context,
+							isConnected: isChainConnected
 						})
 					}
 				}
@@ -1060,7 +1063,8 @@ export default class Directive extends Base {
 					return this.compiler.compile({
 						el: ownerNode,
 						data: Reactive.transform({ context: this.context, data: data }),
-						context: this.context
+						context: this.context,
+						isConnected: () => comment.isConnected
 					});
 				}
 
@@ -1074,7 +1078,8 @@ export default class Directive extends Base {
 					return this.compiler.compile({
 						el: ownerNode,
 						data: mData,
-						context: this.context
+						context: this.context,
+						isConnected: () => comment.isConnected
 					});
 				}
 			}
