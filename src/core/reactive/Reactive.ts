@@ -47,17 +47,13 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
 		if (this.isComputed) {
 			const computedResult = (this.propValue as any).call(this.context);
 
-			if ('get' in computedResult || !isNull(computedResult)) {
-				this.computedGetter = computedResult.get || (() => computedResult);
-			}
+			if (isNull(computedResult))
+				throw new Error("Invalid value used as return in “function $computed(){...}”.");
 
-			if ('set' in computedResult) {
-				this.computedSetter = computedResult.set;
-			}
+			const isNotInferred = isObject(computedResult) || isFunction(computedResult);
 
-			if (isNull(this.computedGetter))
-				throw new Error("Computed property must be a function “function $computed(){...}” that returns " +
-					"a valid value to infer “getter only” or an object with a “get” and/or “set” function");
+			this.computedGetter = (isNotInferred && 'get' in computedResult) ? computedResult.get : (() => computedResult);
+			this.computedSetter = (isNotInferred && 'set' in computedResult) ? computedResult.set : undefined;
 
 			(this.propValue as any) = undefined;
 		}
