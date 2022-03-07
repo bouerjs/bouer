@@ -1011,15 +1011,11 @@ var Reactive = /** @class */ (function (_super) {
         _this.isComputed = typeof _this.propValue === 'function' && _this.propValue.name === '$computed';
         if (_this.isComputed) {
             var computedResult_1 = _this.propValue.call(_this.context);
-            if ('get' in computedResult_1 || !isNull(computedResult_1)) {
-                _this.computedGetter = computedResult_1.get || (function () { return computedResult_1; });
-            }
-            if ('set' in computedResult_1) {
-                _this.computedSetter = computedResult_1.set;
-            }
-            if (isNull(_this.computedGetter))
-                throw new Error("Computed property must be a function “function $computed(){...}” that returns " +
-                    "a valid value to infer “getter only” or an object with a “get” and/or “set” function");
+            if (isNull(computedResult_1))
+                throw new Error("Invalid value used as return in “function $computed(){...}”.");
+            var isNotInferred = isObject(computedResult_1) || isFunction(computedResult_1);
+            _this.computedGetter = (isNotInferred && 'get' in computedResult_1) ? computedResult_1.get : (function () { return computedResult_1; });
+            _this.computedSetter = (isNotInferred && 'set' in computedResult_1) ? computedResult_1.set : undefined;
             _this.propValue = undefined;
         }
         if (typeof _this.propValue === 'function' && !_this.isComputed)
@@ -1196,10 +1192,11 @@ var Directive = /** @class */ (function (_super) {
             if (state_1 === "break")
                 break;
         } while (currentEl = currentEl.nextElementSibling);
+        var isChainConnected = function () { return !isNull(Extend.array(conditions.map(function (x) { return x.element; }), comment).find(function (el) { return el.isConnected; })); };
         forEach(reactives, function (item) {
             _this.binder.binds.push({
                 // Binder is connected if at least one of the chain and the comment is still connected
-                isConnected: function () { return !isNull(Extend.array(conditions.map(function (x) { return x.element; }), comment).find(function (el) { return el.isConnected; })); },
+                isConnected: isChainConnected,
                 watch: item.reactive.onChange(function () { return execute(); }, item.attr)
             });
         });
@@ -1233,6 +1230,7 @@ var Directive = /** @class */ (function (_super) {
                             el: element,
                             data: data,
                             context: _this.context,
+                            isConnected: isChainConnected
                         });
                     }
                 }
@@ -1961,7 +1959,8 @@ var Directive = /** @class */ (function (_super) {
                     return _this.compiler.compile({
                         el: ownerNode,
                         data: Reactive.transform({ context: _this.context, data: data }),
-                        context: _this.context
+                        context: _this.context,
+                        isConnected: function () { return comment.isConnected; }
                     });
                 }
                 if (expObject.type === 'of') {
@@ -1973,7 +1972,8 @@ var Directive = /** @class */ (function (_super) {
                     return _this.compiler.compile({
                         el: ownerNode,
                         data: mData,
-                        context: _this.context
+                        context: _this.context,
+                        isConnected: function () { return comment.isConnected; }
                     });
                 }
             };
@@ -2127,6 +2127,7 @@ var Compiler = /** @class */ (function (_super) {
         var rootElement = options.el;
         var context = options.context || this.bouer;
         var data = (options.data || this.bouer.data);
+        var isConnected = (options.isConnected || (function () { return rootElement.isConnected; }));
         if (!rootElement)
             return Logger.error("Invalid element provided to the compiler.");
         if (!this.analize(rootElement.outerHTML))
@@ -2255,7 +2256,7 @@ var Compiler = /** @class */ (function (_super) {
                 element.attributes.removeNamedItem(delimiterField.field);
                 return _this.binder.create({
                     node: attr,
-                    isConnected: function () { return rootElement.isConnected; },
+                    isConnected: isConnected,
                     fields: [{ expression: delimiterField.expression, field: attr.value }],
                     context: context,
                     data: data
@@ -2267,7 +2268,7 @@ var Compiler = /** @class */ (function (_super) {
                 && delimitersFields.length !== 0) {
                 _this.binder.create({
                     node: node,
-                    isConnected: function () { return rootElement.isConnected; },
+                    isConnected: isConnected,
                     fields: delimitersFields,
                     context: context,
                     data: data
