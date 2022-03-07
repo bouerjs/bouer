@@ -50,23 +50,30 @@ export default class Compiler extends Base {
 	compile<Data>(options: {
 		/** The element that wil be compiled */
 		el: Element,
+
 		/** The data that should be injected in the compilation */
 		data?: Data,
+
 		/**
 		 * In case of components having content inside of the definition,
 		 * a wrapper (Example: <div>) with the content need to be provided
 		 * in `componentSlot` property in order to be replaced on the compilation.
 		 */
-		componentSlot?: Element
+		componentSlot?: Element,
+
 		/** The function that should be fired when the compilation is done */
 		onDone?: (element: Element, data?: Data) => void,
 
 		/** The context of this compilation process */
-		context: RenderContext
+		context: RenderContext,
+
+		/* Allow to provide the connectivity source of the element to be compiled */
+		isConnected?: () => boolean
 	}) {
 		const rootElement = options.el;
 		const context = options.context || this.bouer;
 		const data = (options.data || this.bouer.data!);
+		const isConnected = (options.isConnected || (() => rootElement.isConnected));
 
 		if (!rootElement)
 			return Logger.error("Invalid element provided to the compiler.")
@@ -230,7 +237,7 @@ export default class Compiler extends Base {
 
 				return this.binder.create({
 					node: attr,
-					isConnected: () => rootElement.isConnected,
+					isConnected: isConnected,
 					fields: [ { expression: delimiterField.expression, field: attr.value} ],
 					context: context,
 					data: data
@@ -243,7 +250,7 @@ export default class Compiler extends Base {
 				&& delimitersFields.length !== 0) {
 				this.binder.create({
 					node: node,
-					isConnected: () => rootElement.isConnected,
+					isConnected: isConnected,
 					fields: delimitersFields,
 					context: context,
 					data: data
