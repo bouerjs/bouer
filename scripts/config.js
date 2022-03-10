@@ -35,20 +35,20 @@ const builds = {
     input: resolve('src', 'index.ts'),
     output: {
       file: outputName('bouer.common.js'),
-      exports: "named"
+      exports: 'named'
     }
   },
   'es-browser-esm': {
     input: resolve('src', 'index.ts'),
     output: {
       file: outputName('bouer.esm.js'),
-      exports: "named"
+      exports: 'named'
     }
   },
-}
+};
 
 const rollupConfigBuilder = (key, config) => {
-	const keySplitted = key.split('-');
+  const keySplitted = key.split('-');
   const format = keySplitted.shift();
 
   config.output.name = 'Bouer';
@@ -67,12 +67,12 @@ const rollupConfigBuilder = (key, config) => {
         comments: false,
       }),
       babel({
-        exclude: ["node_modules/**"],
+        exclude: ['node_modules/**'],
         babelHelpers: 'bundled',
       }),
       typescript({
-        lib: ["es5", "es6", "dom"],
-        target: "es5"
+        lib: ['es5', 'es6', 'dom'],
+        target: 'es5'
       })
     ],
     onwarn: (message, logger) => {
@@ -86,11 +86,11 @@ const rollupConfigBuilder = (key, config) => {
     rollupConfig.plugins.push(buble());
 
   return rollupConfig;
-}
+};
 
 Object.keys(builds).filter(key => {
   builds[key] = rollupConfigBuilder(key, builds[key]);
-})
+});
 
 module.exports = {
   builds
