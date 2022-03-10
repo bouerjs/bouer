@@ -1,7 +1,10 @@
 export default class Task {
-	static run = (callback: (stopTask: () => void) => void, milliseconds?: number) => {
-		const t_id = setInterval(() => {
-			callback(() => clearInterval(t_id));
-		}, milliseconds || 10);
-	}
+  static run = (
+    callback: (stopTask: () => void) => void,
+    milliseconds?: number
+  ) => {
+    const timerId = setInterval(() => {
+      callback(() => clearInterval(timerId));
+    }, milliseconds || 10);
+  };
 }

@@ -1,4 +1,4 @@
-export default interface IDelimiter {
+interface IDelimiter {
   /** The name of the delimiter */
   name: string,
   /** The delimiter structure */
@@ -8,6 +8,8 @@ export default interface IDelimiter {
     /** The close syntax */
     close: string
   },
-	/** fires when the element updates */
+  /** fires when the element updates */
   onUpdate?: (valueToSet: string, node: Node, data: object) => string,
 }
+
+export default IDelimiter;

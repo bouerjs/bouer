@@ -1,8 +1,8 @@
-import Bouer from "../instance/Bouer";
-import Constants from "../shared/helpers/Constants";
-import ServiceProvider from "../shared/helpers/ServiceProvider";
-import { $CreateEl, DOM, forEach, toArray } from "../shared/helpers/Utils";
-import Base from "./Base";
+import Bouer from '../instance/Bouer';
+import Constants from '../shared/helpers/Constants';
+import ServiceProvider from '../shared/helpers/ServiceProvider';
+import { $CreateEl, DOM, forEach, toArray } from '../shared/helpers/Utils';
+import Base from './Base';
 
 export default class Skeleton extends Base {
   bouer: Bouer;
@@ -11,12 +11,12 @@ export default class Skeleton extends Base {
   waveColor: string = '';
   defaultBackgroudColor: string = '#E2E2E2';
   defaultWaveColor: string = '#ffffff5d';
-  identifier: string = "bouer";
+  identifier: string = 'bouer';
 
   constructor(bouer: Bouer) {
-		super();
+    super();
 
-		this.reset();
+    this.reset();
     this.bouer = bouer;
     this.style = $CreateEl('style', el => el.id = this.identifier).build();
 
@@ -30,12 +30,10 @@ export default class Skeleton extends Base {
 
   init(color?: { wave?: string, background?: string }) {
     if (!this.style) return;
-    const dir = Constants.skeleton;
-
     if (!DOM.getElementById(this.identifier))
       DOM.head.appendChild(this.style);
 
-		if (!this.style.sheet) return;
+    if (!this.style.sheet) return;
 
     for (let i = 0; i < this.style.sheet.cssRules.length; i++)
       this.style.sheet!.deleteRule(i);
@@ -47,15 +45,26 @@ export default class Skeleton extends Base {
       this.reset();
     }
 
+    const dir = Constants.skeleton;
+    const bgc = this.backgroudColor;
+    const wvc = this.waveColor;
     const rules = [
       '[--s]{ display: none!important; }',
-      '[' + dir + '] { background-color: ' + this.backgroudColor + '!important; position: relative!important; overflow: hidden; }',
+
+      '[' + dir + '] { background-color: ' + bgc + '!important; position: relative!important; overflow: hidden; }',
+
       '[' + dir + '],[' + dir + '] * { color: transparent!important; }',
-      '[' + dir + ']::before, [' + dir + ']::after { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: block; }',
-      '[' + dir + ']::before { background-color: ' + this.backgroudColor + '!important; z-index: 1;}',
-      '[' + dir + ']::after { transform: translateX(-100%); background: linear-gradient(90deg, transparent, ' + this.waveColor
-      + ', transparent); animation: loading 1.5s infinite; z-index: 2; }',
+
+      '[' + dir + ']::before, [' + dir + ']::after { content: ""; position: absolute; top: 0; left: 0; right: 0; ' +
+      'bottom: 0; display: block; }',
+
+      '[' + dir + ']::before { background-color: ' + bgc + '!important; z-index: 1;}',
+
+      '[' + dir + ']::after { transform: translateX(-100%); background: linear-gradient(90deg, transparent, ' + wvc +
+      ', transparent); animation: loading 1.5s infinite; z-index: 2; }',
+
       '@keyframes loading { 100% { transform: translateX(100%); } }',
+
       '@-webkit-keyframes loading { 100% { transform: translateX(100%); } }'
     ];
     forEach(rules, rule => this.style.sheet!.insertRule(rule));
@@ -63,7 +72,7 @@ export default class Skeleton extends Base {
 
   clear(id?: string) {
     id = (id ? ('="' + id + '"') : '');
-    const skeletons = toArray(this.bouer.el.querySelectorAll("[" + Constants.skeleton + id + "]"));
+    const skeletons = toArray(this.bouer.el.querySelectorAll('[' + Constants.skeleton + id + ']'));
     forEach(skeletons, (el: Element) => el.removeAttribute(Constants.skeleton));
   }
 }

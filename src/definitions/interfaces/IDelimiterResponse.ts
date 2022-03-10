@@ -1,7 +1,9 @@
-import IDelimiter from "./IDelimiter";
+import IDelimiter from './IDelimiter';
 
-export default interface IDelimiterResponse {
+interface IDelimiterResponse {
   field: string,
   expression: string,
   delimiter?: IDelimiter
 }
+
+export default IDelimiterResponse;

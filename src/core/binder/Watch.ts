@@ -1,6 +1,6 @@
-import WatchCallback from "../../definitions/types/WatchCallback";
-import Base from "../Base";
-import Reactive from "../reactive/Reactive";
+import WatchCallback from '../../definitions/types/WatchCallback';
+import Base from '../Base';
+import Reactive from '../reactive/Reactive';
 
 export default class Watch<Value, TObject> extends Base {
   readonly property: string;
@@ -13,7 +13,7 @@ export default class Watch<Value, TObject> extends Base {
     node?: Node,
     onDestroy?: () => void
   }) {
-		super();
+    super();
 
     this.reactive = reactive;
     this.property = reactive.propName;
@@ -30,5 +30,5 @@ export default class Watch<Value, TObject> extends Base {
     if (indexOfThis !== -1)
       this.reactive.watches.splice(indexOfThis, 1);
     if (this.onDestroy) this.onDestroy();
-  }
+  };
 }

@@ -1,10 +1,12 @@
-export default interface IAsset {
-	/** the type of the asset */
-	type: string,
+interface IAsset {
+  /** the type of the asset */
+  type: string,
 
-	/** the source path */
-	src: string,
+  /** the source path */
+  src: string,
 
-	/** mark the asset as scoped */
-	scoped: boolean
+  /** mark the asset as scoped */
+  scoped: boolean
 }
+
+export default IAsset;

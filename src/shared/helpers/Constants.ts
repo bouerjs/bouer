@@ -1,4 +1,4 @@
-import { startWith } from "./Utils";
+import { startWith } from './Utils';
 
 const Constants = {
   skip: 'e-skip',
@@ -45,13 +45,13 @@ const Constants = {
     done: 'done',
   },
 
-  check: function (node: Node, cmd: string) {
+  check(node: Node, cmd: string) {
     return startWith(node.nodeName, cmd);
   },
 
-  isConstant: function (value: string) {
-    return (Object.keys(this).map(key => (this as any)[key] as string).indexOf(value) !== -1)
+  isConstant(value: string) {
+    return (Object.keys(this).map(key => (this as any)[key] as string).indexOf(value) !== -1);
   }
-}
+};
 
 export default Constants;

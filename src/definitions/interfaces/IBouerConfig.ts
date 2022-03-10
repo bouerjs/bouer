@@ -1,4 +1,4 @@
-export default interface IBouerConfig {
+interface IBouerConfig {
   /** Allow to use hash (#) on page navigation, by default is `true` */
   usehash?: boolean;
 
@@ -11,9 +11,11 @@ export default interface IBouerConfig {
   /** Defines the default color of the skeleton */
   skeleton?: { background: string, wave: string }
 
-	/** Allow to unbind an Element if isn't connected to the DOM, by default is `true` */
-	autoUnbind?: boolean;
+  /** Allow to unbind an Element if isn't connected to the DOM, by default is `true` */
+  autoUnbind?: boolean;
 
-	/** Allow to remove listeners when the Element isn't connected to the DOM, by default is `true` */
-	autoOffEvent?: boolean;
+  /** Allow to remove listeners when the Element isn't connected to the DOM, by default is `true` */
+  autoOffEvent?: boolean;
 }
+
+export default IBouerConfig;

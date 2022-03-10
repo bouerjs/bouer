@@ -1,5 +1,5 @@
 type dynamic<TValue = any> = {
-	[key: string]: TValue
+  [key: string]: TValue
 }
 
 export default dynamic;

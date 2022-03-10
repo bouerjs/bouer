@@ -1,5 +1,5 @@
 export default class Logger {
-  private static prefix = '[Bouer]'
+  private static prefix = '[Bouer]';
 
   static log(...content: any[]) {
     console.log(Logger.prefix, ...content);

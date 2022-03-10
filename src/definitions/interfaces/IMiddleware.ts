@@ -1,10 +1,12 @@
-import IBinderConfig from "./IBinderConfig";
-import dynamic from "../types/Dynamic";
+import IBinderConfig from './IBinderConfig';
+import dynamic from '../types/Dynamic';
 
-export default interface IMiddleware<Detail = dynamic> {
-	/** binder configuration of the directive */
-	binder: IBinderConfig;
+interface IMiddleware<Detail = dynamic> {
+  /** binder configuration of the directive */
+  binder: IBinderConfig;
 
-	/** some extra detail of the middleware config */
-	detail: Detail;
+  /** some extra detail of the middleware config */
+  detail: Detail;
 }
+
+export default IMiddleware;

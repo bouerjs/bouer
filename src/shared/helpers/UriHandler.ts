@@ -1,12 +1,12 @@
-import Base from "../../core/Base";
-import dynamic from "../../definitions/types/Dynamic";
-import { DOM, forEach, isString } from "./Utils";
+import Base from '../../core/Base';
+import dynamic from '../../definitions/types/Dynamic';
+import { DOM, forEach, isString } from './Utils';
 
 export default class UriHandler extends Base {
   url: string;
 
   constructor(url?: string) {
-		super();
+    super();
 
     this.url = url || DOM.location.href;
   }
@@ -21,7 +21,7 @@ export default class UriHandler extends Base {
       const keys = queryStr.split('&');
       forEach(keys, key => {
         const pair = key.split('=');
-        mParams[pair[0]] = (pair[1] || '').split('#')[0]
+        mParams[pair[0]] = (pair[1] || '').split('#')[0];
       });
     };
 
@@ -34,7 +34,7 @@ export default class UriHandler extends Base {
       const urlPatternReversed = urlPattern.split('/').reverse();
 
       forEach(urlPatternReversed, (value, index) => {
-        const valueExec = RegExp("{([\\S\\s]*?)}").exec(value);
+        const valueExec = RegExp('{([\\S\\s]*?)}').exec(value);
 
         if (Array.isArray(valueExec))
           mParams[valueExec[1]] = urlPartsReversed[index];
@@ -54,6 +54,7 @@ export default class UriHandler extends Base {
     const joined = mParams.join('&');
     return (this.url.includes('?')) ? '&' + joined : '?' + joined;
   }
+
   remove(param: { key: string, type?: string }) {
     return param;
   }

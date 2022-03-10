@@ -1,35 +1,35 @@
-import dynamic from "../../definitions/types/Dynamic";
-import Prop from "./Prop";
-import { forEach, isNull } from "./Utils";
+import dynamic from '../../definitions/types/Dynamic';
+import Prop from './Prop';
+import { fnEmpty, forEach, isNull } from './Utils';
 
 export default class Extend {
   /** joins objects into one */
   static obj<ExtendObjectType = dynamic>(...args: ExtendObjectType[]) {
-    let out: dynamic = {};
+    const out: dynamic = {};
 
     forEach(args, arg => {
       if (isNull(arg)) return;
       forEach(Object.keys(arg), key => {
         Prop.transfer(out, arg, key);
-      })
+      });
     });
 
     return out as dynamic;
   }
 
-	/** add properties to the first object provided */
+  /** add properties to the first object provided */
   static mixin<MixinObjectType = dynamic>(out: MixinObjectType, ...args: object[]) {
-		// Props to mix with out object
-		const props = Extend.obj.apply(this, args) as any;
-		forEach(Object.keys(props), key => {
-			const hasOwnProp = key in out;
-			Prop.transfer(out, props, key);
+    // Props to mix with out object
+    const props = Extend.obj.apply(this, args) as any;
+    forEach(Object.keys(props), key => {
+      const hasOwnProp = key in out;
+      Prop.transfer(out, props, key);
 
-			if (hasOwnProp) {
-				const mOut = (out as any);
-				mOut[key] = mOut[key];
-			}
-		});
+      if (hasOwnProp) {
+        const mOut = (out as any);
+        mOut[key] = fnEmpty(mOut[key]);
+      }
+    });
 
     return out as MixinObjectType;
   }
@@ -43,8 +43,7 @@ export default class Extend {
       if (!Array.isArray(arg))
         return out.push(arg);
 
-      forEach(Object.keys(arg), (key:any) => {
-
+      forEach(Object.keys(arg), (key: any) => {
         const value = arg[key];
         if (isNull(value))
           return;
