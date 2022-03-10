@@ -655,7 +655,7 @@ var Binder = /** @class */ (function (_super) {
             nodeValue: originalValue,
             fields: fields,
             parent: ownerNode,
-            value: '',
+            value: ''
         };
         // Middleware that runs before the bind or update is made
         var $RunDirectiveMiddlewares = function (type) {
