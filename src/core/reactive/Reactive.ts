@@ -148,7 +148,8 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
         const REACTIVE_ARRAY_METHODS = ['push', 'pop', 'unshift', 'shift', 'splice'];
         const inputArray = data as any;
         const reference: dynamic = {}; // Using clousure to cache the array methods
-        const prototype = inputArray.__proto__ = Object.create(Array.prototype);
+        Object.setPrototypeOf(inputArray, Object.create(Array.prototype));
+        const prototype = Object.getPrototypeOf(inputArray);
 
         forEach(REACTIVE_ARRAY_METHODS, method => {
           // cache original method
