@@ -20,15 +20,6 @@ function __extends(d, b) {
     function __() { this.constructor = d; }
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 }
-function __spreadArray(to, from, pack) {
-    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
-        if (ar || !(i in from)) {
-            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
-            ar[i] = from[i];
-        }
-    }
-    return to.concat(ar || Array.prototype.slice.call(from));
-}
 
 var Prop = /** @class */ (function () {
     function Prop() {
@@ -157,6 +148,11 @@ function isFunction(input) {
 function ifNullReturn(v, _return) {
     return isNull(v) ? _return : v;
 }
+function ifNullStop(el) {
+    if (isNull(el))
+        throw new Error('Application is not initialized');
+    return el;
+}
 function trim(value) {
     return value ? value.trim() : value;
 }
@@ -222,17 +218,7 @@ function $CreateComment(id, content) {
     return comment;
 }
 function $CreateAnyEl(elName, callback) {
-    var el = DOM.createElement(elName);
-    if (isFunction(callback))
-        callback(el, DOM);
-    var returnObj = {
-        appendTo: function (target) {
-            target.appendChild(el);
-            return returnObj;
-        },
-        build: function () { return el; }
-    };
-    return returnObj;
+    return $CreateEl(elName, callback);
 }
 function $CreateEl(elName, callback) {
     var el = DOM.createElement(elName);
@@ -243,7 +229,8 @@ function $CreateEl(elName, callback) {
             target.appendChild(el);
             return returnObj;
         },
-        build: function () { return el; }
+        build: function () { return el; },
+        child: function () { return el.children[0]; }
     };
     return returnObj;
 }
@@ -534,28 +521,32 @@ var Logger = /** @class */ (function () {
         for (var _i = 0; _i < arguments.length; _i++) {
             content[_i] = arguments[_i];
         }
-        console.log.apply(console, __spreadArray([Logger.prefix], content, false));
+        content.unshift(Logger.prefix);
+        console.log.apply(null, content);
     };
     Logger.error = function () {
         var content = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             content[_i] = arguments[_i];
         }
-        console.error.apply(console, __spreadArray([Logger.prefix], content, false));
+        content.unshift(Logger.prefix);
+        console.error.apply(null, content);
     };
     Logger.warn = function () {
         var content = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             content[_i] = arguments[_i];
         }
-        console.warn.apply(console, __spreadArray([Logger.prefix], content, false));
+        content.unshift(Logger.prefix);
+        console.warn.apply(null, content);
     };
     Logger.info = function () {
         var content = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             content[_i] = arguments[_i];
         }
-        console.info.apply(console, __spreadArray([Logger.prefix], content, false));
+        content.unshift(Logger.prefix);
+        console.info.apply(null, content);
     };
     Logger.prefix = '[Bouer]';
     return Logger;
@@ -573,8 +564,9 @@ var ReactiveEvent = /** @class */ (function () {
     function ReactiveEvent() {
     }
     ReactiveEvent.on = function (eventName, callback) {
-        var array = (this[eventName]);
-        array.push(callback);
+        if (isNull(this.events[eventName]))
+            this.events[eventName] = [];
+        this.events[eventName].push(callback);
         return {
             eventName: eventName,
             callback: callback,
@@ -582,8 +574,8 @@ var ReactiveEvent = /** @class */ (function () {
         };
     };
     ReactiveEvent.off = function (eventName, callback) {
-        var array = this[eventName];
-        array.splice(array.indexOf(callback), 1);
+        var events = this.events[eventName] || [];
+        events.splice(events.indexOf(callback), 1);
         return true;
     };
     ReactiveEvent.once = function (eventName, callback) {
@@ -604,16 +596,13 @@ var ReactiveEvent = /** @class */ (function () {
     };
     ReactiveEvent.emit = function (eventName, reactive) {
         try {
-            forEach(this[eventName], function (evt) { return evt(reactive); });
+            forEach((this.events[eventName] || []), function (evt) { return evt(reactive); });
         }
         catch (error) {
             Logger.error(buildError(error));
         }
     };
-    ReactiveEvent.BeforeGet = [];
-    ReactiveEvent.AfterGet = [];
-    ReactiveEvent.BeforeSet = [];
-    ReactiveEvent.AfterSet = [];
+    ReactiveEvent.events = {};
     return ReactiveEvent;
 }());
 
@@ -708,9 +697,8 @@ var Binder = /** @class */ (function (_super) {
                 propertyBindConfig.value = valueToSet;
                 if (!isHtml)
                     return (nodeToBind.nodeValue = valueToSet);
-                var htmlSnippet = $CreateEl('div', function (el) {
-                    el.innerHTML = valueToSet;
-                }).build().children[0];
+                var htmlSnippet = $CreateEl('div', function (el) { return el.innerHTML = valueToSet; })
+                    .child();
                 ownerNode.appendChild(htmlSnippet);
                 _this.serviceProvider.get('Compiler').compile({
                     el: htmlSnippet,
@@ -1073,7 +1061,8 @@ var Reactive = /** @class */ (function (_super) {
                 var REACTIVE_ARRAY_METHODS = ['push', 'pop', 'unshift', 'shift', 'splice'];
                 var inputArray_1 = data;
                 var reference_1 = {}; // Using clousure to cache the array methods
-                var prototype_1 = inputArray_1.__proto__ = Object.create(Array.prototype);
+                Object.setPrototypeOf(inputArray_1, Object.create(Array.prototype));
+                var prototype_1 = Object.getPrototypeOf(inputArray_1);
                 forEach(REACTIVE_ARRAY_METHODS, function (method) {
                     // cache original method
                     reference_1[method] = inputArray_1[method].bind(inputArray_1);
@@ -1660,7 +1649,7 @@ var Directive = /** @class */ (function (_super) {
         var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
         if (nodeValue === '')
             return Logger.error(this.errorMsgEmptyNode(node));
-        ownerNode.innerText = nodeValue;
+        ownerNode.textContent = nodeValue;
         ownerNode.removeAttribute(node.nodeName);
     };
     Directive.prototype.bind = function (node, data) {
@@ -2307,7 +2296,11 @@ var Compiler = /** @class */ (function (_super) {
         if (rootElement.hasAttribute(Constants.silent))
             rootElement.removeAttribute(Constants.silent);
         if (isFunction(options.onDone)) {
-            options.onDone.call(context, rootElement);
+            var isPromiseResult = options.onDone.call(context, rootElement);
+            if (isPromiseResult instanceof Promise)
+                isPromiseResult
+                    .then(function (onDone) { return onDone.call(context, rootElement); })
+                    .catch(function (err) { return Logger.error(err); });
         }
         this.eventHandler.emit({
             eventName: Constants.builtInEvents.compile,
@@ -2357,7 +2350,7 @@ var Converter = /** @class */ (function (_super) {
         // If it's a string try to get the element
         else if (typeof input === 'string') {
             try {
-                var $el = this.bouer.el.querySelector(input);
+                var $el = DOM.querySelector(input);
                 if (!$el) {
                     Logger.error('Element with "' + input + '" selector Not Found.');
                     return null;
@@ -3516,12 +3509,12 @@ var Routing = /** @class */ (function (_super) {
         // Store `href` value of the <base /> tag
         _this.base = null;
         _this.bouer = bouer;
-        _this.routeView = _this.bouer.el.querySelector('[route-view]');
         ServiceProvider.add('Routing', _this);
         return _this;
     }
     Routing.prototype.init = function () {
         var _this = this;
+        this.routeView = ifNullStop(this.bouer.el).querySelector('[route-view]');
         if (isNull(this.routeView))
             return;
         this.routeView.removeAttribute('route-view');
@@ -3610,13 +3603,14 @@ var Routing = /** @class */ (function (_super) {
     Routing.prototype.markActiveAnchorsWithRoute = function (route) {
         var _this = this;
         var className = this.bouer.config.activeClassName || 'active-link';
-        var anchors = this.bouer.el.querySelectorAll('a');
+        var appEl = ifNullStop(this.bouer.el);
+        var anchors = appEl.querySelectorAll('a');
         if (isNull(route))
             return;
         forEach(this.activeAnchors, function (anchor) {
             return anchor.classList.remove(className);
         });
-        forEach([].slice.call(this.bouer.el.querySelectorAll('a.' + className)), function (anchor) {
+        forEach([].slice.call(appEl.querySelectorAll('a.' + className)), function (anchor) {
             return anchor.classList.remove(className);
         });
         this.activeAnchors = [];
@@ -3632,7 +3626,7 @@ var Routing = /** @class */ (function (_super) {
         if (isNull(anchor))
             return;
         forEach(this.activeAnchors, function (anchor) { return anchor.classList.remove(className); });
-        forEach([].slice.call(this.bouer.el.querySelectorAll('a.' + className)), function (anchor) { return anchor.classList.remove(className); });
+        forEach([].slice.call(ifNullStop(this.bouer.el).querySelectorAll('a.' + className)), function (anchor) { return anchor.classList.remove(className); });
         anchor.classList.add(className);
         this.activeAnchors = [anchor];
     };
@@ -3711,7 +3705,8 @@ var Skeleton = /** @class */ (function (_super) {
     };
     Skeleton.prototype.clear = function (id) {
         id = (id ? ('="' + id + '"') : '');
-        var skeletons = toArray(this.bouer.el.querySelectorAll('[' + Constants.skeleton + id + ']'));
+        var appEl = ifNullStop(this.bouer.el);
+        var skeletons = toArray(appEl.querySelectorAll('[' + Constants.skeleton + id + ']'));
         forEach(skeletons, function (el) { return el.removeAttribute(Constants.skeleton); });
     };
     return Skeleton;
@@ -3763,13 +3758,8 @@ var Bouer = /** @class */ (function (_super) {
          */
         _this_1.refs = {};
         _this_1.isDestroyed = false;
-        if (isNull(selector) || trim(selector) === '')
-            throw Logger.error(new Error('Invalid selector provided to the instance.'));
-        var el = DOM.querySelector(selector);
-        if (!el)
-            throw Logger.error(new SyntaxError('Element with selector “' + selector + '” not found.'));
-        _this_1.el = el;
-        options = options || {};
+        _this_1.isInitialized = false;
+        _this_1.options = options = (options || {});
         _this_1.config = options.config || {};
         _this_1.deps = options.deps || {};
         forEach(Object.keys(_this_1.deps), function (key) {
@@ -3799,14 +3789,13 @@ var Bouer = /** @class */ (function (_super) {
             { name: 'html', delimiter: { open: '{{:html ', close: '}}' } },
         ]);
         new Binder(_this_1);
+        new EventHandler(_this_1);
         var delimiter = new DelimiterHandler(delimiters, _this_1);
-        var eventHandler = new EventHandler(_this_1);
-        var routing = new Routing(_this_1);
         var componentHandler = new ComponentHandler(_this_1);
         var compiler = new Compiler(_this_1, options.directives || {});
-        new Converter(_this_1);
         var skeleton = new Skeleton(_this_1);
-        skeleton.init();
+        new Converter(_this_1);
+        _this_1.$routing = new Routing(_this_1);
         _this_1.$delimiters = {
             add: delimiter.add,
             remove: delimiter.remove,
@@ -3876,11 +3865,10 @@ var Bouer = /** @class */ (function (_super) {
             add: function (component) { return componentHandler.prepare([component]); },
             get: function (name) { return componentHandler.components[name]; }
         };
-        _this_1.$routing = routing;
         Prop.set(_this_1, 'refs', {
             get: function () {
                 var mRefs = {};
-                forEach(toArray(_this_1.el.querySelectorAll('[' + Constants.ref + ']')), function (ref) {
+                forEach(toArray(ifNullStop(_this_1.el).querySelectorAll('[' + Constants.ref + ']')), function (ref) {
                     var mRef = ref.attributes[Constants.ref];
                     var value = trim(mRef.value) || ref.name || '';
                     if (value === '')
@@ -3893,6 +3881,43 @@ var Bouer = /** @class */ (function (_super) {
                 return mRefs;
             }
         });
+        // Registering all the components
+        componentHandler.prepare(options.components || []);
+        if (!isNull(selector) && trim(selector) !== '')
+            _this_1.init(selector);
+        return _this_1;
+    }
+    /**
+     * Creates a factory instance of Bouer
+     * @param options the options to the instance
+     * @returns Bouer instance
+     */
+    Bouer.create = function (options) {
+        options = (options || {});
+        options.config = (options.config || {});
+        (options.config || {}).autoUnbind = false;
+        (options.config || {}).autoOffEvent = false;
+        return new Bouer('', options);
+    };
+    /**
+     * Initialize create application
+     * @param selector the selector of the element to be controlled by the instance
+     */
+    Bouer.prototype.init = function (selector) {
+        var _this_1 = this;
+        if (this.isInitialized)
+            return this;
+        if (isNull(selector) || trim(selector) === '')
+            throw Logger.error(new Error('Invalid selector provided to the instance.'));
+        var el = DOM.querySelector(selector);
+        if (!(this.el = el))
+            throw Logger.error(new SyntaxError('Element with selector “' + selector + '” not found.'));
+        var options = this.options || {};
+        var binder = ServiceProvider.get(this, 'Binder');
+        var eventHandler = ServiceProvider.get(this, 'EventHandler');
+        var routing = ServiceProvider.get(this, 'Routing');
+        var skeleton = ServiceProvider.get(this, 'Skeleton');
+        var compiler = ServiceProvider.get(this, 'Compiler');
         forEach([options.beforeLoad, options.loaded, options.beforeDestroy, options.destroyed], function (evt) {
             if (typeof evt !== 'function')
                 return;
@@ -3905,13 +3930,19 @@ var Bouer = /** @class */ (function (_super) {
             });
         });
         eventHandler.emit({ eventName: 'beforeLoad', attachedNode: el });
-        // Registering all the components
-        componentHandler.prepare(options.components || []);
+        // Enabling this configs for listeners
+        (options.config || {}).autoUnbind = true;
+        (options.config || {}).autoOffEvent = true;
+        routing.init();
+        skeleton.init();
+        binder.cleanup();
+        eventHandler.cleanup();
+        this.isInitialized = true;
         // compile the app
         compiler.compile({
-            el: _this_1.el,
-            data: _this_1.data,
-            context: _this_1,
+            el: this.el,
+            data: this.data,
+            context: this,
             onDone: function () { return eventHandler.emit({
                 eventName: 'loaded',
                 attachedNode: el
@@ -3926,14 +3957,12 @@ var Bouer = /** @class */ (function (_super) {
         Task.run(function (stopTask) {
             if (_this_1.isDestroyed)
                 return stopTask();
-            if (_this_1.el.isConnected)
+            if (el.isConnected)
                 return;
-            eventHandler.emit({ eventName: 'beforeDestroy', attachedNode: _this_1.el });
+            eventHandler.emit({ eventName: 'beforeDestroy', attachedNode: el });
             _this_1.destroy();
             stopTask();
         });
-        // Initializing Routing
-        routing.init();
         if (!DOM.head.querySelector('link[rel~="icon"]')) {
             $CreateEl('link', function (favicon) {
                 favicon.rel = 'icon';
@@ -3941,8 +3970,8 @@ var Bouer = /** @class */ (function (_super) {
                 favicon.href = 'https://afonsomatelias.github.io/assets/bouer/img/short.png';
             }).appendTo(DOM.head);
         }
-        return _this_1;
-    }
+        return this;
+    };
     /**
      * Sets data into a target object, by default is the `app.data`
      * @param inputData the data the should be setted
@@ -4130,6 +4159,7 @@ var Bouer = /** @class */ (function (_super) {
         else if (DOM.contains(el))
             el.parentElement.removeChild(el);
         this.isDestroyed = true;
+        this.isInitialized = false;
         serviceProvider.clear();
     };
     return Bouer;
