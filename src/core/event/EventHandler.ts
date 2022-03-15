@@ -193,7 +193,7 @@ export default class EventHandler extends Base {
     });
   }
 
-  private cleanup() {
+  cleanup() {
     const autoOffEvent = ifNullReturn(this.bouer.config.autoOffEvent, true);
     if (autoOffEvent == false) return;
     Task.run(() => {
