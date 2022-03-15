@@ -504,6 +504,21 @@ declare class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
     selector: string,
     options?: IBouerOptions<Data, GlobalData, Dependencies>
   );
+
+  /**
+   * Creates a factory instance of Bouer
+   * @param options the options to the instance
+   * @returns Bouer instance
+   */
+  static create<Data = {}, GlobalData = {}, Dependencies = {}>(
+    options?: IBouerOptions<Data, GlobalData, Dependencies>
+  ): Bouer;
+
+  /**
+   * Initialize create application
+   * @param selector the selector of the element to be controlled by the instance
+   */
+  init(selector: string): Bouer;
 }
 
 export {
