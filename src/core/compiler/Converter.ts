@@ -5,6 +5,7 @@ import Logger from '../../shared/logger/Logger';
 import Bouer from '../../instance/Bouer';
 import {
   buildError,
+  DOM,
   findAttribute,
   forEach,
   isEmptyObject,
@@ -40,7 +41,7 @@ export default class Converter extends Base {
     // If it's a string try to get the element
     else if (typeof input === 'string') {
       try {
-        const $el = this.bouer.el.querySelector(input);
+        const $el = DOM.querySelector(input);
         if (!$el) {
           Logger.error('Element with "' + input + '" selector Not Found.');
           return null;
