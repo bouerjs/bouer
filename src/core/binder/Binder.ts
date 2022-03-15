@@ -142,9 +142,8 @@ export default class Binder extends Base {
 
         if (!isHtml) return (nodeToBind.nodeValue = valueToSet);
 
-        const htmlSnippet = $CreateEl('div', (el) => {
-          el.innerHTML = valueToSet;
-        }).build().children[0];
+        const htmlSnippet = $CreateEl('div', el => el.innerHTML = valueToSet)
+          .child();
 
         ownerNode.appendChild(htmlSnippet);
         this.serviceProvider.get<Compiler>('Compiler')!.compile({
@@ -439,7 +438,7 @@ export default class Binder extends Base {
   }
 
   /** Creates a process to unbind properties that is not connected to the DOM anymone */
-  private cleanup() {
+  cleanup() {
     const autoUnbind = ifNullReturn(this.bouer.config.autoUnbind, true);
     if (autoUnbind == false) return;
     Task.run(() => {
