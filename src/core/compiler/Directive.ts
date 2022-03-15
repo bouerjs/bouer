@@ -671,7 +671,7 @@ export default class Directive extends Base {
     if (nodeValue === '')
       return Logger.error(this.errorMsgEmptyNode(node));
 
-    ownerNode.innerText = nodeValue;
+    ownerNode.textContent = nodeValue;
     ownerNode.removeAttribute(node.nodeName);
   }
 
