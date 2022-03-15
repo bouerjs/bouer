@@ -359,7 +359,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
    */
   init(selector: string) {
     if (this.isInitialized)
-      return;
+      return this;
 
     if (isNull(selector) || trim(selector) === '')
       throw Logger.error(new Error('Invalid selector provided to the instance.'));
@@ -432,6 +432,8 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
         favicon.href = 'https://afonsomatelias.github.io/assets/bouer/img/short.png';
       }).appendTo(DOM.head);
     }
+
+    return this;
   }
 
   /**
