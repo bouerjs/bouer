@@ -6,7 +6,7 @@
   "module": "dist/bouer.esm.min.js",
   "typings": "types/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "./node_modules/.bin/jest --detectOpenHandles",
     "dev": "rollup --config rollup.config.js --configPlugin typescript --w",
     "publish": "rollup --config rollup.config.js --configPlugin typescript",
     "release": "node scripts/build.js --prod"
@@ -41,6 +41,10 @@
     "@typescript-eslint/parser": "^5.14.0",
     "eslint": "^8.10.0",
     "eslint-config-google": "^0.14.0",
+    "jest": "^27.5.1",
+    "jsdom": "^19.0.0",
+    "jsdom-global": "^3.0.2",
+    "regenerator-runtime": "^0.13.9",
     "rollup": "^2.58.0",
     "rollup-plugin-cleanup": "^3.2.1",
     "terser": "^5.9.0",
