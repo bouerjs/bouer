@@ -149,6 +149,12 @@ export function ifNullReturn<T>(v: any, _return: T) {
   return isNull(v) ? _return : v;
 }
 
+export function ifNullStop(el: Element | undefined | null) {
+  if (isNull(el))
+    throw new Error('Application is not initialized');
+  return el!;
+}
+
 export function trim(value: string) {
   return value ? value.trim() : value;
 }
@@ -231,24 +237,17 @@ export function $CreateComment(id?: string, content?: string) {
   return comment;
 }
 
-export function $CreateAnyEl(elName: string,
-  callback?: (element: HTMLElement, dom: Document) => void) {
-  const el = DOM.createElement(elName);
-  if (isFunction(callback)) callback!(el, DOM);
-
-  const returnObj = {
-    appendTo: (target: Element) => {
-      target.appendChild(el);
-      return returnObj;
-    },
-    build: () => el
-  };
-  return returnObj;
+export function $CreateAnyEl(
+  elName: string,
+  callback?: (element: HTMLElement, dom: Document) => void
+) {
+  return $CreateEl(elName as any, callback);
 }
 
 export function $CreateEl<TKey extends keyof HTMLElementTagNameMap>(
   elName: TKey,
-  callback?: (element: HTMLElementTagNameMap[TKey], dom: Document) => void) {
+  callback?: (element: HTMLElementTagNameMap[TKey], dom: Document) => void
+) {
   const el = DOM.createElement(elName);
   if (isFunction(callback)) callback!(el, DOM);
 
@@ -257,7 +256,8 @@ export function $CreateEl<TKey extends keyof HTMLElementTagNameMap>(
       target.appendChild(el);
       return returnObj;
     },
-    build: () => el
+    build: () => el,
+    child: () => el.children[0]
   };
   return returnObj;
 }
