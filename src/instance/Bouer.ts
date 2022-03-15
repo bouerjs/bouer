@@ -29,12 +29,11 @@ import {
   $CreateEl, DOM, forEach,
   WIN,
   ifNullReturn,
-  isNull, isObject, toArray, trim,
+  isNull, isObject, toArray, trim, ifNullStop,
 } from '../shared/helpers/Utils';
 
 export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
   extends Base implements IBouerOptions<Data, GlobalData, Dependencies> {
-  readonly el: Element;
   readonly name = 'Bouer';
   readonly version = '3.0.0';
   readonly data: Data;
@@ -42,12 +41,15 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
   readonly config: IBouerConfig;
   readonly deps: Dependencies;
   readonly __id__: number = ServiceProvider.genId();
+  readonly options: IBouerOptions<Data, GlobalData, Dependencies>;
   /**
    * Gets all the elemens having the `ref` attribute
    * @returns an object having all the elements with the `ref attribute value` defined as the key.
    */
   readonly refs: dynamic<Element> = {};
+  el: Element | undefined | null;
   isDestroyed: boolean = false;
+  isInitialized: boolean = false;
 
   /** Data Exposition and Injection handler*/
   readonly $data: {
@@ -181,15 +183,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
   ) {
     super();
 
-    if (isNull(selector) || trim(selector) === '')
-      throw Logger.error(new Error('Invalid selector provided to the instance.'));
-
-    const el = DOM.querySelector(selector);
-    if (!el) throw Logger.error(new SyntaxError('Element with selector “' + selector + '” not found.'));
-
-    this.el = el;
-
-    options = options || {};
+    this.options = options = (options || {});
     this.config = options.config || {};
     this.deps = options.deps || {} as any;
 
@@ -198,7 +192,6 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
       const value = deps[key];
       deps[key] = typeof value === 'function' ? value.bind(this) : value;
     });
-
 
     new ServiceProvider(this);
     new Evaluator(this);
@@ -227,16 +220,14 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     ]);
 
     new Binder(this);
+    new EventHandler(this);
     const delimiter = new DelimiterHandler(delimiters, this);
-    const eventHandler = new EventHandler(this);
-    const routing = new Routing(this);
     const componentHandler = new ComponentHandler(this);
     const compiler = new Compiler(this, options.directives || {});
-
-    new Converter(this);
     const skeleton = new Skeleton(this);
+    new Converter(this);
 
-    skeleton.init();
+    this.$routing = new Routing(this);
 
     this.$delimiters = {
       add: delimiter.add,
@@ -318,28 +309,70 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
       get: name => componentHandler.components[name]
     };
 
-    this.$routing = routing;
-
     Prop.set(this, 'refs', {
       get: () => {
         const mRefs: dynamic<Element> = {};
-        forEach(toArray(this.el.querySelectorAll('[' + Constants.ref + ']')), (ref: any) => {
-          const mRef = ref.attributes[Constants.ref] as Attr;
-          const value = trim(mRef.value) || ref.name || '';
+        forEach(toArray(ifNullStop(this.el).querySelectorAll('[' + Constants.ref + ']')),
+          (ref: any) => {
+            const mRef = ref.attributes[Constants.ref] as Attr;
+            const value = trim(mRef.value) || ref.name || '';
 
-          if (value === '')
-            return Logger.error('Expected an expression in “' + ref.name +
-              '” or at least “name” attribute to combine with “' + ref.name + '”.');
+            if (value === '')
+              return Logger.error('Expected an expression in “' + ref.name +
+                '” or at least “name” attribute to combine with “' + ref.name + '”.');
 
-          if (value in mRefs)
-            return Logger.warn('The key “' + value + '” in “' + ref.name + '” is taken, choose another key.', ref);
+            if (value in mRefs)
+              return Logger.warn('The key “' + value + '” in “' + ref.name + '” is taken, choose another key.', ref);
 
-          mRefs[value] = ref;
-        });
+            mRefs[value] = ref;
+          });
 
         return mRefs;
       }
     });
+
+    // Registering all the components
+    componentHandler.prepare(options.components || []);
+
+    if (!isNull(selector) && trim(selector) !== '')
+      this.init(selector);
+  }
+
+  /**
+   * Creates a factory instance of Bouer
+   * @param options the options to the instance
+   * @returns Bouer instance
+   */
+  static create<Data = {}, GlobalData = {}, Dependencies = {}>(
+    options?: IBouerOptions<Data, GlobalData, Dependencies>
+  ) {
+    options = (options || {});
+    (options.config as any) = (options.config || {});
+    (options.config || {}).autoUnbind = false;
+    (options.config || {}).autoOffEvent = false;
+    return new Bouer('', options);
+  }
+
+  /**
+   * Initialize create application
+   * @param selector the selector of the element to be controlled by the instance
+   */
+  init(selector: string) {
+    if (this.isInitialized)
+      return;
+
+    if (isNull(selector) || trim(selector) === '')
+      throw Logger.error(new Error('Invalid selector provided to the instance.'));
+
+    const el = DOM.querySelector(selector);
+    if (!(this.el = el)) throw Logger.error(new SyntaxError('Element with selector “' + selector + '” not found.'));
+
+    const options = this.options || {};
+    const binder = ServiceProvider.get<Binder>(this, 'Binder')!;
+    const eventHandler = ServiceProvider.get<EventHandler>(this, 'EventHandler')!;
+    const routing = ServiceProvider.get<Routing>(this, 'Routing')!;
+    const skeleton = ServiceProvider.get<Skeleton>(this, 'Skeleton')!;
+    const compiler = ServiceProvider.get<Compiler>(this, 'Compiler')!;
 
     forEach([options.beforeLoad, options.loaded, options.beforeDestroy, options.destroyed],
       evt => {
@@ -355,8 +388,15 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
     eventHandler.emit({ eventName: 'beforeLoad', attachedNode: el });
 
-    // Registering all the components
-    componentHandler.prepare(options.components || []);
+    // Enabling this configs for listeners
+    (options.config || {}).autoUnbind = true;
+    (options.config || {}).autoOffEvent = true;
+
+    routing.init();
+    skeleton.init();
+    binder.cleanup();
+    eventHandler.cleanup();
+    this.isInitialized = true;
 
     // compile the app
     compiler.compile({
@@ -369,7 +409,6 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
       })
     });
 
-
     WIN.addEventListener('beforeunload', () => {
       if (this.isDestroyed) return;
 
@@ -379,15 +418,12 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
     Task.run(stopTask => {
       if (this.isDestroyed) return stopTask();
-      if (this.el.isConnected) return;
+      if (el.isConnected) return;
 
-      eventHandler.emit({ eventName: 'beforeDestroy', attachedNode: this.el });
+      eventHandler.emit({ eventName: 'beforeDestroy', attachedNode: el });
       this.destroy();
       stopTask();
     });
-
-    // Initializing Routing
-    routing.init();
 
     if (!DOM.head.querySelector('link[rel~="icon"]')) {
       $CreateEl('link', (favicon) => {
@@ -659,6 +695,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
       el.parentElement!.removeChild(el);
 
     this.isDestroyed = true;
+    this.isInitialized = false;
     serviceProvider.clear();
   }
 }
