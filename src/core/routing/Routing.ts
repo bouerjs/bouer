@@ -12,7 +12,8 @@ import {
   toArray,
   trim,
   urlCombine,
-  urlResolver
+  urlResolver,
+  ifNullStop
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Base from '../Base';
@@ -33,12 +34,12 @@ export default class Routing extends Base {
     super();
 
     this.bouer = bouer;
-    this.routeView = this.bouer.el.querySelector('[route-view]');
-
     ServiceProvider.add('Routing', this);
   }
 
   init() {
+    this.routeView = ifNullStop(this.bouer.el).querySelector('[route-view]');
+
     if (isNull(this.routeView)) return;
     this.routeView!.removeAttribute('route-view');
     this.base = '/';
@@ -144,15 +145,17 @@ export default class Routing extends Base {
 
   markActiveAnchorsWithRoute(route: string) {
     const className = this.bouer.config.activeClassName || 'active-link';
-    const anchors = this.bouer.el.querySelectorAll('a');
+    const appEl = ifNullStop(this.bouer.el);
+    const anchors = appEl.querySelectorAll('a');
 
     if (isNull(route)) return;
 
     forEach(this.activeAnchors, anchor =>
       anchor.classList.remove(className));
 
-    forEach([].slice.call(this.bouer.el.querySelectorAll('a.' + className)), (anchor: HTMLAnchorElement) =>
-      anchor.classList.remove(className));
+    forEach([].slice.call(appEl.querySelectorAll('a.' + className)),
+      (anchor: HTMLAnchorElement) =>
+        anchor.classList.remove(className));
 
     this.activeAnchors = [];
 
@@ -170,7 +173,7 @@ export default class Routing extends Base {
     if (isNull(anchor)) return;
 
     forEach(this.activeAnchors, anchor => anchor.classList.remove(className));
-    forEach([].slice.call(this.bouer.el.querySelectorAll('a.' + className)),
+    forEach([].slice.call(ifNullStop(this.bouer.el)!.querySelectorAll('a.' + className)),
       (anchor: HTMLAnchorElement) => anchor.classList.remove(className));
 
     anchor.classList.add(className);
