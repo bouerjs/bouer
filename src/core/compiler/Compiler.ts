@@ -62,7 +62,7 @@ export default class Compiler extends Base {
     componentSlot?: Element,
 
     /** The function that should be fired when the compilation is done */
-    onDone?: (element: Element, data?: Data) => void,
+    onDone?: (element: Element, data?: Data) => void | Promise<any>,
 
     /** The context of this compilation process */
     context: RenderContext,
@@ -268,7 +268,11 @@ export default class Compiler extends Base {
       rootElement.removeAttribute(Constants.silent);
 
     if (isFunction(options.onDone)) {
-      options.onDone!.call(context, rootElement);
+      const isPromiseResult = options.onDone!.call(context, rootElement);
+      if (isPromiseResult instanceof Promise)
+        isPromiseResult
+          .then(onDone => onDone.call(context, rootElement))
+          .catch(err => Logger.error(err));
     }
 
     this.eventHandler.emit({
