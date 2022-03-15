@@ -1,7 +1,7 @@
 import Bouer from '../instance/Bouer';
 import Constants from '../shared/helpers/Constants';
 import ServiceProvider from '../shared/helpers/ServiceProvider';
-import { $CreateEl, DOM, forEach, toArray } from '../shared/helpers/Utils';
+import { $CreateEl, ifNullStop, DOM, forEach, toArray } from '../shared/helpers/Utils';
 import Base from './Base';
 
 export default class Skeleton extends Base {
@@ -72,7 +72,8 @@ export default class Skeleton extends Base {
 
   clear(id?: string) {
     id = (id ? ('="' + id + '"') : '');
-    const skeletons = toArray(this.bouer.el.querySelectorAll('[' + Constants.skeleton + id + ']'));
+    const appEl = ifNullStop(this.bouer.el);
+    const skeletons = toArray(appEl.querySelectorAll('[' + Constants.skeleton + id + ']'));
     forEach(skeletons, (el: Element) => el.removeAttribute(Constants.skeleton));
   }
 }
