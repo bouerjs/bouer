@@ -1,4 +1,4 @@
-import { buildError, forEach } from '../../shared/helpers/Utils';
+import { buildError, forEach, isNull } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Reactive from '../reactive/Reactive';
 
@@ -21,17 +21,17 @@ interface ReactiveKeyEvents {
 }
 
 export default class ReactiveEvent {
-  private static BeforeGet: CallbackReactiveProperty[] = [];
-  private static AfterGet: CallbackReactiveProperty[] = [];
-  private static BeforeSet: CallbackReactiveProperty[] = [];
-  private static AfterSet: CallbackReactiveProperty[] = [];
+  private static events: { [key: string]: CallbackReactiveProperty[] } = {};
 
   static on<TKey extends keyof ReactiveKeyEvents>(
     eventName: TKey,
     callback: CallbackReactiveProperty
   ): ReactiveEventResult {
-    const array = ((this as any)[eventName]) as any[];
-    array.push(callback);
+    if (isNull(this.events[eventName]))
+      this.events[eventName] = [];
+
+    this.events[eventName].push(callback);
+
     return {
       eventName: eventName,
       callback: callback,
@@ -43,8 +43,8 @@ export default class ReactiveEvent {
     eventName: TKey,
     callback: CallbackReactiveProperty
   ): boolean {
-    const array = ((this as any)[eventName] as any[]);
-    array.splice(array.indexOf(callback), 1);
+    const events = this.events[eventName] || [];
+    events.splice(events.indexOf(callback), 1);
     return true;
   }
 
@@ -70,7 +70,7 @@ export default class ReactiveEvent {
     reactive: Reactive<TProperty, TObject>
   ): void {
     try {
-      forEach(((this as any)[eventName] as any[]), evt => evt(reactive));
+      forEach((this.events[eventName] || []), evt => evt(reactive));
     } catch (error) {
       Logger.error(buildError(error));
     }
