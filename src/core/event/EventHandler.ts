@@ -15,7 +15,8 @@ import {
   isNull,
   trim,
   where,
-  ifNullReturn
+  ifNullReturn,
+  fnCall
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Evaluator from '../Evaluator';
@@ -188,7 +189,7 @@ export default class EventHandler extends Base {
       }
 
       // Otherwise, dispatch the event
-      evt.callback.call(this.bouer, new CustomEvent(eventName, init));
+      fnCall(evt.callback.call(this.bouer, new CustomEvent(eventName, init)));
       return !isOnceEvent;
     });
   }
