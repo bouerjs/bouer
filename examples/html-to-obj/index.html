@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <base href="/examples/html-to-obj/" />
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="../shared.css">
+  <title>Example - Html to JS Object Literal</title>
+</head>
+
+<body>
+  <div id="app">
+    <form class="center" on:submit.prevent="submit">
+
+      <input-field silent data="{ label: 'First Name', name: 'firstName', value: '' }">
+        <input e-bind="value" type="text" e-name="{{ name }}" />
+      </input-field>
+
+      <input-field silent data="{ label: 'Last Name', name: 'lastName', value: '' }">
+        <input e-bind="value" type="text" e-name="{{ name }}" />
+      </input-field>
+
+      <!-- Build an phones property as an array -->
+      <div e-build="phones" e-array>
+
+        <input-field silent data="{ label: 'Country Code', name: 'code', value: '' }">
+          <input e-bind="value" type="text" e-name="{{ name }}" />
+        </input-field>
+
+        <input-field silent data="{ label: 'Number', name: 'number', value: '' }">
+          <input e-bind="value" type="number" e-name="{{ name }}" />
+        </input-field>
+
+      </div>
+
+      <!-- Build an identification property as an object -->
+      <div e-build="identification">
+        <input-field silent data="{ label: 'Type', name: 'type', value: '' }">
+          <select e-name="{{ name }}" e-bind="value">
+            <option> Id Card </option>
+            <option> Passport </option>
+          </select>
+        </input-field>
+
+
+        <input-field silent data="{ label: 'Code', name: 'code', value: '' }">
+          <input e-bind="value" type="text" e-name="{{ name }}" />
+        </input-field>
+      </div>
+
+      <button type="submit" style="color: #ddd; background-color: #2aba10;"> Submit </button>
+
+      <p id="output"></p>
+
+    </form>
+  </div>
+
+  <script src="../../dist/bouer.js"></script>
+  <script src="./app.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,21 @@
+<div class="center">
+  <!-- Injecting the header -->
+  <app-header></app-header>
+
+  <!-- Register form -->
+  <div class="form">
+    <input ref type="text" name="name" placeholder="Name"> <br>
+    <input ref type="text" name="username" placeholder="Username"> <br>
+
+    <button on:click="this.add">Add User</button>
+  </div>
+
+  <hr>
+
+  <ul class="users">
+    <user-item e-for="user of users"></user-item>
+  </ul>
+
+  <!-- Injecting the footer -->
+  <app-footer></app-footer>
+</div>

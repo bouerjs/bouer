@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Api Request</title>
+  <link rel="stylesheet" href="../shared.css">
+  <style>
+    .navigation {
+      display: flex;
+      margin: 10px 0;
+      margin-left: 39px;
+    }
+
+    .navigation>* {
+      flex: 1;
+      max-width: 90px;
+    }
+
+    .navigation>span {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 10px;
+    }
+
+    ul.users {
+      list-style: none;
+    }
+
+    ul.users li {
+      display: flex;
+      margin: 6px 0;
+      padding: 4px 2px;
+      border-radius: 6px;
+      border: 1px solid #e5e5e5;
+      max-width: 340px;
+    }
+
+    ul.users li .avatar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 80px;
+    }
+
+    ul.users li .avatar span {
+      width: 60px;
+      height: 60px;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: cover;
+      border-radius: 50%;
+      background-color: #dfdfdf;
+    }
+
+    ul.users li .info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    ul.users li .info .row {
+      flex: 1;
+      display: flex;
+      align-items: center;
+    }
+
+    ul.users li .info .row span {
+      margin: auto 0;
+      border-radius: 15px;
+      margin: 1px 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <div class="center">
+      <p>
+        <b>{JSON} Placeholder</b> API Status: <b e-text="{{ status }}"></b>
+      </p>
+
+      <div class="navigation-container">
+        <div class="navigation">
+          <button on:click="start > 0 ? start-- : 0" title="Prev page" e-disabled="{ 'true' : start === 0 }"> &lt; </button>
+          <span e-text="Page {{ start + 1 }} | {{ 10 / limit }}"> Page # | # </span>
+          <button on:click="start++" title="Next page" e-disabled="{ 'true' : start + 1 === 10 / limit }"> &gt; </button>
+        </div>
+      </div>
+
+      <ul class="users">
+        <li e-req="user of users?_start={{ (start * limit) }}&_limit={{ limit }}" on:request="requested"
+          on:response="responded" on:fail="failed" on:done="done">
+
+          <div class="avatar">
+            <span e-style="background-image: url(https://i.pravatar.cc/200?img={{ user.id }});" e-skeleton></span>
+          </div>
+          <div class="info">
+            <div class="row"> <span e-skeleton> <b>Id: </b> {{ user.id }} </span> </div>
+            <div class="row"> <span e-skeleton> <b>Name: </b> {{ user.name }} </span> </div>
+            <div class="row"> <span e-skeleton> <b>Username: </b>{{ user.username }} </span> </div>
+          </div>
+
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <script src="../../dist/bouer.js"></script>
+  <script src="./app.js"></script>
+</body>
+
+</html>

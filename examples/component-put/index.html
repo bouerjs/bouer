@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <base href="/examples/component-put/">
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Component Test</title>
+  <link rel="stylesheet" href="../shared.css">
+  <style>
+    .tab-container {
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #eee;
+      overflow: hidden;
+      border-radius: 4px;
+    }
+
+    .tab-container .tabs>span {
+      border: 1px solid #eee;
+      display: inline-block;
+      margin: 1px 2px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 10pt;
+    }
+
+    .tab-container .tabs {
+      border: 1px solid #eee;
+      padding: 2px 1px;
+    }
+
+    .tab-container .tabs>span:last-child {
+      border: 1px solid #fcc;
+    }
+
+    .tab-container .tab-view {
+      height: 300px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .active {
+      color: #0a66c2;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <div class="center">
+      <h2>Tab Page View</h2>
+
+      <div class="tab-container">
+        <!-- Tab Controlls -->
+        <div class="tabs">
+          <span e-for="item of tabs" on:click="tab = item.tab" e-class="{ 'active': item.tab === tab }">
+            {{ item.text }}
+          </span>
+        </div>
+
+        <!-- Tab View -->
+        <div class="tab-view" e-put="tab"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../dist/bouer.js"></script>
+  <script src="./app.js"></script>
+</body>
+
+</html>
