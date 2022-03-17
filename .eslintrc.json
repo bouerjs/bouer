@@ -30,6 +30,7 @@
     "operator-linebreak": "off",
     "prefer-rest-params": "off",
     "valid-jsdoc": "off",
+    "no-debugger": "off",
     "object-curly-spacing": [
       "error",
       "always"
