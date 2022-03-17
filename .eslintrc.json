@@ -31,6 +31,7 @@
     "prefer-rest-params": "off",
     "valid-jsdoc": "off",
     "no-debugger": "off",
+    "prefer-promise-reject-errors": "off",
     "object-curly-spacing": [
       "error",
       "always"
