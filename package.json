@@ -11,6 +11,11 @@
     "publish": "rollup --config rollup.config.js --configPlugin typescript",
     "release": "node scripts/build.js --prod"
   },
+  "husky": {
+    "hooks": {
+      "pre-push": "npm test"
+    }
+  },
   "files": [
     "src",
     "dist/*.js",
