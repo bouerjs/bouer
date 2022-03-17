@@ -368,9 +368,10 @@ export default class ComponentHandler extends Base {
 
         createdEvent.emit();
 
+        const hasForDirective = componentElement.hasAttribute(Constants.for);
         // If the component has the e-for directive
         // And Does not have the data directive assigned, create it implicitly
-        if (componentElement.hasAttribute(Constants.for) && !(toArray(componentElement.attributes).find((attr: Attr) =>
+        if (hasForDirective && !(toArray(componentElement.attributes).find((attr: Attr) =>
           (attr.name === Constants.data || startWith(attr.name, Constants.data + ':')))))
           componentElement.setAttribute('data', '$data');
 
@@ -561,10 +562,10 @@ export default class ComponentHandler extends Base {
           const index = stylesController.elements.indexOf(component.el!);
           stylesController.elements.splice(index, 1);
 
-          // No elements using the style
-          if (stylesController.elements.length > 0)
+          if (stylesController.elements.length > 0 || (hasForDirective && container.isConnected))
             return;
 
+          // No elements using the style
           forEach(stylesController.styles, style =>
             forEach(toArray(DOM.head.children), item => {
               if (item === style)
