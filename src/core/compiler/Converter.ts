@@ -7,6 +7,7 @@ import {
   buildError,
   DOM,
   findAttribute,
+  fnCall,
   forEach,
   isEmptyObject,
   isFilledObj,
@@ -111,7 +112,7 @@ export default class Converter extends Base {
           }
           // Calling on set function
           if (isFunction(onSet))
-            onSet!.call(instance.bouer, builtObject, propName, value, el);
+            fnCall(onSet!.call(instance.bouer, builtObject, propName, value, el));
         }
 
         forEach(toArray(el.children), (child: Element) => {
@@ -166,7 +167,7 @@ export default class Converter extends Base {
               lastLayer[leadElement] = Extend.obj(objPropertyValue, builtObjValue);
           }
           if (isFunction(onSet))
-            onSet!.call(instance.bouer, lastLayer, leadElement, builtObjValue, buildElement);
+            fnCall(onSet!.call(instance.bouer, lastLayer, leadElement, builtObjValue, buildElement));
 
           return;
         }
