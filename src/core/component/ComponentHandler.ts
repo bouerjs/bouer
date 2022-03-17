@@ -16,7 +16,7 @@ import {
   toLower, urlCombine,
   $CreateAnyEl,
   isObject, pathResolver, toArray,
-  urlResolver, webRequest, where, ifNullReturn, startWith
+  urlResolver, webRequest, where, ifNullReturn, startWith, fnCall
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Base from '../Base';
@@ -358,7 +358,7 @@ export default class ComponentHandler extends Base {
     const initializer = (component as any).init;
 
     if (isFunction(initializer))
-      initializer.call(component);
+      fnCall(initializer.call(component));
 
     const compile = (scriptContent?: string) => {
       try {
