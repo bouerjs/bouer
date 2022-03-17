@@ -6,6 +6,7 @@ import Constants from '../../shared/helpers/Constants';
 import ServiceProvider from '../../shared/helpers/ServiceProvider';
 import {
   DOM,
+  fnCall,
   forEach, isFunction,
   isString,
   startWith, toArray
@@ -268,11 +269,7 @@ export default class Compiler extends Base {
       rootElement.removeAttribute(Constants.silent);
 
     if (isFunction(options.onDone)) {
-      const isPromiseResult = options.onDone!.call(context, rootElement);
-      if (isPromiseResult instanceof Promise)
-        isPromiseResult
-          .then(onDone => onDone.call(context, rootElement))
-          .catch(err => Logger.error(err));
+      fnCall(options.onDone!.call(context, rootElement));
     }
 
     this.eventHandler.emit({
