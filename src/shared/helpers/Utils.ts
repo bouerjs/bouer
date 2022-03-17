@@ -2,6 +2,7 @@
 // Quotes “'+  +'”
 
 import dynamic from '../../definitions/types/Dynamic';
+import Logger from '../logger/Logger';
 import Prop from './Prop';
 
 export function webRequest(url: string, options?: {
@@ -374,6 +375,12 @@ export function buildError(error: any) {
 
 export function fnEmpty(input?: any) {
   return input;
+}
+
+export function fnCall(fn?: any) {
+  if (fn instanceof Promise)
+    fn.then().catch(err => Logger.error(err));
+  return fn;
 }
 
 export const WIN = window;
