@@ -287,44 +287,44 @@ export default class Directive extends Base {
     // Filters the list of items
     const $Where = (list: any[], filterConfigParts: string[]) => {
       hasWhereFilter = true;
-      const whereKeys = filterConfigParts[2];
-      let whereValue = filterConfigParts[1];
+      const wKeys = filterConfigParts[2];
+      let wValue = filterConfigParts[1];
 
-      if (isNull(whereValue) || whereValue === '') {
+      if (isNull(wValue) || wValue === '') {
         Logger.error('Invalid where-value in “' + nodeName + '” with “' + nodeValue + '” expression.');
         return list;
       }
 
-      whereValue = this.evaluator.exec({
-        data: data,
-        code: whereValue,
-        context: this.context
-      });
+      wValue = this.evaluator.exec({ data: data, code: wValue, context: this.context });
 
-      // where:myFilter
-      if (typeof whereValue === 'function') {
-        list = (whereValue as Function)(list);
+      // where:filterFunction
+      if (typeof wValue === 'function') {
+        list = (wValue as Function)(list);
       } else {
-        // where:search:name
-        if (isNull(whereKeys) || whereKeys === '') {
+        // where:search:name?
+        if ((isNull(wKeys) || wKeys === '') && isObject(list[0] || '')) {
           Logger.error(('Invalid where-keys in “' + nodeName + '” with “' + nodeValue + '” expression, ' +
-            'at least one where-key to be provided.'));
+            'at least one where-key to be provided when using list of object.'));
           return list;
         }
 
         const newListCopy: any[] = [];
         forEach(list, item => {
           let isValid = false;
-          for (const prop of whereKeys.split(',').map(m => trim(m))) {
-            const propValue = this.evaluator.exec({
-              data: item,
-              code: prop,
-              context: this.context
-            });
+          if (isNull(wKeys)) {
+            isValid = toStr(item).includes(wValue);
+          } else {
+            for (const prop of wKeys.split(',').map(m => trim(m))) {
+              const propValue = this.evaluator.exec({
+                data: item,
+                code: prop,
+                context: this.context
+              });
 
-            if (toStr(propValue).includes(whereValue)) {
-              isValid = true;
-              break;
+              if (toStr(propValue).includes(wValue)) {
+                isValid = true;
+                break;
+              }
             }
           }
           if (isValid) newListCopy.push(item);
@@ -551,6 +551,17 @@ export default class Directive extends Base {
       }
     };
 
+    const applyWhere = (listCopy: any[], filterConfig: string) => {
+      const whereConfigParts = filterConfig.split(':').map(item => trim(item));
+
+      if (whereConfigParts.length == 1) {
+        Logger.error(('Invalid “' + nodeName + '” where expression “' + nodeValue +
+          '”, at least a where-value and where-keys, or a filter-function must be provided'));
+      } else {
+        return $Where(listCopy, whereConfigParts);
+      }
+    };
+
     const reactivePropertyEvent = ReactiveEvent.on('AfterGet',
       reactive => {
         this.binder.binds.push({
@@ -560,12 +571,20 @@ export default class Directive extends Base {
         });
       });
     let expObj: ExpObject | null = $ExpressionBuilder(nodeValue);
+
+    const filters = expObj!.filters;
+    const findFilter = (fName: string) => filters.filter(item => item.substring(0, fName.length) === fName);
+    const whereConfigs = findFilter('where');
+
+    for (const whereConfig of whereConfigs)
+      applyWhere(expObj!.sourceValue, whereConfig);
+
     reactivePropertyEvent.off();
 
     (execute = () => {
       expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
       const iterable = expObj.iterableExpression;
-      const filters = expObj.filters;
+      const orderConfigs = findFilter('order');
 
       // Cleaning the existing items
       forEach(listedItemsHandler, item => {
@@ -578,35 +597,20 @@ export default class Directive extends Base {
         data: data,
         isReturn: false,
         context: this.context,
-        code: 'var __e = _each, __fl = _filters, __f = _for; ' +
+        code: 'var __e = __each, __fl = __filters, __f = __for; ' +
           '__f(__fl(' + iterable + '), function($$itm, $$idx) { __e($$itm, $$idx); })',
         aditional: {
-          _for: forEach,
-          _each(item: any, index: number) {
-            $InsertForItem({ index, item });
-          },
-          _filters(list: any[]) {
+          __for: forEach,
+          __each: (item: any, index: number) => $InsertForItem({ index, item }),
+          __filters: (list: any[]) => {
             let listCopy = Extend.array(list);
-
-            const findFilter = (fName: string) =>
-              filters.find(item => item.substring(0, fName.length) === fName);
-
             // applying where:
-            const filterConfig = findFilter('where');
-            if (filterConfig) {
-              const whereConfigParts = filterConfig.split(':').map(item => trim(item));
-
-              if (whereConfigParts.length == 1) {
-                Logger.error(('Invalid “' + nodeName + '” where expression “' + nodeValue +
-                  '”, at least a where-value and where-keys, or a filter-function must be provided'));
-              } else {
-                listCopy = $Where(listCopy, whereConfigParts);
-              }
+            for (const filterConfig of whereConfigs) {
+              listCopy = applyWhere(listCopy, filterConfig)!;
             }
 
             // applying order:
-            const orderConfig = findFilter('order');
-            if (orderConfig) {
+            const applyOrder = (orderConfig: string) => {
               const orderConfigParts = orderConfig.split(':').map(item => trim(item));
               if (orderConfigParts.length == 1) {
                 Logger.error(('Invalid “' + nodeName + '” order  expression “' + nodeValue +
@@ -614,6 +618,10 @@ export default class Directive extends Base {
               } else {
                 listCopy = $Order(listCopy, orderConfigParts[1], orderConfigParts[2]);
               }
+            };
+
+            for (const orderConfig of orderConfigs) {
+              applyOrder(orderConfig);
             }
 
             return listCopy;
