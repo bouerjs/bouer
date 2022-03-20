@@ -225,7 +225,6 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     const componentHandler = new ComponentHandler(this);
     const compiler = new Compiler(this, options.directives || {});
     const skeleton = new Skeleton(this);
-    new Converter(this);
 
     this.$routing = new Routing(this);
 
@@ -350,7 +349,34 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     (options.config as any) = (options.config || {});
     (options.config || {}).autoUnbind = false;
     (options.config || {}).autoOffEvent = false;
+    (options.config || {}).autoComponentDestroy = false;
     return new Bouer('', options);
+  }
+
+  /**
+   * Compiles a `HTML snippet` to an `Object Literal`
+   * @param input the input element
+   * @param options the options of the compilation
+   * @param onSet a function that should be fired when a value is setted
+   * @returns the Object Compiled from the HTML
+   */
+  static toJsObj(
+    input: string | HTMLElement,
+    options?: {
+      /**
+       * attributes that tells the compiler to lookup to the element, e.g: [name],[data-name].
+       * * Note: The definition order matters.
+       */
+      names?: string,
+      /**
+       * attributes that tells the compiler where it going to get the value, e.g: [value],[data-value].
+       * * Note: The definition order matters.
+       */
+      values?: string
+    },
+    onSet?: (builtObjectLayer: object, propName: string, value: any, element: Element) => void
+  ) {
+    return Converter.htmlToJsObj(input, options, onSet);
   }
 
   /**
@@ -391,6 +417,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     // Enabling this configs for listeners
     (options.config || {}).autoUnbind = true;
     (options.config || {}).autoOffEvent = true;
+    (options.config || {}).autoComponentDestroy = true;
 
     routing.init();
     skeleton.init();
@@ -517,7 +544,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     },
     onSet?: (builtObjectLayer: object, propName: string, value: any, element: Element) => void
   ) {
-    return new ServiceProvider(this).get<Converter>('Converter')!.htmlToJsObj(input, options, onSet);
+    return Converter.htmlToJsObj(input, options, onSet);
   }
 
   /**
