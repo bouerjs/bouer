@@ -546,7 +546,7 @@ export default class ComponentHandler extends Base {
           });
 
         const autoComponentDestroy = ifNullReturn(this.bouer.config.autoComponentDestroy, true);
-        if (autoComponentDestroy == false) return;
+        if (autoComponentDestroy === false) return;
 
         // Listening the component to be destroyed
         Task.run(stopTask => {
