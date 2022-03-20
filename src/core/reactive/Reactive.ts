@@ -25,9 +25,7 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
   watches: Array<Watch<Value, TObject>> = [];
   isComputed: boolean;
   context: RenderContext;
-
-  computedGetter?: () => any;
-  computedSetter?: (value: Value) => void;
+  fnComputed?: Function;
 
   constructor(options: {
     propName: string,
@@ -45,17 +43,9 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
 
     this.propValue = this.propDescriptor!.value as Value;
     this.isComputed = typeof this.propValue === 'function' && this.propValue.name === '$computed';
+
     if (this.isComputed) {
-      const computedResult = (this.propValue as any).call(this.context);
-
-      if (isNull(computedResult))
-        throw new Error('Invalid value used as return in “function $computed(){...}”.');
-
-      const isNotInferred = isObject(computedResult) || isFunction(computedResult);
-
-      this.computedGetter = (isNotInferred && 'get' in computedResult) ? computedResult.get : (() => computedResult);
-      this.computedSetter = (isNotInferred && 'set' in computedResult) ? computedResult.set : undefined;
-
+      this.fnComputed = this.propValue as any;
       (this.propValue as any) = undefined;
     }
 
@@ -63,19 +53,46 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
       this.propValue = this.propValue.bind(this.context);
   }
 
+  computed = () => {
+    if (!this.isComputed)
+      return { get: () => { }, set: (v: any) => { } };
+
+    const computedResult = this.fnComputed!.call(this.context);
+
+    if (isNull(computedResult))
+      throw new Error('Invalid value used as return in “function $computed(){...}”.');
+
+    const isNotInferred = isObject(computedResult) || isFunction(computedResult);
+
+    return {
+      get: (isNotInferred && 'get' in computedResult) ? computedResult.get : (() => computedResult),
+      set: (isNotInferred && 'set' in computedResult) ? computedResult.set : undefined
+    };
+  };
+
   get = () => {
+    const computedGet = this.computed().get;
+
     ReactiveEvent.emit('BeforeGet', this);
     this.propValue = this.isComputed ?
-      fnCall(this.computedGetter!.call(this.context)) : this.propValue;
+      fnCall(computedGet.call(this.context)) : this.propValue;
     const value = this.propValue;
     ReactiveEvent.emit('AfterGet', this);
     return value;
   };
 
   set = (value: Value) => {
-    this.propValueOld = this.propValue;
-    if (this.propValueOld === value || (Number.isNaN(this.propValueOld) && Number.isNaN(value)))
+    if (this.propValue === value || (Number.isNaN(this.propValue) && Number.isNaN(value)))
       return;
+
+    const computedSet = this.computed().set;
+
+    if (this.isComputed && computedSet)
+      fnCall(computedSet.call(this.context, value));
+    else if (this.isComputed && isNull(computedSet))
+      return;
+
+    this.propValueOld = this.propValue;
 
     ReactiveEvent.emit('BeforeSet', this);
 
@@ -111,9 +128,6 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
     } else {
       this.propValue = value;
     }
-
-    if (this.isComputed && this.computedSetter)
-      fnCall(this.computedSetter.call(this.context, value));
 
     ReactiveEvent.emit('AfterSet', this);
     this.notify();
