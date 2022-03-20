@@ -305,7 +305,7 @@ export default class ComponentHandler extends Base {
     ) => void) {
     const $name = toLower(componentElement.nodeName);
     const container = componentElement.parentElement;
-    if (!componentElement.isConnected || !container)
+    if (!container)
       return;
 
     if (isNull(component.template))
@@ -544,6 +544,9 @@ export default class ComponentHandler extends Base {
             context: component,
             el: rootElement,
           });
+
+        const autoComponentDestroy = ifNullReturn(this.bouer.config.autoComponentDestroy, true);
+        if (autoComponentDestroy == false) return;
 
         // Listening the component to be destroyed
         Task.run(stopTask => {
