@@ -17,6 +17,45 @@ function __extends(d, b) {
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 }
 
+var Logger = /** @class */ (function () {
+    function Logger() {
+    }
+    Logger.log = function () {
+        var content = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            content[_i] = arguments[_i];
+        }
+        content.unshift(Logger.prefix);
+        console.log.apply(null, content);
+    };
+    Logger.error = function () {
+        var content = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            content[_i] = arguments[_i];
+        }
+        content.unshift(Logger.prefix);
+        console.error.apply(null, content);
+    };
+    Logger.warn = function () {
+        var content = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            content[_i] = arguments[_i];
+        }
+        content.unshift(Logger.prefix);
+        console.warn.apply(null, content);
+    };
+    Logger.info = function () {
+        var content = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            content[_i] = arguments[_i];
+        }
+        content.unshift(Logger.prefix);
+        console.info.apply(null, content);
+    };
+    Logger.prefix = '[Bouer]';
+    return Logger;
+}());
+
 var Prop = /** @class */ (function () {
     function Prop() {
     }
@@ -327,6 +366,11 @@ function buildError(error) {
 function fnEmpty(input) {
     return input;
 }
+function fnCall(fn) {
+    if (fn instanceof Promise)
+        fn.then().catch(function (err) { return Logger.error(err); });
+    return fn;
+}
 var WIN = window;
 var DOM = document;
 var anchor = $CreateEl('a').build();
@@ -507,45 +551,6 @@ var Task = /** @class */ (function () {
         }, milliseconds || 10);
     };
     return Task;
-}());
-
-var Logger = /** @class */ (function () {
-    function Logger() {
-    }
-    Logger.log = function () {
-        var content = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            content[_i] = arguments[_i];
-        }
-        content.unshift(Logger.prefix);
-        console.log.apply(null, content);
-    };
-    Logger.error = function () {
-        var content = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            content[_i] = arguments[_i];
-        }
-        content.unshift(Logger.prefix);
-        console.error.apply(null, content);
-    };
-    Logger.warn = function () {
-        var content = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            content[_i] = arguments[_i];
-        }
-        content.unshift(Logger.prefix);
-        console.warn.apply(null, content);
-    };
-    Logger.info = function () {
-        var content = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            content[_i] = arguments[_i];
-        }
-        content.unshift(Logger.prefix);
-        console.info.apply(null, content);
-    };
-    Logger.prefix = '[Bouer]';
-    return Logger;
 }());
 
 var Base = /** @class */ (function () {
@@ -917,7 +922,10 @@ var Binder = /** @class */ (function (_super) {
             };
             watchable.call(_this.bouer, _this.bouer);
         });
-        return watches;
+        return {
+            watches: watches,
+            destroy: function () { return forEach(watches, function (w) { return w.destroy(); }); }
+        };
     };
     /** Creates a process to unbind properties that is not connected to the DOM anymone */
     Binder.prototype.cleanup = function () {
@@ -964,17 +972,36 @@ var Reactive = /** @class */ (function (_super) {
     function Reactive(options) {
         var _this = _super.call(this) || this;
         _this.watches = [];
+        _this.computed = function () {
+            if (!_this.isComputed)
+                return { get: function () { }, set: function (v) { } };
+            var computedResult = _this.fnComputed.call(_this.context);
+            if (isNull(computedResult))
+                throw new Error('Invalid value used as return in “function $computed(){...}”.');
+            var isNotInferred = isObject(computedResult) || isFunction(computedResult);
+            return {
+                get: (isNotInferred && 'get' in computedResult) ? computedResult.get : (function () { return computedResult; }),
+                set: (isNotInferred && 'set' in computedResult) ? computedResult.set : undefined
+            };
+        };
         _this.get = function () {
+            var computedGet = _this.computed().get;
             ReactiveEvent.emit('BeforeGet', _this);
-            _this.propValue = _this.isComputed ? _this.computedGetter.call(_this.context) : _this.propValue;
+            _this.propValue = _this.isComputed ?
+                fnCall(computedGet.call(_this.context)) : _this.propValue;
             var value = _this.propValue;
             ReactiveEvent.emit('AfterGet', _this);
             return value;
         };
         _this.set = function (value) {
-            _this.propValueOld = _this.propValue;
-            if (_this.propValueOld === value || (Number.isNaN(_this.propValueOld) && Number.isNaN(value)))
+            if (_this.propValue === value || (Number.isNaN(_this.propValue) && Number.isNaN(value)))
                 return;
+            var computedSet = _this.computed().set;
+            if (_this.isComputed && computedSet)
+                fnCall(computedSet.call(_this.context, value));
+            else if (_this.isComputed && isNull(computedSet))
+                return;
+            _this.propValueOld = _this.propValue;
             ReactiveEvent.emit('BeforeSet', _this);
             if (isObject(value) || Array.isArray(value)) {
                 if ((typeof _this.propValue) !== (typeof value))
@@ -1008,8 +1035,6 @@ var Reactive = /** @class */ (function (_super) {
             else {
                 _this.propValue = value;
             }
-            if (_this.isComputed && _this.computedSetter)
-                _this.computedSetter.call(_this.context, value);
             ReactiveEvent.emit('AfterSet', _this);
             _this.notify();
         };
@@ -1021,12 +1046,7 @@ var Reactive = /** @class */ (function (_super) {
         _this.propValue = _this.propDescriptor.value;
         _this.isComputed = typeof _this.propValue === 'function' && _this.propValue.name === '$computed';
         if (_this.isComputed) {
-            var computedResult_1 = _this.propValue.call(_this.context);
-            if (isNull(computedResult_1))
-                throw new Error('Invalid value used as return in “function $computed(){...}”.');
-            var isNotInferred = isObject(computedResult_1) || isFunction(computedResult_1);
-            _this.computedGetter = (isNotInferred && 'get' in computedResult_1) ? computedResult_1.get : (function () { return computedResult_1; });
-            _this.computedSetter = (isNotInferred && 'set' in computedResult_1) ? computedResult_1.set : undefined;
+            _this.fnComputed = _this.propValue;
             _this.propValue = undefined;
         }
         if (typeof _this.propValue === 'function' && !_this.isComputed)
@@ -1314,41 +1334,42 @@ var Directive = /** @class */ (function (_super) {
         // Filters the list of items
         var $Where = function (list, filterConfigParts) {
             hasWhereFilter = true;
-            var whereKeys = filterConfigParts[2];
-            var whereValue = filterConfigParts[1];
-            if (isNull(whereValue) || whereValue === '') {
+            var wKeys = filterConfigParts[2];
+            var wValue = filterConfigParts[1];
+            if (isNull(wValue) || wValue === '') {
                 Logger.error('Invalid where-value in “' + nodeName + '” with “' + nodeValue + '” expression.');
                 return list;
             }
-            whereValue = _this.evaluator.exec({
-                data: data,
-                code: whereValue,
-                context: _this.context
-            });
-            // where:myFilter
-            if (typeof whereValue === 'function') {
-                list = whereValue(list);
+            wValue = _this.evaluator.exec({ data: data, code: wValue, context: _this.context });
+            // where:filterFunction
+            if (typeof wValue === 'function') {
+                list = wValue(list);
             }
             else {
-                // where:search:name
-                if (isNull(whereKeys) || whereKeys === '') {
+                // where:search:name?
+                if ((isNull(wKeys) || wKeys === '') && isObject(list[0] || '')) {
                     Logger.error(('Invalid where-keys in “' + nodeName + '” with “' + nodeValue + '” expression, ' +
-                        'at least one where-key to be provided.'));
+                        'at least one where-key to be provided when using list of object.'));
                     return list;
                 }
                 var newListCopy_1 = [];
                 forEach(list, function (item) {
                     var isValid = false;
-                    for (var _i = 0, _a = whereKeys.split(',').map(function (m) { return trim(m); }); _i < _a.length; _i++) {
-                        var prop = _a[_i];
-                        var propValue = _this.evaluator.exec({
-                            data: item,
-                            code: prop,
-                            context: _this.context
-                        });
-                        if (toStr(propValue).includes(whereValue)) {
-                            isValid = true;
-                            break;
+                    if (isNull(wKeys)) {
+                        isValid = toStr(item).includes(wValue);
+                    }
+                    else {
+                        for (var _i = 0, _a = wKeys.split(',').map(function (m) { return trim(m); }); _i < _a.length; _i++) {
+                            var prop = _a[_i];
+                            var propValue = _this.evaluator.exec({
+                                data: item,
+                                code: prop,
+                                context: _this.context
+                            });
+                            if (toStr(propValue).includes(wValue)) {
+                                isValid = true;
+                                break;
+                            }
                         }
                     }
                     if (isValid)
@@ -1542,6 +1563,16 @@ var Directive = /** @class */ (function (_super) {
                 default: return execute();
             }
         };
+        var applyWhere = function (listCopy, filterConfig) {
+            var whereConfigParts = filterConfig.split(':').map(function (item) { return trim(item); });
+            if (whereConfigParts.length == 1) {
+                Logger.error(('Invalid “' + nodeName + '” where expression “' + nodeValue +
+                    '”, at least a where-value and where-keys, or a filter-function must be provided'));
+            }
+            else {
+                return $Where(listCopy, whereConfigParts);
+            }
+        };
         var reactivePropertyEvent = ReactiveEvent.on('AfterGet', function (reactive) {
             _this.binder.binds.push({
                 isConnected: function () { return comment.isConnected; },
@@ -1551,11 +1582,18 @@ var Directive = /** @class */ (function (_super) {
             });
         });
         var expObj = $ExpressionBuilder(nodeValue);
+        var filters = expObj.filters;
+        var findFilter = function (fName) { return filters.filter(function (item) { return item.substring(0, fName.length) === fName; }); };
+        var whereConfigs = findFilter('where');
+        for (var _i = 0, whereConfigs_1 = whereConfigs; _i < whereConfigs_1.length; _i++) {
+            var whereConfig = whereConfigs_1[_i];
+            applyWhere(expObj.sourceValue, whereConfig);
+        }
         reactivePropertyEvent.off();
         (execute = function () {
             expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
             var iterable = expObj.iterableExpression;
-            var filters = expObj.filters;
+            var orderConfigs = findFilter('order');
             // Cleaning the existing items
             forEach(listedItemsHandler, function (item) {
                 if (!item.el.parentElement)
@@ -1567,33 +1605,20 @@ var Directive = /** @class */ (function (_super) {
                 data: data,
                 isReturn: false,
                 context: _this.context,
-                code: 'var __e = _each, __fl = _filters, __f = _for; ' +
+                code: 'var __e = __each, __fl = __filters, __f = __for; ' +
                     '__f(__fl(' + iterable + '), function($$itm, $$idx) { __e($$itm, $$idx); })',
                 aditional: {
-                    _for: forEach,
-                    _each: function (item, index) {
-                        $InsertForItem({ index: index, item: item });
-                    },
-                    _filters: function (list) {
+                    __for: forEach,
+                    __each: function (item, index) { return $InsertForItem({ index: index, item: item }); },
+                    __filters: function (list) {
                         var listCopy = Extend.array(list);
-                        var findFilter = function (fName) {
-                            return filters.find(function (item) { return item.substring(0, fName.length) === fName; });
-                        };
                         // applying where:
-                        var filterConfig = findFilter('where');
-                        if (filterConfig) {
-                            var whereConfigParts = filterConfig.split(':').map(function (item) { return trim(item); });
-                            if (whereConfigParts.length == 1) {
-                                Logger.error(('Invalid “' + nodeName + '” where expression “' + nodeValue +
-                                    '”, at least a where-value and where-keys, or a filter-function must be provided'));
-                            }
-                            else {
-                                listCopy = $Where(listCopy, whereConfigParts);
-                            }
+                        for (var _i = 0, whereConfigs_2 = whereConfigs; _i < whereConfigs_2.length; _i++) {
+                            var filterConfig = whereConfigs_2[_i];
+                            listCopy = applyWhere(listCopy, filterConfig);
                         }
                         // applying order:
-                        var orderConfig = findFilter('order');
-                        if (orderConfig) {
+                        var applyOrder = function (orderConfig) {
                             var orderConfigParts = orderConfig.split(':').map(function (item) { return trim(item); });
                             if (orderConfigParts.length == 1) {
                                 Logger.error(('Invalid “' + nodeName + '” order  expression “' + nodeValue +
@@ -1602,6 +1627,10 @@ var Directive = /** @class */ (function (_super) {
                             else {
                                 listCopy = $Order(listCopy, orderConfigParts[1], orderConfigParts[2]);
                             }
+                        };
+                        for (var _a = 0, orderConfigs_1 = orderConfigs; _a < orderConfigs_1.length; _a++) {
+                            var orderConfig = orderConfigs_1[_a];
+                            applyOrder(orderConfig);
                         }
                         return listCopy;
                     }
@@ -2292,11 +2321,7 @@ var Compiler = /** @class */ (function (_super) {
         if (rootElement.hasAttribute(Constants.silent))
             rootElement.removeAttribute(Constants.silent);
         if (isFunction(options.onDone)) {
-            var isPromiseResult = options.onDone.call(context, rootElement);
-            if (isPromiseResult instanceof Promise)
-                isPromiseResult
-                    .then(function (onDone) { return onDone.call(context, rootElement); })
-                    .catch(function (err) { return Logger.error(err); });
+            fnCall(options.onDone.call(context, rootElement));
         }
         this.eventHandler.emit({
             eventName: Constants.builtInEvents.compile,
@@ -2331,15 +2356,11 @@ var Compiler = /** @class */ (function (_super) {
 
 var Converter = /** @class */ (function (_super) {
     __extends(Converter, _super);
-    function Converter(bouer) {
-        var _this = _super.call(this) || this;
-        _this.bouer = bouer;
-        ServiceProvider.add('Converter', _this);
-        return _this;
+    function Converter() {
+        return _super !== null && _super.apply(this, arguments) || this;
     }
-    Converter.prototype.htmlToJsObj = function (input, options, onSet) {
+    Converter.htmlToJsObj = function (input, options, onSet) {
         var element = undefined;
-        var instance = this;
         // If it's not a HTML Element, just return
         if ((input instanceof HTMLElement))
             element = input;
@@ -2408,7 +2429,7 @@ var Converter = /** @class */ (function (_super) {
                     }
                     // Calling on set function
                     if (isFunction(onSet))
-                        onSet.call(instance.bouer, builtObject, propName, value, el);
+                        fnCall(onSet(builtObject, propName, value, el));
                 }
                 forEach(toArray(el.children), function (child) {
                     if (!findAttribute(child, [Constants.build]))
@@ -2457,7 +2478,7 @@ var Converter = /** @class */ (function (_super) {
                             lastLayer[leadElement] = Extend.obj(objPropertyValue, builtObjValue);
                     }
                     if (isFunction(onSet))
-                        onSet.call(instance.bouer, lastLayer, leadElement, builtObjValue, buildElement);
+                        fnCall(onSet(lastLayer, leadElement, builtObjValue, buildElement));
                     return;
                 }
                 if (Array.isArray(objPropertyValue)) {
@@ -2909,7 +2930,7 @@ var ComponentHandler = /** @class */ (function (_super) {
         var _this = this;
         var $name = toLower(componentElement.nodeName);
         var container = componentElement.parentElement;
-        if (!componentElement.isConnected || !container)
+        if (!container)
             return;
         if (isNull(component.template))
             return Logger.error('The <' + $name + '></' + $name + '> component is not ready yet to be inserted.');
@@ -2951,16 +2972,17 @@ var ComponentHandler = /** @class */ (function (_super) {
         var scriptsAssets = where(component.assets, function (asset) { return toLower(asset.nodeName) === 'script'; });
         var initializer = component.init;
         if (isFunction(initializer))
-            initializer.call(component);
+            fnCall(initializer.call(component));
         var compile = function (scriptContent) {
             try {
                 // Executing the mixed scripts
                 _this.serviceProvider.get('Evaluator')
                     .execRaw((scriptContent || ''), component);
                 createdEvent.emit();
+                var hasForDirective_1 = componentElement.hasAttribute(Constants.for);
                 // If the component has the e-for directive
                 // And Does not have the data directive assigned, create it implicitly
-                if (componentElement.hasAttribute(Constants.for) && !(toArray(componentElement.attributes).find(function (attr) {
+                if (hasForDirective_1 && !(toArray(componentElement.attributes).find(function (attr) {
                     return (attr.name === Constants.data || startWith(attr.name, Constants.data + ':'));
                 })))
                     componentElement.setAttribute('data', '$data');
@@ -3103,6 +3125,9 @@ var ComponentHandler = /** @class */ (function (_super) {
                     context: component,
                     el: rootElement,
                 });
+                var autoComponentDestroy = ifNullReturn(_this.bouer.config.autoComponentDestroy, true);
+                if (autoComponentDestroy === false)
+                    return;
                 // Listening the component to be destroyed
                 Task.run(function (stopTask) {
                     if (component.el.isConnected)
@@ -3116,9 +3141,9 @@ var ComponentHandler = /** @class */ (function (_super) {
                         return;
                     var index = stylesController.elements.indexOf(component.el);
                     stylesController.elements.splice(index, 1);
-                    // No elements using the style
-                    if (stylesController.elements.length > 0)
+                    if (stylesController.elements.length > 0 || (hasForDirective_1 && container.isConnected))
                         return;
+                    // No elements using the style
                     forEach(stylesController.styles, function (style) {
                         return forEach(toArray(DOM.head.children), function (item) {
                             if (item === style)
@@ -3407,7 +3432,7 @@ var EventHandler = /** @class */ (function (_super) {
                 return !isOnceEvent;
             }
             // Otherwise, dispatch the event
-            evt.callback.call(_this.bouer, new CustomEvent(eventName, init));
+            fnCall(evt.callback.call(_this.bouer, new CustomEvent(eventName, init)));
             return !isOnceEvent;
         });
     };
@@ -3790,7 +3815,6 @@ var Bouer = /** @class */ (function (_super) {
         var componentHandler = new ComponentHandler(_this_1);
         var compiler = new Compiler(_this_1, options.directives || {});
         var skeleton = new Skeleton(_this_1);
-        new Converter(_this_1);
         _this_1.$routing = new Routing(_this_1);
         _this_1.$delimiters = {
             add: delimiter.add,
@@ -3893,7 +3917,18 @@ var Bouer = /** @class */ (function (_super) {
         options.config = (options.config || {});
         (options.config || {}).autoUnbind = false;
         (options.config || {}).autoOffEvent = false;
+        (options.config || {}).autoComponentDestroy = false;
         return new Bouer('', options);
+    };
+    /**
+     * Compiles a `HTML snippet` to an `Object Literal`
+     * @param input the input element
+     * @param options the options of the compilation
+     * @param onSet a function that should be fired when a value is setted
+     * @returns the Object Compiled from the HTML
+     */
+    Bouer.toJsObj = function (input, options, onSet) {
+        return Converter.htmlToJsObj(input, options, onSet);
     };
     /**
      * Initialize create application
@@ -3929,6 +3964,7 @@ var Bouer = /** @class */ (function (_super) {
         // Enabling this configs for listeners
         (options.config || {}).autoUnbind = true;
         (options.config || {}).autoOffEvent = true;
+        (options.config || {}).autoComponentDestroy = true;
         routing.init();
         skeleton.init();
         binder.cleanup();
@@ -4024,7 +4060,7 @@ var Bouer = /** @class */ (function (_super) {
      * @returns the Object Compiled from the HTML
      */
     Bouer.prototype.toJsObj = function (input, options, onSet) {
-        return new ServiceProvider(this).get('Converter').htmlToJsObj(input, options, onSet);
+        return Converter.htmlToJsObj(input, options, onSet);
     };
     /**
      * Provides the possibility to watch a property change
