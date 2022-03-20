@@ -178,6 +178,8 @@ declare class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
    * @returns an object having all the elements with the `ref attribute value` defined as the key.
    */
   readonly refs: dynamic<Element>;
+  /** Bouer options */
+  readonly options: IBouerOptions<Data, GlobalData, Dependencies>;
 
   /** Indicates if the application is destroyed or not */
   isDestroyed: boolean;
@@ -513,6 +515,27 @@ declare class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
   static create<Data = {}, GlobalData = {}, Dependencies = {}>(
     options?: IBouerOptions<Data, GlobalData, Dependencies>
   ): Bouer;
+
+  /**
+   * Compiles a `HTML snippet` to an `Object Literal`
+   * @param input the input element
+   * @param options the options of the compilation
+   * @param onSet a function that should be fired when a value is setted
+   * @returns the Object Compiled from the HTML
+   */
+  static toJsObj(
+    input: string | HTMLElement,
+    options?: {
+      names?: string;
+      values?: string;
+    },
+    onSet?: (
+      builtObjectLayer: object,
+      propName: string,
+      value: any,
+      element: Element
+    ) => void
+  ): object | null;
 
   /**
    * Initialize create application
