@@ -434,7 +434,10 @@ export default class Binder extends Base {
       watchable.call(this.bouer, this.bouer);
     });
 
-    return watches;
+    return {
+      watches: watches,
+      destroy: () => forEach(watches, w => w.destroy())
+    };
   }
 
   /** Creates a process to unbind properties that is not connected to the DOM anymone */
