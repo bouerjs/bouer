@@ -16,6 +16,9 @@ interface IBouerConfig {
 
   /** Allow to remove listeners when the Element isn't connected to the DOM, by default is `true` */
   autoOffEvent?: boolean;
+
+  /** Allow to destroy the component when the Element isn't connected to the DOM, by default is `true` */
+  autoComponentDestroy?: boolean;
 }
 
 export default IBouerConfig;
