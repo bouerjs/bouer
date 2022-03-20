@@ -1,8 +1,6 @@
 import Constants from '../../shared/helpers/Constants';
 import Extend from '../../shared/helpers/Extend';
-import ServiceProvider from '../../shared/helpers/ServiceProvider';
 import Logger from '../../shared/logger/Logger';
-import Bouer from '../../instance/Bouer';
 import {
   buildError,
   DOM,
@@ -20,22 +18,12 @@ import Base from '../Base';
 
 
 export default class Converter extends Base {
-  bouer: Bouer;
-
-  constructor(bouer: Bouer) {
-    super();
-
-    this.bouer = bouer;
-    ServiceProvider.add('Converter', this);
-  }
-
-  htmlToJsObj(input: string | HTMLElement,
+  static htmlToJsObj(input: string | HTMLElement,
     options?: {
       names?: string,
       values?: string
     }, onSet?: (builtObject: object, propName: string, value: any, element: Element) => void): object | null {
     let element: Element | undefined = undefined;
-    const instance = this;
     // If it's not a HTML Element, just return
     if ((input instanceof HTMLElement))
       element = input;
@@ -112,7 +100,7 @@ export default class Converter extends Base {
           }
           // Calling on set function
           if (isFunction(onSet))
-            fnCall(onSet!.call(instance.bouer, builtObject, propName, value, el));
+            fnCall(onSet!(builtObject, propName, value, el));
         }
 
         forEach(toArray(el.children), (child: Element) => {
@@ -167,7 +155,7 @@ export default class Converter extends Base {
               lastLayer[leadElement] = Extend.obj(objPropertyValue, builtObjValue);
           }
           if (isFunction(onSet))
-            fnCall(onSet!.call(instance.bouer, lastLayer, leadElement, builtObjValue, buildElement));
+            fnCall(onSet!(lastLayer, leadElement, builtObjValue, buildElement));
 
           return;
         }
