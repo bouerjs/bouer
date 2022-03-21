@@ -50,6 +50,19 @@ describe('When using "e-entry" directive', () => {
 });
 
 describe('When added to the instance component options', () => {
+  it('Warns when extends component and do not provide a "name" and "path"', () => {
+    const fn = console.warn;
+    console.warn = jest.fn();
+
+    Bouer.create({
+      components: [{
+        template: '<div>Element</div>'
+      }],
+    });
+
+    expect(console.warn.mock.calls[0][1]).toBe('Provide a “name” to component at options.components[0] position.');
+    console.warn = fn;
+  });
   it('Register the component with "template" property', () => {
     const context = Bouer.create({
       components: [{
