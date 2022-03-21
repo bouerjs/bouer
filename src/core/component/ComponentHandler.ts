@@ -94,22 +94,27 @@ export default class ComponentHandler extends Base {
   }
 
   prepare(components: (Component<any> | IComponentOptions<any>)[], parent?: (Component<any> | IComponentOptions<any>)) {
-    forEach(components, component => {
-      if (isNull(component.path) && isNull(component.template))
-        return Logger.warn('The component with name “' + component.name + '”' +
-          (component.route ? (' and route “' + component.route + '”') : '') +
-          ' has not “path” or “template” property defined, ' + 'then it was ignored.');
+    forEach(components, (component, index) => {
+      if ((!component.path || isNull(component.path)) && (!component.template || isNull(component.template)))
+        return Logger.warn('The component at options.components[' + index + '] has not valid “path” or “template” ' +
+          'property defined, ' + 'then it was ignored.');
 
       if (isNull(component.name) || !component.name) {
-        const pathSplitted = component.path!.toLowerCase().split('/');
-        let generatedComponentName = pathSplitted[pathSplitted.length - 1].replace('.html', '');
+        if (!component.path || isNull(component.path))
+          return Logger.warn('Provide a “name” to component at options.components[' + index + '] position.');
+
+        const pathSplitted = component.path.toLowerCase().split('/');
+        let componentName = pathSplitted[pathSplitted.length - 1].replace('.html', '');
 
         // If the component name already exists generate a new one
-        if (this.components[generatedComponentName])
-          generatedComponentName = toLower(code(8, generatedComponentName + '-component-'));
+        if (this.components[componentName]) {
+          componentName = toLower(code(8, componentName + '-component-'));
+        }
 
-        component.name = generatedComponentName;
+        component.name = componentName;
       }
+
+      component.name = component.name.toLowerCase();
 
       if (this.components[component.name!])
         return Logger.warn('The component name “' + component.name + '” is already define, try changing the name.');
