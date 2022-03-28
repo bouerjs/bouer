@@ -26,7 +26,7 @@ export default class Extend {
       Prop.transfer(out, props, key);
 
       if (hasOwnProp) {
-        const mOut = (out as any);
+        const mOut = out as any;
         mOut[key] = fnEmpty(mOut[key]);
       }
     });
