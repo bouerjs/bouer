@@ -15,7 +15,7 @@
   },
   "husky": {
     "hooks": {
-      "prepush": "npm test"
+      "pre-push": "npm test"
     }
   },
   "files": [
