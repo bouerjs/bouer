@@ -3,13 +3,15 @@
   "version": "3.0.0",
   "description": "A library that provides a fastest and easy way to bind data to your pages",
   "main": "dist/bouer.common.min.js",
+  "bin": "dist/bouer.common.min.js",
   "module": "dist/bouer.esm.min.js",
   "typings": "types/index.d.ts",
   "scripts": {
     "test": "./node_modules/.bin/jest --detectOpenHandles",
     "dev": "rollup --config rollup.config.js --configPlugin typescript --w",
     "publish": "rollup --config rollup.config.js --configPlugin typescript",
-    "release": "node scripts/build.js --prod"
+    "release": "node scripts/build.js --prod",
+    "prepare": "husky install"
   },
   "husky": {
     "hooks": {
@@ -26,6 +28,14 @@
     "bouerjs",
     "bouer.js"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bouerjs/bouer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bouerjs/bouer/issues"
+  },
+  "homepage": "https://bouerjs.github.io/",
   "author": {
     "name": "Afonso Matumona",
     "email": "afonsomatumona@hotmail.com",
