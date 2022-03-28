@@ -1,6 +1,6 @@
 export default class Task {
   static run = (
-    callback: (stopTask: () => void) => void,
+    callback: (killTask: () => void) => void,
     milliseconds?: number
   ) => {
     const timerId = setInterval(() => {
