@@ -201,9 +201,9 @@ export function findAttribute(
   return res;
 }
 
-export function forEach<TArray>(
-  iterable: TArray[],
-  callback?: (item: TArray, index: number) => void,
+export function forEach<T>(
+  iterable: T[],
+  callback?: (item: T, index: number) => void,
   context?: object
 ) {
   for (let index = 0; index < iterable.length; index++) {
@@ -212,12 +212,12 @@ export function forEach<TArray>(
   }
 }
 
-export function where<TArray>(
-  iterable: TArray[],
-  callback?: (item: TArray, index: number) => any,
+export function where<T>(
+  iterable: T[],
+  callback?: (item: T, index: number) => any,
   context?: object
 ) {
-  const out: TArray[] = [];
+  const out: T[] = [];
   for (let index = 0; index < iterable.length; index++) {
     const item = iterable[index];
     if (isFunction(callback) && callback!.call(context, item, index)) {
@@ -245,9 +245,9 @@ export function $CreateAnyEl(
   return $CreateEl(elName as any, callback);
 }
 
-export function $CreateEl<TKey extends keyof HTMLElementTagNameMap>(
-  elName: TKey,
-  callback?: (element: HTMLElementTagNameMap[TKey], dom: Document) => void
+export function $CreateEl<Key extends keyof HTMLElementTagNameMap>(
+  elName: Key,
+  callback?: (element: HTMLElementTagNameMap[Key], dom: Document) => void
 ) {
   const el = DOM.createElement(elName);
   if (isFunction(callback)) callback!(el, DOM);
@@ -379,7 +379,12 @@ export function fnEmpty(input?: any) {
 
 export function fnCall(fn?: any) {
   if (fn instanceof Promise)
-    fn.then().catch(err => Logger.error(err));
+    fn.then(result => {
+      if (isFunction(result))
+        result.call();
+      else if (result instanceof Promise)
+        result.then();
+    }).catch(err => Logger.error(err));
   return fn;
 }
 
