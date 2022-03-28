@@ -372,7 +372,12 @@ function fnEmpty(input) {
 }
 function fnCall(fn) {
     if (fn instanceof Promise)
-        fn.then().catch(function (err) { return Logger.error(err); });
+        fn.then(function (result) {
+            if (isFunction(result))
+                result.call();
+            else if (result instanceof Promise)
+                result.then();
+        }).catch(function (err) { return Logger.error(err); });
     return fn;
 }
 var WIN = window;
@@ -2768,19 +2773,22 @@ var ComponentHandler = /** @class */ (function (_super) {
     };
     ComponentHandler.prototype.prepare = function (components, parent) {
         var _this = this;
-        forEach(components, function (component) {
-            if (isNull(component.path) && isNull(component.template))
-                return Logger.warn('The component with name “' + component.name + '”' +
-                    (component.route ? (' and route “' + component.route + '”') : '') +
-                    ' has not “path” or “template” property defined, ' + 'then it was ignored.');
+        forEach(components, function (component, index) {
+            if ((!component.path || isNull(component.path)) && (!component.template || isNull(component.template)))
+                return Logger.warn('The component at options.components[' + index + '] has not valid “path” or “template” ' +
+                    'property defined, ' + 'then it was ignored.');
             if (isNull(component.name) || !component.name) {
+                if (!component.path || isNull(component.path))
+                    return Logger.warn('Provide a “name” to component at options.components[' + index + '] position.');
                 var pathSplitted = component.path.toLowerCase().split('/');
-                var generatedComponentName = pathSplitted[pathSplitted.length - 1].replace('.html', '');
+                var componentName = pathSplitted[pathSplitted.length - 1].replace('.html', '');
                 // If the component name already exists generate a new one
-                if (_this.components[generatedComponentName])
-                    generatedComponentName = toLower(code(8, generatedComponentName + '-component-'));
-                component.name = generatedComponentName;
+                if (_this.components[componentName]) {
+                    componentName = toLower(code(8, componentName + '-component-'));
+                }
+                component.name = componentName;
             }
+            component.name = component.name.toLowerCase();
             if (_this.components[component.name])
                 return Logger.warn('The component name “' + component.name + '” is already define, try changing the name.');
             if (!isNull(component.route)) { // Completing the route
