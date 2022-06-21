@@ -3,8 +3,8 @@ import Logger from '../../shared/logger/Logger';
 import Reactive from '../reactive/Reactive';
 
 type CallbackReactiveProperty = <TProperty, TObject>(
-  reactive: Reactive<TProperty,
-    TObject>) => void;
+  reactive: Reactive<TProperty, TObject>
+) => void;
 
 
 type ReactiveEventResult = {
