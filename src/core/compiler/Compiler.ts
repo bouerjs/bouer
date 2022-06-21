@@ -33,12 +33,12 @@ export default class Compiler extends Base {
     '#comment': 8
   };
 
-  constructor(bouer: Bouer, directives: CustomDirective) {
+  constructor(bouer: Bouer, directives?: CustomDirective) {
     super();
 
     this.bouer = bouer;
     this.serviceProvider = new ServiceProvider(bouer);
-    this.directives = directives;
+    this.directives = directives ?? {};
 
     this.binder = this.serviceProvider.get('Binder')!;
     this.delimiter = this.serviceProvider.get('DelimiterHandler')!;
@@ -225,7 +225,7 @@ export default class Compiler extends Base {
       // Event handler
       // on:[?]="..." directive
       if (Constants.check(node, Constants.on))
-        return this.eventHandler.handle(node, data, context);
+        return this.eventHandler.compile(node, data, context);
 
       let delimiterField: IDelimiterResponse | null;
       if ((delimiterField = this.delimiter.shorthand(node.nodeName))) {
