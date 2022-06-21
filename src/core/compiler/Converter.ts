@@ -49,7 +49,7 @@ export default class Converter extends Base {
 
     options = options || {};
 
-    // Clear [ ] and , and return an array of the names provided
+    // Remove `[ ]` and `,` and return an array of the names provided
     const mNames = (options.names || '[name]').replace(/\[|\]/g, '').split(',');
     const mValues = (options.values || '[value]').replace(/\[|\]/g, '').split(',');
 
