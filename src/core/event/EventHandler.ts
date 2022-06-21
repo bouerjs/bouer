@@ -40,7 +40,7 @@ export default class EventHandler extends Base {
     this.cleanup();
   }
 
-  handle(node: Node, data: object, context: RenderContext) {
+  compile(node: Node, data: object, context: RenderContext) {
     const ownerNode = ((node as any).ownerElement || node.parentNode) as Element;
     const nodeName = node.nodeName;
 
