@@ -1917,7 +1917,7 @@ var Directive = /** @class */ (function (_super) {
         var subcribeEvent = function (eventName) {
             var attr = ownerNode.attributes.getNamedItem(Constants.on + eventName);
             if (attr)
-                _this.eventHandler.handle(attr, data, _this.context);
+                _this.eventHandler.compile(attr, data, _this.context);
             return {
                 emit: function (detailObj) {
                     _this.eventHandler.emit({
@@ -2161,7 +2161,7 @@ var Compiler = /** @class */ (function (_super) {
         };
         _this.bouer = bouer;
         _this.serviceProvider = new ServiceProvider(bouer);
-        _this.directives = directives;
+        _this.directives = directives !== null && directives !== void 0 ? directives : {};
         _this.binder = _this.serviceProvider.get('Binder');
         _this.delimiter = _this.serviceProvider.get('DelimiterHandler');
         _this.eventHandler = _this.serviceProvider.get('EventHandler');
@@ -2294,7 +2294,7 @@ var Compiler = /** @class */ (function (_super) {
             // Event handler
             // on:[?]="..." directive
             if (Constants.check(node, Constants.on))
-                return _this.eventHandler.handle(node, data, context);
+                return _this.eventHandler.compile(node, data, context);
             var delimiterField;
             if ((delimiterField = _this.delimiter.shorthand(node.nodeName))) {
                 var element = (node.ownerElement || node.parentNode);
@@ -2393,7 +2393,7 @@ var Converter = /** @class */ (function (_super) {
         if (isNull(element))
             throw Logger.error('Invalid element provided at app.toJsObj(> "' + input + '" <).');
         options = options || {};
-        // Clear [ ] and , and return an array of the names provided
+        // Remove `[ ]` and `,` and return an array of the names provided
         var mNames = (options.names || '[name]').replace(/\[|\]/g, '').split(',');
         var mValues = (options.values || '[value]').replace(/\[|\]/g, '').split(',');
         var getter = function (el, fieldName) {
@@ -3325,7 +3325,7 @@ var EventHandler = /** @class */ (function (_super) {
         _this.cleanup();
         return _this;
     }
-    EventHandler.prototype.handle = function (node, data, context) {
+    EventHandler.prototype.compile = function (node, data, context) {
         var _this = this;
         var ownerNode = (node.ownerElement || node.parentNode);
         var nodeName = node.nodeName;
@@ -3792,6 +3792,7 @@ var Bouer = /** @class */ (function (_super) {
         _this_1.refs = {};
         _this_1.isDestroyed = false;
         _this_1.isInitialized = false;
+        var app = _this_1;
         _this_1.options = options = (options || {});
         _this_1.config = options.config || {};
         _this_1.deps = options.deps || {};
@@ -3800,34 +3801,34 @@ var Bouer = /** @class */ (function (_super) {
             var value = deps[key];
             deps[key] = typeof value === 'function' ? value.bind(_this_1) : value;
         });
-        new ServiceProvider(_this_1);
-        new Evaluator(_this_1);
-        var dataStore = new DataStore(_this_1);
-        var middleware = new Middleware(_this_1);
+        new ServiceProvider(app);
+        new Evaluator(app);
+        var dataStore = new DataStore(app);
+        var middleware = new Middleware(app);
         // Register the middleware
         if (typeof options.middleware === 'function')
-            options.middleware.call(_this_1, middleware.register, _this_1);
+            options.middleware.call(app, middleware.register, app);
         // Transform the data properties into a reative
         _this_1.data = Reactive.transform({
             data: options.data || {},
-            context: _this_1
+            context: app
         });
         _this_1.globalData = Reactive.transform({
             data: options.globalData || {},
-            context: _this_1
+            context: app
         });
         var delimiters = options.delimiters || [];
         delimiters.push.apply(delimiters, [
             { name: 'common', delimiter: { open: '{{', close: '}}' } },
             { name: 'html', delimiter: { open: '{{:html ', close: '}}' } },
         ]);
-        new Binder(_this_1);
-        new EventHandler(_this_1);
-        var delimiter = new DelimiterHandler(delimiters, _this_1);
-        var componentHandler = new ComponentHandler(_this_1);
-        var compiler = new Compiler(_this_1, options.directives || {});
-        var skeleton = new Skeleton(_this_1);
-        _this_1.$routing = new Routing(_this_1);
+        new Binder(app);
+        new EventHandler(app);
+        var delimiter = new DelimiterHandler(delimiters, app);
+        var componentHandler = new ComponentHandler(app);
+        var compiler = new Compiler(app, options.directives);
+        var skeleton = new Skeleton(app);
+        _this_1.$routing = new Routing(app);
         _this_1.$delimiters = {
             add: delimiter.add,
             remove: delimiter.remove,
@@ -3840,10 +3841,10 @@ var Bouer = /** @class */ (function (_super) {
                     return Logger.log('There is already a data stored with this key “' + key + '”.');
                 if (ifNullReturn(toReactive, false) === true)
                     Reactive.transform({
-                        context: _this_1,
+                        context: app,
                         data: data
                     });
-                return new ServiceProvider(_this_1).get('DataStore').set('data', key, data);
+                return new ServiceProvider(app).get('DataStore').set('data', key, data);
             },
             unset: function (key) { return delete dataStore.data[key]; }
         };
@@ -3868,7 +3869,7 @@ var Bouer = /** @class */ (function (_super) {
                         data: data,
                         nodes: [],
                         once: ifNullReturn(once, false),
-                        context: _this_1
+                        context: app
                     };
                 var mWait = dataStore.wait[key];
                 mWait.data = data;
@@ -3952,15 +3953,16 @@ var Bouer = /** @class */ (function (_super) {
             return this;
         if (isNull(selector) || trim(selector) === '')
             throw Logger.error(new Error('Invalid selector provided to the instance.'));
+        var app = this;
         var el = DOM.querySelector(selector);
         if (!(this.el = el))
             throw Logger.error(new SyntaxError('Element with selector “' + selector + '” not found.'));
         var options = this.options || {};
-        var binder = ServiceProvider.get(this, 'Binder');
-        var eventHandler = ServiceProvider.get(this, 'EventHandler');
-        var routing = ServiceProvider.get(this, 'Routing');
-        var skeleton = ServiceProvider.get(this, 'Skeleton');
-        var compiler = ServiceProvider.get(this, 'Compiler');
+        var binder = ServiceProvider.get(app, 'Binder');
+        var eventHandler = ServiceProvider.get(app, 'EventHandler');
+        var routing = ServiceProvider.get(app, 'Routing');
+        var skeleton = ServiceProvider.get(app, 'Skeleton');
+        var compiler = ServiceProvider.get(app, 'Compiler');
         forEach([options.beforeLoad, options.loaded, options.beforeDestroy, options.destroyed], function (evt) {
             if (typeof evt !== 'function')
                 return;
@@ -3969,7 +3971,7 @@ var Bouer = /** @class */ (function (_super) {
                 callback: evt,
                 attachedNode: el,
                 modifiers: { once: true },
-                context: _this_1
+                context: app
             });
         });
         eventHandler.emit({ eventName: 'beforeLoad', attachedNode: el });
@@ -3986,7 +3988,7 @@ var Bouer = /** @class */ (function (_super) {
         compiler.compile({
             el: this.el,
             data: this.data,
-            context: this,
+            context: app,
             onDone: function () { return eventHandler.emit({
                 eventName: 'loaded',
                 attachedNode: el
@@ -4083,7 +4085,8 @@ var Bouer = /** @class */ (function (_super) {
      */
     Bouer.prototype.watch = function (propertyName, callback, targetObject) {
         if (targetObject === void 0) { targetObject = this.data; }
-        return new ServiceProvider(this).get('Binder').onPropertyChange(propertyName, callback, targetObject || this.data);
+        return new ServiceProvider(this).get('Binder')
+            .onPropertyChange(propertyName, callback, targetObject || this.data);
     };
     /**
      * Watch all reactive properties in the provided scope.
@@ -4142,8 +4145,8 @@ var Bouer = /** @class */ (function (_super) {
      */
     Bouer.prototype.emit = function (eventName, options) {
         var mOptions = (options || {});
-        return new ServiceProvider(this).get('EventHandler').
-            emit({
+        return new ServiceProvider(this)
+            .get('EventHandler').emit({
             eventName: eventName,
             attachedNode: mOptions.element,
             init: mOptions.init,
