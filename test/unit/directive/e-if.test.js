@@ -17,7 +17,7 @@ describe('When element is compiled with "e-if" directive', () => {
         see: false
       }
     });
-    const compiler = new Compiler(context, {});
+    const compiler = new Compiler(context);
     const element = toHtml(htmlSnippet);
 
     compiler.compile({
@@ -36,7 +36,7 @@ describe('When element is compiled with "e-if" directive', () => {
         see: true
       }
     });
-    const compiler = new Compiler(context, {});
+    const compiler = new Compiler(context);
     const element = toHtml(htmlSnippet);
 
     compiler.compile({
@@ -63,7 +63,7 @@ describe('When element is compiled with "e-if" and "e-else" directives', () => {
         see: true
       }
     });
-    const compiler = new Compiler(context, {});
+    const compiler = new Compiler(context);
     const element = toHtml(htmlSnippet);
 
     compiler.compile({
@@ -83,7 +83,7 @@ describe('When element is compiled with "e-if" and "e-else" directives', () => {
         see: false
       }
     });
-    const compiler = new Compiler(context, {});
+    const compiler = new Compiler(context);
     const element = toHtml(htmlSnippet);
 
     compiler.compile({
@@ -112,7 +112,7 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
         value: 0
       }
     });
-    const compiler = new Compiler(context, {});
+    const compiler = new Compiler(context);
     const element = toHtml(htmlSnippet);
 
     compiler.compile({
@@ -133,7 +133,7 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
         value: 1
       }
     });
-    const compiler = new Compiler(context, {});
+    const compiler = new Compiler(context);
     const element = toHtml(htmlSnippet);
 
     compiler.compile({
@@ -154,7 +154,7 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
         value: 2
       }
     });
-    const compiler = new Compiler(context, {});
+    const compiler = new Compiler(context);
     const element = toHtml(htmlSnippet);
 
     compiler.compile({
@@ -175,7 +175,7 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
         value: 0
       }
     });
-    const compiler = new Compiler(context, {});
+    const compiler = new Compiler(context);
     const element = toHtml(htmlSnippet);
 
     compiler.compile({

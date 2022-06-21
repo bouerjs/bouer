@@ -10,7 +10,7 @@ describe('Standard events', () => {
 
   beforeEach(() => {
     context = Bouer.create();
-    compiler = new Compiler(context, {});
+    compiler = new Compiler(context);
   });
 
   describe('When compiled with a standard event', () => {

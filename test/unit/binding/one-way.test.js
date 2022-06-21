@@ -11,7 +11,7 @@ describe('When using a delimiter "{{ ... }}" for one way data binding', () => {
     }
   });
 
-  const compiler = new Compiler(context, {});
+  const compiler = new Compiler(context);
 
   it('Render the property in Element <h1> content', () => {
     const htmlSnippet = '<h1>{{ value }}</h1>';

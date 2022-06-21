@@ -14,7 +14,7 @@ describe('When element is compiled with "{attr}" directive (ShortHand Directive)
         title: 'value-rendered',
       }
     });
-    compiler = new Compiler(context, {});
+    compiler = new Compiler(context);
   });
 
   const htmlSnippet = '<h4 {title}>Value</h4>';

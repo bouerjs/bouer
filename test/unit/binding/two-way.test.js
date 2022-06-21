@@ -14,7 +14,7 @@ describe('When using a "e-bind" for two way data binding ', () => {
           value: 'bound-value'
         }
       });
-      const compiler = new Compiler(context, {});
+      const compiler = new Compiler(context);
 
       compiler.compile({
         data: context.data,
@@ -40,7 +40,7 @@ describe('When using a "e-bind" for two way data binding ', () => {
           value: true
         }
       });
-      const compiler = new Compiler(context, {});
+      const compiler = new Compiler(context);
 
       compiler.compile({
         data: context.data,
@@ -72,7 +72,7 @@ describe('When using a "e-bind" for two way data binding ', () => {
           selected: 'male'
         }
       });
-      const compiler = new Compiler(context, {});
+      const compiler = new Compiler(context);
 
       compiler.compile({
         data: context.data,

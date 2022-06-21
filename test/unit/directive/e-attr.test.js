@@ -21,7 +21,7 @@ describe('When element is compiled with "e-[attr]" directive', () => {
         }
       }
     });
-    compiler = new Compiler(context, {});
+    compiler = new Compiler(context);
   });
 
   // Normal rendering

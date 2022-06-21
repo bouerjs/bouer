@@ -15,7 +15,7 @@ describe('When element is compiled with "e-for" directive', () => {
         todos: ['wake up', 'eat', 'code', 'repeat'],
       }
     });
-    compiler = new Compiler(context, {});
+    compiler = new Compiler(context);
   });
 
   describe('When compiled with no filters', () => {

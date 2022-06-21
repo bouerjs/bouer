@@ -15,7 +15,7 @@ describe('When element is compiled with "e-skip" directive', () => {
         value: 'value-rendered'
       }
     });
-    compiler = new Compiler(context, {});
+    compiler = new Compiler(context);
   });
 
   const htmlSnippet = '<h4 e-skip>{{ value }}</h4>';

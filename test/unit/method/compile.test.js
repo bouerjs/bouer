@@ -18,7 +18,7 @@ describe('When "compile" method is called', () => {
       }
     });
 
-    compiler = new Compiler(context, {});
+    compiler = new Compiler(context);
     element = toHtml(htmlSnippet);
   });
   it('Compiles the element according to the "data" provided', async () => {

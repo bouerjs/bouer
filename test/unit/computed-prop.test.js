@@ -34,7 +34,7 @@ describe('When using a computed property', () => {
       }
     });
 
-    compiler = new Compiler(context, {});
+    compiler = new Compiler(context);
   });
 
   describe('When using inferred get', () => {

@@ -10,7 +10,7 @@ describe('When element is compiled with "e-text" directive', () => {
       message: 'Hello'
     }
   });
-  const compiler = new Compiler(context, {});
+  const compiler = new Compiler(context);
 
   it('Renders the data property value in the element content', () => {
     const element = toHtml('<h4 e-text="{{ message }}">#</h4>');

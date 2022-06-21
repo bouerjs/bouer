@@ -18,7 +18,7 @@ describe('When element is compiled with "data" directive', () => {
       }
     });
 
-    compiler = new Compiler(context, {});
+    compiler = new Compiler(context);
   });
 
   it('Injects the data provided', () => {

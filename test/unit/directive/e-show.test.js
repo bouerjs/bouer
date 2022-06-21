@@ -20,7 +20,7 @@ describe('When element is compiled with "e-show" directive', () => {
         see: false
       }
     });
-    compiler = new Compiler(context, {});
+    compiler = new Compiler(context);
   });
 
   it('Adds style attribute with "display:none" value', () => {

@@ -8,7 +8,7 @@ import {
 describe('When element is compiled with "wait-data" directive', () => {
   describe('And data is not provided yet', () => {
     const context = Bouer.create();
-    const compiler = new Compiler(context, {});
+    const compiler = new Compiler(context);
 
     it('Keeps the origin state of the element unitil a data is provided', async () => {
       const element = toHtml(`
@@ -35,7 +35,7 @@ describe('When element is compiled with "wait-data" directive', () => {
 
   describe('And data is already provided', () => {
     const context = Bouer.create();
-    const compiler = new Compiler(context, {});
+    const compiler = new Compiler(context);
 
     it('Compiles the elements right away', async () => {
       const element = toHtml(`

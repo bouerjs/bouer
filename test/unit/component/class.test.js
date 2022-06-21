@@ -52,7 +52,7 @@ describe('Customize Component (extends)', () => {
     const context = Bouer.create({
       components: [new ButtonComponent()],
     });
-    const compiler = new Compiler(context, {});
+    const compiler = new Compiler(context);
 
     compiler.compile({
       data: context.data,
