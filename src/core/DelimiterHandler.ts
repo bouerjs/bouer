@@ -6,10 +6,10 @@ import { isNull, trim } from '../shared/helpers/Utils';
 import Base from './Base';
 
 export default class DelimiterHandler extends Base {
-  delimiters: Array<IDelimiter> = [];
+  delimiters: IDelimiter[] = [];
   bouer: Bouer;
 
-  constructor(delimiters: Array<IDelimiter>, bouer: Bouer) {
+  constructor(delimiters: IDelimiter[], bouer: Bouer) {
     super();
 
     this.bouer = bouer;
