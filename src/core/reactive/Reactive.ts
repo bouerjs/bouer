@@ -16,13 +16,13 @@ import Base from '../Base';
 import Watch from '../binder/Watch';
 import ReactiveEvent from '../event/ReactiveEvent';
 
-export default class Reactive<Value, TObject extends {}> extends Base implements PropertyDescriptor {
+export default class Reactive<Value, TObject> extends Base implements PropertyDescriptor {
   propName: string;
   propValue: Value;
   propValueOld?: Value;
   propSource: TObject;
   propDescriptor: PropertyDescriptor | undefined;
-  watches: Array<Watch<Value, TObject>> = [];
+  watches: Watch<Value, TObject>[] = [];
   isComputed: boolean;
   context: RenderContext;
   fnComputed?: Function;
@@ -39,7 +39,7 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
     this.context = options.context;
     // Setting the value of the property
 
-    this.propDescriptor = Prop.descriptor(this.propSource, this.propName);
+    this.propDescriptor = Prop.descriptor(this.propSource as dynamic, this.propName);
 
     this.propValue = this.propDescriptor!.value as Value;
     this.isComputed = typeof this.propValue === 'function' && this.propValue.name === '$computed';
@@ -116,11 +116,11 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
           this.propValue = value;
         else {
           Reactive.transform({
-            data: value,
+            data: value as dynamic,
             context: this.context
           });
           if (!isNull(this.propValue))
-            mapper(value, this.propValue);
+            mapper(value as dynamic, this.propValue as dynamic);
           else
             this.propValue = value;
         }
@@ -144,7 +144,7 @@ export default class Reactive<Value, TObject extends {}> extends Base implements
     return w;
   }
 
-  static transform = <InputObject>(options: {
+  static transform = <InputObject extends dynamic>(options: {
     context: RenderContext,
     data: InputObject,
     reactiveObj?: Reactive<any, any>,

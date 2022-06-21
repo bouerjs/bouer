@@ -183,34 +183,35 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
   ) {
     super();
 
+    const app = this as Bouer;
     this.options = options = (options || {});
     this.config = options.config || {};
     this.deps = options.deps || {} as any;
 
-    forEach(Object.keys(this.deps), key => {
+    forEach(Object.keys(this.deps as {}), key => {
       const deps = this.deps as any;
       const value = deps[key];
       deps[key] = typeof value === 'function' ? value.bind(this) : value;
     });
 
-    new ServiceProvider(this);
-    new Evaluator(this);
+    new ServiceProvider(app);
+    new Evaluator(app);
 
-    const dataStore = new DataStore(this);
-    const middleware = new Middleware(this);
+    const dataStore = new DataStore(app);
+    const middleware = new Middleware(app);
 
     // Register the middleware
     if (typeof options.middleware === 'function')
-      options.middleware.call(this, middleware.register, this);
+      options.middleware.call(app, middleware.register, app);
 
     // Transform the data properties into a reative
     this.data = Reactive.transform({
       data: options.data || {},
-      context: this
+      context: app
     });
     this.globalData = Reactive.transform({
       data: options.globalData || {},
-      context: this
+      context: app
     });
 
     const delimiters = options.delimiters || [];
@@ -219,14 +220,14 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
       { name: 'html', delimiter: { open: '{{:html ', close: '}}' } },
     ]);
 
-    new Binder(this);
-    new EventHandler(this);
-    const delimiter = new DelimiterHandler(delimiters, this);
-    const componentHandler = new ComponentHandler(this);
-    const compiler = new Compiler(this, options.directives || {});
-    const skeleton = new Skeleton(this);
+    new Binder(app);
+    new EventHandler(app);
+    const delimiter = new DelimiterHandler(delimiters, app);
+    const componentHandler = new ComponentHandler(app);
+    const compiler = new Compiler(app, options.directives);
+    const skeleton = new Skeleton(app);
 
-    this.$routing = new Routing(this);
+    this.$routing = new Routing(app);
 
     this.$delimiters = {
       add: delimiter.add,
@@ -242,10 +243,10 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
         if (ifNullReturn(toReactive, false) === true)
           Reactive.transform({
-            context: this,
+            context: app,
             data: data
           });
-        return new ServiceProvider(this).get<DataStore>('DataStore')!.set('data', key, data);
+        return new ServiceProvider(app).get<DataStore>('DataStore')!.set('data', key, data);
       },
       unset: key => delete dataStore.data[key]
     };
@@ -273,7 +274,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
             data: data,
             nodes: [],
             once: ifNullReturn(once, false),
-            context: this
+            context: app
           };
 
         const mWait = dataStore.wait[key];
@@ -287,7 +288,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
             context: mWait.context,
             data: Reactive.transform({
               context: mWait.context,
-              data: mWait.data
+              data: mWait.data as object
             }),
           });
         });
@@ -390,15 +391,16 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     if (isNull(selector) || trim(selector) === '')
       throw Logger.error(new Error('Invalid selector provided to the instance.'));
 
+    const app = this as Bouer;
     const el = DOM.querySelector(selector);
     if (!(this.el = el)) throw Logger.error(new SyntaxError('Element with selector “' + selector + '” not found.'));
 
     const options = this.options || {};
-    const binder = ServiceProvider.get<Binder>(this, 'Binder')!;
-    const eventHandler = ServiceProvider.get<EventHandler>(this, 'EventHandler')!;
-    const routing = ServiceProvider.get<Routing>(this, 'Routing')!;
-    const skeleton = ServiceProvider.get<Skeleton>(this, 'Skeleton')!;
-    const compiler = ServiceProvider.get<Compiler>(this, 'Compiler')!;
+    const binder = ServiceProvider.get<Binder>(app, 'Binder')!;
+    const eventHandler = ServiceProvider.get<EventHandler>(app, 'EventHandler')!;
+    const routing = ServiceProvider.get<Routing>(app, 'Routing')!;
+    const skeleton = ServiceProvider.get<Skeleton>(app, 'Skeleton')!;
+    const compiler = ServiceProvider.get<Compiler>(app, 'Compiler')!;
 
     forEach([options.beforeLoad, options.loaded, options.beforeDestroy, options.destroyed],
       evt => {
@@ -408,7 +410,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
           callback: evt as any,
           attachedNode: el,
           modifiers: { once: true },
-          context: this
+          context: app
         });
       });
 
@@ -429,7 +431,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     compiler.compile({
       el: this.el,
       data: this.data,
-      context: this,
+      context: app,
       onDone: () => eventHandler.emit({
         eventName: 'loaded',
         attachedNode: el
@@ -469,7 +471,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
    * @param targetObject the target were the inputData
    * @returns the object with the data setted
    */
-  set<InputData, TargetObject = Data>(
+  set<InputData extends {}, TargetObject = Data>(
     inputData: InputData,
     targetObject: TargetObject | Data = this.data
   ) {
@@ -486,7 +488,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     // Transforming the input
     Reactive.transform({
       data: inputData,
-      context: this
+      context: this as Bouer
     });
 
     // Transfering the properties
@@ -501,11 +503,11 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
       ReactiveEvent.once('AfterGet', evt => {
         evt.onemit = reactive => destination = reactive;
-        const desc = Prop.descriptor(targetObject, key);
+        const desc = Prop.descriptor(targetObject as {}, key);
         if (desc) desc.get!();
       });
 
-      Prop.transfer(targetObject, inputData, key);
+      Prop.transfer(targetObject as {}, inputData, key);
 
       if (!destination || !source) return;
       // Adding the previous watches to the property that is being set
@@ -559,9 +561,10 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     callback: (valueNew: TargetObject[Key], valueOld: TargetObject[Key]) => void,
     targetObject: TargetObject | Data = this.data
   ) {
-    return new ServiceProvider(this).get<Binder>('Binder')!.onPropertyChange<TargetObject[Key], TargetObject | Data>(
-      propertyName, callback as WatchCallback, targetObject || this.data
-    );
+    return new ServiceProvider(this).get<Binder>('Binder')!
+      .onPropertyChange<TargetObject[Key], TargetObject | Data>(
+        propertyName, callback as WatchCallback, targetObject || this.data
+      );
   }
 
   /**
@@ -649,8 +652,8 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     }
   ) {
     const mOptions = (options || {});
-    return new ServiceProvider(this).get<EventHandler>('EventHandler')!.
-      emit({
+    return new ServiceProvider(this as Bouer)
+      .get<EventHandler>('EventHandler')!.emit({
         eventName: eventName,
         attachedNode: mOptions.element,
         init: mOptions.init,
@@ -708,7 +711,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   destroy() {
     const el = this.el!;
-    const serviceProvider = new ServiceProvider(this);
+    const serviceProvider = new ServiceProvider(this as Bouer);
     const $Events = serviceProvider.get<EventHandler>('EventHandler')!.$events;
     const destroyedEvents = ($Events['destroyed'] || []).concat(($Events['component:destroyed'] || []));
 

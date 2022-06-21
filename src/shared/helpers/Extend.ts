@@ -4,7 +4,7 @@ import { fnEmpty, forEach, isNull } from './Utils';
 
 export default class Extend {
   /** joins objects into one */
-  static obj<ExtendObjectType = dynamic>(...args: ExtendObjectType[]) {
+  static obj<ExtendObjectType extends dynamic = dynamic>(...args: ExtendObjectType[]) {
     const out: dynamic = {};
 
     forEach(args, arg => {
@@ -18,7 +18,7 @@ export default class Extend {
   }
 
   /** add properties to the first object provided */
-  static mixin<MixinObjectType = dynamic>(out: MixinObjectType, ...args: object[]) {
+  static mixin<MixinObjectType extends dynamic = dynamic>(out: MixinObjectType, ...args: object[]) {
     // Props to mix with out object
     const props = Extend.obj.apply(this, args) as any;
     forEach(Object.keys(props), key => {

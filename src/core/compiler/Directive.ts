@@ -961,7 +961,7 @@ export default class Directive extends Base {
 
     const subcribeEvent = (eventName: string) => {
       const attr = ownerNode.attributes.getNamedItem(Constants.on + eventName);
-      if (attr) this.eventHandler.handle(attr, data, this.context);
+      if (attr) this.eventHandler.compile(attr, data, this.context);
 
       return {
         emit: (detailObj?: dynamic) => {
@@ -1183,7 +1183,7 @@ export default class Directive extends Base {
           context: mWait.context,
           data: Reactive.transform({
             context: mWait.context,
-            data: mWait.data
+            data: mWait.data as dynamic
           }),
         });
       });
