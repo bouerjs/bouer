@@ -1,6 +1,6 @@
 {
   "name": "bouerjs",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "A library that provides a fastest and easy way to bind data to your pages",
   "main": "dist/bouer.common.min.js",
   "bin": "dist/bouer.common.min.js",
