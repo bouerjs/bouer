@@ -136,7 +136,7 @@ export default class Routing extends Base {
 
         const routeRegExp = component.route!.replace(/{(.*?)}/gi, '[\\S\\s]{1,}');
 
-        if (Array.isArray(new RegExp('^' + routeRegExp + '$').exec(url)))
+        if (Array.isArray(new RegExp('^' + routeRegExp + '$', 'i').exec(url)))
           return true;
 
         return false;
