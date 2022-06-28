@@ -2450,7 +2450,7 @@ var Converter = /** @class */ (function (_super) {
             return builtObject;
         };
         var builtObject = objBuilder(element);
-        var builds = toArray(element.querySelectorAll("[" + Constants.build + "]"));
+        var builds = toArray(element.querySelectorAll("[".concat(Constants.build, "]")));
         forEach(builds, function (buildElement) {
             // Getting the e-build attr value
             var buildPath = getter(buildElement, Constants.build);
@@ -3298,7 +3298,7 @@ var Evaluator = /** @class */ (function (_super) {
     };
     Evaluator.prototype.exec = function (options) {
         var data = options.data, args = options.args, expression = options.code, isReturn = options.isReturn, aditional = options.aditional, context = options.context;
-        var dataToUse = Extend.obj((aditional || {}), (data || {}), {
+        var dataToUse = Extend.obj((this.bouer.globalData || {}), (aditional || {}), (data || {}), {
             $root: this.bouer.data,
             $mixin: Extend.mixin
         });
@@ -3379,18 +3379,31 @@ var EventHandler = /** @class */ (function (_super) {
             }
         });
         if (!('on' + eventName in this.input))
-            this.on({ eventName: eventName, callback: callback, modifiers: modifiersObject, context: context, attachedNode: ownerNode });
+            this.on({
+                eventName: eventName,
+                callback: callback,
+                modifiers: modifiersObject,
+                context: context,
+                attachedNode: ownerNode
+            });
         else
             ownerNode.addEventListener(eventName, callback, modifiersObject);
     };
     EventHandler.prototype.on = function (options) {
         var _this = this;
+        var instance = this;
         var eventName = options.eventName, callback = options.callback, context = options.context, attachedNode = options.attachedNode, modifiers = options.modifiers;
+        var iEventSubCallback = function (evt) { return callback.apply(context || _this.bouer, [evt]); };
         var event = {
             eventName: eventName,
-            callback: function (evt) { return callback.apply(context || _this.bouer, [evt]); },
             attachedNode: attachedNode,
             modifiers: modifiers,
+            callback: iEventSubCallback,
+            destroy: function () { return instance.off({
+                callback: iEventSubCallback,
+                attachedNode: attachedNode,
+                eventName: eventName,
+            }); },
             emit: function (options) { return _this.emit({
                 eventName: eventName,
                 attachedNode: attachedNode,
@@ -3630,7 +3643,7 @@ var Routing = /** @class */ (function (_super) {
             if (!component.route)
                 return false;
             var routeRegExp = component.route.replace(/{(.*?)}/gi, '[\\S\\s]{1,}');
-            if (Array.isArray(new RegExp('^' + routeRegExp + '$').exec(url)))
+            if (Array.isArray(new RegExp('^' + routeRegExp + '$', 'i').exec(url)))
                 return true;
             return false;
         }) || this.notFoundPage;
