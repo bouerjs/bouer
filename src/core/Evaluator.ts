@@ -35,7 +35,10 @@ export default class Evaluator extends Base {
     context: RenderContext
   }) {
     const { data, args, code: expression, isReturn, aditional, context } = options;
-    const dataToUse = Extend.obj((aditional || {}), (data || {}),
+    const dataToUse = Extend.obj(
+      (this.bouer.globalData || {}),
+      (aditional || {}),
+      (data || {}),
       {
         $root: this.bouer.data,
         $mixin: Extend.mixin
