@@ -35,7 +35,7 @@ import {
 export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
   extends Base implements IBouerOptions<Data, GlobalData, Dependencies> {
   readonly name = 'Bouer';
-  readonly version = '3.0.0';
+  readonly version = '3.1.0';
   readonly data: Data;
   readonly globalData: GlobalData;
   readonly config: IBouerConfig;
