@@ -101,7 +101,13 @@ export default class EventHandler extends Base {
     });
 
     if (!('on' + eventName in this.input))
-      this.on({ eventName, callback, modifiers: modifiersObject, context, attachedNode: ownerNode });
+      this.on({
+        eventName,
+        callback,
+        modifiers: modifiersObject,
+        context,
+        attachedNode: ownerNode
+      });
     else
       ownerNode.addEventListener(eventName, callback, modifiersObject);
   }
@@ -113,12 +119,20 @@ export default class EventHandler extends Base {
     context: RenderContext,
     modifiers?: IEventModifiers
   }) {
+    const instance = this;
     const { eventName, callback, context, attachedNode, modifiers } = options;
+    const iEventSubCallback = (evt: any) => callback.apply(context || this.bouer, [evt]);
+
     const event: IEventSubscription = {
       eventName: eventName,
-      callback: evt => callback.apply(context || this.bouer, [evt]),
       attachedNode: attachedNode,
       modifiers: modifiers,
+      callback: iEventSubCallback,
+      destroy: () => instance.off({
+        callback: iEventSubCallback,
+        attachedNode,
+        eventName,
+      }),
       emit: options => this.emit({
         eventName: eventName,
         attachedNode: attachedNode,
