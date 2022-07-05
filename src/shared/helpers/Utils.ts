@@ -180,27 +180,6 @@ export function toStr(input: any) {
   }
 }
 
-export function findAttribute(
-  element: Element,
-  attributesToCheck: string[],
-  removeIfFound: boolean = false
-): Attr | null {
-  let res: Attr | null = null;
-
-  if (!element) return null;
-
-  for (const attrName of attributesToCheck) {
-    const flexibleName: any = attrName;
-    if (res = element.attributes[flexibleName])
-      break;
-  }
-
-  if (!isNull(res) && removeIfFound)
-    element.removeAttribute(res!.name);
-
-  return res;
-}
-
 export function forEach<T>(
   iterable: T[],
   callback?: (item: T, index: number) => void,
@@ -258,7 +237,8 @@ export function $CreateEl<Key extends keyof HTMLElementTagNameMap>(
       return returnObj;
     },
     build: () => el,
-    child: () => el.children[0]
+    child: () => el.children[0],
+    children: () => [].slice.call(el.childNodes),
   };
   return returnObj;
 }
@@ -386,6 +366,37 @@ export function fnCall(fn?: any) {
         result.then();
     }).catch(err => Logger.error(err));
   return fn;
+}
+
+export function findAttribute(
+  element: Element,
+  attributesToCheck: string[],
+  removeIfFound: boolean = false
+): Attr | null {
+  let res: Attr | null = null;
+
+  if (!element) return null;
+
+  for (const attrName of attributesToCheck) {
+    const flexibleName: any = attrName;
+    if (res = element.attributes[flexibleName])
+      break;
+  }
+
+  if (!isNull(res) && removeIfFound)
+    element.removeAttribute(res!.name);
+
+  return res;
+}
+
+export function findDirective(
+  node: Node,
+  name: string
+): Attr | null {
+  const attributes = (node as any).attributes || [];
+  return attributes.getNamedItem(name) ||
+    toArray(attributes).find((attr: Attr) =>
+      (attr.name === name || startWith(attr.name, name + ':')));
 }
 
 export const WIN = window;
