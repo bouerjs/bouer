@@ -1,5 +1,5 @@
 /*!
- * Bouer.js v3.0.0
+ * Bouer.js v3.1.0
  * Copyright Easy.js 2018-2020 | 2021-2022 Afonso Matumona
  * Released under the MIT License.
  */
@@ -269,7 +269,8 @@ function $CreateEl(elName, callback) {
             return returnObj;
         },
         build: function () { return el; },
-        child: function () { return el.children[0]; }
+        child: function () { return el.children[0]; },
+        children: function () { return [].slice.call(el.childNodes); },
     };
     return returnObj;
 }
@@ -419,6 +420,11 @@ var Constants = {
     },
     check: function (node, cmd) {
         return startWith(node.nodeName, cmd);
+    },
+    getAttr: function (node, cmd) {
+        return toArray(node.attributes || []).find(function (attr) {
+            return (attr.name === cmd || startWith(attr.name, cmd + ':'));
+        });
     },
     isConstant: function (value) {
         var _this = this;
@@ -707,14 +713,17 @@ var Binder = /** @class */ (function (_super) {
                 propertyBindConfig.value = valueToSet;
                 if (!isHtml)
                     return (nodeToBind.nodeValue = valueToSet);
-                var htmlSnippet = $CreateEl('div', function (el) { return el.innerHTML = valueToSet; })
-                    .child();
-                ownerNode.appendChild(htmlSnippet);
-                _this.serviceProvider.get('Compiler').compile({
-                    el: htmlSnippet,
-                    data: data,
-                    context: context,
-                });
+                var htmlSnippets = $CreateEl('div', function (el) { return el.innerHTML = valueToSet; })
+                    .children();
+                ownerNode.innerHTML = '';
+                forEach(htmlSnippets, function (snippetNode) {
+                    ownerNode.appendChild(snippetNode);
+                    _this.serviceProvider.get('Compiler').compile({
+                        el: snippetNode,
+                        data: data,
+                        context: context,
+                    });
+                }, _this);
             };
             ReactiveEvent.once('AfterGet', function (event) {
                 event.onemit = function (reactive) {
@@ -2253,16 +2262,11 @@ var Compiler = /** @class */ (function (_super) {
                     directive.show(node.attributes.getNamedItem(Constants.show), data);
                 // e-req="..." | e-req:[id]="..."  directive
                 var reqNode = null;
-                if ((reqNode = node.attributes.getNamedItem(Constants.req)) ||
-                    (reqNode = toArray(node.attributes).find(function (attr) { return Constants.check(attr, Constants.req); })))
+                if ((reqNode = Constants.getAttr(node, Constants.req)))
                     return directive.req(reqNode, data);
                 // data="..." | data:[id]="..." directive
                 var dataNode = null;
-                if (dataNode = toArray(node.attributes).find(function (attr) {
-                    var attrName = attr.name;
-                    // In case of data="..." or data:[data-id]="..."
-                    return (attrName === Constants.data || startWith(attrName, Constants.data + ':'));
-                }))
+                if (dataNode = Constants.getAttr(node, Constants.data))
                     return directive.data(dataNode, data);
                 // put="..." directive
                 if (Constants.put in node.attributes)
@@ -2295,6 +2299,7 @@ var Compiler = /** @class */ (function (_super) {
             // on:[?]="..." directive
             if (Constants.check(node, Constants.on))
                 return _this.eventHandler.compile(node, data, context);
+            // ShortHand directive: {title}
             var delimiterField;
             if ((delimiterField = _this.delimiter.shorthand(node.nodeName))) {
                 var element = (node.ownerElement || node.parentNode);
@@ -2327,7 +2332,7 @@ var Compiler = /** @class */ (function (_super) {
             });
         };
         walker(rootElement, data);
-        if (rootElement.hasAttribute(Constants.silent))
+        if (rootElement.hasAttribute && rootElement.hasAttribute(Constants.silent))
             rootElement.removeAttribute(Constants.silent);
         if (isFunction(options.onDone)) {
             fnCall(options.onDone.call(context, rootElement));
@@ -2985,19 +2990,71 @@ var ComponentHandler = /** @class */ (function (_super) {
         var initializer = component.init;
         if (isFunction(initializer))
             fnCall(initializer.call(component));
+        var processDataAttr = function (attr) {
+            var inputData = {};
+            var mData = Extend.obj(data, { $data: data });
+            // Listening to all the reactive properties
+            var reactiveEvent = ReactiveEvent.on('AfterGet', function (reactive) {
+                if (!(reactive.propName in inputData))
+                    inputData[reactive.propName] = undefined;
+                Prop.set(inputData, reactive.propName, reactive);
+            });
+            // If data value is empty gets the main scope value
+            if (attr.value === '')
+                inputData = Extend.obj(_this.bouer.data);
+            else {
+                // Otherwise, compiles the object provided
+                var mInputData_1 = _this.serviceProvider.get('Evaluator')
+                    .exec({
+                    data: mData,
+                    code: attr.value,
+                    context: _this.bouer
+                });
+                if (!isObject(mInputData_1))
+                    Logger.error(('Expected a valid Object Literal expression in “' + attr.nodeName +
+                        '” and got “' + attr.value + '”.'));
+                else {
+                    // Adding all non-existing properties
+                    forEach(Object.keys(mInputData_1), function (key) {
+                        if (!(key in inputData))
+                            inputData[key] = mInputData_1[key];
+                    });
+                }
+            }
+            reactiveEvent.off();
+            inputData = Reactive.transform({
+                context: component,
+                data: inputData
+            });
+            forEach(Object.keys(inputData), function (key) {
+                Prop.transfer(component.data, inputData, key);
+            });
+        };
         var compile = function (scriptContent) {
             try {
+                // Injecting data
+                var hasForDirective_1 = componentElement.hasAttribute(Constants.for);
+                // If the component has the e-for directive
+                // And Does not have the data directive assigned, create it implicitly
+                if (hasForDirective_1 && !(Constants.getAttr(componentElement, Constants.data)))
+                    componentElement.setAttribute('data', '$data');
+                var dataAttr = null;
+                // If the attr is `data`, prepare and inject the value into component `data`
+                if (dataAttr = Constants.getAttr(componentElement, Constants.data)) {
+                    var attr = dataAttr;
+                    if (_this.delimiter.run(attr.value).length !== 0) {
+                        Logger.error(('The “data” attribute cannot contain delimiter, source element: ' +
+                            '<' + $name + '></' + $name + '>.'));
+                    }
+                    else {
+                        processDataAttr(attr);
+                    }
+                    componentElement.removeAttribute(attr.name);
+                }
                 // Executing the mixed scripts
                 _this.serviceProvider.get('Evaluator')
                     .execRaw((scriptContent || ''), component);
                 createdEvent.emit();
-                var hasForDirective_1 = componentElement.hasAttribute(Constants.for);
-                // If the component has the e-for directive
-                // And Does not have the data directive assigned, create it implicitly
-                if (hasForDirective_1 && !(toArray(componentElement.attributes).find(function (attr) {
-                    return (attr.name === Constants.data || startWith(attr.name, Constants.data + ':'));
-                })))
-                    componentElement.setAttribute('data', '$data');
                 // tranfering the attributes
                 forEach(toArray(componentElement.attributes), function (attr) {
                     componentElement.removeAttribute(attr.name);
@@ -3006,48 +3063,6 @@ var ComponentHandler = /** @class */ (function (_super) {
                         return componentElement.classList.forEach(function (cls) {
                             rootElement.classList.add(cls);
                         });
-                    // If the attr is `data`, prepare and inject the value into component `data`
-                    if (attr.nodeName === 'data') {
-                        if (_this.delimiter.run(attr.value).length !== 0)
-                            return Logger.error(('The “data” attribute cannot contain delimiter, source element: ' +
-                                '<' + $name + '></' + $name + '>.'));
-                        var inputData_1 = {};
-                        var mData = Extend.obj(data, { $data: data });
-                        // Listening to all the reactive properties
-                        var reactiveEvent = ReactiveEvent.on('AfterGet', function (reactive) {
-                            if (!(reactive.propName in inputData_1))
-                                inputData_1[reactive.propName] = undefined;
-                            Prop.set(inputData_1, reactive.propName, reactive);
-                        });
-                        // If data value is empty gets the main scope value
-                        if (attr.value === '')
-                            inputData_1 = Extend.obj(_this.bouer.data);
-                        else {
-                            // Other wise, compiles the object provided
-                            var mInputData_1 = _this.serviceProvider.get('Evaluator')
-                                .exec({
-                                data: mData,
-                                code: attr.value,
-                                context: _this.bouer
-                            });
-                            if (!isObject(mInputData_1))
-                                return Logger.error(('Expected a valid Object Literal expression in “' + attr.nodeName +
-                                    '” and got “' + attr.value + '”.'));
-                            // Adding all non-existing properties
-                            forEach(Object.keys(mInputData_1), function (key) {
-                                if (!(key in inputData_1))
-                                    inputData_1[key] = mInputData_1[key];
-                            });
-                        }
-                        reactiveEvent.off();
-                        inputData_1 = Reactive.transform({
-                            context: component,
-                            data: inputData_1
-                        });
-                        return forEach(Object.keys(inputData_1), function (key) {
-                            Prop.transfer(component.data, inputData_1, key);
-                        });
-                    }
                     // sets the attr to the root element
                     rootElement.attributes.setNamedItem(attr);
                 });
@@ -3796,7 +3811,7 @@ var Bouer = /** @class */ (function (_super) {
     function Bouer(selector, options) {
         var _this_1 = _super.call(this) || this;
         _this_1.name = 'Bouer';
-        _this_1.version = '3.0.0';
+        _this_1.version = '3.1.0';
         _this_1.__id__ = ServiceProvider.genId();
         /**
          * Gets all the elemens having the `ref` attribute
@@ -3832,8 +3847,8 @@ var Bouer = /** @class */ (function (_super) {
         });
         var delimiters = options.delimiters || [];
         delimiters.push.apply(delimiters, [
-            { name: 'common', delimiter: { open: '{{', close: '}}' } },
             { name: 'html', delimiter: { open: '{{:html ', close: '}}' } },
+            { name: 'common', delimiter: { open: '{{', close: '}}' } },
         ]);
         new Binder(app);
         new EventHandler(app);
