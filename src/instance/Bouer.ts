@@ -216,8 +216,8 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
     const delimiters = options.delimiters || [];
     delimiters.push.apply(delimiters, [
-      { name: 'common', delimiter: { open: '{{', close: '}}' } },
       { name: 'html', delimiter: { open: '{{:html ', close: '}}' } },
+      { name: 'common', delimiter: { open: '{{', close: '}}' } },
     ]);
 
     new Binder(app);
