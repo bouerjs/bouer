@@ -22,6 +22,10 @@
         <input e-bind="value" type="text" e-name="{{ name }}" />
       </input-field>
 
+      <input-field silent data="{ label: 'Birthday', name: 'birthday', value: '' }">
+        <input e-bind="value" type="date" e-name="{{ name }}" />
+      </input-field>
+
       <!-- Build an phones property as an array -->
       <div e-build="phones" e-array>
 
