@@ -7,9 +7,10 @@ import ServiceProvider from '../../shared/helpers/ServiceProvider';
 import {
   DOM,
   fnCall,
-  forEach, isFunction,
-  isString,
-  startWith, toArray
+  forEach,
+  findDirective,
+  isFunction,
+  isString, toArray
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Base from '../Base';
@@ -94,6 +95,7 @@ export default class Compiler extends Base {
         if (Constants.skip in node.attributes)
           return directive.skip(node);
 
+        // In case of slots
         if ((node.localName.toLowerCase() === Constants.slot || node.tagName.toLowerCase() === Constants.slot)
           && options.componentSlot) {
           const componentSlot = options.componentSlot;
@@ -141,15 +143,15 @@ export default class Compiler extends Base {
 
         // e-def="{...}" directive
         if (Constants.def in node.attributes)
-          directive.def(node.attributes.getNamedItem(Constants.def) as Attr, data);
+          directive.def(findDirective(node, Constants.def)!, data);
 
         // e-entry="..." directive
         if (Constants.entry in node.attributes)
-          directive.entry(node.attributes.getNamedItem(Constants.entry) as Attr, data);
+          directive.entry(findDirective(node, Constants.entry)!, data);
 
         // wait-data="..." directive
         if (Constants.wait in node.attributes)
-          return directive.wait(node.attributes.getNamedItem(Constants.wait) as Attr);
+          return directive.wait(findDirective(node, Constants.wait)!);
 
         // <component></component>
         if (this.component.check(node.localName))
@@ -157,11 +159,11 @@ export default class Compiler extends Base {
 
         // e-for="..." directive
         if (Constants.for in node.attributes)
-          return directive.for(node.attributes.getNamedItem(Constants.for) as Attr, data);
+          return directive.for(findDirective(node, Constants.for)!, data);
 
         // e-if="..." directive
         if (Constants.if in node.attributes)
-          return directive.if(node.attributes.getNamedItem(Constants.if) as Attr, data);
+          return directive.if(findDirective(node, Constants.if)!, data);
 
         // e-else-if="..." or e-else directive
         if ((Constants.elseif in node.attributes) || (Constants.else in node.attributes))
@@ -170,26 +172,21 @@ export default class Compiler extends Base {
 
         // e-show="..." directive
         if (Constants.show in node.attributes)
-          directive.show(node.attributes.getNamedItem(Constants.show) as Attr, data);
+          directive.show(findDirective(node, Constants.show)!, data);
 
         // e-req="..." | e-req:[id]="..."  directive
         let reqNode: any = null;
-        if ((reqNode = node.attributes.getNamedItem(Constants.req) as Attr) ||
-          (reqNode = toArray(node.attributes).find(attr => Constants.check(attr, Constants.req))))
+        if ((reqNode = findDirective(node, Constants.req)))
           return directive.req(reqNode, data);
 
         // data="..." | data:[id]="..." directive
         let dataNode: any = null;
-        if (dataNode = toArray(node.attributes).find((attr: Attr) => {
-          const attrName = attr.name;
-          // In case of data="..." or data:[data-id]="..."
-          return (attrName === Constants.data || startWith(attrName, Constants.data + ':'));
-        }))
+        if (dataNode = findDirective(node, Constants.data))
           return directive.data(dataNode, data);
 
         // put="..." directive
         if (Constants.put in node.attributes)
-          return directive.put(node.attributes.getNamedItem(Constants.put) as Attr, data);
+          return directive.put(findDirective(node, Constants.put) as Attr, data);
 
         // Looping the attributes
         forEach(toArray(node.attributes), (attr: Attr) => {
@@ -227,6 +224,7 @@ export default class Compiler extends Base {
       if (Constants.check(node, Constants.on))
         return this.eventHandler.compile(node, data, context);
 
+      // ShortHand directive: {title}
       let delimiterField: IDelimiterResponse | null;
       if ((delimiterField = this.delimiter.shorthand(node.nodeName))) {
         const element = ((node as any).ownerElement || node.parentNode) as Element;
@@ -265,7 +263,7 @@ export default class Compiler extends Base {
 
     walker(rootElement, data);
 
-    if (rootElement.hasAttribute(Constants.silent))
+    if (rootElement.hasAttribute && rootElement.hasAttribute(Constants.silent))
       rootElement.removeAttribute(Constants.silent);
 
     if (isFunction(options.onDone)) {
