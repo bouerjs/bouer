@@ -211,21 +211,6 @@ function toStr(input) {
         return String(input);
     }
 }
-function findAttribute(element, attributesToCheck, removeIfFound) {
-    if (removeIfFound === void 0) { removeIfFound = false; }
-    var res = null;
-    if (!element)
-        return null;
-    for (var _i = 0, attributesToCheck_1 = attributesToCheck; _i < attributesToCheck_1.length; _i++) {
-        var attrName = attributesToCheck_1[_i];
-        var flexibleName = attrName;
-        if (res = element.attributes[flexibleName])
-            break;
-    }
-    if (!isNull(res) && removeIfFound)
-        element.removeAttribute(res.name);
-    return res;
-}
 function forEach(iterable, callback, context) {
     for (var index = 0; index < iterable.length; index++) {
         if (isFunction(callback))
@@ -377,6 +362,28 @@ function fnCall(fn) {
         }).catch(function (err) { return Logger.error(err); });
     return fn;
 }
+function findAttribute(element, attributesToCheck, removeIfFound) {
+    if (removeIfFound === void 0) { removeIfFound = false; }
+    var res = null;
+    if (!element)
+        return null;
+    for (var _i = 0, attributesToCheck_1 = attributesToCheck; _i < attributesToCheck_1.length; _i++) {
+        var attrName = attributesToCheck_1[_i];
+        var flexibleName = attrName;
+        if (res = element.attributes[flexibleName])
+            break;
+    }
+    if (!isNull(res) && removeIfFound)
+        element.removeAttribute(res.name);
+    return res;
+}
+function findDirective(node, name) {
+    var attributes = node.attributes || [];
+    return attributes.getNamedItem(name) ||
+        toArray(attributes).find(function (attr) {
+            return (attr.name === name || startWith(attr.name, name + ':'));
+        });
+}
 var WIN = window;
 var DOM = document;
 var anchor = $CreateEl('a').build();
@@ -416,11 +423,6 @@ var Constants = {
     },
     check: function (node, cmd) {
         return startWith(node.nodeName, cmd);
-    },
-    getAttr: function (node, cmd) {
-        return toArray(node.attributes || []).find(function (attr) {
-            return (attr.name === cmd || startWith(attr.name, cmd + ':'));
-        });
     },
     isConstant: function (value) {
         var _this = this;
@@ -2193,6 +2195,7 @@ var Compiler = /** @class */ (function (_super) {
                 // e-skip directive
                 if (Constants.skip in node.attributes)
                     return directive.skip(node);
+                // In case of slots
                 if ((node.localName.toLowerCase() === Constants.slot || node.tagName.toLowerCase() === Constants.slot)
                     && options.componentSlot) {
                     var componentSlot = options.componentSlot;
@@ -2233,40 +2236,40 @@ var Compiler = /** @class */ (function (_super) {
                 }
                 // e-def="{...}" directive
                 if (Constants.def in node.attributes)
-                    directive.def(node.attributes.getNamedItem(Constants.def), data);
+                    directive.def(findDirective(node, Constants.def), data);
                 // e-entry="..." directive
                 if (Constants.entry in node.attributes)
-                    directive.entry(node.attributes.getNamedItem(Constants.entry), data);
+                    directive.entry(findDirective(node, Constants.entry), data);
                 // wait-data="..." directive
                 if (Constants.wait in node.attributes)
-                    return directive.wait(node.attributes.getNamedItem(Constants.wait));
+                    return directive.wait(findDirective(node, Constants.wait));
                 // <component></component>
                 if (_this.component.check(node.localName))
                     return _this.component.order(node, data);
                 // e-for="..." directive
                 if (Constants.for in node.attributes)
-                    return directive.for(node.attributes.getNamedItem(Constants.for), data);
+                    return directive.for(findDirective(node, Constants.for), data);
                 // e-if="..." directive
                 if (Constants.if in node.attributes)
-                    return directive.if(node.attributes.getNamedItem(Constants.if), data);
+                    return directive.if(findDirective(node, Constants.if), data);
                 // e-else-if="..." or e-else directive
                 if ((Constants.elseif in node.attributes) || (Constants.else in node.attributes))
                     Logger.warn('The “' + Constants.elseif + '” or “' + Constants.else +
                         '” requires an element with “' + Constants.if + '” above.');
                 // e-show="..." directive
                 if (Constants.show in node.attributes)
-                    directive.show(node.attributes.getNamedItem(Constants.show), data);
+                    directive.show(findDirective(node, Constants.show), data);
                 // e-req="..." | e-req:[id]="..."  directive
                 var reqNode = null;
-                if ((reqNode = Constants.getAttr(node, Constants.req)))
+                if ((reqNode = findDirective(node, Constants.req)))
                     return directive.req(reqNode, data);
                 // data="..." | data:[id]="..." directive
                 var dataNode = null;
-                if (dataNode = Constants.getAttr(node, Constants.data))
+                if (dataNode = findDirective(node, Constants.data))
                     return directive.data(dataNode, data);
                 // put="..." directive
                 if (Constants.put in node.attributes)
-                    return directive.put(node.attributes.getNamedItem(Constants.put), data);
+                    return directive.put(findDirective(node, Constants.put), data);
                 // Looping the attributes
                 forEach(toArray(node.attributes), function (attr) {
                     walker(attr, data);
@@ -3032,11 +3035,11 @@ var ComponentHandler = /** @class */ (function (_super) {
                 var hasForDirective_1 = componentElement.hasAttribute(Constants.for);
                 // If the component has the e-for directive
                 // And Does not have the data directive assigned, create it implicitly
-                if (hasForDirective_1 && !(Constants.getAttr(componentElement, Constants.data)))
+                if (hasForDirective_1 && !(findDirective(componentElement, Constants.data)))
                     componentElement.setAttribute('data', '$data');
                 var dataAttr = null;
                 // If the attr is `data`, prepare and inject the value into component `data`
-                if (dataAttr = Constants.getAttr(componentElement, Constants.data)) {
+                if (dataAttr = findDirective(componentElement, Constants.data)) {
                     var attr = dataAttr;
                     if (_this.delimiter.run(attr.value).length !== 0) {
                         Logger.error(('The “data” attribute cannot contain delimiter, source element: ' +
