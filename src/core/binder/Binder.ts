@@ -142,15 +142,18 @@ export default class Binder extends Base {
 
         if (!isHtml) return (nodeToBind.nodeValue = valueToSet);
 
-        const htmlSnippet = $CreateEl('div', el => el.innerHTML = valueToSet)
-          .child();
+        const htmlSnippets = $CreateEl('div', el => el.innerHTML = valueToSet)
+          .children();
 
-        ownerNode.appendChild(htmlSnippet);
-        this.serviceProvider.get<Compiler>('Compiler')!.compile({
-          el: htmlSnippet,
-          data: data,
-          context: context,
-        });
+        ownerNode.innerHTML = '';
+        forEach(htmlSnippets, snippetNode => {
+          ownerNode.appendChild(snippetNode);
+          this.serviceProvider.get<Compiler>('Compiler')!.compile({
+            el: snippetNode,
+            data: data,
+            context: context,
+          });
+        }, this);
       };
 
       ReactiveEvent.once('AfterGet', (event) => {
