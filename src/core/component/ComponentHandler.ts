@@ -1,22 +1,31 @@
 import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
+import ILifeCycleHooks from '../../definitions/interfaces/ILifeCycleHooks';
 import dynamic from '../../definitions/types/Dynamic';
 import Bouer from '../../instance/Bouer';
+import Constants from '../../shared/helpers/Constants';
 import Extend from '../../shared/helpers/Extend';
-import ServiceProvider from '../../shared/helpers/ServiceProvider';
 import Prop from '../../shared/helpers/Prop';
+import ServiceProvider from '../../shared/helpers/ServiceProvider';
 import Task from '../../shared/helpers/Task';
 import {
-  DOM,
-  code,
-  forEach,
-  isNull,
+  $CreateAnyEl,
   $CreateEl,
   buildError,
+  code,
+  DOM,
+  fnCall,
+  forEach,
+  findDirective,
+  ifNullReturn,
   isFunction,
-  toLower, urlCombine,
-  $CreateAnyEl,
-  isObject, pathResolver, toArray,
-  urlResolver, webRequest, where, ifNullReturn, startWith, fnCall
+  isNull,
+  isObject,
+  pathResolver, toArray,
+  toLower,
+  urlCombine,
+  urlResolver,
+  webRequest,
+  where
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Base from '../Base';
@@ -28,8 +37,6 @@ import ReactiveEvent from '../event/ReactiveEvent';
 import Reactive from '../reactive/Reactive';
 import Routing from '../routing/Routing';
 import Component from './Component';
-import ILifeCycleHooks from '../../definitions/interfaces/ILifeCycleHooks';
-import Constants from '../../shared/helpers/Constants';
 
 export default class ComponentHandler extends Base {
   private bouer: Bouer;
@@ -365,20 +372,79 @@ export default class ComponentHandler extends Base {
     if (isFunction(initializer))
       fnCall(initializer.call(component));
 
+    const processDataAttr = (attr: Attr) => {
+      let inputData: dynamic = {};
+      const mData = Extend.obj(data, { $data: data });
+
+      // Listening to all the reactive properties
+      const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
+        if (!(reactive.propName in inputData))
+          inputData[reactive.propName] = undefined;
+        Prop.set(inputData, reactive.propName, reactive);
+      });
+
+      // If data value is empty gets the main scope value
+      if (attr.value === '')
+        inputData = Extend.obj(this.bouer.data);
+      else {
+        // Otherwise, compiles the object provided
+        const mInputData = this.serviceProvider.get<Evaluator>('Evaluator')!
+          .exec({
+            data: mData,
+            code: attr.value,
+            context: this.bouer
+          });
+
+        if (!isObject(mInputData))
+          Logger.error(('Expected a valid Object Literal expression in “' + attr.nodeName +
+            '” and got “' + attr.value + '”.'));
+        else {
+          // Adding all non-existing properties
+          forEach(Object.keys(mInputData), key => {
+            if (!(key in inputData))
+              inputData[key] = mInputData[key];
+          });
+        }
+      }
+
+      reactiveEvent.off();
+      inputData = Reactive.transform({
+        context: component,
+        data: inputData
+      });
+
+      forEach(Object.keys(inputData), key => {
+        Prop.transfer(component.data, inputData, key);
+      });
+    };
+
     const compile = (scriptContent?: string) => {
       try {
+        // Injecting data
+        const hasForDirective = componentElement.hasAttribute(Constants.for);
+        // If the component has the e-for directive
+        // And Does not have the data directive assigned, create it implicitly
+        if (hasForDirective && !(findDirective(componentElement, Constants.data)))
+          componentElement.setAttribute('data', '$data');
+
+        let dataAttr = null;
+        // If the attr is `data`, prepare and inject the value into component `data`
+        if (dataAttr = findDirective(componentElement, Constants.data)) {
+          const attr = dataAttr as Attr;
+          if (this.delimiter.run(attr.value).length !== 0) {
+            Logger.error(('The “data” attribute cannot contain delimiter, source element: ' +
+              '<' + $name + '></' + $name + '>.'));
+          } else {
+            processDataAttr(attr);
+          }
+          componentElement.removeAttribute(attr.name);
+        }
+
         // Executing the mixed scripts
         this.serviceProvider.get<Evaluator>('Evaluator')!
           .execRaw((scriptContent || ''), component);
 
         createdEvent.emit();
-
-        const hasForDirective = componentElement.hasAttribute(Constants.for);
-        // If the component has the e-for directive
-        // And Does not have the data directive assigned, create it implicitly
-        if (hasForDirective && !(toArray(componentElement.attributes).find((attr: Attr) =>
-          (attr.name === Constants.data || startWith(attr.name, Constants.data + ':')))))
-          componentElement.setAttribute('data', '$data');
 
         // tranfering the attributes
         forEach(toArray(componentElement.attributes), (attr: Attr) => {
@@ -389,56 +455,6 @@ export default class ComponentHandler extends Base {
             return componentElement.classList.forEach(cls => {
               rootElement.classList.add(cls);
             });
-
-          // If the attr is `data`, prepare and inject the value into component `data`
-          if (attr.nodeName === 'data') {
-            if (this.delimiter.run(attr.value).length !== 0)
-              return Logger.error(('The “data” attribute cannot contain delimiter, source element: ' +
-                '<' + $name + '></' + $name + '>.'));
-
-            let inputData: dynamic = {};
-            const mData = Extend.obj(data, { $data: data });
-
-            // Listening to all the reactive properties
-            const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
-              if (!(reactive.propName in inputData))
-                inputData[reactive.propName] = undefined;
-              Prop.set(inputData, reactive.propName, reactive);
-            });
-
-            // If data value is empty gets the main scope value
-            if (attr.value === '')
-              inputData = Extend.obj(this.bouer.data);
-            else {
-              // Other wise, compiles the object provided
-              const mInputData = this.serviceProvider.get<Evaluator>('Evaluator')!
-                .exec({
-                  data: mData,
-                  code: attr.value,
-                  context: this.bouer
-                });
-
-              if (!isObject(mInputData))
-                return Logger.error(('Expected a valid Object Literal expression in “' + attr.nodeName +
-                  '” and got “' + attr.value + '”.'));
-
-              // Adding all non-existing properties
-              forEach(Object.keys(mInputData), key => {
-                if (!(key in inputData))
-                  inputData[key] = mInputData[key];
-              });
-            }
-
-            reactiveEvent.off();
-            inputData = Reactive.transform({
-              context: component,
-              data: inputData
-            });
-
-            return forEach(Object.keys(inputData), key => {
-              Prop.transfer(component.data, inputData, key);
-            });
-          }
 
           // sets the attr to the root element
           rootElement.attributes.setNamedItem(attr);
