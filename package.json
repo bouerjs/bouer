@@ -9,8 +9,8 @@
   "scripts": {
     "test": "./node_modules/.bin/jest --detectOpenHandles",
     "dev": "rollup --config rollup.config.js --configPlugin typescript --w",
-    "publish": "rollup --config rollup.config.js --configPlugin typescript",
-    "release": "node scripts/build.js --prod && npm pack && node ./scripts/test-pkg-json-updater.js",
+    "build": "rollup --config rollup.config.js --configPlugin typescript",
+    "publish": "node scripts/build.js --prod && npm pack && node ./scripts/test-pkg-json-updater.js",
     "prepare": "husky install"
   },
   "husky": {
