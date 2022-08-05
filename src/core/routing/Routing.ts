@@ -150,15 +150,18 @@ export default class Routing extends Base {
 
     if (isNull(route)) return;
 
+    // Removing the active mark
     forEach(this.activeAnchors, anchor =>
       anchor.classList.remove(className));
 
+    // Removing the active mark
     forEach([].slice.call(appEl.querySelectorAll('a.' + className)),
       (anchor: HTMLAnchorElement) =>
         anchor.classList.remove(className));
 
     this.activeAnchors = [];
 
+    // Adding the className and storing all the active anchors
     forEach(toArray(anchors), (anchor: HTMLAnchorElement) => {
       if (anchor.href.split('?')[0] !== route.split('?')[0])
         return;
