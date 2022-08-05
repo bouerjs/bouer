@@ -11,12 +11,19 @@
     "dev": "rollup --config rollup.config.js --configPlugin typescript --w",
     "build": "rollup --config rollup.config.js --configPlugin typescript",
     "publish": "node scripts/build.js --prod && npm pack && node ./scripts/test-pkg-json-updater.js",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "changelog": "auto-changelog -p -u"
   },
   "husky": {
     "hooks": {
       "pre-commit": "npm test"
     }
+  },
+  "auto-changelog": {
+    "output": "CHANGELOG.md",
+    "template": "./template/changelog-template.hbs",
+    "unreleased": true,
+    "commitLimit": false
   },
   "files": [
     "src",
@@ -55,8 +62,10 @@
     "@types/node": "^16.11.13",
     "@typescript-eslint/eslint-plugin": "^5.14.0",
     "@typescript-eslint/parser": "^5.14.0",
+    "auto-changelog": "^2.4.0",
     "eslint": "^8.10.0",
     "eslint-config-google": "^0.14.0",
+    "husky": "^7.0.0",
     "jest": "^27.5.1",
     "jsdom": "^19.0.0",
     "jsdom-global": "^3.0.2",
@@ -65,7 +74,6 @@
     "rollup-plugin-cleanup": "^3.2.1",
     "terser": "^5.9.0",
     "tslib": "^2.3.1",
-    "typescript": "^4.4.3",
-    "husky": "^7.0.0"
+    "typescript": "^4.4.3"
   }
 }
