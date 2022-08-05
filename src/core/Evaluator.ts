@@ -16,11 +16,10 @@ export default class Evaluator extends Base {
     ServiceProvider.add('Evaluator', this);
   }
 
-  execRaw(code: string, context?: RenderContext): void {
+  execRaw(code: string, context?: RenderContext) {
     // Executing the expression
     try {
-      Function('(function(){ ' + code + ' }).call(this)')
-        .call(context || this.bouer);
+      Function(code).call(context || this.bouer);
     } catch (error) {
       Logger.error(buildError(error));
     }
