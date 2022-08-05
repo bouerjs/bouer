@@ -2,19 +2,15 @@ export default class Logger {
   private static prefix = '[Bouer]';
 
   static log(...content: any[]) {
-    content.unshift(Logger.prefix);
-    console.log.apply(null, content);
+    console.log.apply(null, [Logger.prefix].concat(content));
   }
   static error(...content: any[]) {
-    content.unshift(Logger.prefix);
-    console.error.apply(null, content);
+    console.error.apply(null, [Logger.prefix].concat(content));
   }
   static warn(...content: any[]) {
-    content.unshift(Logger.prefix);
-    console.warn.apply(null, content);
+    console.warn.apply(null, [Logger.prefix].concat(content));
   }
   static info(...content: any[]) {
-    content.unshift(Logger.prefix);
-    console.info.apply(null, content);
+    console.info.apply(null, [Logger.prefix].concat(content));
   }
 }
