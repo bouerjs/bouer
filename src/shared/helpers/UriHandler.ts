@@ -34,7 +34,7 @@ export default class UriHandler extends Base {
       const urlPatternReversed = urlPattern.split('/').reverse();
 
       forEach(urlPatternReversed, (value, index) => {
-        const valueExec = RegExp('{([\\S\\s]*?)}').exec(value);
+        const valueExec = RegExp('{([\\S\\s]*?)}', 'ig').exec(value);
 
         if (Array.isArray(valueExec))
           mParams[valueExec[1]] = urlPartsReversed[index];
