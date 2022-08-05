@@ -24,7 +24,6 @@ export default class ServiceProvider {
 
   /**
    * Resolve and Retrieve the instance registered
-   * @param app the application
    * @param name the name of the service
    * @returns the instance of the class
    */
@@ -34,7 +33,6 @@ export default class ServiceProvider {
 
   /**
    * Destroy an instance registered
-   * @param key the name of the class registered
    */
   clear() {
     return ServiceProvider.clear(this.app!);
@@ -53,6 +51,11 @@ export default class ServiceProvider {
     services[name] = instance;
   }
 
+  /**
+   * Resolve and Retrieve the instance registered
+   * @param name the name of the service
+   * @returns the instance of the class
+   */
   static get<Service>(app: Bouer, name: string): Service {
     if (app.isDestroyed) throw new Error('Application already disposed.');
     const services = ServiceProvider.serviceCollection.get(app);
@@ -60,10 +63,18 @@ export default class ServiceProvider {
     return services[name];
   }
 
+  /**
+   * Destroy an instance registered
+   * @param app the application
+   */
   static clear(app: Bouer) {
     return ServiceProvider.serviceCollection.delete(app);
   }
 
+  /**
+   * Generates a unique Id for the application
+   * @returns The next integer from the last one generated
+   */
   static genId() {
     return ServiceProvider.bouerId++;
   }
