@@ -31,8 +31,8 @@ describe('When element is compiled with "e-for" directive', () => {
         context: context,
         el: element,
         onDone: el => {
-          for (let i = 0; i < el.children.length.length; i++) {
-            const child = el.children.length[i];
+          for (let i = 0; i < el.children.length; i++) {
+            const child = el.children[i];
             const todo = context.data.todos[i];
             expect(child.textContent).toBe(todo);
           }
