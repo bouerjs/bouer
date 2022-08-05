@@ -3301,7 +3301,7 @@ var Evaluator = /** @class */ (function (_super) {
     Evaluator.prototype.execRaw = function (code, context) {
         // Executing the expression
         try {
-            Function('(function(){ ' + code + ' }).call(this)')
+            Function(code)
                 .call(context || this.bouer);
         }
         catch (error) {
