@@ -134,7 +134,7 @@ export default class Directive extends Base {
         this.evaluator.exec({
           data: data,
           code: attr.value,
-          context: this.context
+          context: this.context,
         });
       });
 
@@ -167,9 +167,9 @@ export default class Directive extends Base {
       const conditionalExpression = conditions.map((item, index) => {
         const $value = item.node.value;
         switch (item.node.name) {
-          case Constants.if: return 'if(' + $value + '){ _cb(' + index + '); }';
-          case Constants.elseif: return 'else if(' + $value + '){ _cb(' + index + '); }';
-          case Constants.else: return 'else{ _cb(' + index + '); }';
+          case Constants.if: return 'if(' + $value + '){ __cb(' + index + '); }';
+          case Constants.elseif: return 'else if(' + $value + '){ __cb(' + index + '); }';
+          case Constants.else: return 'else{ __cb(' + index + '); }';
         }
       }).join(' ');
 
@@ -179,7 +179,7 @@ export default class Directive extends Base {
         code: conditionalExpression,
         context: this.context,
         aditional: {
-          _cb: (chainIndex: number) => {
+          __cb: (chainIndex: number) => {
             const { element } = conditions[chainIndex];
             container.replaceChild(element, comment);
             this.compiler.compile({
