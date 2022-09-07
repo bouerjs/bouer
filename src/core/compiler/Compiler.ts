@@ -175,12 +175,12 @@ export default class Compiler extends Base {
           directive.show(findDirective(node, Constants.show)!, data);
 
         // e-req="..." | e-req:[id]="..."  directive
-        let reqNode: any = null;
+        let reqNode: Attr | null = null;
         if ((reqNode = findDirective(node, Constants.req)))
           return directive.req(reqNode, data);
 
         // data="..." | data:[id]="..." directive
-        let dataNode: any = null;
+        let dataNode: Attr | null = null;
         if (dataNode = findDirective(node, Constants.data))
           return directive.data(dataNode, data);
 
