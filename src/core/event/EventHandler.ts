@@ -47,7 +47,7 @@ export default class EventHandler extends Base {
     if (isNull(ownerNode))
       return Logger.error('Invalid ParentElement of “' + nodeName + '”');
 
-    // <button on:submit.once.stop="times++"></button>
+    // <button on:submit.once.stop="times++"/>
     const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 
     const eventNameWithModifiers = nodeName.substring(Constants.on.length);
