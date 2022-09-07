@@ -1,5 +1,6 @@
 import IBinderConfig from '../../definitions/interfaces/IBinderConfig';
 import IBinderOptions from '../../definitions/interfaces/IBinderOptions';
+import dynamic from '../../definitions/types/Dynamic';
 import WatchCallback from '../../definitions/types/WatchCallback';
 import Bouer from '../../instance/Bouer';
 import Constants from '../../shared/helpers/Constants';
@@ -33,7 +34,7 @@ export default class Binder extends Base {
   binds: { isConnected: () => boolean; watch: Watch<any, any> }[] = [];
   serviceProvider: ServiceProvider;
 
-  private DEFAULT_BINDER_PROPERTIES: any = {
+  private DEFAULT_BINDER_PROPERTIES: dynamic = {
     text: 'value',
     number: 'valueAsNumber',
     checkbox: 'checked',
