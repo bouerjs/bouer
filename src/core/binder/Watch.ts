@@ -29,6 +29,6 @@ export default class Watch<Value, TObject> extends Base {
     const indexOfThis = this.reactive.watches.indexOf(this);
     if (indexOfThis !== -1)
       this.reactive.watches.splice(indexOfThis, 1);
-    if (this.onDestroy) this.onDestroy();
+    (this.onDestroy || (() => {}))();
   };
 }
