@@ -122,16 +122,18 @@ export default class ComponentHandler extends Base {
       }
 
       component.name = component.name.toLowerCase();
+      let parentRoute = '';
 
       if (this.components[component.name!])
         return Logger.warn('The component name “' + component.name + '” is already define, try changing the name.');
 
       if (!isNull(parent)) {
         /** TODO: Inherit the parent info */
+        parentRoute = parent!.route || '';
       }
 
       if (!isNull(component.route)) { // Completing the route
-        component.route = '/' + urlCombine((isNull(parent) ? '' : parent!.route!), component.route!);
+        component.route = '/' + urlCombine(parentRoute, component.route!);
       }
 
       if (Array.isArray(component.children))
@@ -208,7 +210,7 @@ export default class ComponentHandler extends Base {
             mComponents[$name] = component;
         },
         fail: (error) => {
-          Logger.error('Failed to request <' + $name + '></' + $name + '> component with path “' +
+          Logger.error('Failed to request <' + $name + '/> component with path “' +
             component.path + '”.');
           Logger.error(buildError(error));
 
@@ -219,7 +221,7 @@ export default class ComponentHandler extends Base {
 
     // Checking the restrictions
     if (iComponent.restrictions && iComponent.restrictions!.length > 0) {
-      const blockedRestrictions: any[] = [];
+      const blockedRestrictions: Function[] = [];
       const restrictions = iComponent.restrictions.map(restriction => {
         const restrictionResult = restriction.call(this.bouer, component) as any;
 
@@ -321,7 +323,7 @@ export default class ComponentHandler extends Base {
       return;
 
     if (isNull(component.template))
-      return Logger.error('The <' + $name + '></' + $name + '> component is not ready yet to be inserted.');
+      return Logger.error('The <' + $name + '/> component is not ready yet to be inserted.');
 
     const elementSlots = $CreateAnyEl('SlotContainer', el => {
       el.innerHTML = componentElement.innerHTML;
@@ -343,11 +345,11 @@ export default class ComponentHandler extends Base {
         });
 
         if (htmlSnippet.children.length === 0)
-          return Logger.error(('The component <' + $name + '></' + $name + '> seems to be empty or it ' +
+          return Logger.error(('The component <' + $name + '/> seems to be empty or it ' +
             'has not a root element. Example: <div></div>, to be included.'));
 
         if (htmlSnippet.children.length > 1)
-          return Logger.error(('The component <' + $name + '></' + $name + '> seems to have multiple ' +
+          return Logger.error(('The component <' + $name + '/> seems to have multiple ' +
             'root element, it must have only one root.'));
 
         component.el = htmlSnippet.children[0];
@@ -433,7 +435,7 @@ export default class ComponentHandler extends Base {
           const attr = dataAttr as Attr;
           if (this.delimiter.run(attr.value).length !== 0) {
             Logger.error(('The “data” attribute cannot contain delimiter, source element: ' +
-              '<' + $name + '></' + $name + '>.'));
+              '<' + $name + '/>.'));
           } else {
             processDataAttr(attr);
           }
@@ -599,7 +601,7 @@ export default class ComponentHandler extends Base {
           delete this.stylesController[component.name];
         });
       } catch (error) {
-        Logger.error('Error in <' + $name + '></' + $name + '> component.');
+        Logger.error('Error in <' + $name + '/> component.');
         Logger.error(buildError(error));
       }
     };
@@ -647,7 +649,7 @@ export default class ComponentHandler extends Base {
       }).catch(error => {
         error.stack = '';
         Logger.error(('Error loading the <script src=\'' + url + '\'></script> in ' +
-          '<' + $name + '></' + $name + '> component, remove it in order to be compiled.'));
+          '<' + $name + '/> component, remove it in order to be compiled.'));
         Logger.log(error);
       });
     });
