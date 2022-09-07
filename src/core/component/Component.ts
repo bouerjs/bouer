@@ -47,9 +47,9 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
   constructor(optionsOrPath: string | IComponentOptions<Data>) {
     super();
 
-    let _name: any = undefined;
-    let _path: any = undefined;
-    let _data: any = undefined;
+    let _name: string | undefined = undefined;
+    let _path: string | undefined = undefined;
+    let _data: Data | undefined = undefined;
 
     if (!isString(optionsOrPath)) {
       _name = (optionsOrPath as IComponentOptions<Data>).name;
@@ -57,11 +57,11 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
       _data = (optionsOrPath as IComponentOptions<Data>).data;
       Object.assign(this, optionsOrPath);
     } else {
-      _path = optionsOrPath;
+      _path = optionsOrPath as string;
     }
 
-    this.name = _name;
-    this.path = _path;
+    this.name = _name || '';
+    this.path = _path || '';
     this.data = Reactive.transform({
       context: this as any,
       data: _data || {}
