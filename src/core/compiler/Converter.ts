@@ -15,6 +15,7 @@ import {
   toArray,
 } from '../../shared/helpers/Utils';
 import Base from '../Base';
+import dynamic from '../../definitions/types/Dynamic';
 
 
 export default class Converter extends Base {
@@ -22,7 +23,11 @@ export default class Converter extends Base {
     options?: {
       names?: string,
       values?: string
-    }, onSet?: (builtObject: object, propName: string, value: any, element: Element) => void): object | null {
+    },
+    onSet?: (
+      builtObject: object, propName: string, value: any, element: Element
+    ) => void
+  ): object | null {
     let element: Element | undefined = undefined;
     // If it's not a HTML Element, just return
     if ((input instanceof HTMLElement))
@@ -53,23 +58,23 @@ export default class Converter extends Base {
     const mNames = (options.names || '[name]').replace(/\[|\]/g, '').split(',');
     const mValues = (options.values || '[value]').replace(/\[|\]/g, '').split(',');
 
-    const getter = (el: Element, fieldName: string): any => {
+    const getValue = (el: Element, fieldName: string) => {
       if (fieldName in el) return (el as any)[fieldName];
       return el.getAttribute(fieldName) || (el as any).innerText;
     };
 
-    const tryGetValue = (el: Element): any => {
+    const tryGetValue = (el: Element) => {
       let val: string | number | boolean | undefined | null = undefined;
-      mValues.find((field: string) => (val = getter(el, field)) ? true : false);
+      mValues.find((field: string) => (val = getValue(el, field)) ? true : false);
       return val;
     };
 
     const objBuilder = (element: Element) => {
-      const builtObject: any = {};
+      const builtObject: dynamic = {};
 
       // Elements that skipped on serialization process
-      const escapes: any = { BUTTON: true };
-      const checkables: any = { checkbox: true, radio: true };
+      const escapes: dynamic = { BUTTON: true };
+      const checkables: dynamic = { checkbox: true, radio: true };
 
       (function walker(el: Element) {
         const attr = findAttribute(el, mNames);
@@ -117,7 +122,7 @@ export default class Converter extends Base {
 
     forEach(builds, (buildElement: Element) => {
       // Getting the e-build attr value
-      const buildPath = getter(buildElement, Constants.build) as string;
+      const buildPath = getValue(buildElement, Constants.build) as string;
       const isBuildAsArray = buildElement.hasAttribute(Constants.array);
       const builtObjValue = objBuilder(buildElement);
 
