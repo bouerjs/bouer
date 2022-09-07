@@ -89,7 +89,7 @@ export default class Directive extends Base {
 
     if (!container) return;
 
-    const conditions: { node: Attr, element: Element }[] = [];
+    const conditions: { attr: Attr, node: Element }[] = [];
     const comment = $CreateComment();
     const nodeName = node.nodeName;
     let execute = () => { };
@@ -105,8 +105,8 @@ export default class Directive extends Base {
       const attr = findAttribute(currentEl, ['e-if', 'e-else-if', 'e-else']);
       if (!attr) break;
 
-      const firstCondition = conditions[0]; // if it already got an if,
-      if (attr.name === 'e-if' && firstCondition && (attr.name === firstCondition.node.name))
+      const firstCondition = conditions[0]; // if it already got an 'if',
+      if (attr.name === 'e-if' && firstCondition && (attr.name === firstCondition.attr.name))
         break;
 
       if ((attr.nodeName !== 'e-else') && (trim(ifNullReturn(attr.nodeValue, '')) === ''))
@@ -115,7 +115,7 @@ export default class Directive extends Base {
       if (this.delimiter.run(ifNullReturn(attr.nodeValue, '')).length !== 0)
         return Logger.error(this.errorMsgNodeValue(attr));
 
-      conditions.push({ node: attr, element: currentEl });
+      conditions.push({ attr: attr, node: currentEl });
 
       if (attr.nodeName === ('e-else')) {
         currentEl.removeAttribute(attr.nodeName);
@@ -142,7 +142,7 @@ export default class Directive extends Base {
     } while (currentEl = currentEl.nextElementSibling);
 
     const isChainConnected = () => !isNull(Extend.array(
-      conditions.map(x => x.element),
+      conditions.map(x => x.node),
       comment as any
     ).find(el => el.isConnected));
 
@@ -156,17 +156,17 @@ export default class Directive extends Base {
 
     (execute = () => {
       forEach(conditions, chainItem => {
-        if (!chainItem.element.parentElement) return;
+        if (!chainItem.node.parentElement) return;
 
         if (comment.isConnected)
-          container.removeChild(chainItem.element);
+          container.removeChild(chainItem.node);
         else
-          container.replaceChild(comment, chainItem.element);
+          container.replaceChild(comment, chainItem.node);
       });
 
       const conditionalExpression = conditions.map((item, index) => {
-        const $value = item.node.value;
-        switch (item.node.name) {
+        const $value = item.attr.value;
+        switch (item.attr.name) {
           case Constants.if: return 'if(' + $value + '){ __cb(' + index + '); }';
           case Constants.elseif: return 'else if(' + $value + '){ __cb(' + index + '); }';
           case Constants.else: return 'else{ __cb(' + index + '); }';
@@ -180,7 +180,7 @@ export default class Directive extends Base {
         context: this.context,
         aditional: {
           __cb: (chainIndex: number) => {
-            const { element } = conditions[chainIndex];
+            const { node: element } = conditions[chainIndex];
             container.replaceChild(element, comment);
             this.compiler.compile({
               el: element,
@@ -215,13 +215,11 @@ export default class Directive extends Base {
     });
 
     (execute = (element: HTMLElement) => {
-      const value = this.evaluator.exec({
+      element.style.display = this.evaluator.exec({
         data: data,
         code: nodeValue,
         context: this.context,
-      });
-
-      element.style.display = value ? '' : 'none';
+      }) ? '' : 'none';
     })(ownerNode);
 
     ownerNode.removeAttribute(bindResult.node.nodeName);
@@ -246,7 +244,7 @@ export default class Directive extends Base {
       sourceValue: any,
       leftHandParts: string[],
       iterableExpression: string
-    }
+    };
 
     const comment = $CreateComment();
     const nodeName = node.nodeName;
@@ -364,7 +362,7 @@ export default class Directive extends Base {
       const sourceValue = expObj.sourceValue;
       const isForOf = expObj.isForOf;
 
-      const forData: any = Extend.obj(data);
+      const forData: dynamic = Extend.obj(data);
       const itemKey = leftHandParts[0];
       const indexOrValue = leftHandParts[1] || '_index_or_value';
       const mIndex = leftHandParts[2] || '_for_in_index';
@@ -456,7 +454,7 @@ export default class Directive extends Base {
     };
 
     // Handler the UI when the Array changes
-    const $OnArrayChanges = (detail: any) => {
+    const $OnArrayChanges = (detail?: dynamic) => {
       if (hasWhereFilter || hasOrderFilter)
         return execute(); // Reorganize re-insert all the items
 
