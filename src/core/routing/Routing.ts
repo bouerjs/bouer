@@ -87,7 +87,7 @@ export default class Routing extends Base {
     const page = this.toPage(navigatoTo);
 
     this.clear();
-    if (!page) return; // Page Not Found and NotFound Page Not Defined
+    if (!page) return; // Page Not Found or Page Not Defined
 
     // If it's not found and the url matches .html do nothing
     if (!page && route.endsWith('.html')) return;
