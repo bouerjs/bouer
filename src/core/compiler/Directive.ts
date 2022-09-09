@@ -36,6 +36,7 @@ import Compiler from './Compiler';
 import Base from '../Base';
 import Prop from '../../shared/helpers/Prop';
 import MiddlewareResult from '../middleware/MiddlewareResult';
+import Skeleton from '../Skeleton';
 
 export default class Directive extends Base {
   bouer: Bouer;
@@ -230,6 +231,9 @@ export default class Directive extends Base {
     const container = ownerNode.parentElement;
 
     if (!container) return;
+
+    if (ownerNode.hasAttribute('skeleton-cloned'))
+      return;
 
     type ListedItemsHandler = {
       el: Element,
@@ -921,6 +925,9 @@ export default class Directive extends Base {
       return Logger.error(('Expected a valid “for” expression in “' + nodeName
         + '” and got “' + nodeValue + '”.' + '\nValid: e-req="item of url".'));
 
+    if (ownerNode.hasAttribute('skeleton-cloned'))
+      return;
+
     const delimiters = this.delimiter.run(nodeValue);
     const localDataStore: dynamic = {};
     const dataKey = (node.nodeName.split(':')[1] || '').replace(/\[|\]/g, '');
@@ -941,6 +948,12 @@ export default class Directive extends Base {
 
     // Inserting the comment node
     container.insertBefore(comment, ownerNode);
+
+    const skeleton = this.serviceProvider.get<Skeleton>('Skeleton')!;
+
+    // Only insert if the type is `of
+    if (nodeValue.includes(' of '))
+      skeleton.insertItems(ownerNode);
 
     if (delimiters.length !== 0)
       binderConfig = this.binder.create({
@@ -1078,6 +1091,8 @@ export default class Directive extends Base {
         }
 
         if (expObject.type === 'of') {
+          skeleton.clearItems(ownerNode);
+
           const resUniqueName = code(8, 'res');
           const forDirectiveContent = expObject.expression.replace(expObject.path, resUniqueName);
           const mData = Extend.obj({ [resUniqueName]: response.data }, data);
@@ -1237,5 +1252,13 @@ export default class Directive extends Base {
 
     const ownerNode = this.toOwnerNode(node);
     ownerNode.removeAttribute(node.nodeName);
+
+    const uid = ownerNode.getAttribute('skeleton-clone-code');
+    if (!uid) return;
+
+    ownerNode.removeAttribute('skeleton-clone-code');
+    forEach([].slice.call(this.bouer.el?.querySelectorAll('[="'+ uid +'"]')), (el: Node) => {
+      (el.parentElement || el.parentNode)!.removeChild(el);
+    });
   }
 }
