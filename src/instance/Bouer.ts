@@ -31,6 +31,7 @@ import {
   ifNullReturn,
   isNull, isObject, toArray, trim, ifNullStop,
 } from '../shared/helpers/Utils';
+import SkeletonOptions from '../definitions/types/SkeletonOptions';
 
 export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
   extends Base implements IBouerOptions<Data, GlobalData, Dependencies> {
@@ -127,7 +128,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     /** Removes skeletons havining the `id` provided */
     clear(id?: string): void,
     /** Set Color of the Wave and/or the Background */
-    set(color?: { wave?: string, background?: string }): void
+    set(color?: SkeletonOptions): void
   };
 
   /** Components Handler */
@@ -422,7 +423,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     (options.config || {}).autoComponentDestroy = true;
 
     routing.init();
-    skeleton.init();
+    skeleton.init((options.config || {}).skeleton);
     binder.cleanup();
     eventHandler.cleanup();
     this.isInitialized = true;

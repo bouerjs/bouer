@@ -1,3 +1,5 @@
+import SkeletonOptions from '../types/SkeletonOptions';
+
 interface IBouerConfig {
   /** Allow to use hash (#) on page navigation, by default is `true` */
   usehash?: boolean;
@@ -9,7 +11,7 @@ interface IBouerConfig {
   prefetch?: boolean;
 
   /** Defines the default color of the skeleton */
-  skeleton?: { background: string, wave: string }
+  skeleton?: SkeletonOptions
 
   /** Allow to unbind an Element if isn't connected to the DOM, by default is `true` */
   autoUnbind?: boolean;
