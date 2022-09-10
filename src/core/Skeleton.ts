@@ -68,10 +68,11 @@ export default class Skeleton extends Base {
 
   insertItems(node: Node) {
     const parentNode = node.parentElement || node.parentNode;
+    const mNode = (node as Element);
 
     if (parentNode == null) return;
     if (this.numberOfItems <= 1) return;
-    if (isNull((node as Element).querySelector('[e-skeleton]'))) return;
+    if (!mNode.hasAttribute('e-skeleton') && isNull(mNode.querySelector('[e-skeleton]'))) return;
 
     const uid = code(6);
     (node as Element).setAttribute('skeleton-clone-code', uid);
