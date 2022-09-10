@@ -314,7 +314,7 @@ export default class Directive extends Base {
         forEach(list, item => {
           let isValid = false;
           if (isNull(wKeys)) {
-            isValid = toStr(item).includes(wValue);
+            isValid = toStr(item).toLowerCase().includes(wValue.toLowerCase());
           } else {
             for (const prop of wKeys.split(',').map(m => trim(m))) {
               const propValue = this.evaluator.exec({
@@ -323,7 +323,7 @@ export default class Directive extends Base {
                 context: this.context
               });
 
-              if (toStr(propValue).includes(wValue)) {
+              if (toStr(propValue).toLowerCase().includes(wValue.toLowerCase())) {
                 isValid = true;
                 break;
               }
