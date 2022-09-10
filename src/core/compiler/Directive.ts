@@ -1096,7 +1096,10 @@ export default class Directive extends Base {
           const resUniqueName = code(8, 'res');
           const forDirectiveContent = expObject.expression.replace(expObject.path, resUniqueName);
           const mData = Extend.obj({ [resUniqueName]: response.data }, data);
-          ownerNode.setAttribute(Constants.for, forDirectiveContent);
+          ownerNode.setAttribute(
+            Constants.for,
+            Extend.array([forDirectiveContent], expObject.filters).join(' | ')
+          );
 
           Prop.set(mData, resUniqueName, Prop.descriptor(response, 'data')!);
           return this.compiler.compile({
@@ -1257,7 +1260,7 @@ export default class Directive extends Base {
     if (!uid) return;
 
     ownerNode.removeAttribute('skeleton-clone-code');
-    forEach([].slice.call(this.bouer.el?.querySelectorAll('[="'+ uid +'"]')), (el: Node) => {
+    forEach([].slice.call(this.bouer.el?.querySelectorAll('[="' + uid + '"]')), (el: Node) => {
       (el.parentElement || el.parentNode)!.removeChild(el);
     });
   }
