@@ -15,6 +15,7 @@ import IEventSubscription from './definitions/interfaces/IEventSubscription';
 import IAsset from './definitions/interfaces/IAsset';
 import MiddlewareResult from './core/middleware/MiddlewareResult';
 import Extend from './shared/helpers/Extend';
+import Prop from './shared/helpers/Prop';
 
 export {
   Bouer as default,
@@ -34,4 +35,5 @@ export {
   IEventSubscription,
   IAsset,
   Extend,
+  Prop
 };
