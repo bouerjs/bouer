@@ -29,7 +29,7 @@ import {
   $CreateEl, DOM, forEach,
   WIN,
   ifNullReturn,
-  isNull, isObject, toArray, trim, ifNullStop,
+  isNull, isObject, toArray, trim, ifNullStop, isFunction,
 } from '../shared/helpers/Utils';
 import SkeletonOptions from '../definitions/types/SkeletonOptions';
 
@@ -259,7 +259,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
     this.$wait = {
       get: key => {
-        if (key) return undefined;
+        if (!key) return undefined;
 
         const waitedData = dataStore.wait[key];
         if (!waitedData) return undefined;
@@ -499,16 +499,16 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
       ReactiveEvent.once('AfterGet', evt => {
         evt.onemit = reactive => source = reactive;
-        Prop.descriptor(inputData, key)!.get!();
+        Prop.descriptor(inputData, key as keyof InputData)!.get!();
       });
 
       ReactiveEvent.once('AfterGet', evt => {
         evt.onemit = reactive => destination = reactive;
-        const desc = Prop.descriptor(targetObject as {}, key);
-        if (desc) desc.get!();
+        const desc = Prop.descriptor(targetObject as {}, key as never);
+        if (desc && isFunction(desc.get)) desc.get!();
       });
 
-      Prop.transfer(targetObject as {}, inputData, key);
+      Prop.transfer(targetObject as {}, inputData, key as never);
 
       if (!destination || !source) return;
       // Adding the previous watches to the property that is being set
