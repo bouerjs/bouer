@@ -64,6 +64,7 @@ export default class Skeleton extends Base {
       '@-webkit-keyframes loading { 100% { transform: translateX(100%); } }'
     ];
     forEach(rules, rule => this.style.sheet!.insertRule(rule));
+    this.style.innerText = rules.join(' ');
   }
 
   insertItems(node: Node) {
