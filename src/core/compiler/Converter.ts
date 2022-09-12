@@ -90,19 +90,22 @@ export default class Converter extends Base {
           const isBuildAsArray = el.hasAttribute(Constants.array);
           const value = tryGetValue(el);
 
-          if (isBuildAsArray) {
-            (propOldValue) ?
-              // Add item to the array
-              builtObject[propName] = Extend.array(propOldValue, value) :
-              // Set the new value
-              builtObject[propName] = [value];
-          } else {
-            (propOldValue) ?
-              // Spread and add properties
-              builtObject[propName] = Extend.array(propOldValue, value) :
-              // Set the new value
-              builtObject[propName] = value;
+          if (value !== '') {
+            if (isBuildAsArray) {
+              (propOldValue) ?
+                // Add item to the array
+                builtObject[propName] = Extend.array(propOldValue, value) :
+                // Set the new value
+                builtObject[propName] = [value];
+            } else {
+              (propOldValue) ?
+                // Spread and add properties
+                builtObject[propName] = Extend.array(propOldValue, value) :
+                // Set the new value
+                builtObject[propName] = value;
+            }
           }
+
           // Calling on set function
           if (isFunction(onSet))
             fnCall(onSet!(builtObject, propName, value, el));
