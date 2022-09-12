@@ -76,7 +76,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 
     return forEach(Object.keys(data), key => {
       (this.data as any)[key] = (data as any)[key];
-      Prop.transfer(this.data as dynamic, data, key);
+      Prop.transfer(this.data as dynamic, data, key as any);
     });
   }
 
