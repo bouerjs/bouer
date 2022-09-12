@@ -39,6 +39,7 @@ export default class Binder extends Base {
     number: 'valueAsNumber',
     checkbox: 'checked',
     radio: 'value',
+    contenteditable: 'textContent',
   };
 
   private BindingDirection = {
@@ -179,7 +180,12 @@ export default class Binder extends Base {
 
     const $BindTwoWay = () => {
       let propertyNameToBind = '';
-      const binderTarget = ownerNode.type || ownerNode.localName;
+      let binderTarget = ownerNode.type;
+
+      if (ownerNode.hasAttribute('contenteditable'))
+        binderTarget = 'contenteditable';
+
+      binderTarget = binderTarget || ownerNode.localName;
 
       if (Constants.bind === originalName)
         propertyNameToBind =
@@ -205,7 +211,12 @@ export default class Binder extends Base {
                 ownerNode[propertyNameToBind] == value);
 
             // Default Binding
-            return (ownerNode[propertyNameToBind] = isObject(value) ? toStr(value) : isNull(value) ? '' : value);
+            const _valueToSet = isObject(value) ? toStr(value) : isNull(value) ? '' : value;
+            const _valueSet = ownerNode[propertyNameToBind];
+
+            if (_valueToSet === _valueSet) return;
+
+            return ownerNode[propertyNameToBind] = _valueToSet;
           }
 
           // Array Set
