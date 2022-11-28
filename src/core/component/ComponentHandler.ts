@@ -271,7 +271,7 @@ export default class ComponentHandler extends Base {
 
   /**
    * Subscribe the hooks of the instance
-   * @param { string } eventName the event name to be added
+   * @param { Key } eventName the event name to be added
    * @param { Element } element the element to attach the event
    * @param { any } component the component object
    * @param { object } context the context of the compilation process
@@ -315,8 +315,8 @@ export default class ComponentHandler extends Base {
     componentElement: Element,
     component: Component<any>,
     data: object,
-    onComponent?: <Data>(component: Component<Data>
-    ) => void) {
+    onComponent?: <Data>(component: Component<Data>) => void
+  ) {
     const $name = toLower(componentElement.nodeName);
     const container = componentElement.parentElement;
     if (!container)
