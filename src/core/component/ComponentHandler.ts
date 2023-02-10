@@ -25,7 +25,8 @@ import {
   urlCombine,
   urlResolver,
   webRequest,
-  where
+  where,
+  copyObject
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Base from '../Base';
@@ -48,6 +49,7 @@ export default class ComponentHandler extends Base {
   // Avoids to add multiple styles of the same component if it's already in use
   stylesController: { [key: string]: { styles: Element[], elements: Element[] }, } = {};
   serviceProvider: ServiceProvider;
+  activeComponents: Component<any>[] = [];
 
   constructor(bouer: Bouer) {
     super();
@@ -171,19 +173,22 @@ export default class ComponentHandler extends Base {
   order(componentElement: Element, data: object, onComponent?: (component: Component<any>) => void) {
     const $name = toLower(componentElement.nodeName);
     const mComponents = this.components as dynamic;
-    const inComponent = mComponents[$name];
 
-    if (!inComponent) return Logger.error('No component with name “' + $name + '” registered.');
+    if (!mComponents[$name]) return Logger.error('No component with name “' + $name + '” registered.');
 
-    const component = (inComponent as (Component<any> | IComponentOptions<any>));
+    const component = (mComponents[$name] as (Component<any> | IComponentOptions<any>));
     const iComponent = (component as IComponentOptions<any>);
 
     const mainExecutionWrapper = () => {
       if (component.template) {
-        const newComponent = (component instanceof Component) ? component : new Component(component);
-        newComponent.bouer = this.bouer;
+        const mComponent = (component instanceof Component)
+          ? copyObject(component) as Component
+          : new Component(iComponent);
 
-        this.insert(componentElement, newComponent, data, onComponent);
+        mComponent.template = iComponent.template;
+        mComponent.bouer = this.bouer;
+
+        this.insert(componentElement, mComponent, data, onComponent);
 
         if (component.keepAlive === true)
           mComponents[$name] = component;
@@ -200,11 +205,13 @@ export default class ComponentHandler extends Base {
       // Make component request or Add
       this.request(component.path, {
         success: content => {
-          const newComponent = (component instanceof Component) ? component : new Component(component);
-          iComponent.template = newComponent.template = content;
-          newComponent.bouer = this.bouer;
+          const mComponent = (component instanceof Component)
+            ? copyObject(component) as Component
+            : new Component(iComponent);
+          iComponent.template = mComponent.template = content;
+          mComponent.bouer = this.bouer;
 
-          this.insert(componentElement, newComponent, data, onComponent);
+          this.insert(componentElement, mComponent, data, onComponent);
 
           if (component.keepAlive === true)
             mComponents[$name] = component;
@@ -325,6 +332,10 @@ export default class ComponentHandler extends Base {
     if (isNull(component.template))
       return Logger.error('The <' + $name + '/> component is not ready yet to be inserted.');
 
+    // Adding the component to the active component list if it is not added
+    if (!this.activeComponents.includes(component))
+      this.activeComponents.push(component);
+
     const elementSlots = $CreateAnyEl('SlotContainer', el => {
       el.innerHTML = componentElement.innerHTML;
       componentElement.innerHTML = '';
@@ -356,17 +367,18 @@ export default class ComponentHandler extends Base {
       });
     }
 
-    if (isNull(component.el)) return;
-
     const rootElement = component.el!;
+
+    if (isNull(rootElement)) return;
+
     // Adding the listeners
-    const createdEvent = this.addEvent('created', component.el!, component);
-    const beforeMountEvent = this.addEvent('beforeMount', component.el!, component);
-    const mountedEvent = this.addEvent('mounted', component.el!, component);
-    const beforeLoadEvent = this.addEvent('beforeLoad', component.el!, component);
-    const loadedEvent = this.addEvent('loaded', component.el!, component);
-    this.addEvent('beforeDestroy', component.el!, component);
-    this.addEvent('destroyed', component.el!, component);
+    const createdEvent = this.addEvent('created', rootElement, component);
+    const beforeMountEvent = this.addEvent('beforeMount', rootElement, component);
+    const mountedEvent = this.addEvent('mounted', rootElement, component);
+    const beforeLoadEvent = this.addEvent('beforeLoad', rootElement, component);
+    const loadedEvent = this.addEvent('loaded', rootElement, component);
+    this.addEvent('beforeDestroy', rootElement, component);
+    this.addEvent('destroyed', rootElement, component);
 
     const scriptsAssets = where(component.assets, asset => toLower(asset.nodeName) === 'script');
     const initializer = (component as any).init;
@@ -421,12 +433,13 @@ export default class ComponentHandler extends Base {
     };
 
     const compile = (scriptContent?: string) => {
+      // If the component is not connected anymore, do nothing
+      if (componentElement.isConnected) return;
+
       try {
         // Injecting data
-        const hasForDirective = componentElement.hasAttribute(Constants.for);
-        // If the component has the e-for directive
-        // And Does not have the data directive assigned, create it implicitly
-        if (hasForDirective && !(findDirective(componentElement, Constants.data)))
+        // If the component has does not have the data directive assigned, create it implicitly
+        if (!(findDirective(componentElement, Constants.data)))
           componentElement.setAttribute('data', '$data');
 
         let dataAttr = null;
@@ -463,6 +476,9 @@ export default class ComponentHandler extends Base {
         });
 
         beforeMountEvent.emit();
+
+        // Attaching the root element to the component element
+        Prop.set((componentElement as any), 'root', { value: rootElement });
 
         // Mouting the element
         container.replaceChild(rootElement, componentElement);
@@ -588,7 +604,7 @@ export default class ComponentHandler extends Base {
           const index = stylesController.elements.indexOf(component.el!);
           stylesController.elements.splice(index, 1);
 
-          if (stylesController.elements.length > 0 || (hasForDirective && container.isConnected))
+          if (stylesController.elements.length > 0 || container.isConnected)
             return;
 
           // No elements using the style
