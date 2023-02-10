@@ -153,13 +153,13 @@ export default class Compiler extends Base {
         if (Constants.wait in node.attributes)
           return directive.wait(findDirective(node, Constants.wait)!);
 
-        // <component></component>
-        if (this.component.check(node.localName))
-          return this.component.order(node, data);
-
         // e-for="..." directive
         if (Constants.for in node.attributes)
           return directive.for(findDirective(node, Constants.for)!, data);
+
+        // <component></component>
+        if (this.component.check(node.localName))
+          return this.component.order(node, data);
 
         // e-if="..." directive
         if (Constants.if in node.attributes)
