@@ -434,7 +434,7 @@ export default class ComponentHandler extends Base {
 
     const compile = (scriptContent?: string) => {
       // If the component is not connected anymore, do nothing
-      if (componentElement.isConnected) return;
+      if (!componentElement.isConnected) return;
 
       try {
         // Injecting data
