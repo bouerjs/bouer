@@ -9,7 +9,7 @@ export default class DataStore extends Base {
   wait: {
     [key: string]: {
       nodes: Element[],
-      data?: object,
+      data?: dynamic,
       once?: boolean,
       context: RenderContext
     }
