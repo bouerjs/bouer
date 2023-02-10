@@ -19,7 +19,8 @@ import {
   trim,
   urlCombine,
   $CreateComment,
-  ifNullReturn
+  ifNullReturn,
+  getRootElement
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Binder from '../binder/Binder';
@@ -157,12 +158,14 @@ export default class Directive extends Base {
 
     (execute = () => {
       forEach(conditions, chainItem => {
-        if (!chainItem.node.parentElement) return;
+        const element = getRootElement(chainItem.node);
+
+        if (!element.parentElement) return;
 
         if (comment.isConnected)
-          container.removeChild(chainItem.node);
+          container.removeChild(element);
         else
-          container.replaceChild(comment, chainItem.node);
+          container.replaceChild(comment, element);
       });
 
       const conditionalExpression = conditions.map((item, index) => {
@@ -181,7 +184,8 @@ export default class Directive extends Base {
         context: this.context,
         aditional: {
           __cb: (chainIndex: number) => {
-            const { node: element } = conditions[chainIndex];
+            const { node: mElement } = conditions[chainIndex];
+            const element = getRootElement(mElement);
             container.replaceChild(element, comment);
             this.compiler.compile({
               el: element,
@@ -487,8 +491,8 @@ export default class Directive extends Base {
       switch (method) {
         case 'pop': case 'shift': { // First or Last item removal handler
           const item = mListedItems[method]();
-          if (!item) return;
-          $RemoveEl(item.el);
+          if (isNull(item)) return;
+          $RemoveEl(getRootElement(item.el));
 
           if (method === 'pop') return;
           return reOrganizeIndexes();
@@ -498,7 +502,7 @@ export default class Directive extends Base {
           const deleteCount = args[1] as number;
 
           const removedItems = mListedItems.splice(index, deleteCount);
-          forEach(removedItems, (item: any) => $RemoveEl(item.el));
+          forEach(removedItems, (item: any) => $RemoveEl(getRootElement(item.el)));
 
           expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
 
@@ -511,7 +515,7 @@ export default class Directive extends Base {
             index++;
             $InsertForItem({
               // Getting the next reference
-              reference: listedItemsHandler[index].el || comment,
+              reference: getRootElement(listedItemsHandler[index].el) || comment,
               index: index,
               item,
             });
@@ -531,9 +535,10 @@ export default class Directive extends Base {
         case 'push': case 'unshift': { // Addition handler
           // Gets the last item as default
           const isUnshift = method == 'unshift';
+          const element = listedItemsHandler[0].el;
 
           let indexRef = isUnshift ? 0 : mListedItems.length;
-          let reference = isUnshift ? listedItemsHandler[0].el : comment;
+          let reference = isUnshift ? getRootElement(element) : comment;
 
           // Adding the items to the dom
           forEach([].slice.call(args), item => {
@@ -590,8 +595,9 @@ export default class Directive extends Base {
 
       // Cleaning the existing items
       forEach(listedItemsHandler, item => {
-        if (!item.el.parentElement) return;
-        container.removeChild(item.el);
+        const element = getRootElement(item.el);
+        if (!element.parentElement) return;
+        container.removeChild(element);
       });
       listedItemsHandler = [];
 
