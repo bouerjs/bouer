@@ -17,12 +17,13 @@ import {
   trim,
   urlCombine,
   urlResolver, where
-
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Base from '../Base';
 import EventHandler from '../event/EventHandler';
 import Reactive from '../reactive/Reactive';
+import ComponentHandler from './ComponentHandler';
+
 export default class Component<Data = {}> extends Base implements IComponentOptions<Data> {
   name: string;
   path: string;
@@ -66,6 +67,16 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
       context: this as any,
       data: _data || {}
     });
+
+    // Store the content to avoid showing it unnecessary
+    const template = {
+      value: (optionsOrPath as IComponentOptions<Data>).template
+    };
+
+    Prop.set(this, 'template', {
+      get: () => template.value,
+      set: (v) => template.value = v
+    });
   }
 
   export<ExportableData extends {}>(
@@ -99,6 +110,11 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
     // Destroying all the events attached to the this instance
     forEach(this.events, evt => this.off((evt.eventName as any), evt.callback));
     this.events = [];
+
+    const components = ServiceProvider.get<ComponentHandler>(this.bouer!, 'ComponentHandler')
+      .activeComponents;
+
+    components.splice(components.indexOf(this), 1);
   }
 
   params() {
