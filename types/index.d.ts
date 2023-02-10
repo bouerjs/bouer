@@ -1,3 +1,4 @@
+import ViewChild from '../src/core/ViewChild';
 import MiddlewareResult from '../src/core/middleware/MiddlewareResult';
 import IAsset from '../src/definitions/interfaces/IAsset';
 import IBinderConfig from '../src/definitions/interfaces/IBinderConfig';
@@ -191,20 +192,20 @@ declare class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
      * @param key the data:[`key`]="..." directive key value or the app.$data.set(`key`) key provided.
      * @returns the expected object | null
      */
-    get(key: string): object | undefined;
+    get<Data>(key: string): Data | undefined,
     /**
      * Sets a value into a storage the used anywhere of the application.
      * @param key the key of the data to be stored.
      * @param data the data to be stored.
      * @param toReactive allow to transform the data to a reactive one after being setted. By default is `false`.
      */
-    set(key: string, data: object | any[], toReactive?: boolean): void;
+    set<Data>(key: string, data: Data | Data[], toReactive?: boolean): void,
     /**
      * Destroy the stored data
      * @param key the data:[`key`]="..." directive value or the app.$data.set(`key`) key provided.
      * @returns `true` for item deleted or `false` for item not deleted.
      */
-    unset(key: string): boolean;
+    unset(key: string): boolean
   };
 
   /** (e-req) Requests handler */
@@ -214,13 +215,13 @@ declare class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
      * @param key the e-req:[`key`]="..." directive key value.
      * @returns the expected object | null
      */
-    get(key: string): { data: any;[key: string]: any } | null;
+    get<Response>(key: string): { data: Response, [key: string]: any } | null,
     /**
      * Destroy stored req (request)
      * @param key the e-req:[`key`]="..." directive key value.
      * @returns `true` for item deleted or `false` for item not deleted.
      */
-    unset(key: string): boolean;
+    unset(key: string): boolean
   };
 
   /** Data Waits Handler */
@@ -230,19 +231,19 @@ declare class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
      * @param key the wait-data="`key`" directive value or the app.$wait.set(`key`) key provided.
      * @returns the expected object | null
      */
-    get(key: string): object | undefined;
+    get<WaitData>(key: string): WaitData | undefined,
     /**
      * Provides data for `wait-data` directive elements.
      * @param key the key of `wait-data` directive value.
      * @param data the data provide to the elements waiting
      */
-    set(key: string, data: object, once?: boolean): void;
+    set<WaitData>(key: string, data: WaitData): void,
     /**
      * Destroy stored wait
      * @param key the wait-data="`key`" directive value or the app.$wait.set(`key`) key provided.
      * @returns `true` for item deleted or `false` for item not deleted.
      */
-    unset(key: string): boolean;
+    unset(key: string): boolean
   };
 
   /** Delimiters handler */
@@ -294,6 +295,21 @@ declare class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
      * @param name the name of the component to get
      */
     get<Data>(name: string): Component<Data> | IComponentOptions<Data>;
+    /**
+     * Gets an active component instance by expression
+     * @param expression the expression that matches the wanted components
+     */
+    viewBy<Child extends Component>(expression: (component: Component) => boolean): Child[],
+    /**
+     * Gets an active component instance by name
+     * @param componentName the name of the wanted components
+     */
+    viewByName<Child extends Component>(componentName: string): Child[],
+    /**
+     * Gets an active component instance by name
+     * @param componentId the component element id of the wanted component (in case of just one insertion)
+     */
+    viewById<Child extends Component>(componentId: string): Child[],
   };
 
   /** Routing Handler */
@@ -562,4 +578,5 @@ export {
   IEventSubscription,
   IAsset,
   Extend,
+  ViewChild
 };
