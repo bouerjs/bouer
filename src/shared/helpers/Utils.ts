@@ -399,6 +399,16 @@ export function findDirective(
       (attr.name === name || startWith(attr.name, name + ':')));
 }
 
+export function getRootElement(el: Element) {
+  return (el as any).root || el;
+}
+
+export function copyObject(object: any) {
+  const out = Object.create(object.__proto__);
+  forEach(Object.keys(object), key => out[key] = object[key]);
+  return out;
+}
+
 export const WIN = window;
 export const DOM = document;
 export const anchor = $CreateEl('a').build();
