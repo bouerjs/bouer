@@ -32,6 +32,7 @@ import {
   isNull, isObject, toArray, trim, ifNullStop, isFunction,
 } from '../shared/helpers/Utils';
 import SkeletonOptions from '../definitions/types/SkeletonOptions';
+import ViewChild from '../core/ViewChild';
 
 export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
   extends Base implements IBouerOptions<Data, GlobalData, Dependencies> {
@@ -59,14 +60,14 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
      * @param key the data:[`key`]="..." directive key value or the app.$data.set(`key`) key provided.
      * @returns the expected object | null
      */
-    get(key: string): object | undefined,
+    get<Data>(key: string): Data | undefined,
     /**
      * Sets a value into a storage the used anywhere of the application.
      * @param key the key of the data to be stored.
      * @param data the data to be stored.
      * @param toReactive allow to transform the data to a reactive one after being setted. By default is `false`.
      */
-    set(key: string, data: object | any[], toReactive?: boolean): void,
+    set<Data>(key: string, data: Data | Data[], toReactive?: boolean): void,
     /**
      * Destroy the stored data
      * @param key the data:[`key`]="..." directive value or the app.$data.set(`key`) key provided.
@@ -82,7 +83,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
      * @param key the e-req:[`key`]="..." directive key value.
      * @returns the expected object | null
      */
-    get(key: string): { data: any, [key: string]: any } | null
+    get<Response>(key: string): { data: Response, [key: string]: any } | null
     /**
      * Destroy stored req (request)
      * @param key the e-req:[`key`]="..." directive key value.
@@ -98,13 +99,13 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
      * @param key the wait-data="`key`" directive value or the app.$wait.set(`key`) key provided.
      * @returns the expected object | null
      */
-    get(key: string): object | undefined,
+    get<WaitData>(key: string): WaitData | undefined,
     /**
      * Provides data for `wait-data` directive elements.
      * @param key the key of `wait-data` directive value.
      * @param data the data provide to the elements waiting
      */
-    set(key: string, data: object): void,
+    set<WaitData>(key: string, data: WaitData): void,
     /**
      * Destroy stored wait
      * @param key the wait-data="`key`" directive value or the app.$wait.set(`key`) key provided.
@@ -134,7 +135,10 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
   /** Components Handler */
   readonly $components: {
     add<Data>(component: Component<Data> | IComponentOptions<Data>): void
-    get<Data>(name: string): (Component<Data> | IComponentOptions<Data>)
+    get<Data>(name: string): (Component<Data> | IComponentOptions<Data>),
+    viewBy<Child extends Component>(expression: (component: Component) => boolean): Child[],
+    viewByName<Child extends Component>(componentName: string): Child[],
+    viewById<Child extends Component>(componentId: string): Child[],
   };
 
   /** Routing Handler */
@@ -245,9 +249,9 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
         if (ifNullReturn(toReactive, false) === true)
           Reactive.transform({
             context: app,
-            data: data
+            data: data as dynamic
           });
-        return new ServiceProvider(app).get<DataStore>('DataStore')!.set('data', key, data);
+        return new ServiceProvider(app).get<DataStore>('DataStore')!.set('data', key, data as dynamic);
       },
       unset: key => delete dataStore.data[key]
     };
@@ -258,7 +262,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     };
 
     this.$wait = {
-      get: key => {
+      get: <WaitData>(key: string) => {
         if (!key) return undefined;
 
         const waitedData = dataStore.wait[key];
@@ -267,12 +271,12 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
         if (ifNullReturn(waitedData.once, true))
           this.$wait.unset(key);
 
-        return waitedData.data;
+        return waitedData.data as WaitData;
       },
-      set: (key: string, data: object, once?: boolean) => {
+      set: <WaitData>(key: string, data: WaitData, once?: boolean) => {
         if (!(key in dataStore.wait))
           return dataStore.wait[key] = {
-            data: data,
+            data: data as dynamic,
             nodes: [],
             once: ifNullReturn(once, false),
             context: app
@@ -280,7 +284,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
         const mWait = dataStore.wait[key];
 
-        mWait.data = data;
+        mWait.data = data as dynamic;
         forEach(mWait.nodes, nodeWaiting => {
           if (!nodeWaiting) return;
 
@@ -307,7 +311,10 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
     this.$components = {
       add: component => componentHandler.prepare([component]),
-      get: name => componentHandler.components[name]
+      get: name => componentHandler.components[name],
+      viewBy: (expression: (component: Component) => boolean) => ViewChild.viewBy(this as Bouer, expression),
+      viewByName: (componentName: string) => ViewChild.viewByName(this as Bouer, componentName),
+      viewById: (componentId: string) => ViewChild.viewById(this as Bouer, componentId),
     };
 
     Prop.set(this, 'refs', {
