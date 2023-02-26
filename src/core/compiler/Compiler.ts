@@ -18,6 +18,7 @@ import Binder from '../binder/Binder';
 import ComponentHandler from '../component/ComponentHandler';
 import DelimiterHandler from '../DelimiterHandler';
 import EventHandler from '../event/EventHandler';
+import Routing from '../routing/Routing';
 import Directive from './Directive';
 
 export default class Compiler extends Base {
@@ -76,6 +77,7 @@ export default class Compiler extends Base {
     const context = options.context || this.bouer;
     const data = (options.data || this.bouer.data!);
     const isConnected = (options.isConnected || (() => rootElement.isConnected));
+    const routing = this.serviceProvider.get<Routing>('Routing');
 
     if (!rootElement)
       return Logger.error('Invalid element provided to the compiler.');
@@ -187,6 +189,10 @@ export default class Compiler extends Base {
         // put="..." directive
         if (Constants.put in node.attributes)
           return directive.put(findDirective(node, Constants.put) as Attr, data);
+
+        // route-view node
+        if (routing.routeView === node)
+          return;
 
         // Looping the attributes
         forEach(toArray(node.attributes), (attr: Attr) => {
