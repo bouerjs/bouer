@@ -380,7 +380,7 @@ export default class ComponentHandler extends Base {
     this.addEvent('beforeDestroy', rootElement, component);
     this.addEvent('destroyed', rootElement, component);
 
-    const scriptsAssets = where(component.assets, asset => toLower(asset.nodeName) === 'script');
+    const scriptsAssets = where(component.assets, asset => asset.nodeName === 'SCRIPT');
     const initializer = (component as any).init;
 
     if (isFunction(initializer))
@@ -433,9 +433,6 @@ export default class ComponentHandler extends Base {
     };
 
     const compile = (scriptContent?: string) => {
-      // If the component is not connected anymore, do nothing
-      if (!componentElement.isConnected) return;
-
       try {
         // Injecting data
         // If the component has does not have the data directive assigned, create it implicitly
@@ -478,7 +475,8 @@ export default class ComponentHandler extends Base {
         beforeMountEvent.emit();
 
         // Attaching the root element to the component element
-        Prop.set((componentElement as any), 'root', { value: rootElement });
+        if (!('root' in componentElement))
+          Prop.set((componentElement as any), 'root', { value: rootElement });
 
         // Mouting the element
         container.replaceChild(rootElement, componentElement);
@@ -525,7 +523,7 @@ export default class ComponentHandler extends Base {
           }
           if (isStyle) style.innerText = rules.join(' ');
         };
-        const stylesAssets = where(component.assets, asset => toLower(asset.nodeName) !== 'script');
+        const stylesAssets = where(component.assets, asset => asset.nodeName !== 'SCRIPT');
         const styleAttrName = 'component-style';
 
         // Configuring the styles
