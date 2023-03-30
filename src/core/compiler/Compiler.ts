@@ -10,7 +10,7 @@ import {
   forEach,
   findDirective,
   isFunction,
-  isString, toArray
+  isString, toArray, toLower
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Base from '../Base';
@@ -286,27 +286,59 @@ export default class Compiler extends Base {
     return rootElement;
   }
 
-  analize(htmlSnippet: string): boolean {
-    return true;
+  analize(htmlSnippet: String): boolean {
+    const tagRegexRule = '<([a-z0-9-_]{1,}|/[a-z0-9-_]{1,}).*?>';
+    // Removing unnecessary verification
+    const htmlForParser = htmlSnippet
+      .replace(/<script((.|\n|\r)*?)<\/script>/gm, '<script></script>')
+      .replace(/<style((.|\n|\r)*?)<\/style>/gm, '<style></style>')
+      .replace(/<pre((.|\n|\r)*?)<\/pre>/gm, '<pre></pre>')
+      .replace(/<code((.|\n|\r)*?)<\/code>/gm, '<code></code>')
+      .replace(/&nbsp;/g, '&#160;');
 
-    // const parser = new DOMParser();
-    // const htmlForParser = `<xml>${htmlSnippet}</xml>`
-    //   .replace(/(src|href)=".*?&.*?"/g, '$1=""')
-    //   .replace(/<script[sS]+?<\/script>/gm, '<script></script>')
-    //   .replace(/<style[sS]+?<\/style>/gm, '<style></style>')
-    //   .replace(/<pre[sS]+?<\/pre>/gm, '<pre></pre>')
-    //   .replace(/&nbsp;/g, '&#160;');
+    const history = [];
+    const tagsTree = [];
+    // Getting the tags
+    const tagElements = htmlForParser.match(new RegExp(tagRegexRule, 'ig')) || [];
+    const selfCloseTags = new Set(
+      ['area', 'base', 'br', 'col', 'embed',
+        'hr', 'img', 'input', 'link', 'meta',
+        'param', 'source', 'track', 'wbr']
+    );
 
-    // const doc = parser.parseFromString(htmlForParser, 'text/xml');
-    // const xmlContainer = DOM.createElement('xml');
-    // xmlContainer.innerHTML = doc.documentElement.outerHTML;
-    // const parsererror = xmlContainer.querySelector('parsererror');
+    for (const tagElement of tagElements) {
+      const match = tagElement.match(new RegExp(tagRegexRule, 'i'))!;
+      const tagName = toLower(match[1]);
 
-    // if (parsererror) {
-    //   Logger.error('HTML Snippet:\n' + htmlSnippet.split(/\n/)
-    //  .map((line, column) => `${column + 1}: ${line}`).join('\n'));
-    //   return false;
-    // }
-    // return true;
+      if (selfCloseTags.has(tagName))
+        continue;
+
+      // In case of closing
+      if (tagElement[1] === '/') {
+        const lastTagTree = tagsTree[tagsTree.length - 1];
+
+        // break the process
+        if (lastTagTree.name !== tagName.substring(1))
+          break;
+
+        tagsTree.pop();
+        continue;
+      }
+      history.push(tagElement);
+      tagsTree.push({
+        name: tagName,
+        tag: tagElement
+      });
+    }
+
+    const isValid = tagsTree.length == 0;
+
+    if (!isValid) {
+      history[history.length - 1] += ' <--- Line error';
+      Logger.error('Syntax Error: Missing pair of tag, html snippet: \n' +
+        history.map((tag, index) => ' |' + ' '.padEnd(index + 1, '  ') + tag).join('\n'));
+    }
+
+    return isValid;
   }
 }
