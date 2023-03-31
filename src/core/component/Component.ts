@@ -2,10 +2,11 @@ import IAsset from '../../definitions/interfaces/IAsset';
 import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
 import IEventSubscription from '../../definitions/interfaces/IEventSubscription';
 import ILifeCycleHooks from '../../definitions/interfaces/ILifeCycleHooks';
+import ComponentClass from '../../definitions/types/ComponentClass';
 import dynamic from '../../definitions/types/Dynamic';
 import Bouer from '../../instance/Bouer';
 import Prop from '../../shared/helpers/Prop';
-import ServiceProvider from '../../shared/helpers/ServiceProvider';
+import IoC from '../../shared/helpers/IoCContainer';
 import UriHandler from '../../shared/helpers/UriHandler';
 import {
   $CreateAnyEl,
@@ -37,11 +38,13 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
   isNotFound?: boolean;
   isDestroyed: boolean = false;
 
+  clazz: ComponentClass | undefined;
+
   el?: Element;
   bouer?: Bouer;
-  readonly children?: (Component | IComponentOptions<Data>)[] = [];
+  readonly children?: (Component | IComponentOptions | ComponentClass)[] = [];
   readonly assets: (HTMLScriptElement | HTMLStyleElement | HTMLLinkElement)[] = [];
-  readonly restrictions?: ((component: (Component | IComponentOptions<Data>)) => boolean | Promise<boolean>)[];
+  readonly restrictions?: ((component: Component | IComponentOptions) => boolean | Promise<boolean>)[];
   // Store temporarily this component UI orders
   private events: IEventSubscription[] = [];
 
@@ -70,7 +73,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 
     // Store the content to avoid showing it unnecessary
     const template = {
-      value: (optionsOrPath as IComponentOptions<Data>).template
+      value: (optionsOrPath as IComponentOptions).template
     };
 
     Prop.set(this, 'template', {
@@ -111,10 +114,10 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
     forEach(this.events, evt => this.off((evt.eventName as any), evt.callback));
     this.events = [];
 
-    const components = ServiceProvider.get<ComponentHandler>(this.bouer!, 'ComponentHandler')
+    const components = IoC.resolve(this.bouer!, ComponentHandler)!
       .activeComponents;
 
-    components.splice(components.indexOf(this), 1);
+    components.splice(components.indexOf(this as Component<{}>), 1);
   }
 
   params() {
@@ -125,7 +128,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
     eventName: TKey,
     init?: CustomEventInit
   ) {
-    new ServiceProvider(this.bouer!).get<EventHandler>('EventHandler')!.emit({
+    IoC.resolve(this.bouer!, EventHandler)!.emit({
       eventName: eventName,
       attachedNode: this.el!,
       init: init
@@ -147,7 +150,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
       Logger.warn('The “' + eventName + '” Event is called before the component is mounted, to be dispatched' +
         'it needs to be on registration object: { ' + eventName + ': function(){ ... }, ... }.');
 
-    const evt = new ServiceProvider(this.bouer!).get<EventHandler>('EventHandler')!.on({
+    const evt = IoC.resolve(this.bouer!, EventHandler)!.on({
       eventName,
       callback: callback as any,
       attachedNode: this.el!,
@@ -161,7 +164,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
   off<TKey extends keyof ILifeCycleHooks>(
     eventName: TKey, callback: (event: CustomEvent) => void
   ) {
-    new ServiceProvider(this.bouer!).get<EventHandler>('EventHandler')!.off({
+    IoC.resolve(this.bouer!, EventHandler)!.off({
       eventName,
       callback: callback as any,
       attachedNode: this.el!
