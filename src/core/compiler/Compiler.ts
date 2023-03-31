@@ -3,7 +3,7 @@ import CustomDirective from '../../definitions/types/CustomDirective';
 import RenderContext from '../../definitions/types/RenderContext';
 import Bouer from '../../instance/Bouer';
 import Constants from '../../shared/helpers/Constants';
-import ServiceProvider from '../../shared/helpers/ServiceProvider';
+import IoC from '../../shared/helpers/IoCContainer';
 import {
   DOM,
   fnCall,
@@ -28,7 +28,6 @@ export default class Compiler extends Base {
   eventHandler: EventHandler;
   component: ComponentHandler;
   directives: CustomDirective;
-  serviceProvider: ServiceProvider;
 
   private NODES_TO_IGNORE_IN_COMPILATION = {
     'SCRIPT': 1,
@@ -39,15 +38,14 @@ export default class Compiler extends Base {
     super();
 
     this.bouer = bouer;
-    this.serviceProvider = new ServiceProvider(bouer);
     this.directives = directives ?? {};
 
-    this.binder = this.serviceProvider.get('Binder')!;
-    this.delimiter = this.serviceProvider.get('DelimiterHandler')!;
-    this.eventHandler = this.serviceProvider.get('EventHandler')!;
-    this.component = this.serviceProvider.get('ComponentHandler')!;
+    this.binder = IoC.resolve(bouer, Binder)!;
+    this.delimiter = IoC.resolve(bouer, DelimiterHandler)!;
+    this.eventHandler = IoC.resolve(bouer, EventHandler)!;
+    this.component = IoC.resolve(bouer, ComponentHandler)!;
 
-    ServiceProvider.add('Compiler', this);
+    IoC.register(bouer, this);
   }
 
   compile<Data>(options: {
@@ -77,7 +75,7 @@ export default class Compiler extends Base {
     const context = options.context || this.bouer;
     const data = (options.data || this.bouer.data!);
     const isConnected = (options.isConnected || (() => rootElement.isConnected));
-    const routing = this.serviceProvider.get<Routing>('Routing');
+    const routing = IoC.resolve(this.bouer, Routing)!;
 
     if (!rootElement)
       return Logger.error('Invalid element provided to the compiler.');

@@ -5,7 +5,7 @@ import WatchCallback from '../../definitions/types/WatchCallback';
 import Bouer from '../../instance/Bouer';
 import Constants from '../../shared/helpers/Constants';
 import Extend from '../../shared/helpers/Extend';
-import ServiceProvider from '../../shared/helpers/ServiceProvider';
+import IoC from '../../shared/helpers/IoCContainer';
 import Task from '../../shared/helpers/Task';
 import {
   $CreateEl,
@@ -32,7 +32,6 @@ export default class Binder extends Base {
   bouer: Bouer;
   evaluator: Evaluator;
   binds: { isConnected: () => boolean; watch: Watch<any, any> }[] = [];
-  serviceProvider: ServiceProvider;
 
   private DEFAULT_BINDER_PROPERTIES: dynamic = {
     text: 'value',
@@ -50,10 +49,9 @@ export default class Binder extends Base {
   constructor(bouer: Bouer) {
     super();
     this.bouer = bouer;
-    this.serviceProvider = new ServiceProvider(bouer);
-    this.evaluator = this.serviceProvider.get('Evaluator')!;
+    this.evaluator = IoC.resolve(bouer, Evaluator)!;
 
-    this.serviceProvider.add('Binder', this);
+    IoC.register(bouer, this);
     this.cleanup();
   }
 
@@ -62,7 +60,7 @@ export default class Binder extends Base {
     const originalValue = trim(ifNullReturn(node.nodeValue, ''));
     const originalName = node.nodeName;
     const ownerNode = (node as any).ownerElement || node.parentNode;
-    const middleware = this.serviceProvider.get<Middleware>('Middleware')!;
+    const middleware = IoC.resolve(this.bouer, Middleware)!;
     const onUpdate = options.onUpdate || ((v: any, n: Node) => { });
 
     // Clousure cache property settings
@@ -150,7 +148,7 @@ export default class Binder extends Base {
         ownerNode.innerHTML = '';
         forEach(htmlSnippets, snippetNode => {
           ownerNode.appendChild(snippetNode);
-          this.serviceProvider.get<Compiler>('Compiler')!.compile({
+          IoC.resolve(this.bouer, Compiler)!.compile({
             el: snippetNode,
             data: data,
             context: context,
@@ -420,12 +418,18 @@ export default class Binder extends Base {
     return mWatch;
   }
 
-  onPropertyInScopeChange(watchable: (app: Bouer) => void) {
+  onPropertyInScopeChange(
+    watchable: <
+      Data = {},
+      GlobalData = {},
+      Dependencies = {}
+    >(app: Bouer<Data, GlobalData, Dependencies>) => void
+  ) {
     const watches: Watch<any, any>[] = [];
 
     ReactiveEvent.once('AfterGet', (evt) => {
       evt.onemit = (reactive) => {
-        // Do not watch the same property twice
+        // Using scope watch avoid listen to the same property twice
         if (
           watches.find(
             (w) =>

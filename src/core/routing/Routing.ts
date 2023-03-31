@@ -1,6 +1,6 @@
 import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
 import Bouer from '../../instance/Bouer';
-import ServiceProvider from '../../shared/helpers/ServiceProvider';
+import IoC from '../../shared/helpers/IoCContainer';
 import {
   $CreateAnyEl,
   DOM,
@@ -22,8 +22,8 @@ import ComponentHandler from '../component/ComponentHandler';
 
 export default class Routing extends Base {
   bouer: Bouer;
-  defaultPage?: Component | IComponentOptions<any>;
-  notFoundPage?: Component | IComponentOptions<any>;
+  defaultPage?: Component | IComponentOptions;
+  notFoundPage?: Component | IComponentOptions;
   routeView: Element | null = null;
   activeAnchors: HTMLAnchorElement[] = [];
 
@@ -34,7 +34,7 @@ export default class Routing extends Base {
     super();
 
     this.bouer = bouer;
-    ServiceProvider.add('Routing', this);
+    IoC.register(bouer, this);
   }
 
   init() {
@@ -105,7 +105,7 @@ export default class Routing extends Base {
       this.pushState(resolver.href, DOM.title);
 
     const routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route!);
-    new ServiceProvider(this.bouer).get<ComponentHandler>('ComponentHandler')!
+    IoC.resolve(this.bouer!, ComponentHandler)!
       .order(componentElement, this.bouer.data, () => {
         this.markActiveAnchorsWithRoute(routeToSet);
       });
@@ -130,7 +130,7 @@ export default class Routing extends Base {
     }
 
     // Search for the right page
-    return new ServiceProvider(this.bouer).get<ComponentHandler>('ComponentHandler')!
+    return IoC.resolve(this.bouer, ComponentHandler)!
       .find(component => {
         if (!component.route) return false;
 
@@ -191,7 +191,7 @@ export default class Routing extends Base {
    * Allow to configure the `Default Page` and `NotFound Page`
    * @param { IComponentOptions } component the component to be checked
    */
-  configure<Data>(component: IComponentOptions<Data>) {
+  configure(component: Component | IComponentOptions) {
     if (component.isDefault === true && !isNull(this.defaultPage))
       return Logger.warn('There are multiple “Default Page” provided, check the “' + component.route + '” route.');
 

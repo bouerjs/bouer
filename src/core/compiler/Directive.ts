@@ -5,7 +5,7 @@ import dynamic from '../../definitions/types/Dynamic';
 import Bouer from '../../instance/Bouer';
 import Constants from '../../shared/helpers/Constants';
 import Extend from '../../shared/helpers/Extend';
-import ServiceProvider from '../../shared/helpers/ServiceProvider';
+import IoC from '../../shared/helpers/IoCContainer';
 import {
   code,
   $CreateAnyEl,
@@ -48,7 +48,6 @@ export default class Directive extends Base {
   delimiter: DelimiterHandler;
   $custom: CustomDirective = {};
   context: RenderContext;
-  serviceProvider: ServiceProvider;
 
   constructor(
     customDirective: CustomDirective,
@@ -62,12 +61,10 @@ export default class Directive extends Base {
     this.bouer = compiler.bouer;
     this.$custom = customDirective;
 
-    this.serviceProvider = new ServiceProvider(this.bouer);
-
-    this.evaluator = this.serviceProvider.get('Evaluator')!;
-    this.delimiter = this.serviceProvider.get('DelimiterHandler')!;
-    this.binder = this.serviceProvider.get('Binder')!;
-    this.eventHandler = this.serviceProvider.get('EventHandler')!;
+    this.evaluator = IoC.resolve(this.bouer, Evaluator)!;
+    this.delimiter = IoC.resolve(this.bouer, DelimiterHandler)!;
+    this.binder = IoC.resolve(this.bouer, Binder)!;
+    this.eventHandler = IoC.resolve(this.bouer, EventHandler)!;
   }
 
   // Helper functions
@@ -813,7 +810,7 @@ export default class Directive extends Base {
     let dataKey = node.nodeName.split(':')[1];
     if (dataKey) {
       dataKey = dataKey.replace(/\[|\]/g, '');
-      this.serviceProvider.get<DataStore>('DataStore')!.set('data', dataKey, inputData);
+      IoC.resolve(this.bouer, DataStore)!.set('data', dataKey, inputData);
     }
 
     Reactive.transform({
@@ -856,7 +853,7 @@ export default class Directive extends Base {
       .addEventListener('click', event => {
         event.preventDefault();
 
-        this.serviceProvider.get<Routing>('Routing')!
+        IoC.resolve(this.bouer, Routing)!
           .navigate(href.value);
       }, false);
   }
@@ -872,7 +869,7 @@ export default class Directive extends Base {
       return Logger.error(this.errorMsgNodeValue(node));
 
     ownerNode.removeAttribute(node.nodeName);
-    this.serviceProvider.get<ComponentHandler>('ComponentHandler')!
+    IoC.resolve(this.bouer, ComponentHandler)!
       .prepare([
         {
           name: nodeValue,
@@ -916,7 +913,7 @@ export default class Directive extends Base {
         .appendTo(ownerNode)
         .build();
 
-      this.serviceProvider.get<ComponentHandler>('ComponentHandler')!
+      IoC.resolve(this.bouer, ComponentHandler)!
         .order(componentElement, data);
     })();
   }
@@ -955,7 +952,7 @@ export default class Directive extends Base {
     // Inserting the comment node
     container.insertBefore(comment, ownerNode);
 
-    const skeleton = this.serviceProvider.get<Skeleton>('Skeleton')!;
+    const skeleton = IoC.resolve(this.bouer, Skeleton)!;
 
     // Only insert if the type is `of
     if (nodeValue.includes(' of '))
@@ -1047,7 +1044,7 @@ export default class Directive extends Base {
       return true;
     };
 
-    const middleware = this.serviceProvider.get<Middleware>('Middleware')!;
+    const middleware = IoC.resolve(this.bouer, Middleware)!;
 
     if (!middleware.has('req'))
       return Logger.error('There is no “req” middleware provided for the “e-req” directive requests.');
@@ -1063,7 +1060,7 @@ export default class Directive extends Base {
           data: response
         });
 
-        if (dataKey) this.serviceProvider.get<DataStore>('DataStore')!.set('req', dataKey, response);
+        if (dataKey) IoC.resolve(this.bouer, DataStore)!.set('req', dataKey, response);
 
         subcribeEvent(Constants.builtInEvents.response).emit({
           response: response
@@ -1191,7 +1188,7 @@ export default class Directive extends Base {
       return Logger.error(this.errorMsgNodeValue(node));
 
     ownerNode.removeAttribute(node.nodeName);
-    const dataStore = this.serviceProvider.get<DataStore>('DataStore')!;
+    const dataStore = IoC.resolve(this.bouer, DataStore)!;
     const mWait = dataStore.wait[nodeValue];
 
     if (mWait) {

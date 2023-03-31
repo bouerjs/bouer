@@ -5,7 +5,7 @@ import RenderContext from '../../definitions/types/RenderContext';
 import dynamic from '../../definitions/types/Dynamic';
 import Bouer from '../../instance/Bouer';
 import Constants from '../../shared/helpers/Constants';
-import ServiceProvider from '../../shared/helpers/ServiceProvider';
+import IoC from '../../shared/helpers/IoCContainer';
 import Task from '../../shared/helpers/Task';
 import {
   buildError,
@@ -27,16 +27,14 @@ export default class EventHandler extends Base {
   evaluator: Evaluator;
   $events: { [key: string]: IEventSubscription[] } = {};
   input = $CreateEl('input').build();
-  serviceProvider: ServiceProvider;
 
   constructor(bouer: Bouer) {
     super();
 
     this.bouer = bouer;
-    this.serviceProvider = new ServiceProvider(bouer);
-    this.evaluator = this.serviceProvider.get('Evaluator')!;
+    this.evaluator = IoC.resolve(bouer, Evaluator)!;
 
-    ServiceProvider.add('EventHandler', this);
+    IoC.register(bouer, this);
     this.cleanup();
   }
 
