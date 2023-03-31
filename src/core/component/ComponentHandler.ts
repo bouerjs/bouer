@@ -1,11 +1,12 @@
 import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
 import ILifeCycleHooks from '../../definitions/interfaces/ILifeCycleHooks';
+import ComponentClass from '../../definitions/types/ComponentClass';
 import dynamic from '../../definitions/types/Dynamic';
 import Bouer from '../../instance/Bouer';
 import Constants from '../../shared/helpers/Constants';
 import Extend from '../../shared/helpers/Extend';
 import Prop from '../../shared/helpers/Prop';
-import ServiceProvider from '../../shared/helpers/ServiceProvider';
+import IoC from '../../shared/helpers/IoCContainer';
 import Task from '../../shared/helpers/Task';
 import {
   $CreateAnyEl,
@@ -45,21 +46,21 @@ export default class ComponentHandler extends Base {
   private requests: dynamic = {};
   delimiter: DelimiterHandler;
   eventHandler: EventHandler;
-  components: { [key: string]: (Component<any> | IComponentOptions<any>) } = {};
-  // Avoids to add multiple styles of the same component if it's already in use
+  evaluator: Evaluator;
+  components: { [key: string]: Component | IComponentOptions } = {};
+  // Avoids adding multiple styles of the same component if it's already in use
   stylesController: { [key: string]: { styles: Element[], elements: Element[] }, } = {};
-  serviceProvider: ServiceProvider;
-  activeComponents: Component<any>[] = [];
+  activeComponents: Component[] = [];
 
   constructor(bouer: Bouer) {
     super();
 
     this.bouer = bouer;
-    this.serviceProvider = new ServiceProvider(bouer);
-    this.delimiter = this.serviceProvider.get('DelimiterHandler')!;
-    this.eventHandler = this.serviceProvider.get('EventHandler')!;
+    this.delimiter = IoC.resolve(bouer, DelimiterHandler)!;
+    this.eventHandler = IoC.resolve(bouer, EventHandler)!;
+    this.evaluator = IoC.resolve(bouer, Evaluator)!;
 
-    ServiceProvider.add('ComponentHandler', this);
+    IoC.register(bouer, this);
   }
 
   check(nodeName: string) {
@@ -102,8 +103,20 @@ export default class ComponentHandler extends Base {
       });
   }
 
-  prepare(components: (Component<any> | IComponentOptions<any>)[], parent?: (Component<any> | IComponentOptions<any>)) {
-    forEach(components, (component, index) => {
+  prepare(
+    components: (Component | IComponentOptions | ComponentClass)[],
+    parent?: Component<any>
+  ) {
+    forEach(components, (entry, index) => {
+      const isComponentClass = ((entry as ComponentClass).prototype instanceof Component);
+
+      let component = entry as Component;
+      if (isComponentClass) {
+        // Resolve the instance of the class
+        component = IoC.new(entry as ComponentClass)!;
+        component.clazz = entry as ComponentClass;
+      }
+
       if ((!component.path || isNull(component.path)) && (!component.template || isNull(component.template)))
         return Logger.warn('The component at options.components[' + index + '] has not valid “path” or “template” ' +
           'property defined, ' + 'then it was ignored.');
@@ -141,7 +154,7 @@ export default class ComponentHandler extends Base {
       if (Array.isArray(component.children))
         this.prepare(component.children, component);
 
-      this.serviceProvider.get<Routing>('Routing')!
+      IoC.resolve(this.bouer!, Routing)!
         .configure(this.components[component.name!] = component);
 
       const getContent = (path?: string) => {
@@ -170,30 +183,33 @@ export default class ComponentHandler extends Base {
     });
   }
 
-  order(componentElement: Element, data: object, onComponent?: (component: Component<any>) => void) {
+  order(componentElement: Element, data: object, onComponent?: (component: Component) => void) {
     const $name = toLower(componentElement.nodeName);
-    const mComponents = this.components as dynamic;
+    const component = this.components[$name];
 
-    if (!mComponents[$name]) return Logger.error('No component with name “' + $name + '” registered.');
-
-    const component = (mComponents[$name] as (Component<any> | IComponentOptions<any>));
-    const iComponent = (component as IComponentOptions<any>);
+    if (!component) return Logger.error('No component with name “' + $name + '” registered.');
 
     const mainExecutionWrapper = () => {
-      if (component.template) {
-        const mComponent = (component instanceof Component)
-          ? copyObject(component) as Component
-          : new Component(iComponent);
+      const resolveComponentInstance = (c: Component | IComponentOptions) => {
+        let mCom: Component;
 
-        mComponent.template = iComponent.template;
-        mComponent.bouer = this.bouer;
+        if ((c instanceof Component) && (c as Component).clazz)
+          mCom = IoC.new(c.clazz!)!;
+        else if (c instanceof Component)
+          mCom = copyObject(c);
+        else
+          mCom = new Component(c);
 
-        this.insert(componentElement, mComponent, data, onComponent);
+        if (mCom.keepAlive === true)
+          this.components[$name] = mCom;
 
-        if (component.keepAlive === true)
-          mComponents[$name] = component;
-        return;
-      }
+        mCom.template = c.template;
+        mCom.bouer = this.bouer;
+        return mCom;
+      };
+
+      if (component.template)
+        return this.insert(componentElement, resolveComponentInstance(component)!, data, onComponent);
 
       if (!component.path)
         return Logger.error('Expected a valid value in `path` or `template` got invalid value at “' +
@@ -205,16 +221,8 @@ export default class ComponentHandler extends Base {
       // Make component request or Add
       this.request(component.path, {
         success: content => {
-          const mComponent = (component instanceof Component)
-            ? copyObject(component) as Component
-            : new Component(iComponent);
-          iComponent.template = mComponent.template = content;
-          mComponent.bouer = this.bouer;
-
-          this.insert(componentElement, mComponent, data, onComponent);
-
-          if (component.keepAlive === true)
-            mComponents[$name] = component;
+          component.template = content;
+          this.insert(componentElement, resolveComponentInstance(component)!, data, onComponent);
         },
         fail: (error) => {
           Logger.error('Failed to request <' + $name + '/> component with path “' +
@@ -227,10 +235,11 @@ export default class ComponentHandler extends Base {
     };
 
     // Checking the restrictions
-    if (iComponent.restrictions && iComponent.restrictions!.length > 0) {
+    if (component.restrictions && component.restrictions!.length > 0) {
       const blockedRestrictions: Function[] = [];
-      const restrictions = iComponent.restrictions.map(restriction => {
-        const restrictionResult = restriction.call(this.bouer, component) as any;
+      const restrictions = component.restrictions.map(restriction => {
+
+        const restrictionResult = restriction.call(this.bouer, component);
 
         if (restrictionResult === false)
           blockedRestrictions.push(restriction);
@@ -322,15 +331,20 @@ export default class ComponentHandler extends Base {
     componentElement: Element,
     component: Component<any>,
     data: object,
-    onComponent?: <Data>(component: Component<Data>) => void
+    onComponent?: (component: Component) => void
   ) {
     const $name = toLower(componentElement.nodeName);
     const container = componentElement.parentElement;
+    const compiler = IoC.resolve(this.bouer!, Compiler)!;
+
     if (!container)
       return;
 
     if (isNull(component.template))
       return Logger.error('The <' + $name + '/> component is not ready yet to be inserted.');
+
+    if (!compiler.analize(component.template!))
+      return;
 
     // Adding the component to the active component list if it is not added
     if (!this.activeComponents.includes(component))
@@ -402,7 +416,7 @@ export default class ComponentHandler extends Base {
         inputData = Extend.obj(this.bouer.data);
       else {
         // Otherwise, compiles the object provided
-        const mInputData = this.serviceProvider.get<Evaluator>('Evaluator')!
+        const mInputData = IoC.resolve(this.bouer, Evaluator)!
           .exec({
             data: mData,
             code: attr.value,
@@ -453,7 +467,7 @@ export default class ComponentHandler extends Base {
         }
 
         // Executing the mixed scripts
-        this.serviceProvider.get<Evaluator>('Evaluator')!
+        IoC.resolve(this.bouer, Evaluator)!
           .execRaw((scriptContent || ''), component);
 
         createdEvent.emit();
@@ -569,18 +583,17 @@ export default class ComponentHandler extends Base {
 
         beforeLoadEvent.emit();
         // Compiling the rootElement
-        this.serviceProvider.get<Compiler>('Compiler')!
-          .compile({
-            data: Reactive.transform({ context: component, data: component.data }),
-            onDone: () => {
-              if (isFunction(onComponent))
-                onComponent!(component);
-              loadedEvent.emit();
-            },
-            componentSlot: elementSlots,
-            context: component,
-            el: rootElement,
-          });
+        compiler.compile({
+          data: Reactive.transform({ context: component, data: component.data }),
+          onDone: () => {
+            if (isFunction(onComponent))
+              onComponent!(component);
+            loadedEvent.emit();
+          },
+          componentSlot: elementSlots,
+          context: component,
+          el: rootElement,
+        });
 
         const autoComponentDestroy = ifNullReturn(this.bouer.config.autoComponentDestroy, true);
         if (autoComponentDestroy === false) return;
