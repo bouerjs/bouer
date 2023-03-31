@@ -1,6 +1,7 @@
 import Component from '../../core/component/Component';
 import MiddlewareResult from '../../core/middleware/MiddlewareResult';
 import Bouer from '../../instance/Bouer';
+import ComponentClass from '../types/ComponentClass';
 import CustomDirective from '../types/CustomDirective';
 import IBouerConfig from './IBouerConfig';
 import IComponentOptions from './IComponentOptions';
@@ -18,7 +19,7 @@ interface IBouerOptions<Data, GlobalData, Dependencies> {
   readonly config?: IBouerConfig
 
   /** The components of the instance */
-  readonly components?: (Component<any> | IComponentOptions<any>)[];
+  readonly components?: (Component | IComponentOptions | ComponentClass)[];
 
   /** The custom directives for this instance */
   readonly directives?: CustomDirective,

@@ -1,7 +1,8 @@
 import Component from '../../core/component/Component';
+import ComponentClass from '../types/ComponentClass';
 import ILifeCycleHooks from './ILifeCycleHooks';
 
-interface IComponentOptions<Data> extends ILifeCycleHooks {
+interface IComponentOptions<Data = {}> extends ILifeCycleHooks {
   /** The name of the component */
   name?: string
 
@@ -30,10 +31,10 @@ interface IComponentOptions<Data> extends ILifeCycleHooks {
   prefetch?: boolean;
 
   /** The children of the component that should inherit the `route` of the father */
-  children?: (Component | IComponentOptions<Data>)[];
+  children?: (Component | IComponentOptions | ComponentClass)[];
 
   /** restrictions functions of the component */
-  restrictions?: ((component: (Component | IComponentOptions<Data>)) => boolean | Promise<boolean>)[];
+  restrictions?: ((component: Component | IComponentOptions) => boolean | Promise<boolean>)[];
 
   /** Allow to set this component as the `default page` when the application loads */
   isDefault?: boolean;
