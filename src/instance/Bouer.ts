@@ -579,7 +579,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
    * @param watchableScope the function that should be called when the any reactive property change
    * @returns an object having all the watches and the method to destroy watches at once
    */
-  react(watchableScope: (app: Bouer<Data, GlobalData, Dependencies>) => void) {
+  react(watchableScope: (app: Bouer) => void) {
     return IoC.resolve(this as Bouer, Binder)!
       .onPropertyInScopeChange(watchableScope);
   }
