@@ -19,7 +19,7 @@ import dynamic from '../definitions/types/Dynamic';
 import RenderContext from '../definitions/types/RenderContext';
 import WatchCallback from '../definitions/types/WatchCallback';
 import Constants from '../shared/helpers/Constants';
-import ServiceProvider from '../shared/helpers/ServiceProvider';
+import IoC from '../shared/helpers/IoCContainer';
 import Task from '../shared/helpers/Task';
 import Logger from '../shared/logger/Logger';
 import Base from '../core/Base';
@@ -33,16 +33,16 @@ import {
 } from '../shared/helpers/Utils';
 import SkeletonOptions from '../definitions/types/SkeletonOptions';
 import ViewChild from '../core/ViewChild';
+import ComponentClass from '../definitions/types/ComponentClass';
 
 export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
   extends Base implements IBouerOptions<Data, GlobalData, Dependencies> {
   readonly name = 'Bouer';
-  readonly version = '3.1.0';
   readonly data: Data;
   readonly globalData: GlobalData;
   readonly config: IBouerConfig;
   readonly deps: Dependencies;
-  readonly __id__: number = ServiceProvider.genId();
+  readonly __id__: number = IoC.newId();
   readonly options: IBouerOptions<Data, GlobalData, Dependencies>;
   /**
    * Gets all the elemens having the `ref` attribute
@@ -134,8 +134,8 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /** Components Handler */
   readonly $components: {
-    add<Data>(component: Component<Data> | IComponentOptions<Data>): void
-    get<Data>(name: string): (Component<Data> | IComponentOptions<Data>),
+    add<Data extends {} = {}>(component: Component<Data> | IComponentOptions<Data> | ComponentClass<Data>): void
+    get(name: string): Component | IComponentOptions,
     viewBy<Child extends Component>(expression: (component: Component) => boolean): Child[],
     viewByName<Child extends Component>(componentName: string): Child[],
     viewById<Child extends Component>(componentId: string): Child[],
@@ -150,10 +150,10 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     routeView: Element | null;
 
     /** Store the Component defined has NotFound Page */
-    defaultPage?: Component<any> | IComponentOptions<any>;
+    defaultPage?: Component | IComponentOptions;
 
     /** Store the Component defined has NotFound Page */
-    notFoundPage?: Component<any> | IComponentOptions<any>;
+    notFoundPage?: Component | IComponentOptions;
 
     /** Store `href` value of the <base /> tag */
     base?: string | null;
@@ -199,7 +199,6 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
       deps[key] = typeof value === 'function' ? value.bind(this) : value;
     });
 
-    new ServiceProvider(app);
     new Evaluator(app);
 
     const dataStore = new DataStore(app);
@@ -251,7 +250,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
             context: app,
             data: data as dynamic
           });
-        return new ServiceProvider(app).get<DataStore>('DataStore')!.set('data', key, data as dynamic);
+        return IoC.resolve(app, DataStore)!.set('data', key, data as dynamic);
       },
       unset: key => delete dataStore.data[key]
     };
@@ -404,11 +403,11 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     if (!(this.el = el)) throw Logger.error(new SyntaxError('Element with selector “' + selector + '” not found.'));
 
     const options = this.options || {};
-    const binder = ServiceProvider.get<Binder>(app, 'Binder')!;
-    const eventHandler = ServiceProvider.get<EventHandler>(app, 'EventHandler')!;
-    const routing = ServiceProvider.get<Routing>(app, 'Routing')!;
-    const skeleton = ServiceProvider.get<Skeleton>(app, 'Skeleton')!;
-    const compiler = ServiceProvider.get<Compiler>(app, 'Compiler')!;
+    const binder = IoC.resolve(app, Binder)!;
+    const eventHandler = IoC.resolve(app, EventHandler)!;
+    const routing = IoC.resolve(app, Routing)!;
+    const skeleton = IoC.resolve(app, Skeleton)!;
+    const compiler = IoC.resolve(app, Compiler)!;
 
     forEach([options.beforeLoad, options.loaded, options.beforeDestroy, options.destroyed],
       evt => {
@@ -569,7 +568,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     callback: (valueNew: TargetObject[Key], valueOld: TargetObject[Key]) => void,
     targetObject: TargetObject | Data = this.data
   ) {
-    return new ServiceProvider(this).get<Binder>('Binder')!
+    return IoC.resolve(this as Bouer, Binder)!
       .onPropertyChange<TargetObject[Key], TargetObject | Data>(
         propertyName, callback as WatchCallback, targetObject || this.data
       );
@@ -580,8 +579,8 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
    * @param watchableScope the function that should be called when the any reactive property change
    * @returns an object having all the watches and the method to destroy watches at once
    */
-  react(watchableScope: (app: Bouer) => void) {
-    return new ServiceProvider(this).get<Binder>('Binder')!
+  react(watchableScope: (app: Bouer<Data, GlobalData, Dependencies>) => void) {
+    return IoC.resolve(this as Bouer, Binder)!
       .onPropertyInScopeChange(watchableScope);
   }
 
@@ -607,13 +606,13 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
       }
     }
   ) {
-    return new ServiceProvider(this).get<EventHandler>('EventHandler')!.
+    return IoC.resolve(this as Bouer, EventHandler)!.
       on({
         eventName,
         callback,
         attachedNode: (options || {}).attachedNode,
         modifiers: (options || {}).modifiers,
-        context: this
+        context: this as Bouer
       });
   }
 
@@ -628,7 +627,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     callback?: (event: CustomEvent | Event) => void,
     attachedNode?: Node
   ) {
-    return new ServiceProvider(this).get<EventHandler>('EventHandler')!.
+    return IoC.resolve(this as Bouer, EventHandler)!.
       off({
         eventName,
         callback,
@@ -643,7 +642,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
    * @param boundPropName the bound property name
    */
   unbind(boundNode: Node, boundAttrName?: string, boundPropName?: string) {
-    return new ServiceProvider(this).get<Binder>('Binder')!.
+    return IoC.resolve(this as Bouer, Binder)!.
       remove(boundNode, boundPropName, boundAttrName);
   }
 
@@ -660,13 +659,12 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     }
   ) {
     const mOptions = (options || {});
-    return new ServiceProvider(this as Bouer)
-      .get<EventHandler>('EventHandler')!.emit({
-        eventName: eventName,
-        attachedNode: mOptions.element,
-        init: mOptions.init,
-        once: mOptions.once
-      });
+    return IoC.resolve(this as Bouer, EventHandler)!.emit({
+      eventName: eventName,
+      attachedNode: mOptions.element,
+      init: mOptions.init,
+      once: mOptions.once
+    });
   }
 
   /**
@@ -708,7 +706,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     /** The function that should be fired when the compilation is done */
     onDone?: (element: Element, data?: Data | undefined) => void
   }) {
-    return new ServiceProvider(this).get<Compiler>('Compiler')!.
+    return IoC.resolve(this as Bouer, Compiler)!.
       compile({
         el: options.el,
         data: options.data,
@@ -719,8 +717,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   destroy() {
     const el = this.el!;
-    const serviceProvider = new ServiceProvider(this as Bouer);
-    const $Events = serviceProvider.get<EventHandler>('EventHandler')!.$events;
+    const $Events = IoC.resolve(this as Bouer, EventHandler)!.$events;
     const destroyedEvents = ($Events['destroyed'] || []).concat(($Events['component:destroyed'] || []));
 
     this.emit('destroyed', { element: this.el! });
@@ -736,6 +733,6 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
     this.isDestroyed = true;
     this.isInitialized = false;
-    serviceProvider.clear();
+    IoC.clear(this as Bouer);
   }
 }
