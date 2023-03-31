@@ -2,7 +2,7 @@ import RenderContext from '../definitions/types/RenderContext';
 import dynamic from '../definitions/types/Dynamic';
 import Bouer from '../instance/Bouer';
 import Extend from '../shared/helpers/Extend';
-import ServiceProvider from '../shared/helpers/ServiceProvider';
+import IoC from '../shared/helpers/IoCContainer';
 import { buildError } from '../shared/helpers/Utils';
 import Logger from '../shared/logger/Logger';
 import Base from './Base';
@@ -13,7 +13,7 @@ export default class Evaluator extends Base {
   constructor(bouer: Bouer) {
     super();
     this.bouer = bouer;
-    ServiceProvider.add('Evaluator', this);
+    IoC.register(bouer, this);
   }
 
   execRaw(code: string, context?: RenderContext) {
@@ -43,10 +43,27 @@ export default class Evaluator extends Base {
         $mixin: Extend.mixin
       });
 
+    return Evaluator.run({
+      code: expression,
+      data: dataToUse,
+      isReturn: isReturn,
+      context: context,
+      args: args,
+    });
+  }
+
+  static run(options: {
+    code: string,
+    data?: object,
+    args?: any[],
+    isReturn?: boolean,
+    context?: RenderContext
+  }) {
     try {
+      const { data, args, code: expression, isReturn, context } = options;
       return Function('var d$=arguments[0].d;return(function(){var r$;with(d$){' +
         (isReturn === false ? '' : 'r$=') + expression + '}return r$;}).apply(this, arguments[0].a)')
-        .call((context || this.bouer), { d: dataToUse, a: args });
+        .call(context, { d: data || {}, a: args });
     } catch (error) {
       Logger.error(buildError(error));
     }
