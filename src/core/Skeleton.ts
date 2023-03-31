@@ -1,7 +1,7 @@
 import SkeletonOptions from '../definitions/types/SkeletonOptions';
 import Bouer from '../instance/Bouer';
 import Constants from '../shared/helpers/Constants';
-import ServiceProvider from '../shared/helpers/ServiceProvider';
+import IoC from '../shared/helpers/IoCContainer';
 import { $CreateEl, ifNullStop, DOM, forEach, toArray, code, isNull } from '../shared/helpers/Utils';
 import Base from './Base';
 
@@ -22,7 +22,7 @@ export default class Skeleton extends Base {
     this.bouer = bouer;
     this.style = $CreateEl('style', el => el.id = this.identifier).build();
 
-    ServiceProvider.add('Skeleton', this);
+    IoC.register(bouer, this);
   }
 
   private reset() {
