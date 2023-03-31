@@ -403,10 +403,10 @@ export function getRootElement(el: Element) {
   return (el as any).root || el;
 }
 
-export function copyObject(object: any) {
-  const out = Object.create(object.__proto__);
+export function copyObject<TObject extends dynamic>(object: TObject) {
+  const out: dynamic = Object.create(object.__proto__);
   forEach(Object.keys(object), key => out[key] = object[key]);
-  return out;
+  return out as TObject;
 }
 
 export const WIN = window;
