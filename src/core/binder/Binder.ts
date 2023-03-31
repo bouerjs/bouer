@@ -419,11 +419,7 @@ export default class Binder extends Base {
   }
 
   onPropertyInScopeChange(
-    watchable: <
-      Data = {},
-      GlobalData = {},
-      Dependencies = {}
-    >(app: Bouer<Data, GlobalData, Dependencies>) => void
+    watchable: (app: Bouer<{}, {}, {}>) => void
   ) {
     const watches: Watch<any, any>[] = [];
 
