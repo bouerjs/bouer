@@ -4,17 +4,73 @@ const path = require('path');
 const rollup = require('rollup');
 const terser = require('terser');
 const builds = require('./config').builds;
+const indent = require('js-beautify');
 
-Object.keys(builds).filter(key => {
+let clearConsole = false;
+let numberOfGenerations = 0;
+const buildKeys = Object.keys(builds);
+
+buildKeys.filter(key => {
   const config = builds[key];
   const output = config.output;
 
   const fileNameDev = output.file;
   const fileNameProd = fileNameDev.replace('.js', '.min.js');
   const isProd = process.argv[2] === '--prod';
+  const isDev = process.argv[2] === '--dev';
 
   if (!fs.existsSync('dist')) {
     fs.mkdirSync('dist');
+  }
+
+  if (isDev) {
+    console.clear();
+    const watcher = rollup.watch(config);
+
+    watcher.on('event', event => {
+      const bundle = event.result;
+      const date = new Date().toJSON().replace('T', ' ').replace('Z', '');
+      const prefix = `[${date}]`;
+
+      switch (event.code) {
+        case 'BUNDLE_START':
+
+          // Console clear
+          if (clearConsole) {
+            clearConsole = false;
+            console.clear();
+          }
+
+          console.info(`${prefix} ⚒️  Generating file -> ${event.output[0]}`);
+          break;
+        case 'FATAL':
+          console.error(`${prefix} ☠️ Fatal Error: ${event.error}`);
+          process.exit(1);
+          break;
+        case 'ERROR':
+          console.error(`${prefix} 😵 Error: ${event.error}`);
+          break;
+        case 'BUNDLE_END':
+          bundle.generate({})
+            .then(({ output: [{ code }] }) => writeFile(fileNameDev, code))
+            .finally(() => {
+              bundle.close();
+
+              // Console clear
+              numberOfGenerations++;
+              if (buildKeys.length == numberOfGenerations) {
+                clearConsole = true;
+                numberOfGenerations = 0;
+
+                console.log(`${prefix} ⏳ Waiting for a file to change to rebuild...`);
+                console.log();
+              }
+            });
+          break;
+      }
+    });
+
+    return;
   }
 
   rollup.rollup(config)
@@ -47,20 +103,36 @@ Object.keys(builds).filter(key => {
 function writeFile(dest, code, zip) {
   return new Promise((resolve, reject) => {
     function report(extra) {
-      const colored = `\x1b[1m\x1b[34m${
-        ((path.relative(process.cwd(), dest)) + ' ' + getSize(code) + (extra || ''))
-      }\x1b[39m\x1b[22m`;
-      const instance = new Date();
-      const date = instance.toJSON().split('T')[0];
-      const time = instance.toLocaleTimeString('pt');
-      console.log(`[${ date } ${ time }] ${colored}`);
+      const content = ((path.relative(process.cwd(), dest)) + ' ' + getSize(code) + (extra || ''));
+      const colored = `\x1b[1m\x1b[34m${content}\x1b[39m\x1b[22m`;
+      console.log(`[${new Date().toJSON().replace('T', ' ').replace('Z', '')}] ✅ Completed: ${colored}`);
       resolve();
     }
 
-    fs.writeFile(dest, code, err => {
+    const mCode = indent.js(code, {
+      'indent_size': '2',
+      'indent_char': ' ',
+      'max_preserve_newlines': '1',
+      'preserve_newlines': true,
+      'keep_array_indentation': true,
+      'break_chained_methods': false,
+      'indent_scripts': 'normal',
+      'brace_style': 'collapse',
+      'space_before_conditional': true,
+      'unescape_strings': false,
+      'jslint_happy': false,
+      'end_with_newline': false,
+      'wrap_line_length': '0',
+      'indent_inner_html': false,
+      'comma_first': false,
+      'e4x': false,
+      'indent_empty_lines': false
+    });
+
+    fs.writeFile(dest, mCode, err => {
       if (err) return reject(err);
       if (zip) {
-        zlib.gzip(code, (err, zipped) => {
+        zlib.gzip(mCode, (err, zipped) => {
           if (err) return reject(err);
           report(' (gzipped: ' + getSize(zipped) + ')');
         });
