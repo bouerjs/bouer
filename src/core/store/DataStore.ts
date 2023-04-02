@@ -1,7 +1,6 @@
 import dynamic from '../../definitions/types/Dynamic';
 import RenderContext from '../../definitions/types/RenderContext';
 import Bouer from '../../instance/Bouer';
-import IoC from '../../shared/helpers/IoCContainer';
 import Logger from '../../shared/logger/Logger';
 import Base from '../Base';
 
@@ -19,8 +18,6 @@ export default class DataStore extends Base {
 
   constructor(bouer: Bouer) {
     super();
-
-    IoC.register(bouer, this);
   }
 
   set<TKey extends keyof DataStore>(key: TKey, dataKey: string, data: object) {

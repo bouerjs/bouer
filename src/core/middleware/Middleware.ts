@@ -1,7 +1,6 @@
 import IMiddleware from '../../definitions/interfaces/IMiddleware';
 import IMiddlewareObject from '../../definitions/interfaces/IMiddlewareObject';
 import Bouer from '../../instance/Bouer';
-import IoC from '../../shared/helpers/IoCContainer';
 import Base from '../Base';
 import MiddlewareResult from './MiddlewareResult';
 
@@ -13,7 +12,6 @@ export default class Middleware extends Base {
     super();
 
     this.bouer = bouer;
-    IoC.register(bouer, this);
   }
 
   run = (directive: string, runnable: {

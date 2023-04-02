@@ -34,7 +34,6 @@ export default class Routing extends Base {
     super();
 
     this.bouer = bouer;
-    IoC.register(bouer, this);
   }
 
   init() {
@@ -105,7 +104,7 @@ export default class Routing extends Base {
       this.pushState(resolver.href, DOM.title);
 
     const routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route!);
-    IoC.resolve(this.bouer!, ComponentHandler)!
+    IoC.app(this.bouer).resolve(ComponentHandler)!
       .order(componentElement, this.bouer.data, () => {
         this.markActiveAnchorsWithRoute(routeToSet);
       });
@@ -130,7 +129,7 @@ export default class Routing extends Base {
     }
 
     // Search for the right page
-    return IoC.resolve(this.bouer, ComponentHandler)!
+    return IoC.app(this.bouer).resolve(ComponentHandler)!
       .find(component => {
         if (!component.route) return false;
 
