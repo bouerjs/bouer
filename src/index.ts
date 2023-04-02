@@ -17,6 +17,7 @@ import MiddlewareResult from './core/middleware/MiddlewareResult';
 import Extend from './shared/helpers/Extend';
 import Prop from './shared/helpers/Prop';
 import ViewChild from './core/ViewChild';
+import IoC from './shared/helpers/IoCContainer';
 
 export {
   Bouer as default,
@@ -37,5 +38,6 @@ export {
   IAsset,
   Extend,
   Prop,
-  ViewChild
+  ViewChild,
+  IoC
 };
