@@ -22,6 +22,7 @@
     "@typescript-eslint"
   ],
   "rules": {
+    "padded-blocks":"off",
     "curly": "off",
     "comma-dangle": "off",
     "arrow-parens": "off",
@@ -33,6 +34,7 @@
     "no-debugger": "off",
     "prefer-promise-reject-errors": "off",
     "space-before-function-paren": "off",
+    "linebreak-style": "off",
     "object-curly-spacing": [
       "error",
       "always"
@@ -48,10 +50,6 @@
     "quotes": [
       "error",
       "single"
-    ],
-    "linebreak-style": [
-      "error",
-      "unix"
     ],
     "max-len": [
       "error", {
