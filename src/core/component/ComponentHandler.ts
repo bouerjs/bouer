@@ -52,15 +52,18 @@ export default class ComponentHandler extends Base {
   stylesController: { [key: string]: { styles: Element[], elements: Element[] }, } = {};
   activeComponents: Component[] = [];
 
-  constructor(bouer: Bouer) {
+  constructor(
+    bouer: Bouer,
+    delimiterHandler: DelimiterHandler,
+    eventHandler: EventHandler,
+    evaluator: Evaluator
+  ) {
     super();
 
     this.bouer = bouer;
-    this.delimiter = IoC.resolve(bouer, DelimiterHandler)!;
-    this.eventHandler = IoC.resolve(bouer, EventHandler)!;
-    this.evaluator = IoC.resolve(bouer, Evaluator)!;
-
-    IoC.register(bouer, this);
+    this.delimiter = delimiterHandler!;
+    this.eventHandler = eventHandler!;
+    this.evaluator = evaluator!;
   }
 
   check(nodeName: string) {
@@ -154,7 +157,7 @@ export default class ComponentHandler extends Base {
       if (Array.isArray(component.children))
         this.prepare(component.children, component);
 
-      IoC.resolve(this.bouer!, Routing)!
+      IoC.app(this.bouer).resolve(Routing)!
         .configure(this.components[component.name!] = component);
 
       const getContent = (path?: string) => {
@@ -335,7 +338,7 @@ export default class ComponentHandler extends Base {
   ) {
     const $name = toLower(componentElement.nodeName);
     const container = componentElement.parentElement;
-    const compiler = IoC.resolve(this.bouer!, Compiler)!;
+    const compiler = IoC.app(this.bouer).resolve(Compiler)!;
 
     if (!container)
       return;
@@ -416,7 +419,7 @@ export default class ComponentHandler extends Base {
         inputData = Extend.obj(this.bouer.data);
       else {
         // Otherwise, compiles the object provided
-        const mInputData = IoC.resolve(this.bouer, Evaluator)!
+        const mInputData = IoC.app(this.bouer).resolve(Evaluator)!
           .exec({
             data: mData,
             code: attr.value,
@@ -467,7 +470,7 @@ export default class ComponentHandler extends Base {
         }
 
         // Executing the mixed scripts
-        IoC.resolve(this.bouer, Evaluator)!
+        IoC.app(this.bouer).resolve(Evaluator)!
           .execRaw((scriptContent || ''), component);
 
         createdEvent.emit();

@@ -5,7 +5,6 @@ import RenderContext from '../../definitions/types/RenderContext';
 import dynamic from '../../definitions/types/Dynamic';
 import Bouer from '../../instance/Bouer';
 import Constants from '../../shared/helpers/Constants';
-import IoC from '../../shared/helpers/IoCContainer';
 import Task from '../../shared/helpers/Task';
 import {
   buildError,
@@ -28,13 +27,12 @@ export default class EventHandler extends Base {
   $events: { [key: string]: IEventSubscription[] } = {};
   input = $CreateEl('input').build();
 
-  constructor(bouer: Bouer) {
+  constructor(bouer: Bouer, evaluator: Evaluator) {
     super();
 
     this.bouer = bouer;
-    this.evaluator = IoC.resolve(bouer, Evaluator)!;
+    this.evaluator = evaluator;
 
-    IoC.register(bouer, this);
     this.cleanup();
   }
 

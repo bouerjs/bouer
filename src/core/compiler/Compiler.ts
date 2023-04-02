@@ -34,18 +34,23 @@ export default class Compiler extends Base {
     '#comment': 8
   };
 
-  constructor(bouer: Bouer, directives?: CustomDirective) {
+  constructor(
+    bouer: Bouer,
+    binder: Binder,
+    delimiterHandler: DelimiterHandler,
+    eventHandler: EventHandler,
+    componentHandler: ComponentHandler,
+    directives?: CustomDirective,
+  ) {
     super();
 
     this.bouer = bouer;
     this.directives = directives ?? {};
 
-    this.binder = IoC.resolve(bouer, Binder)!;
-    this.delimiter = IoC.resolve(bouer, DelimiterHandler)!;
-    this.eventHandler = IoC.resolve(bouer, EventHandler)!;
-    this.component = IoC.resolve(bouer, ComponentHandler)!;
-
-    IoC.register(bouer, this);
+    this.binder = binder;
+    this.delimiter = delimiterHandler;
+    this.eventHandler = eventHandler;
+    this.component = componentHandler;
   }
 
   compile<Data>(options: {
@@ -75,7 +80,7 @@ export default class Compiler extends Base {
     const context = options.context || this.bouer;
     const data = (options.data || this.bouer.data!);
     const isConnected = (options.isConnected || (() => rootElement.isConnected));
-    const routing = IoC.resolve(this.bouer, Routing)!;
+    const routing = IoC.app(this.bouer).resolve(Routing)!;
 
     if (!rootElement)
       return Logger.error('Invalid element provided to the compiler.');

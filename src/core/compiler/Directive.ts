@@ -61,10 +61,10 @@ export default class Directive extends Base {
     this.bouer = compiler.bouer;
     this.$custom = customDirective;
 
-    this.evaluator = IoC.resolve(this.bouer, Evaluator)!;
-    this.delimiter = IoC.resolve(this.bouer, DelimiterHandler)!;
-    this.binder = IoC.resolve(this.bouer, Binder)!;
-    this.eventHandler = IoC.resolve(this.bouer, EventHandler)!;
+    this.evaluator = IoC.app(this.bouer).resolve(Evaluator)!;
+    this.delimiter = IoC.app(this.bouer).resolve(DelimiterHandler)!;
+    this.binder = IoC.app(this.bouer).resolve(Binder)!;
+    this.eventHandler = IoC.app(this.bouer).resolve(EventHandler)!;
   }
 
   // Helper functions
@@ -810,7 +810,7 @@ export default class Directive extends Base {
     let dataKey = node.nodeName.split(':')[1];
     if (dataKey) {
       dataKey = dataKey.replace(/\[|\]/g, '');
-      IoC.resolve(this.bouer, DataStore)!.set('data', dataKey, inputData);
+      IoC.app(this.bouer).resolve(DataStore)!.set('data', dataKey, inputData);
     }
 
     Reactive.transform({
@@ -853,7 +853,7 @@ export default class Directive extends Base {
       .addEventListener('click', event => {
         event.preventDefault();
 
-        IoC.resolve(this.bouer, Routing)!
+        IoC.app(this.bouer).resolve(Routing)!
           .navigate(href.value);
       }, false);
   }
@@ -869,7 +869,7 @@ export default class Directive extends Base {
       return Logger.error(this.errorMsgNodeValue(node));
 
     ownerNode.removeAttribute(node.nodeName);
-    IoC.resolve(this.bouer, ComponentHandler)!
+    IoC.app(this.bouer).resolve(ComponentHandler)!
       .prepare([
         {
           name: nodeValue,
@@ -913,7 +913,7 @@ export default class Directive extends Base {
         .appendTo(ownerNode)
         .build();
 
-      IoC.resolve(this.bouer, ComponentHandler)!
+      IoC.app(this.bouer).resolve(ComponentHandler)!
         .order(componentElement, data);
     })();
   }
@@ -952,7 +952,7 @@ export default class Directive extends Base {
     // Inserting the comment node
     container.insertBefore(comment, ownerNode);
 
-    const skeleton = IoC.resolve(this.bouer, Skeleton)!;
+    const skeleton = IoC.app(this.bouer).resolve(Skeleton)!;
 
     // Only insert if the type is `of
     if (nodeValue.includes(' of '))
@@ -1044,7 +1044,7 @@ export default class Directive extends Base {
       return true;
     };
 
-    const middleware = IoC.resolve(this.bouer, Middleware)!;
+    const middleware = IoC.app(this.bouer).resolve(Middleware)!;
 
     if (!middleware.has('req'))
       return Logger.error('There is no “req” middleware provided for the “e-req” directive requests.');
@@ -1060,7 +1060,7 @@ export default class Directive extends Base {
           data: response
         });
 
-        if (dataKey) IoC.resolve(this.bouer, DataStore)!.set('req', dataKey, response);
+        if (dataKey) IoC.app(this.bouer).resolve(DataStore)!.set('req', dataKey, response);
 
         subcribeEvent(Constants.builtInEvents.response).emit({
           response: response
@@ -1188,7 +1188,7 @@ export default class Directive extends Base {
       return Logger.error(this.errorMsgNodeValue(node));
 
     ownerNode.removeAttribute(node.nodeName);
-    const dataStore = IoC.resolve(this.bouer, DataStore)!;
+    const dataStore = IoC.app(this.bouer).resolve(DataStore)!;
     const mWait = dataStore.wait[nodeValue];
 
     if (mWait) {
