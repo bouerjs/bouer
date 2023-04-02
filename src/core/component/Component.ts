@@ -114,7 +114,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
     forEach(this.events, evt => this.off((evt.eventName as any), evt.callback));
     this.events = [];
 
-    const components = IoC.resolve(this.bouer!, ComponentHandler)!
+    const components = IoC.app(this.bouer!).resolve(ComponentHandler)!
       .activeComponents;
 
     components.splice(components.indexOf(this as Component<{}>), 1);
@@ -128,7 +128,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
     eventName: TKey,
     init?: CustomEventInit
   ) {
-    IoC.resolve(this.bouer!, EventHandler)!.emit({
+    IoC.app(this.bouer!).resolve(EventHandler)!.emit({
       eventName: eventName,
       attachedNode: this.el!,
       init: init
@@ -139,10 +139,10 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
     eventName: TKey,
     callback: (event: CustomEvent) => void
   ) {
-    const instanceHooksSet = new Set<String>([
+    const instanceHooksSet = new Set([
       'created', 'beforeMount', 'mounted', 'beforeLoad', 'loaded', 'beforeDestroy', 'destroyed'
     ]);
-    const registerHooksSet = new Set<String>([
+    const registerHooksSet = new Set([
       'requested', 'blocked', 'failed'
     ]);
 
@@ -150,7 +150,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
       Logger.warn('The “' + eventName + '” Event is called before the component is mounted, to be dispatched' +
         'it needs to be on registration object: { ' + eventName + ': function(){ ... }, ... }.');
 
-    const evt = IoC.resolve(this.bouer!, EventHandler)!.on({
+    const evt = IoC.app(this.bouer!).resolve(EventHandler)!.on({
       eventName,
       callback: callback as any,
       attachedNode: this.el!,
@@ -164,7 +164,7 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
   off<TKey extends keyof ILifeCycleHooks>(
     eventName: TKey, callback: (event: CustomEvent) => void
   ) {
-    IoC.resolve(this.bouer!, EventHandler)!.off({
+    IoC.app(this.bouer!).resolve(EventHandler)!.off({
       eventName,
       callback: callback as any,
       attachedNode: this.el!
