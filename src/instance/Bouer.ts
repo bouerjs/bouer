@@ -199,10 +199,27 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
       deps[key] = typeof value === 'function' ? value.bind(this) : value;
     });
 
-    new Evaluator(app);
+    const delimiters = options.delimiters || [];
 
-    const dataStore = new DataStore(app);
-    const middleware = new Middleware(app);
+    // Adding Dependency Injection Services
+    IoC.app(this).add(DataStore, {}, true);
+    IoC.app(this).add(Evaluator, {}, true);
+    IoC.app(this).add(Middleware, {}, true);
+    IoC.app(this).add(Binder, {}, true);
+    IoC.app(this).add(EventHandler, {}, true);
+    IoC.app(this).add(ComponentHandler, {}, true);
+    IoC.app(this).add(Skeleton, {}, true);
+    IoC.app(this).add(Routing, {}, true);
+
+    IoC.app(this).add(DelimiterHandler, { delimiters }, true);
+    IoC.app(this).add(Compiler, { directives: options.directives }, true);
+
+    const dataStore = IoC.app(this).resolve(DataStore)!;
+    const middleware = IoC.app(this).resolve(Middleware)!;
+    const componentHandler = IoC.app(this).resolve(ComponentHandler)!;
+    const compiler = IoC.app(this).resolve(Compiler)!;
+    const skeleton = IoC.app(this).resolve(Skeleton)!;
+    const delimiter = IoC.app(this).resolve(DelimiterHandler)!;
 
     // Register the middleware
     if (typeof options.middleware === 'function')
@@ -218,20 +235,13 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
       context: app
     });
 
-    const delimiters = options.delimiters || [];
     delimiters.push.apply(delimiters, [
       { name: 'html', delimiter: { open: '{{:html ', close: '}}' } },
       { name: 'common', delimiter: { open: '{{', close: '}}' } },
     ]);
 
-    new Binder(app);
-    new EventHandler(app);
-    const delimiter = new DelimiterHandler(delimiters, app);
-    const componentHandler = new ComponentHandler(app);
-    const compiler = new Compiler(app, options.directives);
-    const skeleton = new Skeleton(app);
 
-    this.$routing = new Routing(app);
+    this.$routing = IoC.app(this).resolve(Routing)!;
 
     this.$delimiters = {
       add: delimiter.add,
@@ -250,7 +260,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
             context: app,
             data: data as dynamic
           });
-        return IoC.resolve(app, DataStore)!.set('data', key, data as dynamic);
+        return IoC.app(this).resolve(DataStore)!.set('data', key, data as dynamic);
       },
       unset: key => delete dataStore.data[key]
     };
@@ -403,11 +413,11 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     if (!(this.el = el)) throw Logger.error(new SyntaxError('Element with selector “' + selector + '” not found.'));
 
     const options = this.options || {};
-    const binder = IoC.resolve(app, Binder)!;
-    const eventHandler = IoC.resolve(app, EventHandler)!;
-    const routing = IoC.resolve(app, Routing)!;
-    const skeleton = IoC.resolve(app, Skeleton)!;
-    const compiler = IoC.resolve(app, Compiler)!;
+    const binder = IoC.app(this).resolve(Binder)!;
+    const eventHandler = IoC.app(this).resolve(EventHandler)!;
+    const routing = IoC.app(this).resolve(Routing)!;
+    const skeleton = IoC.app(this).resolve(Skeleton)!;
+    const compiler = IoC.app(this).resolve(Compiler)!;
 
     forEach([options.beforeLoad, options.loaded, options.beforeDestroy, options.destroyed],
       evt => {
@@ -568,7 +578,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     callback: (valueNew: TargetObject[Key], valueOld: TargetObject[Key]) => void,
     targetObject: TargetObject | Data = this.data
   ) {
-    return IoC.resolve(this as Bouer, Binder)!
+    return IoC.app(this).resolve(Binder)!
       .onPropertyChange<TargetObject[Key], TargetObject | Data>(
         propertyName, callback as WatchCallback, targetObject || this.data
       );
@@ -580,7 +590,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
    * @returns an object having all the watches and the method to destroy watches at once
    */
   react(watchableScope: (app: Bouer) => void) {
-    return IoC.resolve(this as Bouer, Binder)!
+    return IoC.app(this).resolve(Binder)!
       .onPropertyInScopeChange(watchableScope);
   }
 
@@ -606,7 +616,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
       }
     }
   ) {
-    return IoC.resolve(this as Bouer, EventHandler)!.
+    return IoC.app(this).resolve(EventHandler)!.
       on({
         eventName,
         callback,
@@ -627,7 +637,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     callback?: (event: CustomEvent | Event) => void,
     attachedNode?: Node
   ) {
-    return IoC.resolve(this as Bouer, EventHandler)!.
+    return IoC.app(this).resolve(EventHandler)!.
       off({
         eventName,
         callback,
@@ -642,7 +652,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
    * @param boundPropName the bound property name
    */
   unbind(boundNode: Node, boundAttrName?: string, boundPropName?: string) {
-    return IoC.resolve(this as Bouer, Binder)!.
+    return IoC.app(this).resolve(Binder)!.
       remove(boundNode, boundPropName, boundAttrName);
   }
 
@@ -659,7 +669,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     }
   ) {
     const mOptions = (options || {});
-    return IoC.resolve(this as Bouer, EventHandler)!.emit({
+    return IoC.app(this).resolve(EventHandler)!.emit({
       eventName: eventName,
       attachedNode: mOptions.element,
       init: mOptions.init,
@@ -706,7 +716,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     /** The function that should be fired when the compilation is done */
     onDone?: (element: Element, data?: Data | undefined) => void
   }) {
-    return IoC.resolve(this as Bouer, Compiler)!.
+    return IoC.app(this).resolve(Compiler)!.
       compile({
         el: options.el,
         data: options.data,
@@ -717,7 +727,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   destroy() {
     const el = this.el!;
-    const $Events = IoC.resolve(this as Bouer, EventHandler)!.$events;
+    const $Events = IoC.app(this).resolve(EventHandler)!.$events;
     const destroyedEvents = ($Events['destroyed'] || []).concat(($Events['component:destroyed'] || []));
 
     this.emit('destroyed', { element: this.el! });
@@ -733,6 +743,6 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
     this.isDestroyed = true;
     this.isInitialized = false;
-    IoC.clear(this as Bouer);
+    IoC.app(this).clear();
   }
 }
