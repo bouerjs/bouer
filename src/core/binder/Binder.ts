@@ -49,9 +49,8 @@ export default class Binder extends Base {
   constructor(bouer: Bouer) {
     super();
     this.bouer = bouer;
-    this.evaluator = IoC.resolve(bouer, Evaluator)!;
+    this.evaluator = IoC.app(bouer).resolve(Evaluator)!;
 
-    IoC.register(bouer, this);
     this.cleanup();
   }
 
@@ -60,7 +59,7 @@ export default class Binder extends Base {
     const originalValue = trim(ifNullReturn(node.nodeValue, ''));
     const originalName = node.nodeName;
     const ownerNode = (node as any).ownerElement || node.parentNode;
-    const middleware = IoC.resolve(this.bouer, Middleware)!;
+    const middleware = IoC.app(this.bouer).resolve(Middleware)!;
     const onUpdate = options.onUpdate || ((v: any, n: Node) => { });
 
     // Clousure cache property settings
@@ -148,7 +147,7 @@ export default class Binder extends Base {
         ownerNode.innerHTML = '';
         forEach(htmlSnippets, snippetNode => {
           ownerNode.appendChild(snippetNode);
-          IoC.resolve(this.bouer, Compiler)!.compile({
+          IoC.app(this.bouer).resolve(Compiler)!.compile({
             el: snippetNode,
             data: data,
             context: context,

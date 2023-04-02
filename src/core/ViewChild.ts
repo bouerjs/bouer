@@ -10,7 +10,7 @@ export default class ViewChild {
     expression: (component: Component) => boolean
   ): Child[] {
     // Retrieving the active component
-    const activeComponents = IoC.resolve(bouerInstance, ComponentHandler)!
+    const activeComponents = IoC.app(bouerInstance).resolve(ComponentHandler)!
       .activeComponents as any[];
     // Applying filter to the find the component
     return where(activeComponents, expression) as Child[];
@@ -19,7 +19,7 @@ export default class ViewChild {
   static viewById<Child extends Component>(bouerInstance: Bouer, componentId: string):
     Child[] {
     // Retrieving the active component
-    const activeComponents = IoC.resolve(bouerInstance, ComponentHandler)!
+    const activeComponents = IoC.app(bouerInstance).resolve(ComponentHandler)!
       .activeComponents;
     // Applying filter to the find the component
     return where(activeComponents, c => (c.el && getRootElement(c.el).id == componentId)) as Child[];
@@ -28,7 +28,7 @@ export default class ViewChild {
   static viewByName<Child extends Component>(bouerInstance: Bouer, componentName: string):
     Child[] {
     // Retrieving the active component
-    const activeComponents = IoC.resolve(bouerInstance, ComponentHandler)!
+    const activeComponents = IoC.app(bouerInstance).resolve(ComponentHandler)!
       .activeComponents;
     // Applying filter to the find the component
     return where(activeComponents, c => c.name.toLowerCase() == (componentName || '').toLowerCase()) as Child[];
