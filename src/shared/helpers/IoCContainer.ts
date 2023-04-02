@@ -1,90 +1,194 @@
 import Evaluator from '../../core/Evaluator';
+import dynamic from '../../definitions/types/Dynamic';
 import Bouer from '../../instance/Bouer';
 import Logger from '../logger/Logger';
+import { forEach, ifNullReturn, isNull, toLower, where } from './Utils';
 
 type ServiceClass<Service> = (new (...args: any[]) => Service);
+type ServiceItem<Service> = {
+  clazz: ServiceClass<Service>,
+  instance?: Service,
+  isSingleton: boolean,
+  args?: dynamic
+};
 
-export default class IoC {
+export default (function IoC() {
+  let bouerId: number = 1;
+  const serviceCollection: Map<Bouer, dynamic<ServiceItem<any>>> = new Map();
 
-  private static _bouerId: number = 1;
-  private static _serviceCollection: Map<Bouer, {
-    [key: string]: {
-      service: {} | ServiceClass<{}>,
-      isSingleton: boolean
-    }
-  }> = new Map();
+  const findServiceByName = (app: Bouer | null, name: string) => {
+    if (!app) return null;
 
-  /**
-   * Register an instance into the service collection
-   * @param instance the instance to be store
-   */
-  static register<Service>(app: Bouer, clazz: Service | ServiceClass<Service>) {
+    const collection = serviceCollection.get(app) || {};
+
+    const serviceName = where(Object.keys(collection),
+      key => toLower(collection[key].clazz.name) == toLower(name)
+    )[0];
+
+    if (!serviceName)
+      return null;
+
+    return collection[serviceName];
+  };
+
+  const classParams = <Type>(ctor: (new (...args: any[]) => Type)) => {
+    if (!ctor) return [];
+    return (ctor + '')
+      .replace(/[/][/].*$/mg, '') // strip single-line comments
+      .replace(/\s+/g, '') // strip white space
+      .replace(/[/][*][^/*]*[*][/]/g, '') // strip multi-line comments
+      .split('){', 1)[0].replace(/^[^(]*[(]/, '') // extract the parameters
+      .replace(/=[^,]+/g, '') // strip any ES6 defaults
+      .split(',').filter(Boolean); // split & filter [""]
+  };
+
+  const add = <Service>(app: Bouer, clazz: ServiceClass<Service>, params?: dynamic, isSingleton?: boolean) => {
     if (app.isDestroyed) throw new Error('Application already disposed.');
 
-    if (!this._serviceCollection.has(app))
-      this._serviceCollection.set(app, {});
+    if (!serviceCollection.has(app))
+      serviceCollection.set(app, {});
 
-    const isClass = (clazz instanceof Function);
-    // Get the service name in the constructor it is an instance otherwise, get from the Class name
-    const serviceName = isClass ? (clazz as ServiceClass<Service>).name : (clazz as Object).constructor.name;
-    const collection = this._serviceCollection.get(app)!;
+    const serviceName = (clazz as ServiceClass<Service>).name;
+    const collection = serviceCollection.get(app)!;
 
-    return collection[serviceName] = {
-      service: clazz as {} | ServiceClass<{}>,
-      isSingleton: !isClass
+    collection[serviceName] = {
+      clazz: clazz as ServiceClass<Service>,
+      isSingleton: ifNullReturn(isSingleton, false),
+      args: params
     };
-  }
+  };
 
   /**
    * Resolve and Retrieve the instance registered
    * @param name the name of the service
    * @returns the instance of the class
    */
-  static resolve<Service>(app: Bouer, clazz: (new (...args: any[]) => Service)) {
+  const resolve = <Service>(app: Bouer, clazz: (new (...args: any[]) => Service)) => {
     if (app.isDestroyed) throw new Error('Application already disposed.');
 
-    const collection = this._serviceCollection.get(app);
-    if (!collection) return undefined;
+    const collection = serviceCollection.get(app);
+    if (!collection) return null;
 
-    const collected = collection[clazz.name];
-    if (collected.isSingleton)
-      return collected.service as Service;
+    const service = collection[clazz.name];
+    if (service.isSingleton) {
 
-    return IoC.new(clazz);
-  }
+      if (service.instance)
+        return service.instance as Service;
+
+      // Otherwise, creates the singleton instance
+      return service.instance = newInstace(app, clazz, service.args) as Service;
+    }
+
+    return newInstace(app, clazz, service.args);
+  };
 
   /**
    * Creates a new instance of a class provided
    * @param clazz the class that the new instance should be created
    * @returns new intance of the class provided
    */
-  static new<Service>(clazz: (new (...args: any[]) => Service)) {
+  const newInstace = <Service>(app: Bouer | null, clazz: (new (...args: any[]) => Service), params?: dynamic) => {
+    const paramsToProvide: string[] = [];
+    const mParams: dynamic = params || {};
+    const data: { __ctor0: ServiceClass<Service>, [key: string]: any } = { __ctor0: clazz };
 
-    if (clazz instanceof Bouer) {
-      Logger.error('Cannot create an instance of Bouer using IoC');
-      return;
-    }
+    // Looping all the params of the class constructor
+    forEach(classParams(clazz), (key, index) => {
+      // Trying to get the value from the provided params
+      let paramValue = mParams[key];
+      // Creating a unique name for the argument
+      const paramName = '__arg' + index;
 
+      // If the parameter name matches Bouer, then injects the provided bouer instance
+      if (toLower(Bouer.name) === toLower(key)) {
+        paramValue = app;
+      } else if (isNull(paramValue)) { // Otherwise, check if the param name matches any dependency
+
+        // Trying to find any dependency with the same name
+        const service = findServiceByName(app, toLower(key));
+
+        // If was found
+        if (service != null) {
+          // And it gots and instance, assign the instance
+          if (service.instance) {
+            paramValue = service.instance as Service;
+          } else { // Otherwise, creates a new instance, and assign
+            paramValue = newInstace(app, service.clazz, service.args);
+            // Setting the instance if it's singleton
+            service.instance = service.isSingleton ? paramValue : null;
+          }
+        }
+      }
+
+      // Setting the param name and value
+      data[paramName] = paramValue;
+
+      // Adding the unique name
+      paramsToProvide.push(paramName);
+    });
+
+    // Creating a new instance according to above process
     return Evaluator.run({
-      code: 'new _c_()',
-      data: { _c_: clazz },
+      code: 'new __ctor0(' + paramsToProvide.join(',') + ')',
+      data: data,
       isReturn: true
     }) as Service;
-  }
+  };
 
   /**
    * Destroy an instance registered
    * @param app the application
    */
-  static clear(app: Bouer) {
-    return IoC._serviceCollection.delete(app);
+  const clear = (app: Bouer) => {
+    return serviceCollection.delete(app);
+  };
+
+  class IoC {
+    /**
+     * Defines the bouer app containing all the services that needs to be provided
+     * @param app the bouer instance
+     * @returns all the available methods to perform
+     */
+    static app<Data = {}, GlobalData = {}, Dependencies = {}>(app: Bouer<Data, GlobalData, Dependencies>) {
+      return {
+        /**
+         * Adds a service to be provided in whole the app
+         * @param instance the instance to be store
+         */
+        add<Service>(clazz: ServiceClass<Service>, params?: dynamic, isSingleton?: boolean) {
+          return add(app as Bouer, clazz, params, isSingleton);
+        },
+        resolve<Service>(clazz: (new (...args: any[]) => Service)) {
+          return resolve(app as Bouer, clazz);
+        },
+        clear() {
+          clear(app as Bouer);
+        }
+      };
+    }
+
+    /**
+     * Creates a new instance of a class provided
+     * @param clazz the class that the new instance should be created
+     * @returns new intance of the class provided
+     */
+    static new<Service>(clazz: (new (...args: any[]) => Service), params?: dynamic) {
+
+      if (clazz instanceof Bouer) {
+        Logger.error('Cannot create an instance of Bouer using IoC');
+        return;
+      }
+      return newInstace(null, clazz);
+    }
+
+    /**
+     * Generates a unique Id for the application
+     * @returns The next integer from the last one generated
+     */
+    static newId() {
+      return bouerId++;
+    }
   }
 
-  /**
-   * Generates a unique Id for the application
-   * @returns The next integer from the last one generated
-   */
-  static newId() {
-    return IoC._bouerId++;
-  }
-}
+  return IoC;
+})();
