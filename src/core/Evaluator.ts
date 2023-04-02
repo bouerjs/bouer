@@ -2,7 +2,6 @@ import RenderContext from '../definitions/types/RenderContext';
 import dynamic from '../definitions/types/Dynamic';
 import Bouer from '../instance/Bouer';
 import Extend from '../shared/helpers/Extend';
-import IoC from '../shared/helpers/IoCContainer';
 import { buildError } from '../shared/helpers/Utils';
 import Logger from '../shared/logger/Logger';
 import Base from './Base';
@@ -13,7 +12,6 @@ export default class Evaluator extends Base {
   constructor(bouer: Bouer) {
     super();
     this.bouer = bouer;
-    IoC.register(bouer, this);
   }
 
   execRaw(code: string, context?: RenderContext) {
