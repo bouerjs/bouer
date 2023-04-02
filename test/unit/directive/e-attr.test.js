@@ -2,7 +2,8 @@ import {
   Bouer,
   Compiler,
   sleep,
-  toHtml
+  toHtml,
+  IoC
 } from '../../index';
 
 describe('When element is compiled with "e-[attr]" directive', () => {
@@ -21,7 +22,7 @@ describe('When element is compiled with "e-[attr]" directive', () => {
         }
       }
     });
-    compiler = new Compiler(context);
+    compiler = IoC.app(context).resolve(Compiler);
   });
 
   // Normal rendering

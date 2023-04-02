@@ -1,7 +1,8 @@
 import {
   Bouer,
   Compiler,
-  toHtml
+  toHtml,
+  IoC
 } from '../index';
 
 describe('When using a computed property', () => {
@@ -34,7 +35,7 @@ describe('When using a computed property', () => {
       }
     });
 
-    compiler = new Compiler(context);
+    compiler = IoC.app(context).resolve(Compiler);
   });
 
   describe('When using inferred get', () => {

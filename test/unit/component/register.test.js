@@ -2,7 +2,8 @@ import {
   Bouer,
   Compiler,
   sleep,
-  toHtml
+  toHtml,
+  IoC
 } from '../../index';
 
 describe('When using "e-entry" directive', () => {
@@ -12,7 +13,7 @@ describe('When using "e-entry" directive', () => {
       <label e-entry="copied-el">Element</label>
     </div>`;
     const context = Bouer.create();
-    const compiler = new Compiler(context);
+    const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
     compiler.compile({
@@ -31,7 +32,7 @@ describe('When using "e-entry" directive', () => {
       <copied-el></copied-el>
     </div>`;
     const context = Bouer.create();
-    const compiler = new Compiler(context);
+    const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
     compiler.compile({
@@ -84,7 +85,7 @@ describe('When added to the instance component options', () => {
         template: '<div>Element</div>'
       }]
     });
-    const compiler = new Compiler(context);
+    const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
     compiler.compile({
@@ -117,7 +118,7 @@ describe('When using the component options', () => {
         }
       }]
     });
-    const compiler = new Compiler(context);
+    const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
     compiler.compile({
@@ -161,7 +162,7 @@ describe('When using the component options', () => {
         destroyed
       }]
     });
-    const compiler = new Compiler(context);
+    const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
     compiler.compile({
@@ -200,7 +201,7 @@ describe('When using the component <script>', () => {
         </script>`,
       }]
     });
-    const compiler = new Compiler(context);
+    const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
     const log = console.log;
@@ -233,7 +234,7 @@ describe('When using the component <script>', () => {
         </script>`,
       }]
     });
-    const compiler = new Compiler(context);
+    const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
     const log = console.log;
     console.log = jest.fn();
@@ -266,7 +267,7 @@ describe('When using the component <script>', () => {
         </script>`,
       }]
     });
-    const compiler = new Compiler(context);
+    const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
     compiler.compile({
@@ -297,7 +298,7 @@ describe('When using component slots', () => {
         </div>`,
       }]
     });
-    const compiler = new Compiler(context);
+    const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
     compiler.compile({
@@ -331,7 +332,7 @@ describe('When using component slots', () => {
         </div>`,
       }]
     });
-    const compiler = new Compiler(context);
+    const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
     compiler.compile({
@@ -381,7 +382,7 @@ describe('When using component slots', () => {
         </div>`,
         }]
       });
-      const compiler = new Compiler(context);
+      const compiler = IoC.app(context).resolve(Compiler);
       const element = toHtml(htmlSnippet);
 
       compiler.compile({

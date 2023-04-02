@@ -3,6 +3,7 @@ import {
   Compiler,
   toHtml,
   sleep,
+  IoC
 } from '../../index';
 
 describe('When element is compiled with "e-req" directive', () => {
@@ -44,7 +45,7 @@ describe('When element is compiled with "e-req" directive', () => {
           });
         }
       });
-      const compiler = new Compiler(context);
+      const compiler = IoC.app(context).resolve(Compiler);
 
       compiler.compile({
         data: context.data,
@@ -87,7 +88,7 @@ describe('When element is compiled with "e-req" directive', () => {
           });
         }
       });
-      const compiler = new Compiler(context);
+      const compiler = IoC.app(context).resolve(Compiler);
 
       compiler.compile({
         data: context.data,
@@ -128,7 +129,7 @@ describe('When element is compiled with "e-req" directive', () => {
           });
         }
       });
-      const compiler = new Compiler(context);
+      const compiler = IoC.app(context).resolve(Compiler);
 
       compiler.compile({
         data: context.data,
@@ -187,7 +188,7 @@ describe('When element is compiled with "e-req" directive', () => {
           });
         }
       });
-      const compiler = new Compiler(context);
+      const compiler = IoC.app(context).resolve(Compiler);
 
       compiler.compile({
         data: context.data,
@@ -231,7 +232,7 @@ describe('When element is compiled with "e-req" directive', () => {
           });
         }
       });
-      const compiler = new Compiler(context);
+      const compiler = IoC.app(context).resolve(Compiler);
 
       compiler.compile({
         data: context.data,
@@ -273,7 +274,7 @@ describe('When element is compiled with "e-req" directive', () => {
           });
         }
       });
-      const compiler = new Compiler(context);
+      const compiler = IoC.app(context).resolve(Compiler);
 
       compiler.compile({
         data: context.data,

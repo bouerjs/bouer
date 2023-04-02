@@ -1,7 +1,8 @@
 import {
   Bouer,
   Compiler,
-  toHtml
+  toHtml,
+  IoC
 } from '../../index';
 
 describe('When element is compiled with "data" directive', () => {
@@ -18,7 +19,7 @@ describe('When element is compiled with "data" directive', () => {
       }
     });
 
-    compiler = new Compiler(context);
+    compiler = IoC.app(context).resolve(Compiler);
   });
 
   it('Injects the data provided', () => {

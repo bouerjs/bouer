@@ -1,24 +1,23 @@
 import {
   Bouer,
   Compiler,
-  toHtml
+  toHtml,
+  IoC
 } from '../index';
 
 describe('Standard events', () => {
   let context;
   let compiler;
 
-  beforeEach(() => {
-    context = Bouer.create();
-    compiler = new Compiler(context);
-  });
-
   describe('When compiled with a standard event', () => {
     it('Removes on:click event attr after compilation', () => {
       const htmlSnippet = '<button on:click="click">Click</button>';
       const element = toHtml(htmlSnippet);
 
-      context.set({ click() {} });
+      context = Bouer.create();
+      compiler = IoC.app(context).resolve(Compiler);
+
+      context.set({ click() { } });
 
       compiler.compile({
         data: context.data,
@@ -53,6 +52,9 @@ describe('Standard events', () => {
       const htmlSnippet = '<button on:click.once="click">Click</button>';
       const element = toHtml(htmlSnippet);
 
+      context = Bouer.create();
+      compiler = IoC.app(context).resolve(Compiler);
+
       const click = jest.fn();
       context.set({ click });
 
@@ -74,7 +76,10 @@ describe('Standard events', () => {
       const htmlSnippet = '<p on:mycustom="mycustom">...</p>';
       const element = toHtml(htmlSnippet);
 
-      context.set({ mycustom() {} });
+      context = Bouer.create();
+      compiler = IoC.app(context).resolve(Compiler);
+
+      context.set({ mycustom() { } });
 
       compiler.compile({
         data: context.data,
@@ -89,6 +94,9 @@ describe('Standard events', () => {
     it('Calls on:mycustom callback function when dispatch', () => {
       const htmlSnippet = '<p on:mycustom="callback">...</p>';
       const element = toHtml(htmlSnippet);
+
+      context = Bouer.create();
+      compiler = IoC.app(context).resolve(Compiler);
 
       const callback = jest.fn();
       context.set({ callback });
@@ -108,6 +116,9 @@ describe('Standard events', () => {
     it('Calls on:mycustom once if "once" modifier was defined', () => {
       const htmlSnippet = '<p on:mycustom.once="callback">...</p>';
       const element = toHtml(htmlSnippet);
+
+      context = Bouer.create();
+      compiler = IoC.app(context).resolve(Compiler);
 
       const callback = jest.fn();
       context.set({ callback });

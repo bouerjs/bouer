@@ -1,7 +1,8 @@
 import {
   Bouer,
   Compiler,
-  toHtml
+  toHtml,
+  IoC
 } from '../../index';
 
 describe('When using a delimiter "{{ ... }}" for one way data binding', () => {
@@ -11,7 +12,7 @@ describe('When using a delimiter "{{ ... }}" for one way data binding', () => {
     }
   });
 
-  const compiler = new Compiler(context);
+  const compiler = IoC.app(context).resolve(Compiler);
 
   it('Render the property in Element <h1> content', () => {
     const htmlSnippet = '<h1>{{ value }}</h1>';

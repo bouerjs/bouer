@@ -1,5 +1,5 @@
 import {
-  Bouer,
+  Bouer
 } from '../../index';
 
 describe('When using "react" method', () => {

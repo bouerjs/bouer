@@ -2,7 +2,8 @@ import {
   Bouer,
   Compiler,
   sleep,
-  toHtml
+  toHtml,
+  IoC
 } from '../../index';
 
 describe('When element is compiled with "e-for" directive', () => {
@@ -15,7 +16,7 @@ describe('When element is compiled with "e-for" directive', () => {
         todos: ['wake up', 'eat', 'code', 'repeat'],
       }
     });
-    compiler = new Compiler(context);
+    compiler = IoC.app(context).resolve(Compiler);
   });
 
   describe('When compiled with no filters', () => {

@@ -1,7 +1,8 @@
 import {
   Bouer,
   Compiler,
-  toHtml
+  toHtml,
+  IoC
 } from '../../index';
 
 describe('When element is compiled with "e-def" directive', () => {
@@ -10,7 +11,7 @@ describe('When element is compiled with "e-def" directive', () => {
 
   beforeEach(() => {
     context = Bouer.create();
-    compiler = new Compiler(context);
+    compiler = IoC.app(context).resolve(Compiler);
   });
 
   const htmlSnippet = '<h4 e-def="{ prop: \'new\' }"></h4>';

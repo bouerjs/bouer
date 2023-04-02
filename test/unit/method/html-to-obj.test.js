@@ -1,6 +1,6 @@
 import {
   Bouer,
-  toHtml,
+  toHtml
 } from '../../index';
 
 describe('When "toJsObj" method is called (On instance)', () => {

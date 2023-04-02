@@ -1,7 +1,8 @@
 import {
   Bouer,
   Compiler,
-  toHtml
+  toHtml,
+  IoC
 } from '../../index';
 
 describe('When element is compiled with "{attr}" directive (ShortHand Directive)', () => {
@@ -14,7 +15,7 @@ describe('When element is compiled with "{attr}" directive (ShortHand Directive)
         title: 'value-rendered',
       }
     });
-    compiler = new Compiler(context);
+    compiler = IoC.app(context).resolve(Compiler);
   });
 
   const htmlSnippet = '<h4 {title}>Value</h4>';

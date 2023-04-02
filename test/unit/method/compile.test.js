@@ -2,7 +2,8 @@ import {
   Bouer,
   Compiler,
   sleep,
-  toHtml
+  toHtml,
+  IoC
 } from '../../index';
 
 describe('When "compile" method is called', () => {
@@ -18,7 +19,7 @@ describe('When "compile" method is called', () => {
       }
     });
 
-    compiler = new Compiler(context);
+    compiler = IoC.app(context).resolve(Compiler);
     element = toHtml(htmlSnippet);
   });
   it('Compiles the element according to the "data" provided', async () => {

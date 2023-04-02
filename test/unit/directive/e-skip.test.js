@@ -2,7 +2,8 @@ import {
   Bouer,
   Compiler,
   sleep,
-  toHtml
+  toHtml,
+  IoC
 } from '../../index';
 
 describe('When element is compiled with "e-skip" directive', () => {
@@ -15,7 +16,7 @@ describe('When element is compiled with "e-skip" directive', () => {
         value: 'value-rendered'
       }
     });
-    compiler = new Compiler(context);
+    compiler = IoC.app(context).resolve(Compiler);
   });
 
   const htmlSnippet = '<h4 e-skip>{{ value }}</h4>';

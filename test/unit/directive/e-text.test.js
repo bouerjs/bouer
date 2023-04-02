@@ -1,7 +1,8 @@
 import {
   Bouer,
   Compiler,
-  toHtml
+  toHtml,
+  IoC
 } from '../../index';
 
 describe('When element is compiled with "e-text" directive', () => {
@@ -10,7 +11,7 @@ describe('When element is compiled with "e-text" directive', () => {
       message: 'Hello'
     }
   });
-  const compiler = new Compiler(context);
+  const compiler = IoC.app(context).resolve(Compiler);
 
   it('Renders the data property value in the element content', () => {
     const element = toHtml('<h4 e-text="{{ message }}">#</h4>');

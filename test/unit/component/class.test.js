@@ -1,8 +1,8 @@
 import {
   Bouer,
   Compiler,
-  // sleep,
-  toHtml
+  toHtml,
+  IoC
 } from '../../index';
 
 import {
@@ -23,13 +23,13 @@ describe('Customize Component (extends)', () => {
     console.warn = jest.fn();
 
     Bouer.create({
-      components: [new ButtonComponent()],
+      components: [ButtonComponent],
     });
 
     expect(console.warn.mock.calls[0][1]).toBe('Provide a “name” to component at options.components[0] position.');
     console.warn = fn;
   });
-  it('Component methods are reached with "this" keyword', async () => {
+  it('Component methods are reached with "this" keyword', () => {
     class ButtonComponent extends Component {
       name = 'ButtonComponent';
 
@@ -50,15 +50,18 @@ describe('Customize Component (extends)', () => {
     </div>`;
     const element = toHtml(htmlSnippet);
     const context = Bouer.create({
-      components: [new ButtonComponent()],
+      components: [ButtonComponent],
     });
-    const compiler = new Compiler(context);
+    const compiler = IoC.app(context).resolve(Compiler);
 
     compiler.compile({
       data: context.data,
       context: context,
       el: element,
     });
+
+    // const componentsResults = context.$components.viewByName('ButtonComponent');
+    // const buttonComponent = componentsResults[0];
 
     const fn = console.log;
     console.log = jest.fn();
