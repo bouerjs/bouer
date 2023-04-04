@@ -7,9 +7,9 @@
   "module": "dist/bouer.esm.min.js",
   "typings": "types/index.d.ts",
   "scripts": {
-    "test": "./node_modules/.bin/jest --detectOpenHandles",
-    "dev": "rollup --config rollup.config.js --configPlugin typescript --w",
-    "build": "rollup --config rollup.config.js --configPlugin typescript",
+    "test": "jest --detectOpenHandles",
+    "dev": "node scripts/build.js --dev",
+    "build": "node scripts/build.js",
     "publish": "node scripts/build.js --prod && npm pack && node ./scripts/test-pkg-json-updater.js",
     "prepare": "husky install",
     "changelog": "auto-changelog -p -u"
@@ -66,14 +66,16 @@
     "eslint": "^8.10.0",
     "eslint-config-google": "^0.14.0",
     "husky": "^7.0.0",
+    "indent.js": "^0.3.5",
     "jest": "^27.5.1",
-    "jsdom": "^19.0.0",
+    "js-beautify": "^1.14.7",
+    "jsdom": "^21.1.1",
     "jsdom-global": "^3.0.2",
-    "regenerator-runtime": "^0.13.9",
+    "regenerator-runtime": "^0.13.11",
     "rollup": "^2.58.0",
     "rollup-plugin-cleanup": "^3.2.1",
     "terser": "^5.9.0",
     "tslib": "^2.3.1",
-    "typescript": "^4.4.3"
+    "typescript": "^4.9.5"
   }
 }
