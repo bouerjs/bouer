@@ -33,20 +33,32 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
   prefetch?: boolean;
   title?: string;
   route?: string;
-  isDefault?: boolean;
-  isNotFound?: boolean;
+
+  readonly isDefault?: boolean;
+  readonly isNotFound?: boolean;
+
+  /** Indicates if the component is destroyed or not */
   isDestroyed: boolean = false;
 
-  clazz: (new (...args: any[]) => Component) | undefined;
+  /** The Component Class */
+  clazz: (new (...args: any[]) => Component<Data>) | undefined;
 
+  /** The root element of the component */
   el?: Element;
+
+  /** Bouer instance of the component */
   bouer?: Bouer;
+
   readonly children?: (Component | IComponentOptions | (new (...args: any[]) => Component))[] = [];
   readonly assets: (HTMLScriptElement | HTMLStyleElement | HTMLLinkElement)[] = [];
   readonly restrictions?: ((component: Component | IComponentOptions) => boolean | Promise<boolean>)[];
   // Store temporarily this component UI orders
   private events: IEventSubscription[] = [];
 
+  /**
+   * Default constructor
+   * @param optionsOrPath the path of the component or the compponent options
+   */
   constructor(optionsOrPath: string | IComponentOptions<Data>) {
     super();
 
@@ -81,6 +93,10 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
     });
   }
 
+  /**
+   * The data the should be exported from the `<script>` tag
+   * @param data the data to export
+   */
   export<ExportableData extends {}>(
     data: ExportableData
   ) {
@@ -93,6 +109,9 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
     });
   }
 
+  /**
+   * Destroys the component
+   */
   destroy() {
     if (!this.el) return false;
 
@@ -119,10 +138,18 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
     components.splice(components.indexOf(this as Component<{}>), 1);
   }
 
+  /**
+   * Maps the parameters of the route in the component `route` and returns as an object
+   */
   params() {
     return new UriHandler().params(this.route);
   }
 
+  /**
+   * Dispatch an event
+   * @param eventName the event name
+   * @param init the CustomEventInit object where we can provid the event detail
+   */
   emit<TKey extends keyof ILifeCycleHooks>(
     eventName: TKey,
     init?: CustomEventInit
@@ -134,6 +161,11 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
     });
   }
 
+  /**
+   * Add an Event listener to the component
+   * @param eventName the event to be added
+   * @param callback the callback function of the event
+   */
   on<TKey extends keyof ILifeCycleHooks>(
     eventName: TKey,
     callback: (event: CustomEvent) => void
@@ -160,6 +192,11 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
     return evt;
   }
 
+  /**
+   * Removes an Event listener to the component
+   * @param eventName the event to be added
+   * @param callback the callback function of the event
+   */
   off<TKey extends keyof ILifeCycleHooks>(
     eventName: TKey, callback: (event: CustomEvent) => void
   ) {
@@ -171,6 +208,10 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
     this.events = where(this.events, evt => !(evt.eventName == eventName && evt.callback == callback));
   }
 
+  /**
+   * Allow to add assets to the component
+   * @param assets the list of assets to be included
+   */
   addAssets(assets: (IAsset | string)[]) {
     const $Assets: any[] = [];
     const assetsTypeMapper: dynamic = {

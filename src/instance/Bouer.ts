@@ -125,20 +125,46 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /** Skeleton handler */
   readonly $skeleton: {
-    /** Removes skeletons havining the `id` provided */
+    /**
+     * Removes skeletons havining the `id` provided
+     * @param id the skeleton identifier
+     */
     clear(id?: string): void,
-    /** Set Color of the Wave and/or the Background */
+    /**
+     * Set Color of the Wave and/or the Background
+     * @param color the color config object for the skeleton
+     */
     set(color?: SkeletonOptions): void
   };
 
   /** Components Handler */
   readonly $components: {
+    /**
+     * Adds a component to the instance
+     * @param component the component to be added
+     */
     add<Data extends {} = {}>(
       component: Component<Data> | IComponentOptions<Data> | (new (...args: any[]) => Component<Data>)
-    ): void
+    ): void;
+    /**
+     * Gets a component from the instance
+     * @param name the name of the component to get
+     */
     get(name: string): Component | IComponentOptions,
+    /**
+     * Gets an active component instance by expression
+     * @param expression the expression that matches the wanted components
+     */
     viewBy<Child extends Component>(expression: (component: Component) => boolean): Child[],
+    /**
+     * Gets an active component instance by name
+     * @param componentName the name of the wanted components
+     */
     viewByName<Child extends Component>(componentName: string): Child[],
+    /**
+     * Gets an active component instance by name
+     * @param componentId the component element id of the wanted component (in case of just one insertion)
+     */
     viewById<Child extends Component>(componentId: string): Child[],
   };
 
@@ -159,22 +185,41 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     /** Store `href` value of the <base /> tag */
     base?: string | null;
 
-    /** Navigates to a certain page without reloading all the page */
+    /**
+     * Navigates to a certain page without reloading all the page
+     * @param route the route to navigate to
+     * @param options navigation options
+     */
     navigate(route: string, options?: {
+      /** allow to change the url after the navigation, default value is `true` */
       setURL?: boolean,
+      /** the data object that should be injected to the page to be loaded, default value is the main data */
       data?: object
     }): void;
 
-    /** Navigates to previous page according to the number of times */
+    /**
+     * Navigates to previous page according to the number of times
+     * @param times number to pages to go back
+     */
     popState(times?: number): void;
 
-    /** Changes the current url to a new one provided */
+    /**
+     * Changes the current url to a new one provided
+     * @param url the url to change
+     * @param title the of the new url
+     */
     pushState(url: string, title?: string): void;
 
-    /** Mark an anchor as active */
+    /**
+     * Mark an anchor as active
+     * @param anchor the anchor to mark
+     */
     markActiveAnchor(anchor: HTMLAnchorElement): void
 
-    /** Mark all anchors having the route provided as active */
+    /**
+     * Mark all anchors having the route provided as active
+     * @param route the that need to marked
+     */
     markActiveAnchorsWithRoute(route: string): void
   };
 
@@ -659,6 +704,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /**
    * Dispatch an event
+   * @param eventName the event name
    * @param options options for the emission
    */
   emit(
@@ -726,6 +772,9 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
       });
   }
 
+  /**
+   * Destroys the application
+   */
   destroy() {
     const el = this.el!;
     const $Events = IoC.app(this).resolve(EventHandler)!.$events;
