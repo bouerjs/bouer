@@ -11,7 +11,7 @@ export default class ViewChild {
   ): Child[] {
     // Retrieving the active component
     const activeComponents = IoC.app(bouerInstance).resolve(ComponentHandler)!
-      .activeComponents as any[];
+      .activeComponents;
     // Applying filter to the find the component
     return where(activeComponents, expression) as Child[];
   }

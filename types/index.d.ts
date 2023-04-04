@@ -16,6 +16,7 @@ import dynamic from '../src/definitions/types/Dynamic';
 import RenderContext from '../src/definitions/types/RenderContext';
 import WatchCallback from '../src/definitions/types/WatchCallback';
 import Extend from '../src/shared/helpers/Extend';
+import IoC from '../src/shared/helpers/IoCContainer';
 
 
 declare class Component<Data = {}> {
@@ -62,12 +63,10 @@ declare class Component<Data = {}> {
   readonly bouer?: Bouer;
 
   /** The children of the component that should inherit the `route` of the father */
-  readonly children?: (Component | IComponentOptions<Data>)[];
+  readonly children?: (Component | IComponentOptions | (new (...args: any[]) => Component))[];
 
   /** restrictions functions of the component */
-  readonly restrictions?: ((
-    component: Component | IComponentOptions<Data>
-  ) => boolean | Promise<boolean>)[];
+  readonly restrictions?: ((component: Component | IComponentOptions) => boolean | Promise<boolean>)[];
 
   /**
    * The data the should be exported from the `<script>` tag
@@ -289,12 +288,14 @@ declare class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
      * Adds a component to the instance
      * @param component the component to be added
      */
-    add<Data>(component: Component<Data> | IComponentOptions<Data>): void;
+    add<Data extends {} = {}>(
+      component: Component<Data> | IComponentOptions<Data> | (new (...args: any[]) => Component<Data>)
+    ): void
     /**
      * Gets a component from the instance
      * @param name the name of the component to get
      */
-    get<Data>(name: string): Component<Data> | IComponentOptions<Data>;
+    get(name: string): Component | IComponentOptions;
     /**
      * Gets an active component instance by expression
      * @param expression the expression that matches the wanted components
@@ -321,10 +322,10 @@ declare class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
     routeView: Element | null;
 
     /** Store the Component defined has NotFound Page */
-    defaultPage?: Component<any> | IComponentOptions<any>;
+    defaultPage?: Component | IComponentOptions;
 
     /** Store the Component defined has NotFound Page */
-    notFoundPage?: Component<any> | IComponentOptions<any>;
+    notFoundPage?: Component | IComponentOptions;
 
     /** Store `href` value of the <base /> tag */
     base?: string | null;
@@ -422,7 +423,7 @@ declare class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> {
    * @param watchableScope the function that should be called when the any reactive property change
    * @returns an object having all the watches and the method to destroy watches at once
    */
-  react(watchableScope: (app: Bouer) => void): void;
+  react(watchableScope: (app: Bouer<Data, GlobalData, Dependencies>) => void): void;
 
   /**
    * Add an Event Listener to the instance or to an object
@@ -578,5 +579,6 @@ export {
   IEventSubscription,
   IAsset,
   Extend,
-  ViewChild
+  ViewChild,
+  IoC
 };

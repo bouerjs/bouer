@@ -33,7 +33,6 @@ import {
 } from '../shared/helpers/Utils';
 import SkeletonOptions from '../definitions/types/SkeletonOptions';
 import ViewChild from '../core/ViewChild';
-import ComponentClass from '../definitions/types/ComponentClass';
 
 export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
   extends Base implements IBouerOptions<Data, GlobalData, Dependencies> {
@@ -134,7 +133,9 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /** Components Handler */
   readonly $components: {
-    add<Data extends {} = {}>(component: Component<Data> | IComponentOptions<Data> | ComponentClass<Data>): void
+    add<Data extends {} = {}>(
+      component: Component<Data> | IComponentOptions<Data> | (new (...args: any[]) => Component<Data>)
+    ): void
     get(name: string): Component | IComponentOptions,
     viewBy<Child extends Component>(expression: (component: Component) => boolean): Child[],
     viewByName<Child extends Component>(componentName: string): Child[],

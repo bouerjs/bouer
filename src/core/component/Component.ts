@@ -2,7 +2,6 @@ import IAsset from '../../definitions/interfaces/IAsset';
 import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
 import IEventSubscription from '../../definitions/interfaces/IEventSubscription';
 import ILifeCycleHooks from '../../definitions/interfaces/ILifeCycleHooks';
-import ComponentClass from '../../definitions/types/ComponentClass';
 import dynamic from '../../definitions/types/Dynamic';
 import Bouer from '../../instance/Bouer';
 import Prop from '../../shared/helpers/Prop';
@@ -38,11 +37,11 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
   isNotFound?: boolean;
   isDestroyed: boolean = false;
 
-  clazz: ComponentClass | undefined;
+  clazz: (new (...args: any[]) => Component) | undefined;
 
   el?: Element;
   bouer?: Bouer;
-  readonly children?: (Component | IComponentOptions | ComponentClass)[] = [];
+  readonly children?: (Component | IComponentOptions | (new (...args: any[]) => Component))[] = [];
   readonly assets: (HTMLScriptElement | HTMLStyleElement | HTMLLinkElement)[] = [];
   readonly restrictions?: ((component: Component | IComponentOptions) => boolean | Promise<boolean>)[];
   // Store temporarily this component UI orders

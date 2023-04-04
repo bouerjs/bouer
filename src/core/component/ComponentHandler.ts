@@ -1,6 +1,5 @@
 import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
 import ILifeCycleHooks from '../../definitions/interfaces/ILifeCycleHooks';
-import ComponentClass from '../../definitions/types/ComponentClass';
 import dynamic from '../../definitions/types/Dynamic';
 import Bouer from '../../instance/Bouer';
 import Constants from '../../shared/helpers/Constants';
@@ -39,6 +38,8 @@ import ReactiveEvent from '../event/ReactiveEvent';
 import Reactive from '../reactive/Reactive';
 import Routing from '../routing/Routing';
 import Component from './Component';
+
+type ComponentClass<Data = {}> = (new (...args: any[]) => Component<Data>);
 
 export default class ComponentHandler extends Base {
   private bouer: Bouer;
@@ -106,8 +107,8 @@ export default class ComponentHandler extends Base {
       });
   }
 
-  prepare(
-    components: (Component | IComponentOptions | ComponentClass)[],
+  prepare<Data = {}>(
+    components: (Component<Data> | IComponentOptions<Data> | ComponentClass<Data>)[],
     parent?: Component<any>
   ) {
     forEach(components, (entry, index) => {

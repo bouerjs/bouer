@@ -1,5 +1,4 @@
 import Component from '../../core/component/Component';
-import ComponentClass from '../types/ComponentClass';
 import ILifeCycleHooks from './ILifeCycleHooks';
 
 interface IComponentOptions<Data = {}> extends ILifeCycleHooks {
@@ -31,7 +30,7 @@ interface IComponentOptions<Data = {}> extends ILifeCycleHooks {
   prefetch?: boolean;
 
   /** The children of the component that should inherit the `route` of the father */
-  children?: (Component | IComponentOptions | ComponentClass)[];
+  children?: (Component | IComponentOptions | (new (...args: any[]) => Component))[];
 
   /** restrictions functions of the component */
   restrictions?: ((component: Component | IComponentOptions) => boolean | Promise<boolean>)[];
