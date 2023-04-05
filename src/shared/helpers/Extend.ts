@@ -3,7 +3,11 @@ import Prop from './Prop';
 import { fnEmpty, forEach, isNull } from './Utils';
 
 export default class Extend {
-  /** joins objects into one */
+  /**
+   * Combines different object into a new one
+   * @param {object} args Objects to be combined
+   * @returns A new object having the properties of all the objects
+   */
   static obj<ExtendObjectType extends dynamic = dynamic>(...args: ExtendObjectType[]) {
     const out: dynamic = {};
 
@@ -17,7 +21,12 @@ export default class Extend {
     return out as dynamic;
   }
 
-  /** add properties to the first object provided */
+  /**
+   * Adds properties to the first object provided
+   * @param {object} out the object that should be added all the properties from the other one
+   * @param {object} args the objects where the properties should be extracted from
+   * @returns the first object with all the new properties added on
+   */
   static mixin<MixinObjectType extends dynamic = dynamic>(out: MixinObjectType, ...args: object[]) {
     // Props to mix with out object
     const props = Extend.obj.apply(this, args) as any;
@@ -34,7 +43,11 @@ export default class Extend {
     return out as MixinObjectType;
   }
 
-  /** joins arrays into one */
+  /**
+   * Combines different arrays into a new one
+   * @param {object} args arrays to be combined
+   * @returns a new arrat having the items of all the arrays
+   */
   static array<ExtendArrayObjectType = any>(...args: Array<ExtendArrayObjectType>) {
     const out: any[] = [];
     forEach(args, arg => {

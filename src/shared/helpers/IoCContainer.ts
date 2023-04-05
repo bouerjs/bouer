@@ -12,6 +12,14 @@ type ServiceItem<Service> = {
   args?: dynamic
 };
 
+/**
+ * It's a **Service Provider** that injects the dependencies passed into the **constructor** of classes that are
+ * create via **IoC**.
+ *
+ * Note: This Service Provider, uses a technic of matching the parameter name (not the Paramenter Type) of the
+ * class provided in the constructor. If the parameter name does not match the name of **Class Type**, the IoC
+ * resolver won't be able to inject the service.
+ */
 export default (function IoC() {
   let bouerId: number = 1;
   const serviceCollection: Map<Bouer, dynamic<ServiceItem<any>>> = new Map();
@@ -145,7 +153,7 @@ export default (function IoC() {
 
   class IoC {
     /**
-     * Defines the bouer app containing all the services that needs to be provided
+     * Defines the bouer app containing all the services that needs to be provided in this app
      * @param app the bouer instance
      * @returns all the available methods to perform
      */
@@ -153,14 +161,26 @@ export default (function IoC() {
       return {
         /**
          * Adds a service to be provided in whole the app
-         * @param instance the instance to be store
+         * @param clazz the service that should be resolved future on
+         * @param params the static parameter that needs to be resolved every time the service is requested.
+         *  Struture: { parameterExactName: parameterValue }. In case os current bouer instance, it is already
+         *  injected no need to specify
+         * @param isSingleton mark the service as singleton to avoid creating an instance whenever it's requested
          */
         add<Service>(clazz: ServiceClass<Service>, params?: dynamic, isSingleton?: boolean) {
           return add(app as Bouer, clazz, params, isSingleton);
         },
+        /**
+         * Resolve the Service with all it's dependencies
+         * @param clazz the class the needs to be resolved
+         * @returns the instance of the class resolved
+         */
         resolve<Service>(clazz: (new (...args: any[]) => Service)) {
           return resolve(app as Bouer, clazz);
         },
+        /**
+         * Dispose all the added service of the current app
+         */
         clear() {
           clear(app as Bouer);
         }
@@ -178,7 +198,7 @@ export default (function IoC() {
         Logger.error('Cannot create an instance of Bouer using IoC');
         return;
       }
-      return newInstace(null, clazz);
+      return newInstace(null, clazz, params);
     }
 
     /**

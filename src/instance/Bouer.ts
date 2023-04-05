@@ -36,40 +36,53 @@ import ViewChild from '../core/ViewChild';
 
 export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
   extends Base implements IBouerOptions<Data, GlobalData, Dependencies> {
+  /** The name of the instance */
   readonly name = 'Bouer';
   readonly data: Data;
   readonly globalData: GlobalData;
   readonly config: IBouerConfig;
   readonly deps: Dependencies;
+
+  /** Unique Id of the instance */
   readonly __id__: number = IoC.newId();
+
+  /** App options provided in the instance */
   readonly options: IBouerOptions<Data, GlobalData, Dependencies>;
+
   /**
    * Gets all the elemens having the `ref` attribute
    * @returns an object having all the elements with the `ref attribute value` defined as the key.
    */
   readonly refs: dynamic<Element> = {};
+
+  /** The main element controlled by the instance */
   el: Element | undefined | null;
+
+  /** Provides the status of the app */
   isDestroyed: boolean = false;
+
+  /** Provides state of the app, if it is already initialized */
   isInitialized: boolean = false;
 
   /** Data Exposition and Injection handler*/
   readonly $data: {
     /**
      * Gets the exposed `data` or the value provided for `data` directive
-     * @param key the data:[`key`]="..." directive key value or the app.$data.set(`key`) key provided.
+     * @param {string} key the data:[`key`]="..." directive key value or the app.$data.set(`key`) key provided.
      * @returns the expected object | null
      */
     get<Data>(key: string): Data | undefined,
     /**
      * Sets a value into a storage the used anywhere of the application.
-     * @param key the key of the data to be stored.
-     * @param data the data to be stored.
-     * @param toReactive allow to transform the data to a reactive one after being setted. By default is `false`.
+     * @param {string} key the key of the data to be stored.
+     * @param {object} data the data to be stored.
+     * @param {boolean?} toReactive allow to transform the data to a reactive one after being setted.
+     * By default is `false`.
      */
     set<Data>(key: string, data: Data | Data[], toReactive?: boolean): void,
     /**
      * Destroy the stored data
-     * @param key the data:[`key`]="..." directive value or the app.$data.set(`key`) key provided.
+     * @param {string} key the data:[`key`]="..." directive value or the app.$data.set(`key`) key provided.
      * @returns `true` for item deleted or `false` for item not deleted.
      */
     unset(key: string): boolean,
@@ -79,13 +92,13 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
   readonly $req: {
     /**
      * Gets the `e-req` directive response value
-     * @param key the e-req:[`key`]="..." directive key value.
+     * @param {string} key the e-req:[`key`]="..." directive key value.
      * @returns the expected object | null
      */
-    get<Response>(key: string): { data: Response, [key: string]: any } | null
+    get<Response>(key: string): { data: Response, [key: string]: any } | null,
     /**
      * Destroy stored req (request)
-     * @param key the e-req:[`key`]="..." directive key value.
+     * @param {string} key the e-req:[`key`]="..." directive key value.
      * @returns `true` for item deleted or `false` for item not deleted.
      */
     unset(key: string): boolean,
@@ -95,19 +108,19 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
   readonly $wait: {
     /**
      * Gets the elements and data of the `wait-data` directive.
-     * @param key the wait-data="`key`" directive value or the app.$wait.set(`key`) key provided.
+     * @param {string} key the wait-data="`key`" directive value or the app.$wait.set(`key`) key provided.
      * @returns the expected object | null
      */
     get<WaitData>(key: string): WaitData | undefined,
     /**
      * Provides data for `wait-data` directive elements.
-     * @param key the key of `wait-data` directive value.
-     * @param data the data provide to the elements waiting
+     * @param {string} key the key of `wait-data` directive value.
+     * @param {object} data the data provide to the elements waiting
      */
     set<WaitData>(key: string, data: WaitData): void,
     /**
      * Destroy stored wait
-     * @param key the wait-data="`key`" directive value or the app.$wait.set(`key`) key provided.
+     * @param {string} key the wait-data="`key`" directive value or the app.$wait.set(`key`) key provided.
      * @returns `true` for item deleted or `false` for item not deleted.
      */
     unset(key: string): boolean,
@@ -115,11 +128,19 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /** Delimiters handler */
   readonly $delimiters: {
-    /** Adds a delimiter into the instance */
+    /**
+     * Adds a delimiter into the instance
+     * @param {object} item delimiter object
+     */
     add(item: IDelimiter): void
-    /** Removes a delimiter from the instance */
+    /**
+     * Removes a delimiter from the instance
+     * @param {string} name the delimiter name
+     */
     remove(name: string): void;
-    /** Retrieve all the delimiters */
+    /**
+     * Retrieve all the delimiters
+     */
     get(): IDelimiter[];
   };
 
@@ -127,12 +148,12 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
   readonly $skeleton: {
     /**
      * Removes skeletons havining the `id` provided
-     * @param id the skeleton identifier
+     * @param {string?} id the skeleton identifier
      */
     clear(id?: string): void,
     /**
      * Set Color of the Wave and/or the Background
-     * @param color the color config object for the skeleton
+     * @param {object?} color the color config object for the skeleton
      */
     set(color?: SkeletonOptions): void
   };
@@ -141,38 +162,35 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
   readonly $components: {
     /**
      * Adds a component to the instance
-     * @param component the component to be added
+     * @param {object} component the component to be added
      */
     add<Data extends {} = {}>(
       component: Component<Data> | IComponentOptions<Data> | (new (...args: any[]) => Component<Data>)
     ): void;
     /**
      * Gets a component from the instance
-     * @param name the name of the component to get
+     * @param {string} name the name of the component to get
      */
     get(name: string): Component | IComponentOptions,
     /**
-     * Gets an active component instance by expression
-     * @param expression the expression that matches the wanted components
+     * Retrieves the actives components matching the a provided expression
+     * @param {string} expression the expression that matches the wanted components
      */
     viewBy<Child extends Component>(expression: (component: Component) => boolean): Child[],
     /**
-     * Gets an active component instance by name
-     * @param componentName the name of the wanted components
+     * Retrieves the actives components matching the component name
+     * @param {string} componentName the name of the wanted components
      */
     viewByName<Child extends Component>(componentName: string): Child[],
     /**
-     * Gets an active component instance by name
-     * @param componentId the component element id of the wanted component (in case of just one insertion)
+     * Retrieves the active component matching the component element or the root element id
+     * @param {string} componentId the component element id of the wanted component (in case of just one insertion)
      */
-    viewById<Child extends Component>(componentId: string): Child[],
+    viewById<Child extends Component>(componentId: string): Child | null,
   };
 
   /** Routing Handler */
   readonly $routing: {
-    /** Store Bouer application instance */
-    bouer: Bouer;
-
     /** Store the route elements */
     routeView: Element | null;
 
@@ -182,13 +200,10 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     /** Store the Component defined has NotFound Page */
     notFoundPage?: Component | IComponentOptions;
 
-    /** Store `href` value of the <base /> tag */
-    base?: string | null;
-
     /**
      * Navigates to a certain page without reloading all the page
-     * @param route the route to navigate to
-     * @param options navigation options
+     * @param {string} route the route to navigate to
+     * @param {object?} options navigation options
      */
     navigate(route: string, options?: {
       /** allow to change the url after the navigation, default value is `true` */
@@ -199,34 +214,34 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
     /**
      * Navigates to previous page according to the number of times
-     * @param times number to pages to go back
+     * @param {number?} times number to pages to go back
      */
     popState(times?: number): void;
 
     /**
      * Changes the current url to a new one provided
-     * @param url the url to change
-     * @param title the of the new url
+     * @param {string} url the url to change
+     * @param {string?} title the of the new url
      */
     pushState(url: string, title?: string): void;
 
     /**
      * Mark an anchor as active
-     * @param anchor the anchor to mark
+     * @param {HTMLAnchorElement} anchor the anchor to mark
      */
     markActiveAnchor(anchor: HTMLAnchorElement): void
 
     /**
      * Mark all anchors having the route provided as active
-     * @param route the that need to marked
+     * @param {string} route the that need to marked
      */
     markActiveAnchorsWithRoute(route: string): void
   };
 
   /**
    * Default constructor
-   * @param selector the selector of the element to be controlled by the instance
-   * @param options the options to the instance
+   * @param {string} selector the selector of the element to be controlled by the instance
+   * @param {object?} options the options to the instance
    */
   constructor(
     selector: string,
@@ -235,6 +250,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     super();
 
     const app = this as Bouer;
+
     this.options = options = (options || {});
     this.config = options.config || {};
     this.deps = options.deps || {} as any;
@@ -367,9 +383,9 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     this.$components = {
       add: component => componentHandler.prepare([component]),
       get: name => componentHandler.components[name],
-      viewBy: (expression: (component: Component) => boolean) => ViewChild.viewBy(this as Bouer, expression),
-      viewByName: (componentName: string) => ViewChild.viewByName(this as Bouer, componentName),
-      viewById: (componentId: string) => ViewChild.viewById(this as Bouer, componentId),
+      viewBy: (expression: (component: Component) => boolean) => ViewChild.by(this as Bouer, expression),
+      viewByName: (componentName: string) => ViewChild.byName(this as Bouer, componentName),
+      viewById: (componentId: string) => ViewChild.byId(this as Bouer, componentId),
     };
 
     Prop.set(this, 'refs', {
@@ -403,7 +419,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /**
    * Creates a factory instance of Bouer
-   * @param options the options to the instance
+   * @param {object?} options the options to the instance
    * @returns Bouer instance
    */
   static create<Data = {}, GlobalData = {}, Dependencies = {}>(
@@ -419,9 +435,9 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /**
    * Compiles a `HTML snippet` to an `Object Literal`
-   * @param input the input element
-   * @param options the options of the compilation
-   * @param onSet a function that should be fired when a value is setted
+   * @param {string} input the input element
+   * @param {object?} options the options of the compilation
+   * @param {Function?} onSet a function that should be fired when a value is setted
    * @returns the Object Compiled from the HTML
    */
   static toJsObj(
@@ -445,7 +461,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /**
    * Initialize create application
-   * @param selector the selector of the element to be controlled by the instance
+   * @param {string} selector the selector of the element to be controlled by the instance
    */
   init(selector: string) {
     if (this.isInitialized)
@@ -530,14 +546,17 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /**
    * Sets data into a target object, by default is the `app.data`
-   * @param inputData the data the should be setted
-   * @param targetObject the target were the inputData
+   * @param {object} inputData the data the should be setted
+   * @param {object?} targetObject the target were the inputData
    * @returns the object with the data setted
    */
   set<InputData extends {}, TargetObject = Data>(
     inputData: InputData,
-    targetObject: TargetObject | Data = this.data
+    targetObject?: TargetObject | Data
   ) {
+    if (isNull(targetObject))
+      targetObject = this.data;
+
     if (!isObject(inputData)) {
       Logger.error('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".');
       return targetObject;
@@ -588,9 +607,9 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /**
    * Compiles a `HTML snippet` to an `Object Literal`
-   * @param input the input element
-   * @param options the options of the compilation
-   * @param onSet a function that should be fired when a value is setted
+   * @param {string} input the input element
+   * @param {object?} options the options of the compilation
+   * @param {Function?} onSet a function that should be fired when a value is setted
    * @returns the Object Compiled from the HTML
    */
   toJsObj(
@@ -614,9 +633,9 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /**
    * Provides the possibility to watch a property change
-   * @param propertyName the property to watch
-   * @param callback the function that should be called when the property change
-   * @param targetObject the target object having the property to watch
+   * @param {string} propertyName the property to watch
+   * @param {Function} callback the function that should be called when the property change
+   * @param {object} targetObject the target object having the property to watch
    * @returns the watch object having the method to destroy the watch
    */
   watch<Key extends keyof TargetObject, TargetObject = Data>(
@@ -632,7 +651,7 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /**
    * Watch all reactive properties in the provided scope.
-   * @param watchableScope the function that should be called when the any reactive property change
+   * @param {Function} watchableScope the function that should be called when the any reactive property change
    * @returns an object having all the watches and the method to destroy watches at once
    */
   react(watchableScope: (app: Bouer) => void) {
@@ -642,10 +661,10 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /**
    * Add an Event Listener to the instance or to an object
-   * @param eventName the event name to be listening
-   * @param callback the callback that should be fired
-   * @param attachedNode A node to attach the event
-   * @param modifiers An object having all the event modifier
+   * @param {string} eventName the event name to be listening
+   * @param {Function} callback the callback that should be fired
+   * @param {Node} attachedNode A node to attach the event
+   * @param {object} modifiers An object having all the event modifier
    * @returns The event added
    */
   on(
@@ -674,9 +693,9 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /**
    * Removes an Event Listener from the instance or from object
-   * @param eventName the event name to be listening
-   * @param callback the callback that should be fired
-   * @param attachedNode A node to attach the event
+   * @param {string} eventName the event name to be listening
+   * @param {Function} callback the callback that should be fired
+   * @param {Node} attachedNode A node to attach the event
    */
   off(
     eventName: string,
@@ -693,9 +712,9 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /**
    * Removes the bind from an element
-   * @param boundNode the node having the bind
-   * @param boundAttrName the bound attribute name
-   * @param boundPropName the bound property name
+   * @param {Node} boundNode the node having the bind
+   * @param {string} boundAttrName the bound attribute name
+   * @param {string} boundPropName the bound property name
    */
   unbind(boundNode: Node, boundAttrName?: string, boundPropName?: string) {
     return IoC.app(this).resolve(Binder)!.
@@ -704,8 +723,8 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /**
    * Dispatch an event
-   * @param eventName the event name
-   * @param options options for the emission
+   * @param {string} eventName the event name
+   * @param {object} options options for the emission
    */
   emit(
     eventName: string,
@@ -726,8 +745,8 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /**
    * Limits sequential execution to a single one acording to the milliseconds provided
-   * @param callback the callback that should be performed the execution
-   * @param wait milliseconds to the be waited before the single execution
+   * @param {Function} callback the callback that should be performed the execution
+   * @param {number} wait milliseconds to the be waited before the single execution
    * @returns executable function
    */
   lazy(callback: (...args: any[]) => void, wait?: number) {
@@ -751,7 +770,8 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
 
   /**
    * Compiles an html element
-   * @param options the options of the compilation process
+   * @param {string} options the options of the compilation process
+   * @returns the element compiled
    */
   compile<Data>(options: {
     /** The element that wil be compiled */

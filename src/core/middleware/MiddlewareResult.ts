@@ -1,5 +1,7 @@
 interface MiddlewareResult<T = any> {
-  data: T
+  /** The data that will be used in the directive */
+  data: T,
+  /** An additional fields */
   [key: string]: any
 }
 

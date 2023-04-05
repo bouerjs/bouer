@@ -29,33 +29,53 @@ interface IBouerOptions<Data, GlobalData, Dependencies> {
   /** Appends delimiters to the instance */
   readonly delimiters?: IDelimiter[],
 
-  /** Middlewares that should be used in the application */
-  middleware?: (
-    /** Configures the middleware to a directive according to a specific action */
+  /**
+   * Middlewares that should be used in the application
+   * @param configure Configures the middleware for a directive according to a specific action
+   * @param app The application instance
+   */
+  middleware?(
     configure: (
       /** The directive to be applied */
       directive: string,
       /** The actions where it should be applied */
       actions: (
         /** Actions that will be performed on bind */
-        onBind: (configure: (context: IMiddleware) => MiddlewareResult | Promise<MiddlewareResult>) => void,
+        onBind: (
+          /** Configure an action to be called when the directive is bound */
+          configure: (context: IMiddleware) => MiddlewareResult | Promise<MiddlewareResult>
+        ) => void,
         /** Actions that will be performed on update */
-        onUpdate: (configure: (context: IMiddleware) => MiddlewareResult | Promise<MiddlewareResult>) => void
+        onUpdate: (
+          /** Configure an action to be called when the directive is updated */
+          configure: (context: IMiddleware) => MiddlewareResult | Promise<MiddlewareResult>
+        ) => void
       ) => void) => void,
-    /** The application instance */
     app: Bouer
-  ) => void,
+  ): void,
 
-  /** The hook that should be called before the component is loaded */
+  /**
+   * The hook that should be called before the component is loaded
+   * @param event the called event object
+   */
   beforeLoad?(event: CustomEvent): void;
 
-  /** The hook that should be called after the component is loaded (Compiled) */
+  /**
+   * The hook that should be called after the component is loaded (Compiled)
+   * @param event the called event object
+   */
   loaded?(event: CustomEvent): void;
 
-  /** The hook that should be called before the component is destroyed */
+  /**
+   * The hook that should be called before the component is destroyed
+   * @param event the called event object
+   */
   beforeDestroy?(event: CustomEvent): void;
 
-  /** The hook that should be called after the component is destroyed */
+  /**
+   * The hook that should be called after the component is destroyed
+   * @param event the called event object
+   */
   destroyed?(event: CustomEvent): void;
 }
 

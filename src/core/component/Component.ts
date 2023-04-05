@@ -50,14 +50,17 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
   bouer?: Bouer;
 
   readonly children?: (Component | IComponentOptions | (new (...args: any[]) => Component))[] = [];
+  /** All the assets attached to the component */
   readonly assets: (HTMLScriptElement | HTMLStyleElement | HTMLLinkElement)[] = [];
+
   readonly restrictions?: ((component: Component | IComponentOptions) => boolean | Promise<boolean>)[];
-  // Store temporarily this component UI orders
+
+  /** Store temporarily this component UI orders */
   private events: IEventSubscription[] = [];
 
   /**
    * Default constructor
-   * @param optionsOrPath the path of the component or the compponent options
+   * @param {string|object} optionsOrPath the path of the component or the compponent options
    */
   constructor(optionsOrPath: string | IComponentOptions<Data>) {
     super();
@@ -94,8 +97,8 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
   }
 
   /**
-   * The data the should be exported from the `<script>` tag
-   * @param data the data to export
+   * The data that should be exported from the `<script>` tag to the root element
+   * @param {object} data the data to export
    */
   export<ExportableData extends {}>(
     data: ExportableData
@@ -147,8 +150,8 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 
   /**
    * Dispatch an event
-   * @param eventName the event name
-   * @param init the CustomEventInit object where we can provid the event detail
+   * @param {string} eventName the event name
+   * @param {object?} init the CustomEventInit object where we can provid the event detail
    */
   emit<TKey extends keyof ILifeCycleHooks>(
     eventName: TKey,
@@ -163,8 +166,8 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 
   /**
    * Add an Event listener to the component
-   * @param eventName the event to be added
-   * @param callback the callback function of the event
+   * @param {string} eventName the event to be added
+   * @param {Function} callback the callback function of the event
    */
   on<TKey extends keyof ILifeCycleHooks>(
     eventName: TKey,
@@ -194,8 +197,8 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
 
   /**
    * Removes an Event listener to the component
-   * @param eventName the event to be added
-   * @param callback the callback function of the event
+   * @param {string} eventName the event to be added
+   * @param {Function} callback the callback function of the event
    */
   off<TKey extends keyof ILifeCycleHooks>(
     eventName: TKey, callback: (event: CustomEvent) => void
@@ -209,8 +212,8 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
   }
 
   /**
-   * Allow to add assets to the component
-   * @param assets the list of assets to be included
+   * Adds assets to the component
+   * @param {string|object} assets the list of assets to be included
    */
   addAssets(assets: (IAsset | string)[]) {
     const $Assets: any[] = [];

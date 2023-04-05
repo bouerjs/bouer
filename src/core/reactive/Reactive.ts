@@ -21,15 +21,22 @@ export default class Reactive<Value, TObject> extends Base implements PropertyDe
   propValue: Value;
   propValueOld?: Value;
   propSource: TObject;
-  propDescriptor: PropertyDescriptor | undefined;
+  baseDescriptor: PropertyDescriptor | undefined;
   watches: Watch<Value, TObject>[] = [];
   isComputed: boolean;
   context: RenderContext;
   fnComputed?: Function;
 
+  /**
+   * Default constructor
+   * @param {object} options the options of the reactive instance
+   */
   constructor(options: {
+    /** the property name */
     propName: string,
+    /** the object containing the property to be tranformed */
     srcObject: TObject,
+    /** function execution context */
     context: RenderContext
   }) {
     super();
@@ -39,9 +46,9 @@ export default class Reactive<Value, TObject> extends Base implements PropertyDe
     this.context = options.context;
     // Setting the value of the property
 
-    this.propDescriptor = Prop.descriptor(this.propSource as dynamic, this.propName);
+    this.baseDescriptor = Prop.descriptor(this.propSource as dynamic, this.propName);
 
-    this.propValue = this.propDescriptor!.value as Value;
+    this.propValue = this.baseDescriptor!.value as Value;
     this.isComputed = typeof this.propValue === 'function' && this.propValue.name === '$computed';
 
     if (this.isComputed) {
@@ -53,7 +60,7 @@ export default class Reactive<Value, TObject> extends Base implements PropertyDe
       this.propValue = this.propValue.bind(this.context);
   }
 
-  computed = () => {
+  private readonly computed = () => {
     if (!this.isComputed)
       return { get: () => { }, set: (v: any) => { } };
 
@@ -104,7 +111,7 @@ export default class Reactive<Value, TObject> extends Base implements PropertyDe
       if (Array.isArray(value)) {
         Reactive.transform({
           data: value,
-          reactiveObj: this,
+          descriptor: this,
           context: this.context
         });
 
@@ -133,27 +140,48 @@ export default class Reactive<Value, TObject> extends Base implements PropertyDe
     this.notify();
   };
 
+  /**
+   * Force onChange callback calling
+   */
   notify() {
     // Running all the watches
     forEach(this.watches, watch => watch.callback.call(this.context, this.propValue, this.propValueOld));
   }
 
+  /**
+   * Subscribe an event that should be performed on property value change
+   * @param {Function} callback the callback function that will be called
+   * @param {Node?} node the node that should be attached (Optional)
+   * @returns A watch instance object
+   */
   onChange(callback: WatchCallback, node?: Node): Watch<Value, TObject> {
     const w = new Watch(this, callback, { node: node });
     this.watches.push(w);
     return w;
   }
 
-  static transform = <InputObject extends dynamic>(options: {
+  /**
+   * Tranform a Object Litertal to a an Object with reactive properties
+   * @param {object} options the options for object transformation
+   * @returns the object transformed
+   */
+  static transform = <InputObject>(options: {
+    /** The context where this reactive property belongs */
     context: RenderContext,
+    /** The data having the property that needs to be transformed to a reactive one */
     data: InputObject,
-    reactiveObj?: Reactive<any, any>,
+    /** Reactive descriptor that needs to be provided in case of Array Object */
+    descriptor?: Reactive<any, any>,
   }) => {
     const context = options.context;
-    const executer = (data: InputObject, visiting: any[], visited: any[], reactiveObj?: Reactive<any, any>) => {
+    const executer = (
+      data: InputObject | InputObject[],
+      visiting: any[], visited: any[],
+      descriptor?: Reactive<any, any>
+    ) => {
       if (Array.isArray(data)) {
-        if (reactiveObj == null) {
-          Logger.warn('Cannot transform this array to a reactive one because no reactive objecto was provided');
+        if (descriptor == null) {
+          Logger.warn('Cannot transform this array to a reactive one because no reactive object was provided');
           return data;
         }
 
@@ -184,7 +212,7 @@ export default class Reactive<Value, TObject> extends Base implements PropertyDe
 
             const result = reference[method].apply(inputArray, args);
 
-            forEach(reactiveObj.watches, watch => watch.callback(inputArray, oldArrayValue, {
+            forEach(descriptor.watches, watch => watch.callback(inputArray, oldArrayValue, {
               method: method,
               args: args
             }));
@@ -202,11 +230,11 @@ export default class Reactive<Value, TObject> extends Base implements PropertyDe
         return data;
       visiting.push(data);
 
-      forEach(Object.keys(data), key => {
+      forEach(Object.keys(data as dynamic), key => {
         const mInputObject = data as dynamic;
 
         // Already a reactive property, do nothing
-        if (!('value' in Prop.descriptor(data, key)!))
+        if (!('value' in Prop.descriptor(data as dynamic, key)!))
           return;
 
         const propertyValue = mInputObject[key];
@@ -220,7 +248,7 @@ export default class Reactive<Value, TObject> extends Base implements PropertyDe
           context: context
         });
 
-        Prop.set(data, key, reactive);
+        Prop.set(data as dynamic, key, reactive);
         if (Array.isArray(propertyValue)) {
           executer(propertyValue as any, visiting, visited, reactive); // Transform the array to a reactive one
           forEach(propertyValue, (item: object) => executer(item as any, visiting, visited));
@@ -234,6 +262,6 @@ export default class Reactive<Value, TObject> extends Base implements PropertyDe
       return data;
     };
 
-    return executer(options.data, [], [], options.reactiveObj);
+    return executer(options.data, [], [], options.descriptor);
   };
 }
