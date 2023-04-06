@@ -19,12 +19,13 @@ import {
   urlResolver, where
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
-import Base from '../Base';
 import EventHandler from '../event/EventHandler';
 import Reactive from '../reactive/Reactive';
 import ComponentHandler from './ComponentHandler';
 
-export default class Component<Data = {}> extends Base implements IComponentOptions<Data> {
+export default class Component<Data = {}> implements IComponentOptions<Data> {
+  readonly _IRT_ = true;
+
   name: string;
   path: string;
   data: Data;
@@ -63,8 +64,6 @@ export default class Component<Data = {}> extends Base implements IComponentOpti
    * @param {string|object} optionsOrPath the path of the component or the compponent options
    */
   constructor(optionsOrPath: string | IComponentOptions<Data>) {
-    super();
-
     let _name: string | undefined = undefined;
     let _path: string | undefined = undefined;
     let _data: Data | undefined = undefined;

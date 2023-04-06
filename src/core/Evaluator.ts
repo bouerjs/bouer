@@ -4,13 +4,11 @@ import Bouer from '../instance/Bouer';
 import Extend from '../shared/helpers/Extend';
 import { buildError } from '../shared/helpers/Utils';
 import Logger from '../shared/logger/Logger';
-import Base from './Base';
 
-export default class Evaluator extends Base {
+export default class Evaluator {
   bouer: Bouer;
 
   constructor(bouer: Bouer) {
-    super();
     this.bouer = bouer;
   }
 
@@ -23,7 +21,7 @@ export default class Evaluator extends Base {
     }
   }
 
-  exec(options: {
+  exec(opts: {
     data: object,
     code: string,
     isReturn?: boolean,
@@ -31,26 +29,21 @@ export default class Evaluator extends Base {
     args?: any[],
     context: RenderContext
   }) {
-    const { data, args, code: expression, isReturn, aditional, context } = options;
     const dataToUse = Extend.obj(
       (this.bouer.globalData || {}),
-      (aditional || {}),
-      (data || {}),
+      (opts.aditional || {}),
+      (opts.data || {}),
       {
         $root: this.bouer.data,
         $mixin: Extend.mixin
       });
 
-    return Evaluator.run({
-      code: expression,
-      data: dataToUse,
-      isReturn: isReturn,
-      context: context,
-      args: args,
-    });
+    delete (opts as any).data;
+    opts.data = dataToUse;
+    return Evaluator.run(opts);
   }
 
-  static run(options: {
+  static run(opts: {
     code: string,
     data?: object,
     args?: any[],
@@ -58,10 +51,9 @@ export default class Evaluator extends Base {
     context?: RenderContext
   }) {
     try {
-      const { data, args, code: expression, isReturn, context } = options;
       return Function('var d$=arguments[0].d;return(function(){var r$;with(d$){' +
-        (isReturn === false ? '' : 'r$=') + expression + '}return r$;}).apply(this, arguments[0].a)')
-        .call(context, { d: data || {}, a: args });
+        (opts.isReturn === false ? '' : 'r$=') + opts.code + '}return r$;}).apply(this, arguments[0].a)')
+        .call(opts.context, { d: opts.data || {}, a: opts.args });
     } catch (error) {
       Logger.error(buildError(error));
     }

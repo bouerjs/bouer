@@ -2,15 +2,12 @@ import Bouer from '../instance/Bouer';
 import IDelimiter from '../definitions/interfaces/IDelimiter';
 import IDelimiterResponse from '../definitions/interfaces/IDelimiterResponse';
 import { isNull, trim } from '../shared/helpers/Utils';
-import Base from './Base';
 
-export default class DelimiterHandler extends Base {
+export default class DelimiterHandler {
   delimiters: IDelimiter[] = [];
   bouer: Bouer;
 
   constructor(delimiters: IDelimiter[], bouer: Bouer) {
-    super();
-
     this.bouer = bouer;
     this.delimiters = delimiters;
   }
@@ -32,13 +29,13 @@ export default class DelimiterHandler extends Base {
       const center = '([\\S\\s]*?)';
 
       for (let i = 0; i < this.delimiters.length; i++) {
-        const delimiter = this.delimiters[i];
+        const item = this.delimiters[i];
         const result = text.match(
-          RegExp(delimiter.delimiter.open + center + delimiter.delimiter.close, flag || '')
+          RegExp(item.delimiter.open + center + item.delimiter.close, flag || '')
         );
 
         if (result) {
-          mDelimiter = delimiter;
+          mDelimiter = item;
           return result;
         }
       }

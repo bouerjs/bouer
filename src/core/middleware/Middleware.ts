@@ -1,15 +1,14 @@
 import IMiddleware from '../../definitions/interfaces/IMiddleware';
 import IMiddlewareObject from '../../definitions/interfaces/IMiddlewareObject';
 import Bouer from '../../instance/Bouer';
-import Base from '../Base';
 import MiddlewareResult from './MiddlewareResult';
 
-export default class Middleware extends Base {
+export default class Middleware {
+  readonly _IRT_ = true;
   private middlewareConfigContainer: { [key: string]: IMiddlewareObject[] } = {};
   bouer: Bouer;
 
   constructor(bouer: Bouer) {
-    super();
 
     this.bouer = bouer;
   }

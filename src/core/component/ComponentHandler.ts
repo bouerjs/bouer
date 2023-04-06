@@ -29,7 +29,6 @@ import {
   copyObject
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
-import Base from '../Base';
 import Compiler from '../compiler/Compiler';
 import DelimiterHandler from '../DelimiterHandler';
 import Evaluator from '../Evaluator';
@@ -41,7 +40,8 @@ import Component from './Component';
 
 type ComponentClass<Data = {}> = (new (...args: any[]) => Component<Data>);
 
-export default class ComponentHandler extends Base {
+export default class ComponentHandler {
+  readonly _IRT_ = true;
   private bouer: Bouer;
   // Handle all the components web requests to avoid multiple requests
   private requests: dynamic = {};
@@ -59,8 +59,6 @@ export default class ComponentHandler extends Base {
     eventHandler: EventHandler,
     evaluator: Evaluator
   ) {
-    super();
-
     this.bouer = bouer;
     this.delimiter = delimiterHandler!;
     this.eventHandler = eventHandler!;

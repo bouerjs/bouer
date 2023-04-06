@@ -14,11 +14,11 @@ import {
   isObject,
   toArray,
 } from '../../shared/helpers/Utils';
-import Base from '../Base';
 import dynamic from '../../definitions/types/Dynamic';
 
 
-export default class Converter extends Base {
+export default class Converter {
+  readonly _IRT_ = true;
   static htmlToJsObj(input: string | HTMLElement,
     options?: {
       names?: string,

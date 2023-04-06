@@ -2,9 +2,9 @@ import SkeletonOptions from '../definitions/types/SkeletonOptions';
 import Bouer from '../instance/Bouer';
 import Constants from '../shared/helpers/Constants';
 import { $CreateEl, ifNullStop, DOM, forEach, toArray, code, isNull } from '../shared/helpers/Utils';
-import Base from './Base';
 
-export default class Skeleton extends Base {
+export default class Skeleton {
+  readonly _IRT_ = true;
   bouer: Bouer;
   style: HTMLStyleElement;
   backgroudColor: string = '';
@@ -15,8 +15,6 @@ export default class Skeleton extends Base {
   numberOfItems: number = 1;
 
   constructor(bouer: Bouer) {
-    super();
-
     this.reset();
     this.bouer = bouer;
     this.style = $CreateEl('style', el => el.id = this.identifier).build();

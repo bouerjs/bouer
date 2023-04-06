@@ -237,8 +237,8 @@ export function $CreateEl<Key extends keyof HTMLElementTagNameMap>(
       return returnObj;
     },
     build: () => el,
-    child: () => el.children[0],
-    children: () => [].slice.call(el.childNodes),
+    child: () => el.children[0] as Element,
+    children: () => [].slice.call(el.childNodes) as Element[],
   };
   return returnObj;
 }
@@ -370,18 +370,16 @@ export function fnCall(fn?: any) {
 
 export function findAttribute(
   element: Element,
-  attributesToCheck: string[],
+  attrs: string[],
   removeIfFound: boolean = false
 ): Attr | null {
   let res: Attr | null = null;
 
   if (!element) return null;
 
-  for (const attrName of attributesToCheck) {
-    const flexibleName: any = attrName;
-    if (res = element.attributes[flexibleName])
+  for (let i = 0; i < attrs.length; i++)
+    if (res = element.attributes[attrs[i] as any])
       break;
-  }
 
   if (!isNull(res) && removeIfFound)
     element.removeAttribute(res!.name);

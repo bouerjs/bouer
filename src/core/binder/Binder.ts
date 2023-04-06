@@ -21,14 +21,13 @@ import {
   where,
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
-import Base from '../Base';
 import Compiler from '../compiler/Compiler';
 import Evaluator from '../Evaluator';
 import ReactiveEvent from '../event/ReactiveEvent';
 import Middleware from '../middleware/Middleware';
 import Watch from './Watch';
 
-export default class Binder extends Base {
+export default class Binder {
   bouer: Bouer;
   evaluator: Evaluator;
   binds: { isConnected: () => boolean; watch: Watch<any, any> }[] = [];
@@ -47,7 +46,6 @@ export default class Binder extends Base {
   };
 
   constructor(bouer: Bouer) {
-    super();
     this.bouer = bouer;
     this.evaluator = IoC.app(bouer).resolve(Evaluator)!;
 

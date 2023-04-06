@@ -12,11 +12,11 @@ import {
   toArray
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
-import Base from '../Base';
 import Watch from '../binder/Watch';
 import ReactiveEvent from '../event/ReactiveEvent';
 
-export default class Reactive<Value, TObject> extends Base implements PropertyDescriptor {
+export default class Reactive<Value, TObject> implements PropertyDescriptor {
+  readonly _IRT_ = true;
   propName: string;
   propValue: Value;
   propValueOld?: Value;
@@ -39,7 +39,6 @@ export default class Reactive<Value, TObject> extends Base implements PropertyDe
     /** function execution context */
     context: RenderContext
   }) {
-    super();
 
     this.propName = options.propName;
     this.propSource = options.srcObject;
@@ -115,9 +114,9 @@ export default class Reactive<Value, TObject> extends Base implements PropertyDe
           context: this.context
         });
 
-        const propValueAsAny = this.propValue as any;
-        propValueAsAny.splice(0, propValueAsAny.length);
-        propValueAsAny.push.apply(propValueAsAny, (value as any));
+        const propValue = this.propValue as any[];
+        propValue.splice(0, propValue.length);
+        propValue.push.apply(propValue, (value as any));
       } else if (isObject(value)) {
         if ((value instanceof Node)) // If some html element
           this.propValue = value;
@@ -237,23 +236,23 @@ export default class Reactive<Value, TObject> extends Base implements PropertyDe
         if (!('value' in Prop.descriptor(data as dynamic, key)!))
           return;
 
-        const propertyValue = mInputObject[key];
+        const propValue = mInputObject[key];
 
-        if ((propertyValue instanceof Object) && ((propertyValue._IRT_) || (propertyValue instanceof Node)))
+        if ((propValue instanceof Object) && ((propValue._IRT_) || (propValue instanceof Node)))
           return;
 
-        const reactive = new Reactive({
+        const descriptor = new Reactive({
           propName: key,
           srcObject: data,
           context: context
         });
 
-        Prop.set(data as dynamic, key, reactive);
-        if (Array.isArray(propertyValue)) {
-          executer(propertyValue as any, visiting, visited, reactive); // Transform the array to a reactive one
-          forEach(propertyValue, (item: object) => executer(item as any, visiting, visited));
-        } else if (isObject(propertyValue))
-          executer(propertyValue, visiting, visited);
+        Prop.set(data as dynamic, key, descriptor);
+        if (Array.isArray(propValue)) {
+          executer(propValue as any, visiting, visited, descriptor); // Transform the array to a reactive one
+          forEach(propValue, (item: object) => executer(item as any, visiting, visited));
+        } else if (isObject(propValue))
+          executer(propValue, visiting, visited);
       });
 
       visiting.splice(visiting.indexOf(data), 1);

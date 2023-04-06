@@ -16,11 +16,11 @@ import {
   ifNullStop
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
-import Base from '../Base';
 import Component from '../component/Component';
 import ComponentHandler from '../component/ComponentHandler';
 
-export default class Routing extends Base {
+export default class Routing {
+  readonly _IRT_ = true;
   bouer: Bouer;
   defaultPage?: Component | IComponentOptions;
   notFoundPage?: Component | IComponentOptions;
@@ -31,8 +31,6 @@ export default class Routing extends Base {
   base: string | null = null;
 
   constructor(bouer: Bouer) {
-    super();
-
     this.bouer = bouer;
   }
 
@@ -188,7 +186,7 @@ export default class Routing extends Base {
 
   /**
    * Allow to configure the `Default Page` and `NotFound Page`
-   * @param { IComponentOptions } component the component to be checked
+   * @param {Component|IComponentOptions} component the component to be checked
    */
   configure(component: Component | IComponentOptions) {
     if (component.isDefault === true && !isNull(this.defaultPage))

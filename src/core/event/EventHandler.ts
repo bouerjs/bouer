@@ -19,17 +19,15 @@ import {
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Evaluator from '../Evaluator';
-import Base from '../Base';
 
-export default class EventHandler extends Base {
+export default class EventHandler {
+  readonly _IRT_ = true;
   bouer: Bouer;
   evaluator: Evaluator;
   $events: { [key: string]: IEventSubscription[] } = {};
   input = $CreateEl('input').build();
 
   constructor(bouer: Bouer, evaluator: Evaluator) {
-    super();
-
     this.bouer = bouer;
     this.evaluator = evaluator;
 

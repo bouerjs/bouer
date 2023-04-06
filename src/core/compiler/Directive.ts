@@ -34,12 +34,12 @@ import Reactive from '../reactive/Reactive';
 import Routing from '../routing/Routing';
 import DataStore from '../store/DataStore';
 import Compiler from './Compiler';
-import Base from '../Base';
 import Prop from '../../shared/helpers/Prop';
 import MiddlewareResult from '../middleware/MiddlewareResult';
 import Skeleton from '../Skeleton';
 
-export default class Directive extends Base {
+export default class Directive {
+  readonly _IRT_ = true;
   bouer: Bouer;
   binder: Binder;
   evaluator: Evaluator;
@@ -54,8 +54,6 @@ export default class Directive extends Base {
     compiler: Compiler,
     compilerContext: RenderContext
   ) {
-    super();
-
     this.compiler = compiler;
     this.context = compilerContext;
     this.bouer = compiler.bouer;
@@ -240,7 +238,7 @@ export default class Directive extends Base {
       el: Element,
       data: dynamic
     };
-    type ExpObject = {
+    type ExpressionType = {
       type: string,
       filters: string[],
       isForOf: boolean,
@@ -317,7 +315,9 @@ export default class Directive extends Base {
           if (isNull(wKeys)) {
             isValid = toStr(item).toLowerCase().includes(wValue.toLowerCase());
           } else {
-            for (const prop of wKeys.split(',').map(m => trim(m))) {
+            const keysList = wKeys.split(',').map(m => trim(m));
+            for (let i = 0; i < keysList.length; i++) {
+              const prop = keysList[i];
               const propValue = this.evaluator.exec({
                 data: item,
                 code: prop,
@@ -419,7 +419,7 @@ export default class Directive extends Base {
     };
 
     // Builds the expression to an object
-    const $ExpressionBuilder = (expression: string): ExpObject => {
+    const $ExpressionBuilder = (expression: string): ExpressionType => {
       const filters = expression.split('|').map(item => trim(item));
       const forExpression = filters[0].replace(/\(|\)/g, '');
       filters.shift();
@@ -555,14 +555,14 @@ export default class Directive extends Base {
       }
     };
 
-    const applyWhere = (listCopy: any[], filterConfig: string) => {
-      const whereConfigParts = filterConfig.split(':').map(item => trim(item));
+    const applyWhere = (listCopy: any[], config: string) => {
+      const parts = config.split(':').map(item => trim(item));
 
-      if (whereConfigParts.length == 1) {
+      if (parts.length == 1) {
         Logger.error(('Invalid “' + nodeName + '” where expression “' + nodeValue +
           '”, at least a where-value and where-keys, or a filter-function must be provided'));
       } else {
-        return $Where(listCopy, whereConfigParts);
+        return $Where(listCopy, parts);
       }
     };
 
@@ -574,21 +574,21 @@ export default class Directive extends Base {
             $OnArrayChanges(detail), node)
         });
       });
-    let expObj: ExpObject | null = $ExpressionBuilder(nodeValue);
+    let expObj: ExpressionType | null = $ExpressionBuilder(nodeValue);
 
     const filters = expObj!.filters;
     const findFilter = (fName: string) => filters.filter(item => item.substring(0, fName.length) === fName);
-    const whereConfigs = findFilter('where');
+    const whereFilterConfigs = findFilter('where');
 
-    for (const whereConfig of whereConfigs)
-      applyWhere(expObj!.sourceValue, whereConfig);
+    // Applying the filter before rendering the items
+    forEach(whereFilterConfigs, config => applyWhere(expObj!.sourceValue, config));
 
     reactivePropertyEvent.off();
 
     (execute = () => {
       expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
       const iterable = expObj.iterableExpression;
-      const orderConfigs = findFilter('order');
+      const orderFilterConfigs = findFilter('order');
 
       // Cleaning the existing items
       forEach(listedItemsHandler, item => {
@@ -610,24 +610,20 @@ export default class Directive extends Base {
           __filters: (list: any[]) => {
             let listCopy = Extend.array(list);
             // applying where:
-            for (const filterConfig of whereConfigs) {
-              listCopy = applyWhere(listCopy, filterConfig)!;
-            }
+            forEach(whereFilterConfigs, config => listCopy = applyWhere(listCopy, config)!);
 
             // applying order:
-            const applyOrder = (orderConfig: string) => {
-              const orderConfigParts = orderConfig.split(':').map(item => trim(item));
-              if (orderConfigParts.length == 1) {
+            const applyOrder = (config: string) => {
+              const parts = config.split(':').map(item => trim(item));
+              if (parts.length == 1) {
                 Logger.error(('Invalid “' + nodeName + '” order  expression “' + nodeValue +
                   '”, at least the order type must be provided'));
               } else {
-                listCopy = $Order(listCopy, orderConfigParts[1], orderConfigParts[2]);
+                listCopy = $Order(listCopy, parts[1], parts[2]);
               }
             };
 
-            for (const orderConfig of orderConfigs) {
-              applyOrder(orderConfig);
-            }
+            forEach(orderFilterConfigs, config => applyOrder(config));
 
             return listCopy;
           }
@@ -990,7 +986,7 @@ export default class Directive extends Base {
       };
     };
 
-    type ExpObject = {
+    type ExpressionType = {
       filters: string[],
       type: string,
       expression: string,
@@ -998,7 +994,7 @@ export default class Directive extends Base {
       path: string
     };
 
-    const builder = (expression: string): ExpObject => {
+    const builder = (expression: string): ExpressionType => {
       const filters = expression.split('|').map(item => trim(item));
       // Removing and retrieving the Request Expression
       const reqExpression = filters.shift()!.replace(/\(|\)/g, '');
@@ -1048,6 +1044,17 @@ export default class Directive extends Base {
 
     if (!middleware.has('req'))
       return Logger.error('There is no “req” middleware provided for the “e-req” directive requests.');
+
+    const createMiddlewareContext = (expObject: ExpressionType) => {
+      return {
+        binder: binderConfig,
+        detail: {
+          requestType: expObject.type,
+          requestPath: expObject.path,
+          reponseData: localDataStore
+        }
+      };
+    };
 
     (onInsertOrUpdate = () => {
       const expObject = builder(trim(node.nodeValue || ''));
@@ -1119,16 +1126,7 @@ export default class Directive extends Base {
       middleware.run('req', {
         type: 'onBind',
         action: middlewareRequest => {
-          const context = {
-            binder: binderConfig,
-            detail: {
-              requestType: expObject.type,
-              requestPath: expObject.path,
-              reponseData: localDataStore
-            }
-          };
-
-          const cbs = {
+          middlewareRequest(createMiddlewareContext(expObject), {
             success: (response: MiddlewareResult) => {
               responseHandler(response);
             },
@@ -1136,9 +1134,7 @@ export default class Directive extends Base {
               error: error
             }),
             done: () => subcribeEvent(Constants.builtInEvents.done).emit()
-          };
-
-          middlewareRequest(context, cbs);
+          });
         }
       });
     })();
@@ -1149,16 +1145,8 @@ export default class Directive extends Base {
         type: 'onUpdate',
         default: () => onInsertOrUpdate(),
         action: middlewareRequest => {
-          const context = {
-            binder: binderConfig,
-            detail: {
-              requestType: expObject.type,
-              requestPath: expObject.path,
-              reponseData: localDataStore
-            }
-          };
 
-          const cbs = {
+          middlewareRequest(createMiddlewareContext(expObject), {
             success: (response: MiddlewareResult) => {
               if (!isValidResponse(response, expObject.type))
                 return;
@@ -1169,9 +1157,7 @@ export default class Directive extends Base {
               error: error
             }),
             done: () => subcribeEvent(Constants.builtInEvents.done).emit()
-          };
-
-          middlewareRequest(context, cbs);
+          });
         }
       });
     };
@@ -1202,7 +1188,7 @@ export default class Directive extends Base {
           context: mWait.context,
           data: Reactive.transform({
             context: mWait.context,
-            data: mWait.data as dynamic
+            data: mWait.data!
           }),
         });
       });

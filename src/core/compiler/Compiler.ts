@@ -13,7 +13,6 @@ import {
   isString, toArray, toLower
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
-import Base from '../Base';
 import Binder from '../binder/Binder';
 import ComponentHandler from '../component/ComponentHandler';
 import DelimiterHandler from '../DelimiterHandler';
@@ -21,7 +20,8 @@ import EventHandler from '../event/EventHandler';
 import Routing from '../routing/Routing';
 import Directive from './Directive';
 
-export default class Compiler extends Base {
+export default class Compiler {
+  readonly _IRT_ = true;
   bouer: Bouer;
   binder: Binder;
   delimiter: DelimiterHandler;
@@ -42,11 +42,8 @@ export default class Compiler extends Base {
     componentHandler: ComponentHandler,
     directives?: CustomDirective,
   ) {
-    super();
-
     this.bouer = bouer;
     this.directives = directives ?? {};
-
     this.binder = binder;
     this.delimiter = delimiterHandler;
     this.eventHandler = eventHandler;
@@ -309,7 +306,8 @@ export default class Compiler extends Base {
         'param', 'source', 'track', 'wbr']
     );
 
-    for (const tagElement of tagElements) {
+    for (let i = 0; i < tagElements.length; i++) {
+      const tagElement = tagElements[i];
       const match = tagElement.match(new RegExp(tagRegexRule, 'i'))!;
       const tagName = toLower(match[1]);
 

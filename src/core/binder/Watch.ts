@@ -1,8 +1,7 @@
 import WatchCallback from '../../definitions/types/WatchCallback';
-import Base from '../Base';
 import Reactive from '../reactive/Reactive';
 
-export default class Watch<Value, TObject> extends Base {
+export default class Watch<Value, TObject> {
   /** the property name being watched */
   readonly property: string;
   /** the node attached to the watch */
@@ -24,8 +23,6 @@ export default class Watch<Value, TObject> extends Base {
     node?: Node,
     onDestroy?: () => void
   }) {
-    super();
-
     this.reactive = reactive;
     this.property = reactive.propName;
     this.callback = callback;

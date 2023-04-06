@@ -22,7 +22,6 @@ import Constants from '../shared/helpers/Constants';
 import IoC from '../shared/helpers/IoCContainer';
 import Task from '../shared/helpers/Task';
 import Logger from '../shared/logger/Logger';
-import Base from '../core/Base';
 import Prop from '../shared/helpers/Prop';
 import ReactiveEvent from '../core/event/ReactiveEvent';
 import {
@@ -34,10 +33,12 @@ import {
 import SkeletonOptions from '../definitions/types/SkeletonOptions';
 import ViewChild from '../core/ViewChild';
 
-export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
-  extends Base implements IBouerOptions<Data, GlobalData, Dependencies> {
+export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> implements
+  IBouerOptions<Data, GlobalData, Dependencies> {
   /** The name of the instance */
+  readonly _IRT_ = true;
   readonly name = 'Bouer';
+  readonly version = '3.1.0';
   readonly data: Data;
   readonly globalData: GlobalData;
   readonly config: IBouerConfig;
@@ -247,8 +248,6 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}>
     selector: string,
     options?: IBouerOptions<Data, GlobalData, Dependencies>
   ) {
-    super();
-
     const app = this as Bouer;
 
     this.options = options = (options || {});
