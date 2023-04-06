@@ -1,43 +1,21 @@
-import Bouer from './instance/Bouer';
-import Component from './core/component/Component';
-import IBouerOptions from './definitions/interfaces/IBouerOptions';
-import IComponentOptions from './definitions/interfaces/IComponentOptions';
-import Watch from './core/binder/Watch';
-import Reactive from './core/reactive/Reactive';
-import IBinderConfig from './definitions/interfaces/IBinderConfig';
-import IDelimiter from './definitions/interfaces/IDelimiter';
-import IDelimiterResponse from './definitions/interfaces/IDelimiterResponse';
-import IMiddleware from './definitions/interfaces/IMiddleware';
-import WatchCallback from './definitions/types/WatchCallback';
-import CustomDirective from './definitions/types/CustomDirective';
-import IEventModifiers from './definitions/interfaces/IEventModifiers';
-import IEventSubscription from './definitions/interfaces/IEventSubscription';
-import IAsset from './definitions/interfaces/IAsset';
-import MiddlewareResult from './core/middleware/MiddlewareResult';
-import Extend from './shared/helpers/Extend';
-import Prop from './shared/helpers/Prop';
-import ViewChild from './core/ViewChild';
-import IoC from './shared/helpers/IoCContainer';
+export { default as default } from './instance/Bouer';
 
-export {
-  Bouer as default,
-  IBouerOptions,
-  Component,
-  IComponentOptions,
-  Watch,
-  WatchCallback,
-  Reactive,
-  IMiddleware,
-  MiddlewareResult,
-  IBinderConfig,
-  IDelimiter,
-  IDelimiterResponse,
-  CustomDirective,
-  IEventModifiers,
-  IEventSubscription,
-  IAsset,
-  Extend,
-  Prop,
-  ViewChild,
-  IoC
-};
+export { default as Component } from './core/component/Component';
+export { default as IBouerOptions } from './definitions/interfaces/IBouerOptions';
+export { default as IComponentOptions } from './definitions/interfaces/IComponentOptions';
+export { default as Watch } from './core/binder/Watch';
+export { default as Reactive } from './core/reactive/Reactive';
+export { default as IBinderConfig } from './definitions/interfaces/IBinderConfig';
+export { default as IDelimiter } from './definitions/interfaces/IDelimiter';
+export { default as IDelimiterResponse } from './definitions/interfaces/IDelimiterResponse';
+export { default as IMiddleware } from './definitions/interfaces/IMiddleware';
+export { default as WatchCallback } from './definitions/types/WatchCallback';
+export { default as CustomDirective } from './definitions/types/CustomDirective';
+export { default as IEventModifiers } from './definitions/interfaces/IEventModifiers';
+export { default as IEventSubscription } from './definitions/interfaces/IEventSubscription';
+export { default as IAsset } from './definitions/interfaces/IAsset';
+export { default as MiddlewareResult } from './core/middleware/MiddlewareResult';
+export { default as Extend } from './shared/helpers/Extend';
+export { default as Prop } from './shared/helpers/Prop';
+export { default as ViewChild } from './core/ViewChild';
+export { default as IoC } from './shared/helpers/IoCContainer';
