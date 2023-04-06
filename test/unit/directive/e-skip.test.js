@@ -33,7 +33,7 @@ describe('When element is compiled with "e-skip" directive', () => {
       }
     });
 
-    await sleep(5);
+    await sleep(1);
     expect(element.textContent).toContain('{{ value }}');
   });
 });

@@ -41,7 +41,7 @@ describe('When using "e-entry" directive', () => {
       el: element
     });
 
-    await sleep(5);
+    await sleep(1);
     const copiedEl = element.children[1];
 
     expect(copiedEl.tagName).toBe('LABEL');
@@ -94,7 +94,7 @@ describe('When added to the instance component options', () => {
       el: element,
     });
 
-    await sleep(5);
+    await sleep(1);
     const copiedElComponent = context.$components.get('my-component');
     const componentEl = element.children[0];
 
@@ -127,7 +127,7 @@ describe('When using the component options', () => {
       el: element,
     });
 
-    await sleep(5);
+    await sleep(1);
     const componentEl = element.children[0];
     expect(componentEl.textContent).toContain('Compiled value');
   });
@@ -171,7 +171,7 @@ describe('When using the component options', () => {
       el: element,
     });
 
-    await sleep(5);
+    await sleep(1);
     expect(created).toHaveBeenCalled();
     expect(beforeMount).toHaveBeenCalled();
     expect(mounted).toHaveBeenCalled();
@@ -213,7 +213,7 @@ describe('When using the component <script>', () => {
       el: element,
     });
 
-    await sleep(5);
+    await sleep(1);
     expect(console.log).toHaveBeenCalled();
     expect(console.log.mock.calls[0][0]).toBe('Script executed');
     console.log = log;
@@ -245,7 +245,7 @@ describe('When using the component <script>', () => {
       el: element,
     });
 
-    await sleep(5);
+    await sleep(1);
     expect(console.log.mock.calls[0][0]).toBe('mounted');
     console.log = log;
   });
@@ -276,7 +276,7 @@ describe('When using the component <script>', () => {
       el: element,
     });
 
-    await sleep(5);
+    await sleep(1);
     expect(element.children[0].textContent).toContain('exported-value');
   });
 });
@@ -307,7 +307,7 @@ describe('When using component slots', () => {
       el: element
     });
 
-    await sleep(5);
+    await sleep(1);
     expect(element.children[0].innerHTML).toContain('Injected');
   });
   it('Injects the element <el slot="..."> body in component body to target <slot name="...">', async () => {
@@ -341,7 +341,7 @@ describe('When using component slots', () => {
       el: element,
     });
 
-    await sleep(5);
+    await sleep(1);
     const child = element.children[0];
 
     expect(child.tagName).toBe('DIV');
@@ -391,7 +391,7 @@ describe('When using component slots', () => {
         el: element,
       });
 
-      await sleep(5);
+      await sleep(1);
       const child = element.children[0];
 
       expect(child.tagName).toBe('DIV');

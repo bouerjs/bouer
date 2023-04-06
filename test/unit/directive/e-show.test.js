@@ -48,7 +48,7 @@ describe('When element is compiled with "e-show" directive', () => {
       el: element
     });
 
-    await sleep(5);
+    await sleep(1);
     context.data.see = true;
 
     const child = element.children[0];

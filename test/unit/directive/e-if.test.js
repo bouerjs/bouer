@@ -185,7 +185,7 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
       el: element
     });
 
-    await sleep(5);
+    await sleep(1);
 
     const blocks = [
       {
@@ -203,7 +203,7 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
     ];
     for (let i = 0; i < blocks.length; i++) {
       context.data.value = i;
-      await sleep(5);
+      await sleep(1);
 
       const blockValue = blocks[i].content;
       expect(element.innerHTML).toContain(blockValue);

@@ -74,7 +74,7 @@ describe('When element is compiled with "e-for" directive', () => {
       test();
 
       data.search = 'ea';
-      await sleep(5);
+      await sleep(1);
 
       test();
     });
@@ -114,7 +114,7 @@ describe('When element is compiled with "e-for" directive', () => {
 
       data.search = 'ea';
 
-      await sleep(5);
+      await sleep(1);
       test();
     });
 
@@ -170,7 +170,7 @@ describe('When element is compiled with "e-for" directive', () => {
       test();
 
       data.search = 'ea';
-      await sleep(5);
+      await sleep(1);
 
       test();
     });

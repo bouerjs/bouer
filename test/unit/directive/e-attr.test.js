@@ -71,10 +71,10 @@ describe('When element is compiled with "e-[attr]" directive', () => {
         }
       });
 
-      await sleep(5);
+      await sleep(1);
       context.data.isVisible = false;
 
-      await sleep(5);
+      await sleep(1);
       expect('class' in element.attributes).toBe(false);
     });
 
@@ -92,10 +92,10 @@ describe('When element is compiled with "e-[attr]" directive', () => {
         }
       });
 
-      await sleep(5);
+      await sleep(1);
       context.data.isVisible = false;
 
-      await sleep(5);
+      await sleep(1);
       expect(element.classList.contains('green')).toBe(true);
       expect(element.classList.contains('visible')).toBe(false);
     });
@@ -141,7 +141,7 @@ describe('When element is compiled with "e-[attr]" directive', () => {
       // Removes classes one by one and check if it was really removed
       for (const cls of classes) {
         context.data.classList[cls] = false;
-        await sleep(5);
+        await sleep(1);
         expect(element.classList.contains(cls)).toBe(false);
       }
 

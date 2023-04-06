@@ -53,7 +53,7 @@ describe('When element is compiled with "e-req" directive', () => {
         el: element
       });
 
-      await sleep(5);
+      await sleep(1);
 
       expect(requested).toHaveBeenCalled();
       expect(responded).toHaveBeenCalled();
@@ -96,7 +96,7 @@ describe('When element is compiled with "e-req" directive', () => {
         el: element
       });
 
-      await sleep(5);
+      await sleep(1);
 
       expect(requested).toHaveBeenCalled();
       expect(responded).toHaveBeenCalled();
@@ -137,7 +137,7 @@ describe('When element is compiled with "e-req" directive', () => {
         el: element
       });
 
-      await sleep(5);
+      await sleep(1);
 
       expect(requested).toHaveBeenCalled();
       expect(responded).not.toHaveBeenCalled();
@@ -196,7 +196,7 @@ describe('When element is compiled with "e-req" directive', () => {
         el: element
       });
 
-      await sleep(5);
+      await sleep(1);
 
       expect(requested).toHaveBeenCalled();
       expect(responded).toHaveBeenCalled();
@@ -240,7 +240,7 @@ describe('When element is compiled with "e-req" directive', () => {
         el: element
       });
 
-      await sleep(5);
+      await sleep(1);
 
       expect(requested).toHaveBeenCalled();
       expect(responded).toHaveBeenCalled();
@@ -282,7 +282,7 @@ describe('When element is compiled with "e-req" directive', () => {
         el: element
       });
 
-      await sleep(5);
+      await sleep(1);
 
       expect(requested).toHaveBeenCalled();
       expect(responded).not.toHaveBeenCalled();

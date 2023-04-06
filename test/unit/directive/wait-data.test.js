@@ -23,10 +23,10 @@ describe('When element is compiled with "wait-data" directive', () => {
         el: element
       });
 
-      await sleep(5);
+      await sleep(1);
       expect(element.innerHTML).toContain('{{ value }}');
 
-      await sleep(5);
+      await sleep(1);
       context.$wait.set('wait-key', {
         value: 'waited value'
       });
@@ -54,7 +54,7 @@ describe('When element is compiled with "wait-data" directive', () => {
         el: element
       });
 
-      await sleep(5);
+      await sleep(1);
       expect(element.innerHTML).not.toContain('{{ value }}');
       expect(element.innerHTML).toContain('waited value');
     });
