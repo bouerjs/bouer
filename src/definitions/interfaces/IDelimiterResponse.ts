@@ -1,9 +1,9 @@
 import IDelimiter from './IDelimiter';
 
 interface IDelimiterResponse {
-  /** delimiter field name */
+  /** the delimiter match expression */
   field: string,
-  /** the expression provided in the node */
+  /** expression inside of the field */
   expression: string,
   /** delimiter object containing the current delimiter config */
   delimiter?: IDelimiter
