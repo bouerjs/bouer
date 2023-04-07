@@ -4,8 +4,8 @@ import IEventSubscription from '../../definitions/interfaces/IEventSubscription'
 import ILifeCycleHooks from '../../definitions/interfaces/ILifeCycleHooks';
 import dynamic from '../../definitions/types/Dynamic';
 import Bouer from '../../instance/Bouer';
-import Prop from '../../shared/helpers/Prop';
 import IoC from '../../shared/helpers/IoCContainer';
+import Prop from '../../shared/helpers/Prop';
 import UriHandler from '../../shared/helpers/UriHandler';
 import {
   $CreateAnyEl,
@@ -13,6 +13,7 @@ import {
   ifNullReturn,
   isObject,
   isString,
+  setData,
   toLower,
   trim,
   urlCombine,
@@ -23,7 +24,7 @@ import EventHandler from '../event/EventHandler';
 import Reactive from '../reactive/Reactive';
 import ComponentHandler from './ComponentHandler';
 
-export default class Component<Data = {}> implements IComponentOptions<Data> {
+export default class Component<Data extends {} = {}> implements IComponentOptions<Data> {
   readonly _IRT_ = true;
 
   name: string;
@@ -288,5 +289,18 @@ export default class Component<Data = {}> implements IComponentOptions<Data> {
     });
 
     this.assets.push.apply(this.assets, $Assets);
+  }
+
+  /**
+   * Sets data into a target object, by default is the `component.data`
+   * @param {object} inputData the data the should be setted
+   * @param {object?} targetObject the target were the inputData
+   * @returns the object with the data setted
+   */
+  set<InputData extends {}, TargetObject extends {} = Data>(
+    inputData: InputData,
+    targetObject?: TargetObject
+  ): InputData & TargetObject {
+    return setData(this, inputData, targetObject);
   }
 }
