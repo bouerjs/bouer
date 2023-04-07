@@ -1,7 +1,10 @@
 
 // Quotes “'+  +'”
 
+import ReactiveEvent from '../../core/event/ReactiveEvent';
+import Reactive from '../../core/reactive/Reactive';
 import dynamic from '../../definitions/types/Dynamic';
+import RenderContext from '../../definitions/types/RenderContext';
 import Logger from '../logger/Logger';
 import Prop from './Prop';
 
@@ -405,6 +408,64 @@ export function copyObject<TObject extends dynamic>(object: TObject) {
   const out: dynamic = Object.create(object.__proto__);
   forEach(Object.keys(object), key => out[key] = object[key]);
   return out as TObject;
+}
+
+export function setData<
+  InputData extends {}, TargetObject extends {}, DataResult extends InputData & TargetObject
+>(
+  context: RenderContext,
+  inputData: InputData,
+  targetObject?: TargetObject
+): DataResult {
+  if (isNull(targetObject))
+    targetObject = context.data as any;
+
+  if (!isObject(inputData)) {
+    Logger.error('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".');
+    return targetObject as any;
+  }
+
+  if (isObject(targetObject) && targetObject == null) {
+    Logger.error('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".');
+    return inputData as any;
+  }
+
+  // Transforming the input
+  Reactive.transform({
+    data: inputData,
+    context: context
+  });
+
+  // Transfering the properties
+  forEach(Object.keys(inputData), key => {
+    let source: Reactive<any, any> | undefined;
+    let destination: Reactive<any, any> | undefined;
+
+    ReactiveEvent.once('AfterGet', evt => {
+      evt.onemit = reactive => source = reactive;
+      Prop.descriptor(inputData, key as keyof InputData)!.get!();
+    });
+
+    ReactiveEvent.once('AfterGet', evt => {
+      evt.onemit = reactive => destination = reactive;
+      const desc = Prop.descriptor(targetObject as {}, key as never);
+      if (desc && isFunction(desc.get)) desc.get!();
+    });
+
+    Prop.transfer(targetObject as {}, inputData, key as never);
+
+    if (!destination || !source) return;
+    // Adding the previous watches to the property that is being set
+    forEach(destination.watches, watch => {
+      if (source!.watches.indexOf(watch) === -1)
+        source!.watches.push(watch);
+    });
+
+    // Notifying the bounds and watches
+    source.notify();
+  });
+
+  return (targetObject! as any) as DataResult;
 }
 
 export const WIN = window;
