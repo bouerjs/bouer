@@ -38,7 +38,7 @@ import Reactive from '../reactive/Reactive';
 import Routing from '../routing/Routing';
 import Component from './Component';
 
-type ComponentClass<Data = {}> = (new (...args: any[]) => Component<Data>);
+type ComponentClass<Data extends {} = {}> = (new (...args: any[]) => Component<Data>);
 
 export default class ComponentHandler {
   readonly _IRT_ = true;
@@ -105,7 +105,7 @@ export default class ComponentHandler {
       });
   }
 
-  prepare<Data = {}>(
+  prepare<Data extends {} = {}>(
     components: (Component<Data> | IComponentOptions<Data> | ComponentClass<Data>)[],
     parent?: Component<any>
   ) {
@@ -117,13 +117,17 @@ export default class ComponentHandler {
         // Resolve the instance of the class
         component = IoC.new(entry as ComponentClass)!;
         component.clazz = entry as ComponentClass;
+
+        // Assining the Component Class name if it's not defined
+        if ((isNull(component.name) || !component.path) && (entry as ComponentClass).name !== Component.name)
+          component.name = (entry as ComponentClass).name.toLowerCase();
       }
 
       if ((!component.path || isNull(component.path)) && (!component.template || isNull(component.template)))
         return Logger.warn('The component at options.components[' + index + '] has not valid “path” or “template” ' +
           'property defined, ' + 'then it was ignored.');
 
-      if (isNull(component.name) || !component.name) {
+      if ((isNull(component.name) || !component.name) && !isComponentClass) {
         if (!component.path || isNull(component.path))
           return Logger.warn('Provide a “name” to component at options.components[' + index + '] position.');
 
