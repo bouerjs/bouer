@@ -1,39 +1,42 @@
+import DelimiterHandler from '../core/DelimiterHandler';
+import Evaluator from '../core/Evaluator';
+import Skeleton from '../core/Skeleton';
+import ViewChild from '../core/ViewChild';
 import Binder from '../core/binder/Binder';
 import Compiler from '../core/compiler/Compiler';
 import Converter from '../core/compiler/Converter';
 import Component from '../core/component/Component';
 import ComponentHandler from '../core/component/ComponentHandler';
-import DelimiterHandler from '../core/DelimiterHandler';
-import Evaluator from '../core/Evaluator';
 import EventHandler from '../core/event/EventHandler';
 import Middleware from '../core/middleware/Middleware';
 import Reactive from '../core/reactive/Reactive';
 import Routing from '../core/routing/Routing';
-import Skeleton from '../core/Skeleton';
 import DataStore from '../core/store/DataStore';
-import IBouerOptions from '../definitions/interfaces/IBouerOptions';
 import IBouerConfig from '../definitions/interfaces/IBouerConfig';
+import IBouerOptions from '../definitions/interfaces/IBouerOptions';
 import IComponentOptions from '../definitions/interfaces/IComponentOptions';
 import IDelimiter from '../definitions/interfaces/IDelimiter';
 import dynamic from '../definitions/types/Dynamic';
 import RenderContext from '../definitions/types/RenderContext';
+import SkeletonOptions from '../definitions/types/SkeletonOptions';
 import WatchCallback from '../definitions/types/WatchCallback';
 import Constants from '../shared/helpers/Constants';
 import IoC from '../shared/helpers/IoCContainer';
-import Task from '../shared/helpers/Task';
-import Logger from '../shared/logger/Logger';
 import Prop from '../shared/helpers/Prop';
-import ReactiveEvent from '../core/event/ReactiveEvent';
+import Task from '../shared/helpers/Task';
 import {
-  $CreateEl, DOM, forEach,
+  $CreateEl, DOM,
   WIN,
+  forEach,
   ifNullReturn,
-  isNull, isObject, toArray, trim, ifNullStop, isFunction,
+  ifNullStop,
+  isNull,
+  setData,
+  toArray, trim
 } from '../shared/helpers/Utils';
-import SkeletonOptions from '../definitions/types/SkeletonOptions';
-import ViewChild from '../core/ViewChild';
+import Logger from '../shared/logger/Logger';
 
-export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> implements
+export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dependencies extends {} = {}> implements
   IBouerOptions<Data, GlobalData, Dependencies> {
   /** The name of the instance */
   readonly _IRT_ = true;
@@ -421,11 +424,11 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> implem
    * @param {object?} options the options to the instance
    * @returns Bouer instance
    */
-  static create<Data = {}, GlobalData = {}, Dependencies = {}>(
+  static create<Data extends {} = {}, GlobalData extends {} = {}, Dependencies extends {} = {}>(
     options?: IBouerOptions<Data, GlobalData, Dependencies>
   ) {
     options = (options || {});
-    (options.config as any) = (options.config || {});
+    (options.config as dynamic) = (options.config || {});
     (options.config || {}).autoUnbind = false;
     (options.config || {}).autoOffEvent = false;
     (options.config || {}).autoComponentDestroy = false;
@@ -544,64 +547,16 @@ export default class Bouer<Data = {}, GlobalData = {}, Dependencies = {}> implem
   }
 
   /**
-   * Sets data into a target object, by default is the `app.data`
+   * Sets data into a target object, by default is the `bouer.data`
    * @param {object} inputData the data the should be setted
    * @param {object?} targetObject the target were the inputData
    * @returns the object with the data setted
    */
-  set<InputData extends {}, TargetObject = Data>(
+  set<InputData extends {}, TargetObject extends {} = Data>(
     inputData: InputData,
-    targetObject?: TargetObject | Data
-  ) {
-    if (isNull(targetObject))
-      targetObject = this.data;
-
-    if (!isObject(inputData)) {
-      Logger.error('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".');
-      return targetObject;
-    }
-
-    if (isObject(targetObject) && targetObject == null) {
-      Logger.error('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".');
-      return inputData;
-    }
-
-    // Transforming the input
-    Reactive.transform({
-      data: inputData,
-      context: this as Bouer
-    });
-
-    // Transfering the properties
-    forEach(Object.keys(inputData), key => {
-      let source: Reactive<any, any> | undefined;
-      let destination: Reactive<any, any> | undefined;
-
-      ReactiveEvent.once('AfterGet', evt => {
-        evt.onemit = reactive => source = reactive;
-        Prop.descriptor(inputData, key as keyof InputData)!.get!();
-      });
-
-      ReactiveEvent.once('AfterGet', evt => {
-        evt.onemit = reactive => destination = reactive;
-        const desc = Prop.descriptor(targetObject as {}, key as never);
-        if (desc && isFunction(desc.get)) desc.get!();
-      });
-
-      Prop.transfer(targetObject as {}, inputData, key as never);
-
-      if (!destination || !source) return;
-      // Adding the previous watches to the property that is being set
-      forEach(destination.watches, watch => {
-        if (source!.watches.indexOf(watch) === -1)
-          source!.watches.push(watch);
-      });
-
-      // Notifying the bounds and watches
-      source.notify();
-    });
-
-    return targetObject;
+    targetObject?: TargetObject
+  ): InputData & TargetObject {
+    return setData(this, inputData, targetObject);
   }
 
   /**
