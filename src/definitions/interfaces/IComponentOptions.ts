@@ -1,7 +1,7 @@
 import Component from '../../core/component/Component';
 import ILifeCycleHooks from './ILifeCycleHooks';
 
-interface IComponentOptions<Data = {}> extends ILifeCycleHooks {
+interface IComponentOptions<Data extends {} = {}> extends ILifeCycleHooks {
   /** The name of the component */
   name?: string
 
