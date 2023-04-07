@@ -105,9 +105,9 @@ export default class ComponentHandler {
       });
   }
 
-  prepare<Data extends {} = {}>(
-    components: (Component<Data> | IComponentOptions<Data> | ComponentClass<Data>)[],
-    parent?: Component<any>
+  prepare(
+    components: (Component | IComponentOptions | ComponentClass)[],
+    parent?: Component
   ) {
     forEach(components, (entry, index) => {
       const isComponentClass = ((entry as ComponentClass).prototype instanceof Component);
