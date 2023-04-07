@@ -157,7 +157,9 @@ export default (function IoC() {
      * @param app the bouer instance
      * @returns all the available methods to perform
      */
-    static app<Data = {}, GlobalData = {}, Dependencies = {}>(app: Bouer<Data, GlobalData, Dependencies>) {
+    static app<Data extends {} = {}, GlobalData extends {} = {}, Dependencies extends {} = {}>(
+      app: Bouer<Data, GlobalData, Dependencies>
+    ) {
       return {
         /**
          * Adds a service to be provided in whole the app
