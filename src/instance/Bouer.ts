@@ -83,7 +83,7 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
      * @param {boolean?} toReactive allow to transform the data to a reactive one after being setted.
      * By default is `false`.
      */
-    set<Data>(key: string, data: Data | Data[], toReactive?: boolean): void,
+    set<Data>(key: string, data: Data, toReactive?: boolean): void,
     /**
      * Destroy the stored data
      * @param {string} key the data:[`key`]="..." directive value or the app.$data.set(`key`) key provided.
