@@ -7,7 +7,7 @@ export default class DelimiterHandler {
   delimiters: IDelimiter[] = [];
   bouer: Bouer;
 
-  constructor(delimiters: IDelimiter[], bouer: Bouer) {
+  constructor(bouer: Bouer, delimiters: IDelimiter[]) {
     this.bouer = bouer;
     this.delimiters = delimiters;
   }
