@@ -84,15 +84,11 @@
       </p>
 
       <div class="navigation-container">
-        <div class="navigation">
-          <button on:click="start > 0 ? start-- : 0" title="Prev page" e-disabled="{ 'true' : start === 0 }"> &lt; </button>
-          <span e-text="Page {{ start + 1 }} | {{ 10 / limit }}"> Page # | # </span>
-          <button on:click="start++" title="Next page" e-disabled="{ 'true' : start + 1 === 10 / limit }"> &gt; </button>
-        </div>
+        <input type="text" placeholder="search..." e-bind="search">
       </div>
 
       <ul class="users">
-        <li e-req="user of users?_start={{ (start * limit) }}&_limit={{ limit }}" on:request="requested"
+        <li e-req="user of users?_start={{ (start * limit) }}&_limit={{ limit }} | where:search:name" on:request="requested"
           on:response="responded" on:fail="failed" on:done="done">
 
           <div class="avatar">
@@ -106,6 +102,16 @@
 
         </li>
       </ul>
+
+      <div class="navigation-container">
+        <div class="navigation">
+          <button on:click="start > 0 ? start-- : 0" title="Prev page" e-disabled="{ 'true' : start === 0 }"> &lt;
+          </button>
+          <span e-text="Page {{ start + 1 }} | {{ 10 / limit }}"> Page # | # </span>
+          <button on:click="start++" title="Next page" e-disabled="{ 'true' : start + 1 === 10 / limit }"> &gt;
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
