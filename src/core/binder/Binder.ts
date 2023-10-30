@@ -154,13 +154,13 @@ export default class Binder {
       };
 
       ReactiveEvent.once('AfterGet', (event) => {
-        event.onemit = (reactive) => {
+        event.onemit = (descriptor) => {
           this.binds.push({
             isConnected: options.isConnected,
-            watch: reactive.onChange(() => {
+            watch: descriptor.onChange(() => {
               $RunDirectiveMiddlewares('onUpdate');
               setter();
-              onUpdate(reactive.propValue, node);
+              onUpdate(descriptor.propValue, node);
             }, node),
           });
         };
@@ -331,10 +331,10 @@ export default class Binder {
           });
 
         // Adding the event on emittion
-        evt.onemit = (reactive) => {
+        evt.onemit = (descriptor) => {
           this.binds.push({
             isConnected: options.isConnected,
-            watch: reactive.onChange(() => {
+            watch: descriptor.onChange(() => {
               $RunDirectiveMiddlewares('onUpdate');
               const value = getValue();
               callback(this.BindingDirection.fromDataToInput, value);
@@ -399,16 +399,16 @@ export default class Binder {
     });
   }
 
-  onPropertyChange<Value, TargetObject>(
-    propertyName: string | number | symbol,
-    callback: WatchCallback,
+  onPropertyChange<Value, TargetObject, Key extends keyof TargetObject>(
+    propertyName: keyof TargetObject,
+    callback: WatchCallback<TargetObject[Key]>,
     targetObject: TargetObject
   ) {
     let mWatch: Watch<Value, TargetObject> | undefined;
 
     ReactiveEvent.once('AfterGet', (event) => {
-      event.onemit = (reactive) =>
-        (mWatch = reactive.onChange(callback) as any);
+      event.onemit = (descriptor) =>
+        (mWatch = descriptor.onChange(callback as WatchCallback) as any);
       fnEmpty((targetObject as any)[propertyName]);
     });
 
@@ -416,18 +416,18 @@ export default class Binder {
   }
 
   onPropertyInScopeChange(
-    watchable: (app: Bouer<{}, {}, {}>) => void
+    watchable: (this: Bouer, app: Bouer) => void
   ) {
     const watches: Watch<any, any>[] = [];
 
     ReactiveEvent.once('AfterGet', (evt) => {
-      evt.onemit = (reactive) => {
+      evt.onemit = (descriptor) => {
         // Using scope watch avoid listen to the same property twice
         if (
           watches.find(
             (w) =>
-              w.property === reactive.propName &&
-              w.reactive.propSource === reactive.propSource
+              w.property === descriptor.propName &&
+              w.descriptor.propSource === descriptor.propSource
           )
         )
           return;
@@ -435,7 +435,7 @@ export default class Binder {
         // Execution handler
         let isExecuting = false;
         watches.push(
-          reactive.onChange(() => {
+          descriptor.onChange(() => {
             if (isExecuting) return;
             isExecuting = true;
             watchable.call(this.bouer, this.bouer);
