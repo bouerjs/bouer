@@ -6,9 +6,9 @@ import AppFooter from "./components/footer/app-footer.js";
 
 new Bouer('#app', {
   components: [
-    new AppHeader(),
-    new UserItem(),
-    new AppMain(),
-    new AppFooter()
+    AppHeader,
+    UserItem,
+    AppMain,
+    AppFooter
   ]
 });
