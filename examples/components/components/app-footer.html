@@ -1,0 +1,22 @@
+<footer>
+  <small>Copyright © Bouer {{ year }} </small>
+</footer>
+
+<script>
+  var year = new Date().toJSON().split('-')[0];
+
+  this.export({
+    year: year
+  })
+</script>
+
+<style scoped>
+  footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 0;
+    margin: 4px 0;
+  }
+</style>
