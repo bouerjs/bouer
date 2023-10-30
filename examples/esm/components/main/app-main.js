@@ -3,6 +3,8 @@ import {
 } from "../../../../dist/bouer.esm.js";
 
 export default class AppMain extends Component {
+  name = 'AppMain';
+
   constructor() {
     super("/components/main/app-main.html");
   }
