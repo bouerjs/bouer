@@ -1,7 +1,6 @@
 var app = new Bouer('#app', {
   middleware: function (configure, app) {
     configure('req', function (onBind, onUpdate) {
-
       onBind(function (context) {
 
         // the type of the request: `of` or `as`
@@ -35,6 +34,7 @@ var app = new Bouer('#app', {
     start: 0,
     limit: 2,
     status: '',
+    search: '',
 
     // Methods
     requested: function (evt) {
@@ -53,4 +53,9 @@ var app = new Bouer('#app', {
       }, 2000);
     },
   },
+  config: {
+    skeleton: {
+      numberOfItems: 5
+    }
+  }
 });
