@@ -8,8 +8,14 @@
   "typings": "types/index.d.ts",
   "scripts": {
     "test": "jest --detectOpenHandles",
-    "dev": "node scripts/build.js --dev",
-    "build": "node scripts/build.js",
+
+    "dev": "rollup --config rollup.config.js --configPlugin typescript --w",
+    "dev-r": "node scripts/build.js --dev",
+
+    "build": "rollup --config rollup.config.js --configPlugin typescript",
+    "build-r": "node scripts/build.js",
+    "build-all": "node scripts/build.js --prod",
+
     "publish": "node scripts/build.js --prod && npm pack && node ./scripts/test-pkg-json-updater.js",
     "prepare": "husky install",
     "changelog": "auto-changelog -p -u"
