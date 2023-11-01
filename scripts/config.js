@@ -71,8 +71,7 @@ const rollupConfigBuilder = (key, config) => {
         babelHelpers: 'bundled',
       }),
       typescript({
-        lib: ['es5', 'es6', 'dom'],
-        target: 'es5'
+        tsconfig: 'tsconfig.json'
       })
     ],
     onwarn: (message, logger) => {

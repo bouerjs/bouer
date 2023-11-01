@@ -1,12 +1,12 @@
 import 'jsdom';
 import 'jsdom-global/register';
 import 'regenerator-runtime/runtime';
+
 import Bouer from '../src/index';
 import Compiler from '../src/core/compiler/Compiler';
-import {
-  $CreateEl
-} from '../src/shared/helpers/Utils';
-const { promisify } = require('util');
+import IoC from '../src/shared/helpers/IoCContainer';
+import { $CreateEl } from '../src/shared/helpers/Utils';
+import { promisify } from 'util';
 
 const sleep = promisify(setTimeout);
 
@@ -27,7 +27,7 @@ function nextTick(cb, seconds = 10) {
 export {
   Bouer,
   Compiler,
-
+  IoC,
   nextTick,
   toHtml,
   sleep,

@@ -2,7 +2,7 @@ const fs = require('fs');
 const zlib = require('zlib');
 const path = require('path');
 const rollup = require('rollup');
-const terser = require('terser');
+const { minify } = require('terser');
 const builds = require('./config').builds;
 const indent = require('js-beautify');
 
@@ -44,15 +44,15 @@ buildKeys.filter(key => {
           console.info(`${prefix} ⚒️  Generating file -> ${event.output[0]}`);
           break;
         case 'FATAL':
-          console.error(`${prefix} ☠️ Fatal Error: ${event.error}`);
+          console.error(`${prefix} ☠️ Fatal Error:`, event.error);
           process.exit(1);
           break;
         case 'ERROR':
-          console.error(`${prefix} 😵 Error: ${event.error}`);
+          console.error(`${prefix} 😵 Error:`, event.error);
           break;
         case 'BUNDLE_END':
-          bundle.generate({})
-            .then(({ output: [{ code }] }) => writeFile(fileNameDev, code))
+          bundle.generate(output)
+            .then(({ output: [{ code }] }) => writeFile(fileNameDev, beautify(code)))
             .finally(() => {
               bundle.close();
 
@@ -63,7 +63,6 @@ buildKeys.filter(key => {
                 numberOfGenerations = 0;
 
                 console.log(`${prefix} ⏳ Waiting for a file to change to rebuild...`);
-                console.log();
               }
             });
           break;
@@ -76,22 +75,12 @@ buildKeys.filter(key => {
   rollup.rollup(config)
     .then(bundle => bundle.generate(output))
     .then(({
-      output: [{
-        code
-      }]
+      output: [{ code }]
     }) => {
-      writeFile(fileNameDev, code);
+      writeFile(fileNameDev, beautify(code));
 
       if (!isProd) return;
-      terser.minify(code, {
-        toplevel: true,
-        output: {
-          ascii_only: true
-        },
-        compress: {
-          pure_funcs: ['makeMap']
-        }
-      }).then(terserOutput => {
+      minify(code).then(terserOutput => {
         return writeFile(fileNameProd, terserOutput.code, true);
       });
     })
@@ -99,6 +88,28 @@ buildKeys.filter(key => {
       console.error(err);
     });
 });
+
+function beautify(code) {
+  return indent.js(code, {
+    'indent_size': '2',
+    'indent_char': ' ',
+    'max_preserve_newlines': '1',
+    'preserve_newlines': true,
+    'keep_array_indentation': true,
+    'break_chained_methods': false,
+    'indent_scripts': 'normal',
+    'brace_style': 'collapse',
+    'space_before_conditional': true,
+    'unescape_strings': false,
+    'jslint_happy': false,
+    'end_with_newline': false,
+    'wrap_line_length': '0',
+    'indent_inner_html': false,
+    'comma_first': false,
+    'e4x': false,
+    'indent_empty_lines': false
+  });
+}
 
 function writeFile(dest, code, zip) {
   return new Promise((resolve, reject) => {
@@ -109,30 +120,10 @@ function writeFile(dest, code, zip) {
       resolve();
     }
 
-    const mCode = indent.js(code, {
-      'indent_size': '2',
-      'indent_char': ' ',
-      'max_preserve_newlines': '1',
-      'preserve_newlines': true,
-      'keep_array_indentation': true,
-      'break_chained_methods': false,
-      'indent_scripts': 'normal',
-      'brace_style': 'collapse',
-      'space_before_conditional': true,
-      'unescape_strings': false,
-      'jslint_happy': false,
-      'end_with_newline': false,
-      'wrap_line_length': '0',
-      'indent_inner_html': false,
-      'comma_first': false,
-      'e4x': false,
-      'indent_empty_lines': false
-    });
-
-    fs.writeFile(dest, mCode, err => {
+    fs.writeFile(dest, code, err => {
       if (err) return reject(err);
       if (zip) {
-        zlib.gzip(mCode, (err, zipped) => {
+        zlib.gzip(code, (err, zipped) => {
           if (err) return reject(err);
           report(' (gzipped: ' + getSize(zipped) + ')');
         });
