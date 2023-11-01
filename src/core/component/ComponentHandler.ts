@@ -38,7 +38,7 @@ import Reactive from '../reactive/Reactive';
 import Routing from '../routing/Routing';
 import Component from './Component';
 
-type ComponentClass<Data extends {} = {}> = (new (...args: any[]) => Component<Data>);
+type ComponentClass<Data extends {} = dynamic> = (new (...args: any[]) => Component<Data>);
 
 export default class ComponentHandler {
   readonly _IRT_ = true;
@@ -53,16 +53,11 @@ export default class ComponentHandler {
   stylesController: { [key: string]: { styles: Element[], elements: Element[] }, } = {};
   activeComponents: Component[] = [];
 
-  constructor(
-    bouer: Bouer,
-    delimiterHandler: DelimiterHandler,
-    eventHandler: EventHandler,
-    evaluator: Evaluator
-  ) {
+  constructor(bouer: Bouer) {
     this.bouer = bouer;
-    this.delimiter = delimiterHandler!;
-    this.eventHandler = eventHandler!;
-    this.evaluator = evaluator!;
+    this.delimiter = IoC.app(bouer).resolve(DelimiterHandler)!;
+    this.eventHandler = IoC.app(bouer).resolve(EventHandler)!;
+    this.evaluator = IoC.app(bouer).resolve(Evaluator)!;
   }
 
   check(nodeName: string) {
@@ -115,19 +110,15 @@ export default class ComponentHandler {
       let component = entry as Component;
       if (isComponentClass) {
         // Resolve the instance of the class
-        component = IoC.new(entry as ComponentClass)!;
+        component = IoC.app(this.bouer).resolve(entry as ComponentClass) || IoC.new(entry as ComponentClass)!;
         component.clazz = entry as ComponentClass;
-
-        // Assining the Component Class name if it's not defined
-        if ((isNull(component.name) || !component.path) && (entry as ComponentClass).name !== Component.name)
-          component.name = (entry as ComponentClass).name.toLowerCase();
       }
 
       if ((!component.path || isNull(component.path)) && (!component.template || isNull(component.template)))
         return Logger.warn('The component at options.components[' + index + '] has not valid “path” or “template” ' +
           'property defined, ' + 'then it was ignored.');
 
-      if ((isNull(component.name) || !component.name) && !isComponentClass) {
+      if ((isNull(component.name) || !component.name)) {
         if (!component.path || isNull(component.path))
           return Logger.warn('Provide a “name” to component at options.components[' + index + '] position.');
 
@@ -200,7 +191,7 @@ export default class ComponentHandler {
         let mCom: Component;
 
         if ((c instanceof Component) && (c as Component).clazz)
-          mCom = IoC.new(c.clazz!)!;
+          mCom = IoC.app(this.bouer).resolve(c.clazz!) || IoC.new(c.clazz!)!;
         else if (c instanceof Component)
           mCom = copyObject(c);
         else
@@ -391,6 +382,15 @@ export default class ComponentHandler {
 
     if (isNull(rootElement)) return;
 
+    // Transforming all unknown variables to reactive
+    const unknownVars = where(Object.keys(component), key => !(key in component));
+    if (unknownVars.length > 0)
+      Reactive.transform({
+        context: component,
+        data: component,
+        keys: unknownVars
+      });
+
     // Adding the listeners
     const createdEvent = this.addEvent('created', rootElement, component);
     const beforeMountEvent = this.addEvent('beforeMount', rootElement, component);
@@ -401,20 +401,20 @@ export default class ComponentHandler {
     this.addEvent('destroyed', rootElement, component);
 
     const scriptsAssets = where(component.assets, asset => asset.nodeName === 'SCRIPT');
-    const initializer = (component as any).init;
+    const initializer = component.init;
 
     if (isFunction(initializer))
-      fnCall(initializer.call(component));
+      fnCall(initializer!.call(component));
 
     const processDataAttr = (attr: Attr) => {
       let inputData: dynamic = {};
       const mData = Extend.obj(data, { $data: data });
 
       // Listening to all the reactive properties
-      const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
-        if (!(reactive.propName in inputData))
-          inputData[reactive.propName] = undefined;
-        Prop.set(inputData, reactive.propName, reactive);
+      const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
+        if (!(descriptor.propName in inputData))
+          inputData[descriptor.propName] = undefined;
+        Prop.set(inputData, descriptor.propName, descriptor);
       });
 
       // If data value is empty gets the main scope value
@@ -430,8 +430,8 @@ export default class ComponentHandler {
           });
 
         if (!isObject(mInputData))
-          Logger.error(('Expected a valid Object Literal expression in “' + attr.nodeName +
-            '” and got “' + attr.value + '”.'));
+          Logger.error('Expected a valid Object Literal expression in “' + attr.nodeName +
+            '” and got “' + attr.value + '”.');
         else {
           // Adding all non-existing properties
           forEach(Object.keys(mInputData), key => {
@@ -496,7 +496,7 @@ export default class ComponentHandler {
 
         // Attaching the root element to the component element
         if (!('root' in componentElement))
-          Prop.set((componentElement as any), 'root', { value: rootElement });
+          Prop.set(componentElement, 'root', { value: rootElement });
 
         // Mouting the element
         container.replaceChild(rootElement, componentElement);
