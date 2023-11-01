@@ -1,4 +1,5 @@
 import dynamic from './Dynamic';
+import RenderContext from './RenderContext';
 
 /**
  * Watch Callback
@@ -6,6 +7,8 @@ import dynamic from './Dynamic';
  * @param valueOld The old value
  * @param detail An object containing extra details, like the attached to a `node`
  */
-type WatchCallback = <ValueNew, ValueOld>(valueNew: ValueNew, valueOld: ValueOld, detail?: dynamic) => void;
+type WatchCallback<V = any> = (
+  this: RenderContext, valueNew: V, valueOld: V | undefined, detail?: dynamic
+) => void;
 
 export default WatchCallback;
