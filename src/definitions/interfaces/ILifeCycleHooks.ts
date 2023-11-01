@@ -1,63 +1,66 @@
-interface ILifeCycleHooks {
+import Component from '../../core/component/Component';
+import dynamic from '../types/Dynamic';
+
+interface ILifeCycleHooks<Data extends {} = dynamic> {
   /**
    * The hook that should be called when the component is requested
    * @param event the called event object
    */
-  requested?(event: CustomEvent): void;
+  requested?(this: Component<Data>, event: CustomEvent): void;
 
   /**
    * The hook that should be called when the component is created
    * @param event the called event object
    */
-  created?(event: CustomEvent): void;
+  created?(this: Component<Data>, event: CustomEvent): void;
 
   /**
    * The hook that should be called before the component is mounted
    * @param event the called event object
    */
-  beforeMount?(event: CustomEvent): void;
+  beforeMount?(this: Component<Data>, event: CustomEvent): void;
 
   /**
    * The hook that should be called after the component is mounted
    * @param event the called event object
    */
-  mounted?(event: CustomEvent): void;
+  mounted?(this: Component<Data>, event: CustomEvent): void;
 
   /**
    * The hook that should be called before the component is loaded
    * @param event the called event object
    */
-  beforeLoad?(event: CustomEvent): void;
+  beforeLoad?(this: Component<Data>, event: CustomEvent): void;
 
   /**
    * The hook that should be called after the component is loaded (Compiled)
    * @param event the called event object
    */
-  loaded?(event: CustomEvent): void;
+  loaded?(this: Component<Data>, event: CustomEvent): void;
 
   /**
    * The hook that should be called before the component is destroyed
    * @param event the called event object
    */
-  beforeDestroy?(event: CustomEvent): void;
+  beforeDestroy?(this: Component<Data>, event: CustomEvent): void;
 
   /**
    * The hook that should be called after the component is destroyed
    * @param event the called event object
    */
-  destroyed?(event: CustomEvent): void;
+  destroyed?(this: Component<Data>, event: CustomEvent): void;
 
   /**
    * The hook that should be called when the component was blocked by restrictions
    * @param event the called event object
    */
-  blocked?(event: CustomEvent): void;
+  blocked?(this: Component<Data>, event: CustomEvent): void;
 
   /**
    * The hook that should be called after the component request is failed
    * @param event the called event object
    */
-  failed?(event: CustomEvent): void;
+  failed?(this: Component<Data>, event: CustomEvent): void;
 }
 
 export default ILifeCycleHooks;

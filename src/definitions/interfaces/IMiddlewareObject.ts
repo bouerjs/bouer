@@ -1,9 +1,10 @@
-import MiddlewareResult from '../../core/middleware/MiddlewareResult';
+import IMiddlewareResult from '../../core/middleware/IMiddlewareResult';
+import Bouer from '../../instance/Bouer';
 import IMiddleware from './IMiddleware';
 
 interface IMiddlewareObject {
-  onBind?: (context: IMiddleware, next: () => void) => MiddlewareResult | Promise<MiddlewareResult>,
-  onUpdate?: (context: IMiddleware, next: () => void) => MiddlewareResult | Promise<MiddlewareResult>
+  onBind?: (this: Bouer, context: IMiddleware, next: () => void) => IMiddlewareResult | Promise<IMiddlewareResult>,
+  onUpdate?: (this: Bouer, context: IMiddleware, next: () => void) => IMiddlewareResult | Promise<IMiddlewareResult>
 }
 
 export default IMiddlewareObject;

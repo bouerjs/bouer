@@ -13,7 +13,7 @@ interface IEventSubscription {
    * @param args other values provided to the event
    * @returns nothing or a promise according to the event
    */
-  callback: (evt: Event | CustomEvent, ...args: any[]) => void | Promise<any>,
+  callback: (evt: CustomEvent, ...args: any[]) => void | Promise<any>,
   /**
    * A method to dispatch the current event
    * @param options Options that can provided on the emission
