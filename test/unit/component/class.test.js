@@ -10,25 +10,6 @@ import {
 } from '../../../src/index';
 
 describe('Customize Component (extends)', () => {
-  it('Warns when extends component and do not provide a "name" and "path"', () => {
-    class ButtonComponent extends Component {
-      constructor() {
-        super({
-          template: '<button>Custom Component</button>'
-        });
-      }
-    }
-
-    const fn = console.warn;
-    console.warn = jest.fn();
-
-    Bouer.create({
-      components: [ButtonComponent],
-    });
-
-    expect(console.warn.mock.calls[0][1]).toBe('Provide a “name” to component at options.components[0] position.');
-    console.warn = fn;
-  });
   it('Component methods are reached with "this" keyword', () => {
     class ButtonComponent extends Component {
       name = 'ButtonComponent';

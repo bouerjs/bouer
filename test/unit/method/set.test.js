@@ -2,7 +2,7 @@ import {
   Bouer,
 } from '../../index';
 
-describe('When "set" method is called with no target object', () => {
+describe('When "set" method from Bouer is called with no target object', () => {
   let context;
 
   beforeEach(() => {
@@ -18,7 +18,7 @@ describe('When "set" method is called with no target object', () => {
   });
 });
 
-describe('When "set" method is called with target object', () => {
+describe('When "set" method from Bouer is called with target object', () => {
   let context;
 
   beforeEach(() => {

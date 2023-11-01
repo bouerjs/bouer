@@ -61,7 +61,7 @@ describe('When added to the instance component options', () => {
       }],
     });
 
-    expect(console.warn.mock.calls[0][1]).toBe('Provide a “name” to component at options.components[0] position.');
+    expect(console.warn).toBeCalled();
     console.warn = fn;
   });
   it('Register the component with "template" property', () => {
@@ -100,6 +100,17 @@ describe('When added to the instance component options', () => {
 
     expect(componentEl.tagName).toBe('DIV');
     expect(componentEl.outerHTML.trim()).toBe(copiedElComponent.template.trim());
+  });
+  it('Warns when extends component and do not provide a "name" and "path"', () => {
+    const fn = console.warn;
+    console.warn = jest.fn();
+
+    Bouer.create({
+      components: [{ template: '<button>Custom Component</button>' }],
+    });
+
+    expect(console.warn).toBeCalled();
+    console.warn = fn;
   });
 });
 

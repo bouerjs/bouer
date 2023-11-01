@@ -6,15 +6,14 @@ import {
 } from '../../index';
 
 describe('When using a delimiter "{{ ... }}" for one way data binding', () => {
-  const context = Bouer.create({
-    data: {
-      value: 'Printed'
-    }
-  });
-
-  const compiler = IoC.app(context).resolve(Compiler);
-
   it('Render the property in Element <h1> content', () => {
+    const context = Bouer.create({
+      data: {
+        value: 'Printed'
+      }
+    });
+
+    const compiler = IoC.app(context).resolve(Compiler);
     const htmlSnippet = '<h1>{{ value }}</h1>';
     const element = toHtml(htmlSnippet);
 
