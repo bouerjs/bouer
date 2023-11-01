@@ -1,10 +1,12 @@
-export default class Task {
-  static run = (
-    callback: (killTask: () => void) => void,
-    milliseconds?: number
-  ) => {
-    const timerId = setInterval(() => {
-      callback(() => clearInterval(timerId));
-    }, milliseconds || 10);
+export default (function Task() {
+  return {
+    run(
+      callback: (killTask: () => void) => void,
+      milliseconds?: number
+    ) {
+      const timerId = setInterval(() => {
+        callback(() => clearInterval(timerId));
+      }, milliseconds || 10);
+    }
   };
-}
+})();
