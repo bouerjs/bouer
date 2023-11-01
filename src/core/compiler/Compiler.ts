@@ -36,20 +36,21 @@ export default class Compiler {
 
   constructor(
     bouer: Bouer,
-    binder: Binder,
-    delimiterHandler: DelimiterHandler,
-    eventHandler: EventHandler,
-    componentHandler: ComponentHandler,
     directives?: CustomDirective,
   ) {
     this.bouer = bouer;
     this.directives = directives ?? {};
-    this.binder = binder;
-    this.delimiter = delimiterHandler;
-    this.eventHandler = eventHandler;
-    this.component = componentHandler;
+    this.binder = IoC.app(bouer).resolve(Binder)!;
+    this.delimiter = IoC.app(bouer).resolve(DelimiterHandler)!;
+    this.eventHandler = IoC.app(bouer).resolve(EventHandler)!;
+    this.component = IoC.app(bouer).resolve(ComponentHandler)!;
   }
 
+  /**
+   * Compiles an html element
+   * @param {string} options the options of the compilation process
+   * @returns the element compiled
+   */
   compile<Data>(options: {
     /** The element that wil be compiled */
     el: Element,
@@ -65,7 +66,7 @@ export default class Compiler {
     componentSlot?: Element,
 
     /** The function that should be fired when the compilation is done */
-    onDone?: (element: Element, data?: Data) => void | Promise<any>,
+    onDone?: (this: typeof options.context, element: Element, data?: Data) => void | Promise<any>,
 
     /** The context of this compilation process */
     context: RenderContext,
@@ -85,7 +86,7 @@ export default class Compiler {
     if (!this.analize(rootElement.outerHTML))
       return rootElement;
 
-    const directive = new Directive(this.directives || {}, this, context);
+    const directive = new Directive(this.directives || {}, this, context as RenderContext);
 
     const walker = (node: Node, data: object) => {
       if (node.nodeName in this.NODES_TO_IGNORE_IN_COMPILATION)
@@ -228,7 +229,7 @@ export default class Compiler {
       // Event handler
       // on:[?]="..." directive
       if (Constants.check(node, Constants.on))
-        return this.eventHandler.compile(node, data, context);
+        return this.eventHandler.compile(node, data, context as RenderContext);
 
       // ShortHand directive: {title}
       let delimiterField: IDelimiterResponse | null;
@@ -245,7 +246,7 @@ export default class Compiler {
           node: attr,
           isConnected: isConnected,
           fields: [{ expression: delimiterField.expression, field: attr.value }],
-          context: context,
+          context: context as RenderContext,
           data: data
         });
       }
@@ -258,7 +259,7 @@ export default class Compiler {
           node: node,
           isConnected: isConnected,
           fields: delimitersFields,
-          context: context,
+          context: context as RenderContext,
           data: data
         });
       }
@@ -286,58 +287,84 @@ export default class Compiler {
     return rootElement;
   }
 
-  analize(htmlSnippet: String): boolean {
-    const tagRegexRule = '<([a-z0-9-_]{1,}|/[a-z0-9-_]{1,}).*?>';
+  analize(htmlSnippet: string) {
+    const tagRegexRule = '<([a-z0-9-_]{1,}|/[a-z0-9-_]{1,})((.|\n|\r)*?)>';
     // Removing unnecessary verification
     const htmlForParser = htmlSnippet
       .replace(/<script((.|\n|\r)*?)<\/script>/gm, '<script></script>')
       .replace(/<style((.|\n|\r)*?)<\/style>/gm, '<style></style>')
       .replace(/<pre((.|\n|\r)*?)<\/pre>/gm, '<pre></pre>')
       .replace(/<code((.|\n|\r)*?)<\/code>/gm, '<code></code>')
+      .replace(/<svg((.|\n|\r)*?)<\/svg>/gm, '<svg></svg>')
+      .replace(/<!--((.|\n|\r)*?)-->/gm, '')
       .replace(/&nbsp;/g, '&#160;');
 
+    const indentChar = '  ';
     const history = [];
     const tagsTree = [];
+    let indentNumber = 0;
+    let message = '';
+    let isValid = true;
+
     // Getting the tags
     const tagElements = htmlForParser.match(new RegExp(tagRegexRule, 'ig')) || [];
     const selfCloseTags = new Set(
-      ['area', 'base', 'br', 'col', 'embed',
+      [
+        'area', 'base', 'br', 'col', 'embed',
         'hr', 'img', 'input', 'link', 'meta',
-        'param', 'source', 'track', 'wbr']
+        'param', 'source', 'track', 'wbr'
+      ]
     );
 
     for (let i = 0; i < tagElements.length; i++) {
       const tagElement = tagElements[i];
       const match = tagElement.match(new RegExp(tagRegexRule, 'i'))!;
       const tagName = toLower(match[1]);
+      const isClosing = tagElement[1] === '/';
+
+      history.push({
+        tag: tagElement,
+        ident: isClosing ? indentNumber : ++indentNumber,
+      });
 
       if (selfCloseTags.has(tagName))
         continue;
 
-      // In case of closing
-      if (tagElement[1] === '/') {
-        const lastTagTree = tagsTree[tagsTree.length - 1];
-
-        // break the process
-        if (lastTagTree.name !== tagName.substring(1))
-          break;
-
-        tagsTree.pop();
-        continue;
-      }
-      history.push(tagElement);
       tagsTree.push({
         name: tagName,
         tag: tagElement
       });
+
+      // In case of closing
+      if (isClosing) {
+        indentNumber--;
+
+        // Keep building the tree
+        if (!isValid) continue;
+
+        const closingTag = tagsTree.pop()!;
+        const openningTag = tagsTree.pop();
+
+        if (!openningTag || openningTag.name !== closingTag.name.substring(1)) {
+          indentNumber++;
+
+          message = 'Syntax Error: Unexpected token, the openning tag `' + (openningTag!.tag || 'NoToken') +
+            '` does not match with closing tag: `' + closingTag.tag + '`:\n\n';
+
+          isValid = false;
+          history.push(history[history.length - 1]);
+          history[history.length - 2] = {
+            tag: '<====================== Line Error ======================',
+            ident: indentNumber + 1
+          };
+        }
+        continue;
+      }
     }
 
-    const isValid = tagsTree.length == 0;
-
     if (!isValid) {
-      history[history.length - 1] += ' <--- Line error';
-      Logger.error('Syntax Error: Missing pair of tag, html snippet: \n' +
-        history.map((tag, index) => ' |' + ' '.padEnd(index + 1, '  ') + tag).join('\n'));
+      Logger.error(message +
+        history.map((h, i) => (i + 1) + '.' + Array(h.ident).fill(indentChar).join('') + h.tag).join('\n'));
     }
 
     return isValid;
