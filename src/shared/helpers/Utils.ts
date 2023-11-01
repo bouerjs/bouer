@@ -6,12 +6,15 @@ import Reactive from '../../core/reactive/Reactive';
 import dynamic from '../../definitions/types/Dynamic';
 import RenderContext from '../../definitions/types/RenderContext';
 import Logger from '../logger/Logger';
+import Constants from './Constants';
+import Extend from './Extend';
 import Prop from './Prop';
 
 export function webRequest(url: string, options?: {
   body?: any;
   headers?: object;
   method?: string;
+  beforeSend?: (xhr: XMLHttpRequest) => void;
 }) {
   if (!url) return Promise.reject(new Error('Invalid Url'));
 
@@ -25,8 +28,8 @@ export function webRequest(url: string, options?: {
   };
 
   const getOption = (key: string, mDefault: any) => {
-    const initAsAny = (options || {}) as any;
-    const value = initAsAny[key];
+    const mOptions = (options || {}) as dynamic;
+    const value = mOptions[key];
     if (value) return value;
     return mDefault;
   };
@@ -34,15 +37,15 @@ export function webRequest(url: string, options?: {
   const headers = getOption('headers', {});
   const method = getOption('method', 'get');
   const body = getOption('body', undefined);
+  const beforeSend = getOption('body', (xhr: XMLHttpRequest) => { });
   const xhr = createXhr(method);
 
-  type IResponse = {
+  interface IResponse extends Response {
     url: string,
     ok: boolean,
     status: number,
     statusText: string,
-    headers: object,
-    json(): Promise<object>,
+    json(): Promise<any>,
     text(): Promise<string>
   }
 
@@ -86,6 +89,8 @@ export function webRequest(url: string, options?: {
     xhr.ontimeout = () => {
       createResponse(reject, false, xhr.status, xhr, '');
     };
+
+    beforeSend(xhr);
 
     xhr.send(body);
   });
@@ -183,27 +188,25 @@ export function toStr(input: any) {
   }
 }
 
-export function forEach<T>(
+export function forEach<T, C = {}>(
   iterable: T[],
-  callback?: (item: T, index: number) => void,
-  context?: object
+  callback: (this: typeof context, item: T, index: number) => void,
+  context?: C
 ) {
-  for (let index = 0; index < iterable.length; index++) {
-    if (isFunction(callback))
-      callback!.call(context, iterable[index], index);
+  for (let i = 0; i < iterable.length; i++) {
+    callback.call(context, iterable[i], i);
   }
 }
 
-export function where<T>(
+export function where<T, C = {}>(
   iterable: T[],
-  callback?: (item: T, index: number) => any,
-  context?: object
+  callback: (this: typeof context, item: T, index: number) => any,
+  context?: C
 ) {
   const out: T[] = [];
-  for (let index = 0; index < iterable.length; index++) {
-    const item = iterable[index];
-    if (isFunction(callback) && callback!.call(context, item, index)) {
-      out.push(item);
+  for (let i = 0; i < iterable.length; i++) {
+    if (callback.call(context, iterable[i], i)) {
+      out.push(iterable[i]);
     }
   }
   return out;
@@ -400,7 +403,7 @@ export function findDirective(
       (attr.name === name || startWith(attr.name, name + ':')));
 }
 
-export function getRootElement(el: Element) {
+export function getRootElement(el: Element): Element {
   return (el as any).root || el;
 }
 
@@ -411,7 +414,7 @@ export function copyObject<TObject extends dynamic>(object: TObject) {
 }
 
 export function setData<
-  InputData extends {}, TargetObject extends {}, DataResult extends InputData & TargetObject
+  InputData extends dynamic, TargetObject extends dynamic, DataResult extends InputData & TargetObject
 >(
   context: RenderContext,
   inputData: InputData,
@@ -442,12 +445,12 @@ export function setData<
     let destination: Reactive<any, any> | undefined;
 
     ReactiveEvent.once('AfterGet', evt => {
-      evt.onemit = reactive => source = reactive;
+      evt.onemit = descriptor => source = descriptor;
       Prop.descriptor(inputData, key as keyof InputData)!.get!();
     });
 
     ReactiveEvent.once('AfterGet', evt => {
-      evt.onemit = reactive => destination = reactive;
+      evt.onemit = descriptor => destination = descriptor;
       const desc = Prop.descriptor(targetObject as {}, key as never);
       if (desc && isFunction(desc.get)) desc.get!();
     });
@@ -466,6 +469,176 @@ export function setData<
   });
 
   return (targetObject! as any) as DataResult;
+}
+
+export function htmlToJsObj(input: string | HTMLElement,
+  options?: {
+    /**
+    * attributes that tells the compiler to lookup to the element, e.g: [name],[data-name].
+    * * Note: The definition order matters.
+    */
+    names?: string,
+    /**
+    * attributes that tells the compiler where it going to get the value, e.g: [value],[data-value].
+    * * Note: The definition order matters.
+    */
+    values?: string
+  },
+  onSet?: (
+    builtObject: object, propName: string, value: any, element: Element
+  ) => void
+): object | null {
+  let element: Element | undefined = undefined;
+  // If it's not a HTML Element, just return
+  if ((input instanceof HTMLElement))
+    element = input;
+  // If it's a string try to get the element
+  else if (typeof input === 'string') {
+    try {
+      const $el = DOM.querySelector(input);
+      if (!$el) {
+        Logger.error('Element with "' + input + '" selector Not Found.');
+        return null;
+      }
+      element = $el;
+    } catch (error) {
+      // Unknown error
+      Logger.error(buildError(error));
+      return null;
+    }
+  }
+
+  // If the element is not
+  if (isNull(element))
+    throw Logger.error('Invalid element provided at app.toJsObj(> "' + input + '" <).');
+
+  options = options || {};
+
+  // Remove `[ ]` and `,` and return an array of the names provided
+  const mNames = (options.names || '[name]').replace(/\[|\]/g, '').split(',');
+  const mValues = (options.values || '[value]').replace(/\[|\]/g, '').split(',');
+
+  const getValue = (el: Element, fieldName: string) => {
+    if (fieldName in el) return (el as any)[fieldName];
+    return el.getAttribute(fieldName) || (el as any).innerText;
+  };
+
+  const tryGetValue = (el: Element) => {
+    let val: string | number | boolean | undefined | null = undefined;
+    mValues.find((field: string) => (val = getValue(el, field)) ? true : false);
+    return val;
+  };
+
+  const objBuilder = (element: Element) => {
+    const builtObject: dynamic = {};
+
+    // Elements that skipped on serialization process
+    const escapes: dynamic = { BUTTON: true };
+    const checkables: dynamic = { checkbox: true, radio: true };
+
+    (function walker(el: Element) {
+      const attr = findAttribute(el, mNames);
+      if (attr) {
+        const propName = attr.value;
+
+        if (escapes[el.tagName] === true) return;
+
+        if ((el instanceof HTMLInputElement) && (checkables[el.type] === true && el.checked === false))
+          return;
+
+        const propOldValue = builtObject[propName];
+        const isBuildAsArray = el.hasAttribute(Constants.array);
+        const value = tryGetValue(el);
+
+        if (value !== '') {
+          if (isBuildAsArray) {
+            (propOldValue) ?
+              // Add item to the array
+              builtObject[propName] = Extend.array(propOldValue, value) :
+              // Set the new value
+              builtObject[propName] = [value];
+          } else {
+            (propOldValue) ?
+              // Spread and add properties
+              builtObject[propName] = Extend.array(propOldValue, value) :
+              // Set the new value
+              builtObject[propName] = value;
+          }
+        }
+
+        // Calling on set function
+        if (isFunction(onSet))
+          fnCall(onSet!(builtObject, propName, value, el));
+      }
+
+      forEach(toArray(el.children), (child: Element) => {
+        if (!findAttribute(child, [Constants.build]))
+          walker(child);
+      });
+    })(element);
+
+    return builtObject;
+  };
+
+  const builtObject = objBuilder(element!);
+  const builds = toArray(element!.querySelectorAll(`[${Constants.build}]`));
+
+  forEach(builds, (buildElement: Element) => {
+    // Getting the e-build attr value
+    const buildPath = getValue(buildElement, Constants.build) as string;
+    const isBuildAsArray = buildElement.hasAttribute(Constants.array);
+    const builtObjValue = objBuilder(buildElement);
+
+    // If the object is empty (has all fields with `null` value)
+    if (!isFilledObj(builtObjValue)) return;
+
+    (function objStructurer(remainPath, lastLayer) {
+      const splittedPath = remainPath.split('.');
+      const leadElement = splittedPath[0];
+
+      // Remove the lead element of the array
+      splittedPath.shift();
+
+      const objPropertyValue = lastLayer[leadElement];
+
+      if (isNull(objPropertyValue))
+        lastLayer[leadElement] = {};
+
+      // If it's the last element of the array
+      if (splittedPath.length === 0) {
+        if (isBuildAsArray) {
+          // Handle Array
+          if (isObject(objPropertyValue) && !isEmptyObject(objPropertyValue)) {
+            lastLayer[leadElement] = [Extend.obj(objPropertyValue, builtObjValue)];
+          } else if (Array.isArray(objPropertyValue)) {
+            objPropertyValue.push(builtObjValue);
+          } else {
+            lastLayer[leadElement] = [builtObjValue];
+          }
+        } else {
+          isNull(objPropertyValue) ?
+            // Set the new property
+            lastLayer[leadElement] = builtObjValue :
+            // Spread and add the new fields into the object
+            lastLayer[leadElement] = Extend.obj(objPropertyValue, builtObjValue);
+        }
+        if (isFunction(onSet))
+          fnCall(onSet!(lastLayer, leadElement, builtObjValue, buildElement));
+
+        return;
+      }
+
+      if (Array.isArray(objPropertyValue)) {
+        return forEach(objPropertyValue, item => {
+          objStructurer(splittedPath.join('.'), item);
+        });
+      }
+
+      objStructurer(splittedPath.join('.'), lastLayer[leadElement]);
+    })(buildPath, builtObject);
+  });
+
+  return builtObject;
 }
 
 export const WIN = window;
