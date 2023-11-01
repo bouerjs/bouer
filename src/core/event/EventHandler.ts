@@ -19,6 +19,7 @@ import {
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Evaluator from '../Evaluator';
+import IoC from '../../shared/helpers/IoCContainer';
 
 export default class EventHandler {
   readonly _IRT_ = true;
@@ -29,7 +30,7 @@ export default class EventHandler {
 
   constructor(bouer: Bouer, evaluator: Evaluator) {
     this.bouer = bouer;
-    this.evaluator = evaluator;
+    this.evaluator = IoC.app(bouer).resolve(Evaluator)!;
 
     this.cleanup();
   }
@@ -108,7 +109,7 @@ export default class EventHandler {
 
   on(options: {
     eventName: string,
-    callback: (event: CustomEvent | Event) => void,
+    callback: (this: typeof options.context, event: CustomEvent) => void,
     attachedNode?: Node,
     context: RenderContext,
     modifiers?: IEventModifiers
@@ -144,7 +145,7 @@ export default class EventHandler {
 
   off(options: {
     eventName: string,
-    callback?: (event: CustomEvent | Event) => void,
+    callback?: (this: RenderContext, event: CustomEvent) => void,
     attachedNode?: Node
   }) {
     const { eventName, callback, attachedNode } = options;

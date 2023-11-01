@@ -1,7 +1,7 @@
 import IMiddleware from '../../definitions/interfaces/IMiddleware';
 import IMiddlewareObject from '../../definitions/interfaces/IMiddlewareObject';
 import Bouer from '../../instance/Bouer';
-import MiddlewareResult from './MiddlewareResult';
+import IMiddlewareResult from './IMiddlewareResult';
 
 export default class Middleware {
   readonly _IRT_ = true;
@@ -9,7 +9,6 @@ export default class Middleware {
   bouer: Bouer;
 
   constructor(bouer: Bouer) {
-
     this.bouer = bouer;
   }
 
@@ -24,7 +23,7 @@ export default class Middleware {
   }) => {
     const middlewares = this.middlewareConfigContainer[directive];
     if (!middlewares) {
-      return (runnable.default || (() => { }))();
+      return (runnable.default || (() => { })).call(this.bouer);
     }
 
     let index = 0;
@@ -36,7 +35,7 @@ export default class Middleware {
 
       if (middlewareAction) {
         runnable.action((config, cbs) => {
-          Promise.resolve(middlewareAction(config, () => {
+          Promise.resolve(middlewareAction.call(this.bouer, config, () => {
             isNext = true;
           })).then(value => {
             if (!isNext) cbs.success(value);
@@ -58,16 +57,23 @@ export default class Middleware {
     }
   };
 
-  register = (directive: string, actions: (
-    onBind: (configure: (context: IMiddleware) => MiddlewareResult | Promise<MiddlewareResult>) => void,
-    onUpdate: (configure: (context: IMiddleware) => MiddlewareResult | Promise<MiddlewareResult>) => void
+  subscribe = (directive: string, actions: (
+    this: Bouer,
+    onBind: (
+      this: Bouer,
+      configure: (this: Bouer, context: IMiddleware) => IMiddlewareResult | Promise<IMiddlewareResult>
+    ) => void,
+    onUpdate: (
+      this: Bouer,
+      configure: (this: Bouer, context: IMiddleware) => IMiddlewareResult | Promise<IMiddlewareResult>
+    ) => void
   ) => void) => {
     if (!this.middlewareConfigContainer[directive])
       this.middlewareConfigContainer[directive] = [];
 
     const middleware: IMiddlewareObject = {};
 
-    actions(
+    actions.call(this.bouer,
       onBind => middleware.onBind = onBind,
       onUpdate => middleware.onUpdate = onUpdate
     );

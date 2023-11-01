@@ -3,7 +3,7 @@ import Logger from '../../shared/logger/Logger';
 import Reactive from '../reactive/Reactive';
 
 type CallbackReactiveProperty = <TProperty, TObject>(
-  reactive: Reactive<TProperty, TObject>
+  descriptor: Reactive<TProperty, TObject>
 ) => void;
 
 
@@ -53,8 +53,8 @@ export default class ReactiveEvent {
     callback: (event: { onemit?: CallbackReactiveProperty }) => void
   ): void {
     const event: { onemit?: CallbackReactiveProperty } = {};
-    const mEvent = ReactiveEvent.on(eventName, (reactive: any) => {
-      if (event.onemit) event.onemit(reactive);
+    const mEvent = ReactiveEvent.on(eventName, (descriptor: any) => {
+      if (event.onemit) event.onemit(descriptor);
     });
     try {
       callback(event);
@@ -67,10 +67,10 @@ export default class ReactiveEvent {
 
   static emit<TKey extends keyof ReactiveKeyEvents, TProperty, TObject>(
     eventName: TKey,
-    reactive: Reactive<TProperty, TObject>
+    descriptor: Reactive<TProperty, TObject>
   ): void {
     try {
-      forEach((this.events[eventName] || []), evt => evt(reactive));
+      forEach((this.events[eventName] || []), evt => evt(descriptor));
     } catch (error) {
       Logger.error(buildError(error));
     }

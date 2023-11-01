@@ -1,30 +1,30 @@
 import WatchCallback from '../../definitions/types/WatchCallback';
 import Reactive from '../reactive/Reactive';
 
-export default class Watch<Value, TObject> {
+export default class Watch<V, O> {
   /** the property name being watched */
   readonly property: string;
   /** the node attached to the watch */
   readonly node: Node | undefined;
   /** Reactive object containing all the reative logic */
-  readonly reactive: Reactive<Value, TObject>;
+  readonly descriptor: Reactive<V, O>;
   /** the callback that needs to be performed when there is a change */
-  readonly callback: WatchCallback;
+  readonly callback: WatchCallback<V>;
   /** an action that needs to be performed when this watch instance is destroyed */
   readonly onDestroy?: () => void | undefined;
 
   /**
    * Default constructor
-   * @param {object} reactive the reactive descriptor instance
+   * @param {object} descriptor the reactive descriptor instance
    * @param {Function} callback the callback that will be called on change
    * @param {object?} options watch options where the node and onDestroy function are provided
    */
-  constructor(reactive: Reactive<Value, TObject>, callback: WatchCallback, options?: {
+  constructor(descriptor: Reactive<V, O>, callback: WatchCallback<V>, options?: {
     node?: Node,
     onDestroy?: () => void
   }) {
-    this.reactive = reactive;
-    this.property = reactive.propName;
+    this.descriptor = descriptor;
+    this.property = descriptor.propName;
     this.callback = callback;
 
     if (options) {
@@ -37,9 +37,9 @@ export default class Watch<Value, TObject> {
    * Destroys/Stop the watching process
    */
   destroy = () => {
-    const indexOfThis = this.reactive.watches.indexOf(this);
-    if (indexOfThis !== -1)
-      this.reactive.watches.splice(indexOfThis, 1);
+    const watchIndex = this.descriptor.watches.indexOf(this);
+    if (watchIndex !== -1)
+      this.descriptor.watches.splice(watchIndex, 1);
     (this.onDestroy || (() => {}))();
   };
 }

@@ -34,6 +34,7 @@ export default class Routing {
     this.bouer = bouer;
   }
 
+  /** Initialize the routing the instance */
   init() {
     this.routeView = ifNullStop(this.bouer.el).querySelector('[route-view]');
 
@@ -61,10 +62,15 @@ export default class Routing {
     });
   }
 
-  navigate(route: string, options: {
+  /**
+   * Navigates to a certain page without reloading all the page
+   * @param {string} route the route to navigate to
+   * @param {object?} options navigation options
+   */
+  navigate(route: string, options?: {
     setURL?: boolean,
     data?: object
-  } = {}) {
+  }) {
     if (!this.routeView)
       return;
 
@@ -76,6 +82,8 @@ export default class Routing {
     const resolver = urlResolver(route);
     const usehash = ifNullReturn(this.bouer.config.usehash, true);
     let navigatoTo = (usehash ? resolver.hash : resolver.pathname).split('?')[0];
+
+    options = options || {};
 
     // In case of: /about/me/, remove the last forward slash
     if (navigatoTo[navigatoTo.length - 1] === '/')
@@ -91,7 +99,7 @@ export default class Routing {
 
     const componentElement = $CreateAnyEl(page.name!, el => {
       // Inherit the data scope by default
-      el.setAttribute('data', isObject(options.data) ? JSON.stringify(options.data) : '$data');
+      el.setAttribute('data', isObject(options!.data) ? JSON.stringify(options!.data) : '$data');
     }).appendTo(this.routeView!)
       .build();
 

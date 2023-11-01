@@ -2,6 +2,7 @@ import IAsset from '../../definitions/interfaces/IAsset';
 import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
 import IEventSubscription from '../../definitions/interfaces/IEventSubscription';
 import ILifeCycleHooks from '../../definitions/interfaces/ILifeCycleHooks';
+import DataType from '../../definitions/types/DataType';
 import dynamic from '../../definitions/types/Dynamic';
 import Bouer from '../../instance/Bouer';
 import IoC from '../../shared/helpers/IoCContainer';
@@ -24,12 +25,12 @@ import EventHandler from '../event/EventHandler';
 import Reactive from '../reactive/Reactive';
 import ComponentHandler from './ComponentHandler';
 
-export default class Component<Data extends {} = {}> implements IComponentOptions<Data> {
+export default class Component<Data extends {} = dynamic> implements IComponentOptions<Data> {
   readonly _IRT_ = true;
 
   name: string;
   path: string;
-  data: Data;
+  data: DataType<Data, Component<Data>>;
   template?: string;
   keepAlive?: boolean;
   prefetch?: boolean;
@@ -55,7 +56,9 @@ export default class Component<Data extends {} = {}> implements IComponentOption
   /** All the assets attached to the component */
   readonly assets: (HTMLScriptElement | HTMLStyleElement | HTMLLinkElement)[] = [];
 
-  readonly restrictions?: ((component: Component | IComponentOptions) => boolean | Promise<boolean>)[];
+  readonly restrictions?: (
+    (this: Bouer, component: Component<Data> | IComponentOptions<Data>) => boolean | Promise<boolean>
+  )[];
 
   /** Store temporarily this component UI orders */
   private events: IEventSubscription[] = [];
@@ -67,7 +70,7 @@ export default class Component<Data extends {} = {}> implements IComponentOption
   constructor(optionsOrPath: string | IComponentOptions<Data>) {
     let _name: string | undefined = undefined;
     let _path: string | undefined = undefined;
-    let _data: Data | undefined = undefined;
+    let _data: DataType<Data, Component<Data>> | undefined = undefined;
 
     if (!isString(optionsOrPath)) {
       _name = (optionsOrPath as IComponentOptions<Data>).name;
@@ -100,15 +103,13 @@ export default class Component<Data extends {} = {}> implements IComponentOption
    * The data that should be exported from the `<script>` tag to the root element
    * @param {object} data the data to export
    */
-  export<ExportableData extends {}>(
-    data: ExportableData
-  ) {
+  export(data: dynamic) {
     if (!isObject(data))
       return Logger.log('Invalid object for component.export(...), only "Object Literal" is allowed.');
 
     return forEach(Object.keys(data), key => {
       (this.data as any)[key] = (data as any)[key];
-      Prop.transfer(this.data as dynamic, data, key as any);
+      Prop.transfer(this.data, data, key as any);
     });
   }
 
@@ -301,6 +302,21 @@ export default class Component<Data extends {} = {}> implements IComponentOption
     inputData: InputData,
     targetObject?: TargetObject
   ): InputData & TargetObject {
-    return setData(this, inputData, targetObject);
+    const result = setData(this as Component, inputData, targetObject);
+    forEach(Object.keys(inputData), key => Prop.transfer(this, inputData, key as keyof InputData));
+    return result;
   }
+
+  init?(): void;
+
+  requested?(event: CustomEvent): void;
+  created?(event: CustomEvent): void;
+  beforeMount?(event: CustomEvent): void;
+  mounted?(event: CustomEvent): void;
+  beforeLoad?(event: CustomEvent): void;
+  loaded?(event: CustomEvent): void;
+  beforeDestroy?(event: CustomEvent): void;
+  destroyed?(event: CustomEvent): void;
+  blocked?(event: CustomEvent): void;
+  failed?(event: CustomEvent): void;
 }

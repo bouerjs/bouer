@@ -15,14 +15,14 @@ import Logger from '../../shared/logger/Logger';
 import Watch from '../binder/Watch';
 import ReactiveEvent from '../event/ReactiveEvent';
 
-export default class Reactive<Value, TObject> implements PropertyDescriptor {
+export default class Reactive<V, O> implements PropertyDescriptor {
   readonly _IRT_ = true;
   propName: string;
-  propValue: Value;
-  propValueOld?: Value;
-  propSource: TObject;
+  propValue: V;
+  propValueOld?: V;
+  propSource: O;
   baseDescriptor: PropertyDescriptor | undefined;
-  watches: Watch<Value, TObject>[] = [];
+  watches: Watch<V, O>[] = [];
   isComputed: boolean;
   context: RenderContext;
   fnComputed?: Function;
@@ -35,7 +35,7 @@ export default class Reactive<Value, TObject> implements PropertyDescriptor {
     /** the property name */
     propName: string,
     /** the object containing the property to be tranformed */
-    srcObject: TObject,
+    srcObject: O,
     /** function execution context */
     context: RenderContext
   }) {
@@ -47,7 +47,7 @@ export default class Reactive<Value, TObject> implements PropertyDescriptor {
 
     this.baseDescriptor = Prop.descriptor(this.propSource as dynamic, this.propName);
 
-    this.propValue = this.baseDescriptor!.value as Value;
+    this.propValue = this.baseDescriptor!.value as V;
     this.isComputed = typeof this.propValue === 'function' && this.propValue.name === '$computed';
 
     if (this.isComputed) {
@@ -87,7 +87,7 @@ export default class Reactive<Value, TObject> implements PropertyDescriptor {
     return value;
   };
 
-  set = (value: Value) => {
+  set = (value: V) => {
     if (this.propValue === value || (Number.isNaN(this.propValue) && Number.isNaN(value)))
       return;
 
@@ -144,7 +144,7 @@ export default class Reactive<Value, TObject> implements PropertyDescriptor {
    */
   notify() {
     // Running all the watches
-    forEach(this.watches, watch => watch.callback.call(this.context, this.propValue, this.propValueOld));
+    forEach(this.watches, w => w.callback.call(this.context, this.propValue, this.propValueOld));
   }
 
   /**
@@ -153,7 +153,7 @@ export default class Reactive<Value, TObject> implements PropertyDescriptor {
    * @param {Node?} node the node that should be attached (Optional)
    * @returns A watch instance object
    */
-  onChange(callback: WatchCallback, node?: Node): Watch<Value, TObject> {
+  onChange(callback: WatchCallback<V>, node?: Node): Watch<V, O> {
     const w = new Watch(this, callback, { node: node });
     this.watches.push(w);
     return w;
@@ -171,12 +171,15 @@ export default class Reactive<Value, TObject> implements PropertyDescriptor {
     data: InputObject,
     /** Reactive descriptor that needs to be provided in case of Array Object */
     descriptor?: Reactive<any, any>,
+    /** All the keys that needs to be transformed */
+    keys?: string[]
   }) => {
     const context = options.context;
     const executer = (
       data: InputObject | InputObject[],
       visiting: any[], visited: any[],
-      descriptor?: Reactive<any, any>
+      descriptor?: Reactive<any, any>,
+      keys?: string[],
     ) => {
       if (Array.isArray(data)) {
         if (descriptor == null) {
@@ -211,7 +214,7 @@ export default class Reactive<Value, TObject> implements PropertyDescriptor {
 
             const result = reference[method].apply(inputArray, args);
 
-            forEach(descriptor.watches, watch => watch.callback(inputArray, oldArrayValue, {
+            forEach(descriptor.watches, watch => watch.callback.call(context, inputArray, oldArrayValue, {
               method: method,
               args: args
             }));
@@ -229,7 +232,7 @@ export default class Reactive<Value, TObject> implements PropertyDescriptor {
         return data;
       visiting.push(data);
 
-      forEach(Object.keys(data as dynamic), key => {
+      forEach(keys || Object.keys(data as dynamic), key => {
         const mInputObject = data as dynamic;
 
         // Already a reactive property, do nothing

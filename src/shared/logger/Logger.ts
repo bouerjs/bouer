@@ -1,16 +1,17 @@
-export default class Logger {
-  private static prefix = '[Bouer]';
-
-  static log(...content: any[]) {
-    console.log.apply(null, [Logger.prefix].concat(content));
-  }
-  static error(...content: any[]) {
-    console.error.apply(null, [Logger.prefix].concat(content));
-  }
-  static warn(...content: any[]) {
-    console.warn.apply(null, [Logger.prefix].concat(content));
-  }
-  static info(...content: any[]) {
-    console.info.apply(null, [Logger.prefix].concat(content));
-  }
-}
+export default (function Logger() {
+  const prefix = '[Bouer]';
+  return {
+    log(l: any) {
+      console.log.apply(null, [prefix].concat(Error(l) as any));
+    },
+    error(e: any) {
+      console.error.apply(null, [prefix].concat(Error(e) as any));
+    },
+    warn(w: any) {
+      console.warn.apply(null, [prefix].concat(Error(w) as any));
+    },
+    info(i: any) {
+      console.info.apply(null, [prefix].concat(Error(i) as any));
+    }
+  };
+})();
