@@ -1,18 +1,45 @@
 # v3.1.0
-[2022-08-05]
+[2023-11-01]
 
 ### Features
 
 * feat: changed the order of data-attribute is processed to be able to use when the component script is executed ([`4cb7661`](https://github.com/bouerjs/bouer/commit/4cb76615dfd11fed5864d14ce321753459986b8f))
+* feat: types definition in the interfaces ([`6444b69`](https://github.com/bouerjs/bouer/commit/6444b698cbfcaf4a31929f6548bf6831dad655d0))
+* feat: added html code analizer to avoid syntax error in component code snippet ([`67d48aa`](https://github.com/bouerjs/bouer/commit/67d48aa1bd646e04b7424128225db53a70f745fe))
+* feat: added number of items in skeleton using e-req directive ([`2720a95`](https://github.com/bouerjs/bouer/commit/2720a95fc683dd9acf7e0768479e5cfadef77a29))
 * feat: added findDirective function ([`32926d8`](https://github.com/bouerjs/bouer/commit/32926d8d913e41a6bb93689cab1cb20ba17701d2))
 * feat: added test package.json version updater ([`3bc3416`](https://github.com/bouerjs/bouer/commit/3bc341602aad48109d7394054e7fd9f35dd7aa9b))
+* feat: added viewBy, viewByName, viewById in $components ([`4378ed6`](https://github.com/bouerjs/bouer/commit/4378ed63743cb4b7e1fb32ff3abce96d0d70214c))
+* feat: added ViewChild to be able to retrieve an active component ([`58ee424`](https://github.com/bouerjs/bouer/commit/58ee424deefec28eaa7b1f78bbaf744e4e203430))
 * feat: changed the way the directive is retrieved ([`9ce067f`](https://github.com/bouerjs/bouer/commit/9ce067f5d63a2c7df5231ff15bb4bb1fa4555353))
+* feat: Utils functions exported to be used in the applications ([`61e8165`](https://github.com/bouerjs/bouer/commit/61e8165b34ea663bd3e4e0deacf0c5cb81a2b7e7))
 * feat: Enabled multiple html element insertion using template with html delimiter {{:html [...] }} ([`9f4ff1d`](https://github.com/bouerjs/bouer/commit/9f4ff1deb12903ad979f58257afd351df8153e46))
+* feat: implemented `set` method to the component instance to be able to set data directly to the component.data without resorting to the `set` method of the Bouer instance ([`78b1758`](https://github.com/bouerjs/bouer/commit/78b175843cbf4c9b4234642917dc7210019dcb68))
+* feat: added component class registration ([`0ac9f94`](https://github.com/bouerjs/bouer/commit/0ac9f94c37357823eaddec2fa74a1888de677896))
+* feat: assume Component Class name if no specific name was provided ([`d2d4157`](https://github.com/bouerjs/bouer/commit/d2d415700153cb17f31455e335184e836108a7ef))
+* feat: linked the Component Element (the tag inserted to the DOM) to the Root Element of the component after the compilation ([`c597937`](https://github.com/bouerjs/bouer/commit/c597937755769406c8c01112dbe122fe0007a0d5))
+* feat: inverted 'e-for' and 'component reading' order to be able to deal with component element instead of the root element ([`c65bfe4`](https://github.com/bouerjs/bouer/commit/c65bfe486d4ff401a6698612e840b474892fafd1))
+* feat: exported IoC Container class ([`97b5179`](https://github.com/bouerjs/bouer/commit/97b5179a412dd1c1e01d038f93121f81af1316e8))
+* feat: exported Prop class for property transfering using module ([`7c5958d`](https://github.com/bouerjs/bouer/commit/7c5958ded1151b2ec6f12a2af3d922a15a61ff49))
 * feat: added npm pack and script to update test package.json ([`ca45838`](https://github.com/bouerjs/bouer/commit/ca45838723d1d4d62c17a670e4cc40942f7cf1ec))
 
 ### Fixes
 
+* fix: typing issues and extracted the main setData code from Bouer Class to be able to share with Component class ([`2deb099`](https://github.com/bouerjs/bouer/commit/2deb099450387cde68dccca86337142cd71d00f8))
+* fix: components sharing the same instance bug fixed ([`2bdd6bd`](https://github.com/bouerjs/bouer/commit/2bdd6bd005a3d8e02fe8cfc8bf6f78182f536a11))
+* fix: avoid adding properties with invalid valud in the object generation using toJsObj method ([`ab6f25e`](https://github.com/bouerjs/bouer/commit/ab6f25e9701d45d9a5c1ce359edfbcb2de291eca))
+* fix: contentEditable two-way binding bug fixed ([`3bbe273`](https://github.com/bouerjs/bouer/commit/3bbe2738b739a54851fff7a9ac25e894ed2c4c10))
+* fix: avoid the exception that appears when a property is being set to the data ([`a66442c`](https://github.com/bouerjs/bouer/commit/a66442cf7a4dae4b4175eace5dc82f9316ad71fe))
+* fix: added new helpers function ([`79a7514`](https://github.com/bouerjs/bouer/commit/79a7514f649ae40760da6b2d3aa7e36b8d97347c))
+* fix: fixed property bind bug in `e-req` directive filters ([`0087859`](https://github.com/bouerjs/bouer/commit/0087859d1582ed9836b5a922090bdd8976028215))
+* fix: avoid double default page loading bug when using Routing ([`e90a86c`](https://github.com/bouerjs/bouer/commit/e90a86c14004eb0efb85a1141fa042f682d0ef63))
+* fix: removed unnecessary code in script execution ([`1271d4c`](https://github.com/bouerjs/bouer/commit/1271d4c727ecc2b3a390af088ca6c76c89f7e6c7))
+* fix: added case insensitive to 'e-for' directive where filters ([`802c22c`](https://github.com/bouerjs/bouer/commit/802c22cebd5c37b890edb4be0387c582eced0cd5))
+* fix: fixed error when looping children on e-for testing ([`95a1d46`](https://github.com/bouerjs/bouer/commit/95a1d46a98fc7696e3d44009294511038d02aa11))
+* fix: restricted skeleton items insertion only to e-req `of` type ([`398ddac`](https://github.com/bouerjs/bouer/commit/398ddac8d0d3341cfa6ebe9bf837adf12e084015))
+* fix: added insensitive case route params handling ([`3b500fc`](https://github.com/bouerjs/bouer/commit/3b500fc9e0bad4b851a387c7e96ab0ab5a0ebb2e))
 * fix: fixed {{: html [...] }} bug on rendering the html snippet ([`729fc7c`](https://github.com/bouerjs/bouer/commit/729fc7c84075a0f75aca0fd206423abc6c49b581))
+* fix: added style content to the skeleton css ([`50d3006`](https://github.com/bouerjs/bouer/commit/50d30068731620885ec7f748095637b9bdd4878c))
 
 # v3.1.0
 [2022-06-28]
