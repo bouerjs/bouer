@@ -35,7 +35,7 @@ import Routing from '../routing/Routing';
 import DataStore from '../store/DataStore';
 import Compiler from './Compiler';
 import Prop from '../../shared/helpers/Prop';
-import MiddlewareResult from '../middleware/MiddlewareResult';
+import IMiddlewareResult from '../middleware/IMiddlewareResult';
 import Skeleton from '../Skeleton';
 
 export default class Directive {
@@ -94,7 +94,7 @@ export default class Directive {
     if (nodeName === Constants.elseif || nodeName === Constants.else) return;
 
     let currentEl: Element | null = ownerNode;
-    const reactives: { attr: Attr, reactive: Reactive<any, any> }[] = [];
+    const reactives: { attr: Attr, descriptor: Reactive<any, any> }[] = [];
 
     do { // Searching for 'e-else-if' and 'e-else' to complete the conditional chain
       if (currentEl == null) break;
@@ -121,11 +121,11 @@ export default class Directive {
 
       // Listening to the property get only if the callback function is defined
       ReactiveEvent.once('AfterGet', event => {
-        event.onemit = reactive => {
+        event.onemit = descriptor => {
           // Avoiding multiple binding in the same property
-          if (reactives.findIndex(item => item.reactive.propName == reactive.propName) !== -1)
+          if (reactives.findIndex(item => item.descriptor.propName == descriptor.propName) !== -1)
             return;
-          reactives.push({ attr: attr, reactive: reactive });
+          reactives.push({ attr: attr, descriptor: descriptor });
         };
 
         this.evaluator.exec({
@@ -141,13 +141,13 @@ export default class Directive {
     const isChainConnected = () => !isNull(Extend.array(
       conditions.map(x => x.node),
       comment as any
-    ).find(el => el.isConnected));
+    ).find((el: Element) => el.isConnected));
 
     forEach(reactives, item => {
       this.binder.binds.push({
         // Binder is connected if at least one of the chain and the comment is still connected
         isConnected: isChainConnected,
-        watch: item.reactive.onChange(() => execute(), item.attr)
+        watch: item.descriptor.onChange(() => execute(), item.attr)
       });
     });
 
@@ -532,7 +532,7 @@ export default class Directive {
         case 'push': case 'unshift': { // Addition handler
           // Gets the last item as default
           const isUnshift = method == 'unshift';
-          const element = listedItemsHandler[0].el;
+          const element = (listedItemsHandler[0] || {}).el || comment;
 
           let indexRef = isUnshift ? 0 : mListedItems.length;
           let reference = isUnshift ? getRootElement(element) : comment;
@@ -567,10 +567,10 @@ export default class Directive {
     };
 
     const reactivePropertyEvent = ReactiveEvent.on('AfterGet',
-      reactive => {
+      descriptor => {
         this.binder.binds.push({
           isConnected: () => comment.isConnected,
-          watch: reactive.onChange((_n, _o, detail) =>
+          watch: descriptor.onChange((_n, _o, detail) =>
             $OnArrayChanges(detail), node)
         });
       });
@@ -645,10 +645,10 @@ export default class Directive {
       return Logger.error(this.errorMsgNodeValue(node));
 
     const inputData: dynamic = {};
-    const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
-      if (!(reactive.propName in inputData))
-        inputData[reactive.propName] = undefined;
-      Prop.set(inputData, reactive.propName, reactive);
+    const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
+      if (!(descriptor.propName in inputData))
+        inputData[descriptor.propName] = undefined;
+      Prop.set(inputData, descriptor.propName, descriptor);
     });
 
     const mInputData = this.evaluator.exec({
@@ -658,8 +658,8 @@ export default class Directive {
     });
 
     if (!isObject(mInputData))
-      return Logger.error(('Expected a valid Object Literal expression in “' + node.nodeName +
-        '” and got “' + nodeValue + '”.'));
+      return Logger.error('Expected a valid Object Literal expression in “' + node.nodeName +
+        '” and got “' + nodeValue + '”.');
 
     // Adding all non-existing properties
     forEach(Object.keys(mInputData), key => {
@@ -773,10 +773,10 @@ export default class Directive {
 
     let inputData: dynamic = {};
     const mData = Extend.obj(data, { $data: data });
-    const reactiveEvent = ReactiveEvent.on('AfterGet', reactive => {
-      if (!(reactive.propName in inputData))
-        inputData[reactive.propName] = undefined;
-      Prop.set(inputData, reactive.propName, reactive);
+    const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
+      if (!(descriptor.propName in inputData))
+        inputData[descriptor.propName] = undefined;
+      Prop.set(inputData, descriptor.propName, descriptor);
     });
 
     // If data value is empty gets the main scope value
@@ -791,8 +791,8 @@ export default class Directive {
       });
 
       if (!isObject(mInputData))
-        return Logger.error(('Expected a valid Object Literal expression in “' + node.nodeName +
-          '” and got “' + nodeValue + '”.'));
+        return Logger.error('Expected a valid Object Literal expression in “' + node.nodeName +
+          '” and got “' + nodeValue + '”.');
 
       // Adding all non-existing properties
       forEach(Object.keys(mInputData), key => {
@@ -881,8 +881,7 @@ export default class Directive {
     let execute = () => { };
 
     if (nodeValue === '')
-      return Logger.error(this.errorMsgEmptyNode(node),
-        'Direct <empty string> injection value is not allowed.');
+      return Logger.error(this.errorMsgEmptyNode(node) + ' Direct <empty string> injection value is not allowed.');
 
     if (this.delimiter.run(nodeValue).length !== 0)
       return Logger.error('Expected an expression with no delimiter in “' + node.nodeName +
@@ -1013,7 +1012,7 @@ export default class Directive {
       };
     };
 
-    const isValidResponse = (response: MiddlewareResult, requestType: string) => {
+    const isValidResponse = (response: IMiddlewareResult, requestType: string) => {
       if (!response) {
         Logger.error(('the return must be an object containing “data” property. ' +
           'Example: { data: {} | [] }'));
@@ -1058,7 +1057,7 @@ export default class Directive {
 
     (onInsertOrUpdate = () => {
       const expObject = builder(trim(node.nodeValue || ''));
-      const responseHandler = (response: MiddlewareResult) => {
+      const responseHandler = (response: IMiddlewareResult) => {
         if (!isValidResponse(response, expObject.type))
           return;
 
@@ -1125,9 +1124,9 @@ export default class Directive {
 
       middleware.run('req', {
         type: 'onBind',
-        action: middlewareRequest => {
+        action(middlewareRequest) {
           middlewareRequest(createMiddlewareContext(expObject), {
-            success: (response: MiddlewareResult) => {
+            success: (response: IMiddlewareResult) => {
               responseHandler(response);
             },
             fail: (error: any) => subcribeEvent(Constants.builtInEvents.fail).emit({
@@ -1144,10 +1143,9 @@ export default class Directive {
       middleware.run('req', {
         type: 'onUpdate',
         default: () => onInsertOrUpdate(),
-        action: middlewareRequest => {
-
+        action(middlewareRequest) {
           middlewareRequest(createMiddlewareContext(expObject), {
-            success: (response: MiddlewareResult) => {
+            success: (response: IMiddlewareResult) => {
               if (!isValidResponse(response, expObject.type))
                 return;
 
@@ -1184,7 +1182,7 @@ export default class Directive {
       // Compile all the waiting nodes
       forEach(mWait.nodes, (nodeWaiting) => {
         this.compiler.compile({
-          el: nodeWaiting,
+          el: nodeWaiting as Element,
           context: mWait.context,
           data: Reactive.transform({
             context: mWait.context,
