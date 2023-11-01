@@ -4,7 +4,6 @@ import Skeleton from '../core/Skeleton';
 import ViewChild from '../core/ViewChild';
 import Binder from '../core/binder/Binder';
 import Compiler from '../core/compiler/Compiler';
-import Converter from '../core/compiler/Converter';
 import Component from '../core/component/Component';
 import ComponentHandler from '../core/component/ComponentHandler';
 import EventHandler from '../core/event/EventHandler';
@@ -16,6 +15,8 @@ import IBouerConfig from '../definitions/interfaces/IBouerConfig';
 import IBouerOptions from '../definitions/interfaces/IBouerOptions';
 import IComponentOptions from '../definitions/interfaces/IComponentOptions';
 import IDelimiter from '../definitions/interfaces/IDelimiter';
+import IEventSubscription from '../definitions/interfaces/IEventSubscription';
+import DataType from '../definitions/types/DataType';
 import dynamic from '../definitions/types/Dynamic';
 import RenderContext from '../definitions/types/RenderContext';
 import SkeletonOptions from '../definitions/types/SkeletonOptions';
@@ -28,6 +29,7 @@ import {
   $CreateEl, DOM,
   WIN,
   forEach,
+  htmlToJsObj,
   ifNullReturn,
   ifNullStop,
   isNull,
@@ -36,15 +38,16 @@ import {
 } from '../shared/helpers/Utils';
 import Logger from '../shared/logger/Logger';
 
-export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dependencies extends {} = {}> implements
+export default class Bouer
+  <Data extends {} = dynamic, GlobalData extends {} = dynamic, Dependencies extends {} = dynamic> implements
   IBouerOptions<Data, GlobalData, Dependencies> {
   /** The name of the instance */
   readonly _IRT_ = true;
   readonly name = 'Bouer';
   readonly version = '3.1.0';
-  readonly data: Data;
-  readonly globalData: GlobalData;
   readonly config: IBouerConfig;
+  readonly data: DataType<Data, Bouer<Data, GlobalData, Dependencies>>;
+  readonly globalData: DataType<GlobalData, Bouer<Data, GlobalData, Dependencies>>;
   readonly deps: Dependencies;
 
   /** Unique Id of the instance */
@@ -168,7 +171,7 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
      * Adds a component to the instance
      * @param {object} component the component to be added
      */
-    add<Data extends {} = {}>(
+    add<Data extends {} = dynamic>(
       component: Component<Data> | IComponentOptions<Data> | (new (...args: any[]) => Component<Data>)
     ): void;
     /**
@@ -266,17 +269,16 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
     const delimiters = options.delimiters || [];
 
     // Adding Dependency Injection Services
-    IoC.app(this).add(DataStore, {}, true);
-    IoC.app(this).add(Evaluator, {}, true);
-    IoC.app(this).add(Middleware, {}, true);
-    IoC.app(this).add(Binder, {}, true);
-    IoC.app(this).add(EventHandler, {}, true);
-    IoC.app(this).add(ComponentHandler, {}, true);
-    IoC.app(this).add(Skeleton, {}, true);
-    IoC.app(this).add(Routing, {}, true);
-
-    IoC.app(this).add(DelimiterHandler, { delimiters }, true);
-    IoC.app(this).add(Compiler, { directives: options.directives }, true);
+    IoC.app(this).add(DataStore, [this], true);
+    IoC.app(this).add(Evaluator, [this], true);
+    IoC.app(this).add(Middleware, [this], true);
+    IoC.app(this).add(Binder, [this], true);
+    IoC.app(this).add(EventHandler, [this], true);
+    IoC.app(this).add(ComponentHandler, [this], true);
+    IoC.app(this).add(Skeleton, [this], true);
+    IoC.app(this).add(Routing, [this], true);
+    IoC.app(this).add(DelimiterHandler, [this, delimiters], true);
+    IoC.app(this).add(Compiler, [this, options.directives], true);
 
     const dataStore = IoC.app(this).resolve(DataStore)!;
     const middleware = IoC.app(this).resolve(Middleware)!;
@@ -287,7 +289,7 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
 
     // Register the middleware
     if (typeof options.middleware === 'function')
-      options.middleware.call(app, middleware.register, app);
+      options.middleware.call(app as typeof this, (middleware.subscribe as () => void), app);
 
     // Transform the data properties into a reative
     this.data = Reactive.transform({
@@ -303,7 +305,6 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
       { name: 'html', delimiter: { open: '{{:html ', close: '}}' } },
       { name: 'common', delimiter: { open: '{{', close: '}}' } },
     ]);
-
 
     this.$routing = IoC.app(this).resolve(Routing)!;
 
@@ -383,7 +384,7 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
     };
 
     this.$components = {
-      add: component => componentHandler.prepare([component]),
+      add: component => componentHandler.prepare([component as Component]),
       get: name => componentHandler.components[name],
       viewBy: (expression: (component: Component) => boolean) => ViewChild.by(this as Bouer, expression),
       viewByName: (componentName: string) => ViewChild.byName(this as Bouer, componentName),
@@ -402,8 +403,10 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
               return Logger.error('Expected an expression in “' + ref.name +
                 '” or at least “name” attribute to combine with “' + ref.name + '”.');
 
-            if (value in mRefs)
-              return Logger.warn('The key “' + value + '” in “' + ref.name + '” is taken, choose another key.', ref);
+            if (value in mRefs) {
+              Logger.warn('The key “' + value + '” in “' + ref.name + '” is taken, choose another key.');
+              return Logger.warn(ref);
+            }
 
             mRefs[value] = ref;
           });
@@ -424,7 +427,7 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
    * @param {object?} options the options to the instance
    * @returns Bouer instance
    */
-  static create<Data extends {} = {}, GlobalData extends {} = {}, Dependencies extends {} = {}>(
+  static create<Data extends {} = dynamic, GlobalData extends {} = dynamic, Dependencies extends {} = dynamic>(
     options?: IBouerOptions<Data, GlobalData, Dependencies>
   ) {
     options = (options || {});
@@ -458,7 +461,7 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
     },
     onSet?: (builtObjectLayer: object, propName: string, value: any, element: Element) => void
   ) {
-    return Converter.htmlToJsObj(input, options, onSet);
+    return htmlToJsObj(input, options, onSet);
   }
 
   /**
@@ -512,7 +515,7 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
     compiler.compile({
       el: this.el,
       data: this.data,
-      context: app,
+      context: this as Bouer,
       onDone: () => eventHandler.emit({
         eventName: 'loaded',
         attachedNode: el
@@ -556,7 +559,7 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
     inputData: InputData,
     targetObject?: TargetObject
   ): InputData & TargetObject {
-    return setData(this, inputData, targetObject);
+    return setData(this as Bouer, inputData, targetObject);
   }
 
   /**
@@ -582,7 +585,7 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
     },
     onSet?: (builtObjectLayer: object, propName: string, value: any, element: Element) => void
   ) {
-    return Converter.htmlToJsObj(input, options, onSet);
+    return htmlToJsObj(input, options, onSet);
   }
 
   /**
@@ -592,15 +595,14 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
    * @param {object} targetObject the target object having the property to watch
    * @returns the watch object having the method to destroy the watch
    */
-  watch<Key extends keyof TargetObject, TargetObject = Data>(
+  watch<Key extends keyof TargetObject, TargetObject extends {} = Data>(
     propertyName: Key,
-    callback: (valueNew: TargetObject[Key], valueOld: TargetObject[Key]) => void,
-    targetObject: TargetObject | Data = this.data
+    callback: WatchCallback<TargetObject[Key]>,
+    targetObject?: TargetObject
   ) {
-    return IoC.app(this).resolve(Binder)!
-      .onPropertyChange<TargetObject[Key], TargetObject | Data>(
-        propertyName, callback as WatchCallback, targetObject || this.data
-      );
+    return IoC.app(this).resolve(Binder)!.onPropertyChange(
+      propertyName, callback, (targetObject || this.data) as TargetObject
+    );
   }
 
   /**
@@ -608,9 +610,14 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
    * @param {Function} watchableScope the function that should be called when the any reactive property change
    * @returns an object having all the watches and the method to destroy watches at once
    */
-  react(watchableScope: (app: Bouer) => void) {
+  react(
+    watchableScope: (
+      this: Bouer<Data, GlobalData, Dependencies>,
+      app: Bouer<Data, GlobalData, Dependencies>
+    ) => void
+  ) {
     return IoC.app(this).resolve(Binder)!
-      .onPropertyInScopeChange(watchableScope);
+      .onPropertyInScopeChange(watchableScope as () => void);
   }
 
   /**
@@ -623,7 +630,7 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
    */
   on(
     eventName: string,
-    callback: (event: CustomEvent | Event) => void,
+    callback: (this: Bouer<Data, GlobalData, Dependencies>, event: CustomEvent) => void,
     options?: {
       attachedNode?: Node,
       modifiers?: {
@@ -634,11 +641,11 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
         signal?: AbortSignal;
       }
     }
-  ) {
+  ): IEventSubscription {
     return IoC.app(this).resolve(EventHandler)!.
       on({
         eventName,
-        callback,
+        callback: callback as (() => void),
         attachedNode: (options || {}).attachedNode,
         modifiers: (options || {}).modifiers,
         context: this as Bouer
@@ -653,13 +660,13 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
    */
   off(
     eventName: string,
-    callback?: (event: CustomEvent | Event) => void,
+    callback?: (this: Bouer<Data, GlobalData, Dependencies>, event: CustomEvent) => void,
     attachedNode?: Node
   ) {
     return IoC.app(this).resolve(EventHandler)!.
       off({
         eventName,
-        callback,
+        callback: callback as (() => void),
         attachedNode
       });
   }
@@ -703,7 +710,7 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
    * @param {number} wait milliseconds to the be waited before the single execution
    * @returns executable function
    */
-  lazy(callback: (...args: any[]) => void, wait?: number) {
+  lazy(callback: (this: Bouer<Data, GlobalData, Dependencies>, ...args: any[]) => void, wait?: number) {
     const _this = this;
     let timeout: any; wait = isNull(wait) ? 500 : wait;
     const immediate = arguments[2];
@@ -730,18 +737,18 @@ export default class Bouer<Data extends {} = {}, GlobalData extends {} = {}, Dep
   compile<Data>(options: {
     /** The element that wil be compiled */
     el: Element,
-    /** The context of this compilation process */
-    context: RenderContext,
+    /** The context of this compilation process, by default is the Bouer instance */
+    context?: RenderContext,
     /** The data that should be injected in the compilation */
     data?: Data,
     /** The function that should be fired when the compilation is done */
-    onDone?: (element: Element, data?: Data | undefined) => void
-  }) {
+    onDone?: (this: typeof options.context, element: Element, data?: Data | undefined) => void
+  }): Element | void {
     return IoC.app(this).resolve(Compiler)!.
       compile({
         el: options.el,
         data: options.data,
-        context: options.context,
+        context: options.context || this as Bouer,
         onDone: options.onDone
       });
   }
