@@ -8,7 +8,7 @@ import Extend from '../../shared/helpers/Extend';
 import IoC from '../../shared/helpers/IoCContainer';
 import Task from '../../shared/helpers/Task';
 import {
-  $CreateEl,
+  createEl,
   findAttribute,
   fnEmpty,
   forEach,
@@ -139,7 +139,7 @@ export default class Binder {
 
         if (!isHtml) return (nodeToBind.nodeValue = valueToSet);
 
-        const htmlSnippets = $CreateEl('div', el => el.innerHTML = valueToSet)
+        const htmlSnippets = createEl('div', el => el.innerHTML = valueToSet)
           .children();
 
         ownerNode.innerHTML = '';

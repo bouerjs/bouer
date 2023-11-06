@@ -217,20 +217,20 @@ export function toArray(array: any) {
   return [].slice.call(array);
 }
 
-export function $CreateComment(id?: string, content?: string) {
+export function createComment(id?: string, content?: string) {
   const comment = DOM.createComment(content || ' e ');
   (comment as any).id = id || code(8);
   return comment;
 }
 
-export function $CreateAnyEl(
+export function createAnyEl(
   elName: string,
   callback?: (element: HTMLElement, dom: Document) => void
 ) {
-  return $CreateEl(elName as any, callback);
+  return createEl(elName as any, callback);
 }
 
-export function $CreateEl<Key extends keyof HTMLElementTagNameMap>(
+export function createEl<Key extends keyof HTMLElementTagNameMap>(
   elName: Key,
   callback?: (element: HTMLElementTagNameMap[Key], dom: Document) => void
 ) {
@@ -249,7 +249,7 @@ export function $CreateEl<Key extends keyof HTMLElementTagNameMap>(
   return returnObj;
 }
 
-export function $RemoveEl(el: Element) {
+export function removeEl(el: Element) {
   const parent = el.parentNode;
   if (parent) parent.removeChild(el);
 }
@@ -643,4 +643,4 @@ export function htmlToJsObj(input: string | HTMLElement,
 
 export const WIN = window;
 export const DOM = document;
-export const anchor = $CreateEl('a').build();
+export const anchor = createEl('a').build();

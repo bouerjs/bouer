@@ -2,7 +2,7 @@ import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
 import Bouer from '../../instance/Bouer';
 import IoC from '../../shared/helpers/IoCContainer';
 import {
-  $CreateAnyEl,
+  createAnyEl,
   DOM,
   forEach,
   WIN,
@@ -97,7 +97,7 @@ export default class Routing {
     // If it's not found and the url matches .html do nothing
     if (!page && route.endsWith('.html')) return;
 
-    const componentElement = $CreateAnyEl(page.name!, el => {
+    const componentElement = createAnyEl(page.name!, el => {
       // Inherit the data scope by default
       el.setAttribute('data', isObject(options!.data) ? JSON.stringify(options!.data) : '$data');
     }).appendTo(this.routeView!)

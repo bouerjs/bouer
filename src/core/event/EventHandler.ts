@@ -8,7 +8,7 @@ import Constants from '../../shared/helpers/Constants';
 import Task from '../../shared/helpers/Task';
 import {
   buildError,
-  $CreateEl,
+  createEl,
   forEach,
   isFunction,
   isNull,
@@ -26,7 +26,7 @@ export default class EventHandler {
   bouer: Bouer;
   evaluator: Evaluator;
   $events: { [key: string]: IEventSubscription[] } = {};
-  input = $CreateEl('input').build();
+  input = createEl('input').build();
 
   constructor(bouer: Bouer, evaluator: Evaluator) {
     this.bouer = bouer;

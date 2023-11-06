@@ -1,15 +1,15 @@
 import WatchCallback from '../../definitions/types/WatchCallback';
 import Reactive from '../reactive/Reactive';
 
-export default class Watch<V, O> {
+export default class Watch<Value, Obj> {
   /** the property name being watched */
   readonly property: string;
   /** the node attached to the watch */
   readonly node: Node | undefined;
   /** Reactive object containing all the reative logic */
-  readonly descriptor: Reactive<V, O>;
+  readonly descriptor: Reactive<Value, Obj>;
   /** the callback that needs to be performed when there is a change */
-  readonly callback: WatchCallback<V>;
+  readonly callback: WatchCallback<Value>;
   /** an action that needs to be performed when this watch instance is destroyed */
   readonly onDestroy?: () => void | undefined;
 
@@ -19,7 +19,7 @@ export default class Watch<V, O> {
    * @param {Function} callback the callback that will be called on change
    * @param {object?} options watch options where the node and onDestroy function are provided
    */
-  constructor(descriptor: Reactive<V, O>, callback: WatchCallback<V>, options?: {
+  constructor(descriptor: Reactive<Value, Obj>, callback: WatchCallback<Value>, options?: {
     node?: Node,
     onDestroy?: () => void
   }) {

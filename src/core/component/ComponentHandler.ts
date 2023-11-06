@@ -8,8 +8,8 @@ import Prop from '../../shared/helpers/Prop';
 import IoC from '../../shared/helpers/IoCContainer';
 import Task from '../../shared/helpers/Task';
 import {
-  $CreateAnyEl,
-  $CreateEl,
+  createAnyEl,
+  createEl,
   buildError,
   code,
   DOM,
@@ -347,7 +347,7 @@ export default class ComponentHandler {
     if (!this.activeComponents.includes(component))
       this.activeComponents.push(component);
 
-    const elementSlots = $CreateAnyEl('SlotContainer', el => {
+    const elementSlots = createAnyEl('SlotContainer', el => {
       el.innerHTML = componentElement.innerHTML;
       componentElement.innerHTML = '';
     }).build();
@@ -355,7 +355,7 @@ export default class ComponentHandler {
     const isKeepAlive = componentElement.hasAttribute('keep-alive') || ifNullReturn(component.keepAlive, false);
     // Component Creation
     if (isKeepAlive === false || isNull(component.el)) {
-      $CreateEl('body', htmlSnippet => {
+      createEl('body', htmlSnippet => {
         htmlSnippet.innerHTML = component.template!;
 
         forEach([].slice.call(htmlSnippet.children), (asset: any) => {

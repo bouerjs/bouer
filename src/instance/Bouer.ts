@@ -26,7 +26,7 @@ import IoC from '../shared/helpers/IoCContainer';
 import Prop from '../shared/helpers/Prop';
 import Task from '../shared/helpers/Task';
 import {
-  $CreateEl, DOM,
+  createEl, DOM,
   WIN,
   forEach,
   htmlToJsObj,
@@ -539,7 +539,7 @@ export default class Bouer
     });
 
     if (!DOM.head.querySelector('link[rel~="icon"]')) {
-      $CreateEl('link', (favicon) => {
+      createEl('link', (favicon) => {
         favicon.rel = 'icon';
         favicon.type = 'image/png';
         favicon.href = 'https://afonsomatelias.github.io/assets/bouer/img/short.png';

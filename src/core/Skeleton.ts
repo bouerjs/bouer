@@ -1,7 +1,7 @@
 import SkeletonOptions from '../definitions/types/SkeletonOptions';
 import Bouer from '../instance/Bouer';
 import Constants from '../shared/helpers/Constants';
-import { $CreateEl, ifNullStop, DOM, forEach, toArray, code, isNull } from '../shared/helpers/Utils';
+import { createEl, ifNullStop, DOM, forEach, toArray, code, isNull } from '../shared/helpers/Utils';
 
 export default class Skeleton {
   readonly _IRT_ = true;
@@ -17,7 +17,7 @@ export default class Skeleton {
   constructor(bouer: Bouer) {
     this.reset();
     this.bouer = bouer;
-    this.style = $CreateEl('style', el => el.id = this.identifier).build();
+    this.style = createEl('style', el => el.id = this.identifier).build();
   }
 
   private reset() {

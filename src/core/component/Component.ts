@@ -9,7 +9,7 @@ import IoC from '../../shared/helpers/IoCContainer';
 import Prop from '../../shared/helpers/Prop';
 import UriHandler from '../../shared/helpers/UriHandler';
 import {
-  $CreateAnyEl,
+  createAnyEl,
   forEach,
   ifNullReturn,
   isObject,
@@ -271,7 +271,7 @@ export default class Component<Data extends {} = dynamic> implements IComponentO
         src = urlCombine(hasBaseURIInURL ? resolver.origin : resolver.baseURI, resolver.pathname);
       }
 
-      const $Asset = $CreateAnyEl(type, el => {
+      const $Asset = createAnyEl(type, el => {
         if (ifNullReturn(scoped, true))
           el.setAttribute('scoped', 'true');
 

@@ -8,17 +8,17 @@ import Extend from '../../shared/helpers/Extend';
 import IoC from '../../shared/helpers/IoCContainer';
 import {
   code,
-  $CreateAnyEl,
+  createAnyEl,
   findAttribute,
   forEach,
   isNull,
   isObject,
-  $RemoveEl,
+  removeEl,
   toLower,
   toStr,
   trim,
   urlCombine,
-  $CreateComment,
+  createComment,
   ifNullReturn,
   getRootElement
 } from '../../shared/helpers/Utils';
@@ -87,7 +87,7 @@ export default class Directive {
     if (!container) return;
 
     const conditions: { attr: Attr, node: Element }[] = [];
-    const comment = $CreateComment();
+    const comment = createComment();
     const nodeName = node.nodeName;
     let execute = () => { };
 
@@ -249,7 +249,7 @@ export default class Directive {
       iterableExpression: string
     };
 
-    const comment = $CreateComment();
+    const comment = createComment();
     const nodeName = node.nodeName;
     const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
 
@@ -489,7 +489,7 @@ export default class Directive {
         case 'pop': case 'shift': { // First or Last item removal handler
           const item = mListedItems[method]();
           if (isNull(item)) return;
-          $RemoveEl(getRootElement(item.el));
+          removeEl(getRootElement(item.el));
 
           if (method === 'pop') return;
           return reOrganizeIndexes();
@@ -499,7 +499,7 @@ export default class Directive {
           const deleteCount = args[1] as number;
 
           const removedItems = mListedItems.splice(index, deleteCount);
-          forEach(removedItems, (item: any) => $RemoveEl(getRootElement(item.el)));
+          forEach(removedItems, (item: any) => removeEl(getRootElement(item.el)));
 
           expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
 
@@ -904,7 +904,7 @@ export default class Directive {
       nodeValue = trim(ifNullReturn(node.nodeValue, ''));
       if (nodeValue === '') return;
 
-      const componentElement = $CreateAnyEl(nodeValue)
+      const componentElement = createAnyEl(nodeValue)
         .appendTo(ownerNode)
         .build();
 
@@ -929,7 +929,7 @@ export default class Directive {
     const delimiters = this.delimiter.run(nodeValue);
     const localDataStore: dynamic = {};
     const dataKey = (node.nodeName.split(':')[1] || '').replace(/\[|\]/g, '');
-    const comment = $CreateComment(undefined, 'request-' + (dataKey || code(6)));
+    const comment = createComment(undefined, 'request-' + (dataKey || code(6)));
 
     let onInsertOrUpdate = () => { };
     let onUpdate = () => { };

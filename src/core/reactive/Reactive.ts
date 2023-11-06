@@ -15,51 +15,19 @@ import Logger from '../../shared/logger/Logger';
 import Watch from '../binder/Watch';
 import ReactiveEvent from '../event/ReactiveEvent';
 
-export default class Reactive<V, O> implements PropertyDescriptor {
+export default class Reactive<Value, Obj> implements PropertyDescriptor {
   readonly _IRT_ = true;
   propName: string;
-  propValue: V;
-  propValueOld?: V;
-  propSource: O;
+  propValue: Value;
+  propValueOld?: Value;
+  propSource: Obj;
   baseDescriptor: PropertyDescriptor | undefined;
-  watches: Watch<V, O>[] = [];
+  watches: Watch<Value, Obj>[] = [];
   isComputed: boolean;
   context: RenderContext;
-  fnComputed?: Function;
+  fnComputed: Function | null = null;
 
-  /**
-   * Default constructor
-   * @param {object} options the options of the reactive instance
-   */
-  constructor(options: {
-    /** the property name */
-    propName: string,
-    /** the object containing the property to be tranformed */
-    srcObject: O,
-    /** function execution context */
-    context: RenderContext
-  }) {
-
-    this.propName = options.propName;
-    this.propSource = options.srcObject;
-    this.context = options.context;
-    // Setting the value of the property
-
-    this.baseDescriptor = Prop.descriptor(this.propSource as dynamic, this.propName);
-
-    this.propValue = this.baseDescriptor!.value as V;
-    this.isComputed = typeof this.propValue === 'function' && this.propValue.name === '$computed';
-
-    if (this.isComputed) {
-      this.fnComputed = this.propValue as any;
-      (this.propValue as any) = undefined;
-    }
-
-    if (typeof this.propValue === 'function' && !this.isComputed)
-      this.propValue = this.propValue.bind(this.context);
-  }
-
-  private readonly computed = () => {
+  computed() {
     if (!this.isComputed)
       return { get: () => { }, set: (v: any) => { } };
 
@@ -74,7 +42,39 @@ export default class Reactive<V, O> implements PropertyDescriptor {
       get: (isNotInferred && 'get' in computedResult) ? computedResult.get : (() => computedResult),
       set: (isNotInferred && 'set' in computedResult) ? computedResult.set : undefined
     };
-  };
+  }
+
+  /**
+   * Default constructor
+   * @param {object} options the options of the reactive instance
+   */
+  constructor(options: {
+    /** the property name */
+    propName: string,
+    /** the object containing the property to be tranformed */
+    srcObject: Obj,
+    /** function execution context */
+    context: RenderContext
+  }) {
+
+    this.propName = options.propName;
+    this.propSource = options.srcObject;
+    this.context = options.context;
+    // Setting the value of the property
+
+    this.baseDescriptor = Prop.descriptor(this.propSource as dynamic, this.propName);
+
+    this.propValue = this.baseDescriptor!.value as Value;
+    this.isComputed = typeof this.propValue === 'function' && this.propValue.name === '$computed';
+
+    if (this.isComputed) {
+      this.fnComputed = this.propValue as any;
+      (this.propValue as any) = undefined;
+    }
+
+    if (typeof this.propValue === 'function' && !this.isComputed)
+      this.propValue = this.propValue.bind(this.context);
+  }
 
   get = () => {
     const computedGet = this.computed().get;
@@ -87,7 +87,7 @@ export default class Reactive<V, O> implements PropertyDescriptor {
     return value;
   };
 
-  set = (value: V) => {
+  set = (value: Value) => {
     if (this.propValue === value || (Number.isNaN(this.propValue) && Number.isNaN(value)))
       return;
 
@@ -153,7 +153,7 @@ export default class Reactive<V, O> implements PropertyDescriptor {
    * @param {Node?} node the node that should be attached (Optional)
    * @returns A watch instance object
    */
-  onChange(callback: WatchCallback<V>, node?: Node): Watch<V, O> {
+  onChange(callback: WatchCallback<Value>, node?: Node): Watch<Value, Obj> {
     const w = new Watch(this, callback, { node: node });
     this.watches.push(w);
     return w;

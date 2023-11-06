@@ -12,17 +12,6 @@ export default class UriHandler {
   params(urlPattern?: string) {
     const mParams: dynamic<string> = {};
 
-    const buildQueryParams = () => {
-      // Building from query string
-      const queryStr = this.url.split('?')[1];
-      if (!queryStr) return this;
-      const keys = queryStr.split('&');
-      forEach(keys, key => {
-        const pair = key.split('=');
-        mParams[pair[0]] = (pair[1] || '').split('#')[0];
-      });
-    };
-
     if (urlPattern && isString(urlPattern)) {
       const urlWithQueryParamsIgnored = this.url.split('?')[0];
       const urlPartsReversed = urlWithQueryParamsIgnored.split('/').reverse();
@@ -39,7 +28,15 @@ export default class UriHandler {
       });
     }
 
-    buildQueryParams();
+    // Building from query string
+    const queryStr = this.url.split('?')[1];
+    if (!queryStr) return this;
+    const keys = queryStr.split('&');
+    forEach(keys, key => {
+      const pair = key.split('=');
+      mParams[pair[0]] = (pair[1] || '').split('#')[0];
+    });
+
     return mParams;
   }
 
