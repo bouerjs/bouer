@@ -5,13 +5,13 @@ import 'regenerator-runtime/runtime';
 import Bouer from '../src/index';
 import Compiler from '../src/core/compiler/Compiler';
 import IoC from '../src/shared/helpers/IoCContainer';
-import { $CreateEl } from '../src/shared/helpers/Utils';
+import { createEl } from '../src/shared/helpers/Utils';
 import { promisify } from 'util';
 
 const sleep = promisify(setTimeout);
 
 function toHtml(strContent) {
-  return $CreateEl('body', el => el.innerHTML = strContent)
+  return createEl('body', el => el.innerHTML = strContent)
     .child();
 }
 
