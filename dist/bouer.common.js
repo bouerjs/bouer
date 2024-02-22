@@ -1,6 +1,6 @@
 /*!
  * Bouer.js v3.1.0
- * Copyright Easy.js 2018-2020 | 2021-2023 Afonso Matumona
+ * Copyright Easy.js 2018-2020 | 2021-2024 Afonso Matumona
  * Released under the MIT License.
  */
 'use strict';
@@ -142,23 +142,7 @@ var Reactive = /** @class */ (function() {
     var _this = this;
     this._IRT_ = true;
     this.watches = [];
-    this.computed = function() {
-      if (!_this.isComputed)
-        return {
-          get: function() {},
-          set: function(v) {}
-        };
-      var computedResult = _this.fnComputed.call(_this.context);
-      if (isNull(computedResult))
-        throw new Error('Invalid value used as return in “function $computed(){...}”.');
-      var isNotInferred = isObject(computedResult) || isFunction(computedResult);
-      return {
-        get: (isNotInferred && 'get' in computedResult) ? computedResult.get : (function() {
-          return computedResult;
-        }),
-        set: (isNotInferred && 'set' in computedResult) ? computedResult.set : undefined
-      };
-    };
+    this.fnComputed = null;
     this.get = function() {
       var computedGet = _this.computed().get;
       ReactiveEvent.emit('BeforeGet', _this);
@@ -225,6 +209,23 @@ var Reactive = /** @class */ (function() {
     if (typeof this.propValue === 'function' && !this.isComputed)
       this.propValue = this.propValue.bind(this.context);
   }
+  Reactive.prototype.computed = function() {
+    if (!this.isComputed)
+      return {
+        get: function() {},
+        set: function(v) {}
+      };
+    var computedResult = this.fnComputed.call(this.context);
+    if (isNull(computedResult))
+      throw new Error('Invalid value used as return in “function $computed(){...}”.');
+    var isNotInferred = isObject(computedResult) || isFunction(computedResult);
+    return {
+      get: (isNotInferred && 'get' in computedResult) ? computedResult.get : (function() {
+        return computedResult;
+      }),
+      set: (isNotInferred && 'set' in computedResult) ? computedResult.set : undefined
+    };
+  };
   /**
    * Force onChange callback calling
    */
@@ -629,17 +630,17 @@ function toArray(array) {
   return [].slice.call(array);
 }
 
-function $CreateComment(id, content) {
+function createComment(id, content) {
   var comment = DOM.createComment(content || ' e ');
   comment.id = id || code(8);
   return comment;
 }
 
-function $CreateAnyEl(elName, callback) {
-  return $CreateEl(elName, callback);
+function createAnyEl(elName, callback) {
+  return createEl(elName, callback);
 }
 
-function $CreateEl(elName, callback) {
+function createEl(elName, callback) {
   var el = DOM.createElement(elName);
   if (isFunction(callback))
     callback(el, DOM);
@@ -661,7 +662,7 @@ function $CreateEl(elName, callback) {
   return returnObj;
 }
 
-function $RemoveEl(el) {
+function removeEl(el) {
   var parent = el.parentNode;
   if (parent)
     parent.removeChild(el);
@@ -1008,7 +1009,7 @@ function htmlToJsObj(input, options, onSet) {
 }
 var WIN = window;
 var DOM = document;
-var anchor = $CreateEl('a').build();
+var anchor = createEl('a').build();
 var DelimiterHandler = /** @class */ (function() {
   function DelimiterHandler(bouer, delimiters) {
     this.delimiters = [];
@@ -1112,7 +1113,7 @@ var Skeleton = /** @class */ (function() {
     this.numberOfItems = 1;
     this.reset();
     this.bouer = bouer;
-    this.style = $CreateEl('style', function(el) {
+    this.style = createEl('style', function(el) {
       return el.id = _this.identifier;
     }).build();
   }
@@ -1482,7 +1483,7 @@ var Binder = /** @class */ (function() {
         propertyBindConfig.value = valueToSet;
         if (!isHtml)
           return (nodeToBind.nodeValue = valueToSet);
-        var htmlSnippets = $CreateEl('div', function(el) {
+        var htmlSnippets = createEl('div', function(el) {
             return el.innerHTML = valueToSet;
           })
           .children();
@@ -1749,7 +1750,7 @@ var EventHandler = /** @class */ (function() {
   function EventHandler(bouer, evaluator) {
     this._IRT_ = true;
     this.$events = {};
-    this.input = $CreateEl('input').build();
+    this.input = createEl('input').build();
     this.bouer = bouer;
     this.evaluator = IoC.app(bouer).resolve(Evaluator);
     this.cleanup();
@@ -1988,7 +1989,7 @@ var Routing = /** @class */ (function() {
     // If it's not found and the url matches .html do nothing
     if (!page && route.endsWith('.html'))
       return;
-    var componentElement = $CreateAnyEl(page.name, function(el) {
+    var componentElement = createAnyEl(page.name, function(el) {
         // Inherit the data scope by default
         el.setAttribute('data', isObject(options.data) ? JSON.stringify(options.data) : '$data');
       }).appendTo(this.routeView)
@@ -2149,7 +2150,7 @@ var Directive = /** @class */ (function() {
     if (!container)
       return;
     var conditions = [];
-    var comment = $CreateComment();
+    var comment = createComment();
     var nodeName = node.nodeName;
     var execute = function() {};
     if (nodeName === Constants.elseif || nodeName === Constants.else)
@@ -2309,7 +2310,7 @@ var Directive = /** @class */ (function() {
       return;
     if (ownerNode.hasAttribute('skeleton-cloned'))
       return;
-    var comment = $CreateComment();
+    var comment = createComment();
     var nodeName = node.nodeName;
     var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
     var listedItemsHandler = [];
@@ -2532,7 +2533,7 @@ var Directive = /** @class */ (function() {
           var item = mListedItems[method]();
           if (isNull(item))
             return;
-          $RemoveEl(getRootElement(item.el));
+          removeEl(getRootElement(item.el));
           if (method === 'pop')
             return;
           return reOrganizeIndexes();
@@ -2542,7 +2543,7 @@ var Directive = /** @class */ (function() {
           var deleteCount = args[1];
           var removedItems = mListedItems.splice(index_1, deleteCount);
           forEach(removedItems, function(item) {
-            return $RemoveEl(getRootElement(item.el));
+            return removeEl(getRootElement(item.el));
           });
           expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
           var leftHandParts = expObj.leftHandParts;
@@ -2926,7 +2927,7 @@ var Directive = /** @class */ (function() {
       nodeValue = trim(ifNullReturn(node.nodeValue, ''));
       if (nodeValue === '')
         return;
-      var componentElement = $CreateAnyEl(nodeValue)
+      var componentElement = createAnyEl(nodeValue)
         .appendTo(ownerNode)
         .build();
       IoC.app(_this.bouer).resolve(ComponentHandler)
@@ -2947,7 +2948,7 @@ var Directive = /** @class */ (function() {
     var delimiters = this.delimiter.run(nodeValue);
     var localDataStore = {};
     var dataKey = (node.nodeName.split(':')[1] || '').replace(/\[|\]/g, '');
-    var comment = $CreateComment(undefined, 'request-' + (dataKey || code(6)));
+    var comment = createComment(undefined, 'request-' + (dataKey || code(6)));
     var onInsertOrUpdate = function() {};
     var onUpdate = function() {};
     var binderConfig = {
@@ -3524,19 +3525,7 @@ var UriHandler = /** @class */ (function() {
     this.url = url || DOM.location.href;
   }
   UriHandler.prototype.params = function(urlPattern) {
-    var _this = this;
     var mParams = {};
-    var buildQueryParams = function() {
-      // Building from query string
-      var queryStr = _this.url.split('?')[1];
-      if (!queryStr)
-        return _this;
-      var keys = queryStr.split('&');
-      forEach(keys, function(key) {
-        var pair = key.split('=');
-        mParams[pair[0]] = (pair[1] || '').split('#')[0];
-      });
-    };
     if (urlPattern && isString(urlPattern)) {
       var urlWithQueryParamsIgnored = this.url.split('?')[0];
       var urlPartsReversed_1 = urlWithQueryParamsIgnored.split('/').reverse();
@@ -3549,7 +3538,15 @@ var UriHandler = /** @class */ (function() {
           mParams[valueExec[1]] = urlPartsReversed_1[index];
       });
     }
-    buildQueryParams();
+    // Building from query string
+    var queryStr = this.url.split('?')[1];
+    if (!queryStr)
+      return this;
+    var keys = queryStr.split('&');
+    forEach(keys, function(key) {
+      var pair = key.split('=');
+      mParams[pair[0]] = (pair[1] || '').split('#')[0];
+    });
     return mParams;
   };
   UriHandler.prototype.add = function(params) {
@@ -3762,7 +3759,7 @@ var Component = /** @class */ (function() {
         // Building the URL according to the main path
         src = urlCombine(hasBaseURIInURL ? resolver.origin : resolver.baseURI, resolver.pathname);
       }
-      var $Asset = $CreateAnyEl(type, function(el) {
+      var $Asset = createAnyEl(type, function(el) {
         if (ifNullReturn(scoped, true))
           el.setAttribute('scoped', 'true');
         switch (toLower(type)) {
@@ -4066,14 +4063,14 @@ var ComponentHandler = /** @class */ (function() {
     // Adding the component to the active component list if it is not added
     if (!this.activeComponents.includes(component))
       this.activeComponents.push(component);
-    var elementSlots = $CreateAnyEl('SlotContainer', function(el) {
+    var elementSlots = createAnyEl('SlotContainer', function(el) {
       el.innerHTML = componentElement.innerHTML;
       componentElement.innerHTML = '';
     }).build();
     var isKeepAlive = componentElement.hasAttribute('keep-alive') || ifNullReturn(component.keepAlive, false);
     // Component Creation
     if (isKeepAlive === false || isNull(component.el)) {
-      $CreateEl('body', function(htmlSnippet) {
+      createEl('body', function(htmlSnippet) {
         htmlSnippet.innerHTML = component.template;
         forEach([].slice.call(htmlSnippet.children), function(asset) {
           if (['SCRIPT', 'LINK', 'STYLE'].indexOf(asset.nodeName) === -1)
@@ -4723,7 +4720,7 @@ var Bouer = /** @class */ (function() {
       stopTask();
     });
     if (!DOM.head.querySelector('link[rel~="icon"]')) {
-      $CreateEl('link', function(favicon) {
+      createEl('link', function(favicon) {
         favicon.rel = 'icon';
         favicon.type = 'image/png';
         favicon.href = 'https://afonsomatelias.github.io/assets/bouer/img/short.png';
@@ -4892,10 +4889,6 @@ var Bouer = /** @class */ (function() {
   };
   return Bouer;
 }());
-exports.$CreateAnyEl = $CreateAnyEl;
-exports.$CreateComment = $CreateComment;
-exports.$CreateEl = $CreateEl;
-exports.$RemoveEl = $RemoveEl;
 exports.Compiler = Compiler;
 exports.Component = Component;
 exports.DOM = DOM;
@@ -4911,6 +4904,9 @@ exports.anchor = anchor;
 exports.buildError = buildError;
 exports.code = code;
 exports.copyObject = copyObject;
+exports.createAnyEl = createAnyEl;
+exports.createComment = createComment;
+exports.createEl = createEl;
 exports["default"] = Bouer;
 exports.findAttribute = findAttribute;
 exports.findDirective = findDirective;
@@ -4930,6 +4926,7 @@ exports.isPrimitive = isPrimitive;
 exports.isString = isString;
 exports.mapper = mapper;
 exports.pathResolver = pathResolver;
+exports.removeEl = removeEl;
 exports.setData = setData;
 exports.startWith = startWith;
 exports.toArray = toArray;
