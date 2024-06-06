@@ -227,9 +227,24 @@ var Reactive = /** @class */ (function() {
    */
   Reactive.prototype.notify = function() {
     var _this = this;
+    var isObj = isObject(this.propValue);
     // Running all the watches
     forEach(this.watches, function(w) {
-      return w.callback.call(_this.context, _this.propValue, _this.propValueOld);
+      // Remapping the binding from the parents to the children properties
+      var reactiveEvent = isObj ? ReactiveEvent.on('AfterGet', function(descriptor) {
+        if (w.property === descriptor.propName)
+          return;
+        var parentWatch = w;
+        // If it's already bound, ignore
+        if (descriptor.watches.indexOf(parentWatch) != -1)
+          return;
+        // Assotiating the child property with the parent watch
+        descriptor.watches.push(w);
+      }) : {
+        off: function() {}
+      };
+      w.callback.call(_this.context, _this.propValue, _this.propValueOld);
+      reactiveEvent.off();
     });
   };
   /**
@@ -325,7 +340,7 @@ var Reactive = /** @class */ (function() {
       visited.push(data);
       return data;
     };
-    return executer(options.data, [], [], options.descriptor);
+    return executer(options.data, [], [], options.descriptor, options.keys);
   };
   return Reactive;
 }());
@@ -3397,9 +3412,10 @@ var Compiler = /** @class */ (function() {
       var delimiterField;
       if ((delimiterField = _this.delimiter.shorthand(node.nodeName))) {
         var element = (node.ownerElement || node.parentNode);
-        var attr = DOM.createAttribute('e-' + delimiterField.expression);
-        attr.value = '{{ ' + delimiterField.expression + ' }}';
-        element.attributes.setNamedItem(attr);
+        var attrName = 'e-' + delimiterField.expression;
+        var attrValue = '{{ ' + delimiterField.expression + ' }}';
+        element.setAttribute(attrName, attrValue);
+        var attr = element.attributes.getNamedItem(attrName);
         element.attributes.removeNamedItem(delimiterField.field);
         return _this.binder.create({
           node: attr,
@@ -3537,7 +3553,7 @@ var UriHandler = /** @class */ (function() {
     // Building from query string
     var queryStr = this.url.split('?')[1];
     if (!queryStr)
-      return this;
+      return mParams;
     var keys = queryStr.split('&');
     forEach(keys, function(key) {
       var pair = key.split('=');
@@ -3563,7 +3579,7 @@ var Component = /** @class */ (function() {
    * Default constructor
    * @param {string|object} optionsOrPath the path of the component or the compponent options
    */
-  function Component(optionsOrPath) {
+  function Component(optionsOrPath, assets) {
     this._IRT_ = true;
     /** Indicates if the component is destroyed or not */
     this.isDestroyed = false;
@@ -3575,7 +3591,7 @@ var Component = /** @class */ (function() {
     var _name = undefined;
     var _path = undefined;
     var _data = undefined;
-    if (!isString(optionsOrPath)) {
+    if (isObject(optionsOrPath)) {
       _name = optionsOrPath.name;
       _path = optionsOrPath.path;
       _data = optionsOrPath.data;
@@ -3591,7 +3607,7 @@ var Component = /** @class */ (function() {
     });
     // Store the content to avoid showing it unnecessary
     var template = {
-      value: optionsOrPath.template
+      value: (optionsOrPath || {}).template || ''
     };
     Prop.set(this, 'template', {
       get: function() {
@@ -3601,6 +3617,7 @@ var Component = /** @class */ (function() {
         return template.value = v;
       }
     });
+    ComponentHandler.prepareAssets(this, assets || []);
   }
   /**
    * The data that should be exported from the `<script>` tag to the root element
@@ -3702,81 +3719,6 @@ var Component = /** @class */ (function() {
     });
   };
   /**
-   * Adds assets to the component
-   * @param {string|object} assets the list of assets to be included
-   */
-  Component.prototype.addAssets = function(assets) {
-    var $Assets = [];
-    var assetsTypeMapper = {
-      js: 'script',
-      css: 'link',
-      scss: 'link',
-      sass: 'link',
-      less: 'link',
-      styl: 'link',
-      style: 'link',
-    };
-    var isValidAssetSrc = function(src, index) {
-      var isValid = (src || trim(src)) ? true : false;
-      if (!isValid)
-        Logger.error('Invalid asset “src”, in assets[' + index + '].src');
-      return isValid;
-    };
-    var assetTypeGetter = function(src, index) {
-      var srcSplitted = src.split('.');
-      var type = assetsTypeMapper[toLower(srcSplitted[srcSplitted.length - 1])];
-      if (!type)
-        return Logger.error('Couldn\'t find out what type of asset it is, provide ' +
-          'the “type” explicitly at assets[' + index + '].type');
-      return type;
-    };
-    forEach(assets, function(asset, index) {
-      var src = '';
-      var type = '';
-      var scoped = true;
-      if (typeof asset === 'string') { // String type
-        if (!isValidAssetSrc(asset, index))
-          return;
-        type = assetTypeGetter(trim(src = asset.replace(/\.less|\.s[ac]ss|\.styl/i, '.css')), index);
-      } else { // Object Type
-        if (!isValidAssetSrc(trim(src = asset.src.replace(/\.less|\.s[ac]ss\.styl/i, '.css')), index))
-          return;
-        if (!asset.type) {
-          if (!(type = assetTypeGetter(src, index)))
-            return;
-        } else {
-          type = assetsTypeMapper[toLower(asset.type)] || asset.type;
-        }
-        scoped = ifNullReturn(asset.scoped, true);
-      }
-      if ((src[0] !== '.')) { // The src begins with dot (.)
-        var resolver = urlResolver(src);
-        var hasBaseURIInURL = resolver.baseURI === src.substring(0, resolver.baseURI.length);
-        // Building the URL according to the main path
-        src = urlCombine(hasBaseURIInURL ? resolver.origin : resolver.baseURI, resolver.pathname);
-      }
-      var $Asset = createAnyEl(type, function(el) {
-        if (ifNullReturn(scoped, true))
-          el.setAttribute('scoped', 'true');
-        switch (toLower(type)) {
-          case 'script':
-            el.setAttribute('src', src);
-            break;
-          case 'link':
-            el.setAttribute('href', src);
-            el.setAttribute('rel', 'stylesheet');
-            el.setAttribute('type', 'text/css');
-            break;
-          default:
-            el.setAttribute('src', src);
-            break;
-        }
-      }).build();
-      $Assets.push($Asset);
-    });
-    this.assets.push.apply(this.assets, $Assets);
-  };
-  /**
    * Sets data into a target object, by default is the `component.data`
    * @param {object} inputData the data the should be setted
    * @param {object?} targetObject the target were the inputData
@@ -3801,6 +3743,13 @@ var ComponentHandler = /** @class */ (function() {
     // Avoids adding multiple styles of the same component if it's already in use
     this.stylesController = {};
     this.activeComponents = [];
+    this.componentDefaultProps = new Set([
+            'name', 'path', 'title', 'route',
+            'template', 'data', 'keepAlive', 'assets',
+            'prefetch', 'children', 'restrictions',
+            'isDefault', 'isNotFound', 'isDestroyed',
+            'clazz', 'el', 'bouer', 'events', '_IRT_'
+        ]);
     this.bouer = bouer;
     this.delimiter = IoC.app(bouer).resolve(DelimiterHandler);
     this.eventHandler = IoC.app(bouer).resolve(EventHandler);
@@ -3814,11 +3763,10 @@ var ComponentHandler = /** @class */ (function() {
     if (!isNull(this.requests[path]))
       return this.requests[path].push(response);
     this.requests[path] = [response];
-    var resolver = urlResolver(path);
-    var hasBaseElement = DOM.head.querySelector('base') != null;
-    var hasBaseURIInURL = resolver.baseURI === path.substring(0, resolver.baseURI.length);
+    var baseElement = DOM.head.querySelector('base');
+    var resolver = baseElement !== null && baseElement !== void 0 ? baseElement : urlResolver('/');
     // Building the URL according to the main path
-    var componentPath = urlCombine(hasBaseURIInURL ? resolver.origin : resolver.baseURI, resolver.pathname);
+    var componentPath = urlCombine(resolver.baseURI, path.replace(resolver.baseURI, ''));
     webRequest(componentPath, {
         headers: {
           'Content-Type': 'text/plain'
@@ -3836,7 +3784,7 @@ var ComponentHandler = /** @class */ (function() {
         delete _this.requests[path];
       })
       .catch(function(error) {
-        if (!hasBaseElement)
+        if (!baseElement)
           Logger.warn('It seems like you are not using the “<base href="/base/components/path/" />” ' +
             'element, try to add as the first child into “<head></head>” element.');
         forEach(_this.requests[path], function(request) {
@@ -3847,7 +3795,7 @@ var ComponentHandler = /** @class */ (function() {
   };
   ComponentHandler.prototype.prepare = function(components, parent) {
     var _this = this;
-    forEach(components, function(entry, index) {
+    forEach(components, function(entry) {
       var isComponentClass = (entry.prototype instanceof Component);
       var component = entry;
       if (isComponentClass) {
@@ -3855,24 +3803,27 @@ var ComponentHandler = /** @class */ (function() {
         component = IoC.app(_this.bouer).resolve(entry) || IoC.new(entry);
         component.clazz = entry;
       }
-      if ((!component.path || isNull(component.path)) && (!component.template || isNull(component.template)))
-        return Logger.warn('The component at options.components[' + index + '] has not valid “path” or “template” ' +
-          'property defined, ' + 'then it was ignored.');
-      if ((isNull(component.name) || !component.name)) {
-        if (!component.path || isNull(component.path))
-          return Logger.warn('Provide a “name” to component at options.components[' + index + '] position.');
-        var pathSplitted = component.path.toLowerCase().split('/');
-        var componentName = pathSplitted[pathSplitted.length - 1].replace('.html', '');
-        // If the component name already exists generate a new one
-        if (_this.components[componentName]) {
-          componentName = toLower(code(8, componentName + '-component-'));
+      // In case of no-named-component, creates a name
+      if (isNull(component.name) || !component.name) {
+        // Generate a random name
+        component.name = toLower(code(8, 'templ' + '-component-'));
+        // But, if the component has a path, generate a beautiful name for it
+        if (!isNull(component.path) || !component.path) {
+          var pathSplitted = component.path.toLowerCase().split('/');
+          var componentName = pathSplitted[pathSplitted.length - 1].replace('.html', '') || Component.name;
+          // If the component name already exists generate a new one
+          if (_this.components[componentName]) {
+            componentName = toLower(code(8, componentName + '-component-'));
+          }
+          component.name = componentName;
         }
-        component.name = componentName;
       }
+      // Normalize the name
       component.name = component.name.toLowerCase();
       var parentRoute = '';
       if (_this.components[component.name])
-        return Logger.warn('The component name “' + component.name + '” is already define, try changing the name.');
+        return Logger.warn('The component name “' + component.name + '” is already define, ' +
+          'try changing the “component.name” property.');
       if (!isNull(parent)) {
         /** TODO: Inherit the parent info */
         parentRoute = parent.route || '';
@@ -3927,7 +3878,8 @@ var ComponentHandler = /** @class */ (function() {
         mCom.bouer = _this.bouer;
         return mCom;
       };
-      if (component.template)
+      var isGroupableComponent = !component.template && !component.path;
+      if (component.template || isGroupableComponent)
         return _this.insert(componentElement, resolveComponentInstance(component), data, onComponent);
       if (!component.path)
         return Logger.error('Expected a valid value in `path` or `template` got invalid value at “' +
@@ -4067,7 +4019,9 @@ var ComponentHandler = /** @class */ (function() {
     // Component Creation
     if (isKeepAlive === false || isNull(component.el)) {
       createEl('body', function(htmlSnippet) {
-        htmlSnippet.innerHTML = component.template;
+        // If both .path and .template are invalid, it means that it's a groupable component
+        var template = !component.path && !component.template ? '<div></div>' : component.template;
+        htmlSnippet.innerHTML = template;
         forEach([].slice.call(htmlSnippet.children), function(asset) {
           if (['SCRIPT', 'LINK', 'STYLE'].indexOf(asset.nodeName) === -1)
             return;
@@ -4088,14 +4042,15 @@ var ComponentHandler = /** @class */ (function() {
       return;
     // Transforming all unknown variables to reactive
     var unknownVars = where(Object.keys(component), function(key) {
-      return !(key in component);
+      return !_this.componentDefaultProps.has(key);
     });
-    if (unknownVars.length > 0)
+    if (unknownVars.length > 0) {
       Reactive.transform({
         context: component,
         data: component,
         keys: unknownVars
       });
+    }
     // Adding the listeners
     var createdEvent = this.addEvent('created', rootElement, component);
     var beforeMountEvent = this.addEvent('beforeMount', rootElement, component);
@@ -4176,14 +4131,13 @@ var ComponentHandler = /** @class */ (function() {
         createdEvent.emit();
         // tranfering the attributes
         forEach(toArray(componentElement.attributes), function(attr) {
-          componentElement.removeAttribute(attr.name);
           // if the attr is the class, transfer the items to the root element
           if (attr.nodeName === 'class')
             return componentElement.classList.forEach(function(cls) {
               rootElement.classList.add(cls);
             });
           // sets the attr to the root element
-          rootElement.attributes.setNamedItem(attr);
+          rootElement.setAttribute(attr.name, attr.value);
         });
         beforeMountEvent.emit();
         // Attaching the root element to the component element
@@ -4361,6 +4315,87 @@ var ComponentHandler = /** @class */ (function() {
         Logger.log(error);
       });
     });
+  };
+  /**
+   * Adds assets to the component
+   * @param {string|object} assets the list of assets to be included
+   */
+  ComponentHandler.prepareAssets = function(component, assets) {
+    var $Assets = [];
+    var assetsTypeMapper = {
+      js: 'script',
+      css: 'link',
+      scss: 'link',
+      sass: 'link',
+      less: 'link',
+      styl: 'link',
+      style: 'link',
+    };
+    var isValidAssetSrc = function(src, index) {
+      var isValid = (src || trim(src)) ? true : false;
+      if (!isValid)
+        Logger.error('Invalid asset “src”, in assets[' + index + '].src');
+      return isValid;
+    };
+    var assetTypeGetter = function(src, index) {
+      var srcSplitted = src.split('.');
+      var type = assetsTypeMapper[toLower(srcSplitted[srcSplitted.length - 1])];
+      if (!type)
+        return Logger.error('Couldn\'t find out what type of asset it is, provide ' +
+          'the “type” explicitly at assets[' + index + '].type');
+      return type;
+    };
+    forEach(assets, function(asset, index) {
+      var src = '';
+      var type = '';
+      var scoped = true;
+      if (typeof asset === 'string') { // String type
+        if (!isValidAssetSrc(asset, index))
+          return;
+        type = assetTypeGetter(trim(src = asset.replace(/\.less|\.s[ac]ss|\.styl/i, '.css')), index);
+      } else { // Object Type
+        if (!isValidAssetSrc(trim(src = asset.src.replace(/\.less|\.s[ac]ss\.styl/i, '.css')), index))
+          return;
+        if (!asset.type) {
+          if (!(type = assetTypeGetter(src, index)))
+            return;
+        } else {
+          type = assetsTypeMapper[toLower(asset.type)] || asset.type;
+        }
+        scoped = ifNullReturn(asset.scoped, true);
+      }
+      var isRelativePathImport = src[0] === '.';
+      if (isRelativePathImport && (!component.path || isNull(component.path))) {
+        Logger.warn('Component with no `path` cannot use imported assets, check component: ' + component.path);
+        return;
+      }
+      if (isRelativePathImport) {
+        var pathSections = component.path.split('/').slice(0, -1);
+        if (pathSections[0] === '')
+          pathSections.shift();
+        src = pathSections.join('/') + src.substring(1, src.length);
+      }
+      var $Asset = createAnyEl(type, function(el) {
+        if (ifNullReturn(scoped, true))
+          el.setAttribute('scoped', 'true');
+        switch (toLower(type)) {
+          case 'script':
+            el.setAttribute('src', src);
+            break;
+          case 'link':
+            el.setAttribute('href', src);
+            el.setAttribute('rel', 'stylesheet');
+            el.setAttribute('type', 'text/css');
+            break;
+          default:
+            el.setAttribute('src', src);
+            break;
+        }
+      }).build();
+      $Assets.push($Asset);
+    });
+    component.assets.splice(0, component.assets.length);
+    component.assets.push.apply(component.assets, $Assets);
   };
   return ComponentHandler;
 }());

@@ -1,8 +1,9 @@
 # v3.1.0
-[2023-11-01]
+[2024-06-06]
 
 ### Features
 
+* feat: Now is possible to create an empty component (without path and template), giving the possibility to use a component as groupable component ([`338ab4a`](https://github.com/bouerjs/bouer/commit/338ab4aff0f2966f7bdbe4c3face0430fe474233))
 * feat: changed the order of data-attribute is processed to be able to use when the component script is executed ([`4cb7661`](https://github.com/bouerjs/bouer/commit/4cb76615dfd11fed5864d14ce321753459986b8f))
 * feat: types definition in the interfaces ([`6444b69`](https://github.com/bouerjs/bouer/commit/6444b698cbfcaf4a31929f6548bf6831dad655d0))
 * feat: added html code analizer to avoid syntax error in component code snippet ([`67d48aa`](https://github.com/bouerjs/bouer/commit/67d48aa1bd646e04b7424128225db53a70f745fe))
@@ -14,6 +15,7 @@
 * feat: changed the way the directive is retrieved ([`9ce067f`](https://github.com/bouerjs/bouer/commit/9ce067f5d63a2c7df5231ff15bb4bb1fa4555353))
 * feat: Utils functions exported to be used in the applications ([`61e8165`](https://github.com/bouerjs/bouer/commit/61e8165b34ea663bd3e4e0deacf0c5cb81a2b7e7))
 * feat: Enabled multiple html element insertion using template with html delimiter {{:html [...] }} ([`9f4ff1d`](https://github.com/bouerjs/bouer/commit/9f4ff1deb12903ad979f58257afd351df8153e46))
+* feat: empty object property properties remap, meaning, if the object is empty (no properties) in the first instance and then bound future properties to elements, after the set of the object all the properties will be remapped to be able to mantain realtime UI update ([`e9645e6`](https://github.com/bouerjs/bouer/commit/e9645e60834cfd718b663e31b2411862abe6529c))
 * feat: implemented `set` method to the component instance to be able to set data directly to the component.data without resorting to the `set` method of the Bouer instance ([`78b1758`](https://github.com/bouerjs/bouer/commit/78b175843cbf4c9b4234642917dc7210019dcb68))
 * feat: added component class registration ([`0ac9f94`](https://github.com/bouerjs/bouer/commit/0ac9f94c37357823eaddec2fa74a1888de677896))
 * feat: assume Component Class name if no specific name was provided ([`d2d4157`](https://github.com/bouerjs/bouer/commit/d2d415700153cb17f31455e335184e836108a7ef))
@@ -30,10 +32,14 @@
 * fix: avoid adding properties with invalid valud in the object generation using toJsObj method ([`ab6f25e`](https://github.com/bouerjs/bouer/commit/ab6f25e9701d45d9a5c1ce359edfbcb2de291eca))
 * fix: contentEditable two-way binding bug fixed ([`3bbe273`](https://github.com/bouerjs/bouer/commit/3bbe2738b739a54851fff7a9ac25e894ed2c4c10))
 * fix: avoid the exception that appears when a property is being set to the data ([`a66442c`](https://github.com/bouerjs/bouer/commit/a66442cf7a4dae4b4175eace5dc82f9316ad71fe))
+* fix: shorthand attribute creation fixed ([`202fc24`](https://github.com/bouerjs/bouer/commit/202fc243839abeb1f02a99bccb719813b2cbd909))
 * fix: added new helpers function ([`79a7514`](https://github.com/bouerjs/bouer/commit/79a7514f649ae40760da6b2d3aa7e36b8d97347c))
 * fix: fixed property bind bug in `e-req` directive filters ([`0087859`](https://github.com/bouerjs/bouer/commit/0087859d1582ed9836b5a922090bdd8976028215))
+* fix: ViewChild.by types correction, now the class provided in by&lt;Child&gt;() will be shown in the filters expression ([`4f8e3c0`](https://github.com/bouerjs/bouer/commit/4f8e3c03726a3dc06e6424ff0893272ca7cff2e8))
 * fix: avoid double default page loading bug when using Routing ([`e90a86c`](https://github.com/bouerjs/bouer/commit/e90a86c14004eb0efb85a1141fa042f682d0ef63))
+* fix: this.$components.viewBy types correction, now the class provided in by&lt;Child&gt;() will be shown in the filters expression ([`9392d08`](https://github.com/bouerjs/bouer/commit/9392d08dd3db9cd28295d273c48608a4bfeafb06))
 * fix: removed unnecessary code in script execution ([`1271d4c`](https://github.com/bouerjs/bouer/commit/1271d4c727ecc2b3a390af088ca6c76c89f7e6c7))
+* fix: removed unnecessary UrlParams instance from .params() method calling ([`aca846f`](https://github.com/bouerjs/bouer/commit/aca846fda103abfb1a55c11cba5ed13d1263b105))
 * fix: added case insensitive to 'e-for' directive where filters ([`802c22c`](https://github.com/bouerjs/bouer/commit/802c22cebd5c37b890edb4be0387c582eced0cd5))
 * fix: fixed error when looping children on e-for testing ([`95a1d46`](https://github.com/bouerjs/bouer/commit/95a1d46a98fc7696e3d44009294511038d02aa11))
 * fix: restricted skeleton items insertion only to e-req `of` type ([`398ddac`](https://github.com/bouerjs/bouer/commit/398ddac8d0d3341cfa6ebe9bf837adf12e084015))

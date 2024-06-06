@@ -2,11 +2,7 @@
 node_modules
 package-lock.json
 
-test/usage/js/node_modules
-test/usage/js/package-lock.json
-
-test/usage/ts/node_modules
-test/usage/ts/package-lock.json
+*/node_modules
 
 test/usage/js/dist
 test/usage/ts/dist
