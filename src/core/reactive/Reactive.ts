@@ -143,8 +143,24 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
    * Force onChange callback calling
    */
   notify() {
+    const isObj = isObject(this.propValue);
     // Running all the watches
-    forEach(this.watches, w => w.callback.call(this.context, this.propValue, this.propValueOld));
+    forEach(this.watches, w => {
+      // Remapping the binding from the parents to the children properties
+      const reactiveEvent = isObj ? ReactiveEvent.on('AfterGet', descriptor => {
+        if (w.property === descriptor.propName) return;
+        const parentWatch = w as any;
+
+        // If it's already bound, ignore
+        if (descriptor.watches.indexOf(parentWatch) != -1) return;
+
+        // Assotiating the child property with the parent watch
+        descriptor.watches.push(w as any);
+      }) : { off: () => { } };
+
+      w.callback.call(this.context, this.propValue, this.propValueOld);
+      reactiveEvent.off();
+    });
   }
 
   /**
@@ -264,6 +280,6 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
       return data;
     };
 
-    return executer(options.data, [], [], options.descriptor);
+    return executer(options.data, [], [], options.descriptor, options.keys);
   };
 }
