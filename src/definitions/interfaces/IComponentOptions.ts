@@ -6,45 +6,45 @@ import ILifeCycleHooks from './ILifeCycleHooks';
 
 interface IComponentOptions<Data extends {} = dynamic> extends ILifeCycleHooks<Data> {
   /** The name of the component */
-  name?: string
+  readonly name?: string
 
   /** The path of the component (not required on e-entry directive) */
-  path?: string;
+  readonly path?: string;
 
   /** The title that should be replaced when the page is loaded */
-  title?: string;
+  readonly title?: string;
 
   /** The navigation url */
-  route?: string;
+  readonly route?: string;
 
   /** The component html template [hard code component] */
-  template?: string;
+  readonly template?: string;
 
   /** The default data that should be injected in the component */
-  data?: DataType<Data, Component<Data>>;
+  readonly data?: DataType<Data, Component<Data>>;
 
   /** Allow the component the keep the last state */
-  keepAlive?: boolean;
+  readonly keepAlive?: boolean;
 
   /**
    * Allow to prefetch the component content when the application is ready.
    * Note: it overrides the global prefetch value
    */
-  prefetch?: boolean;
+  readonly prefetch?: boolean;
 
   /** The children of the component that should inherit the `route` of the father */
-  children?: (Component | IComponentOptions | (new (...args: any[]) => Component))[];
+  readonly children?: (Component | IComponentOptions | (new (...args: any[]) => Component))[];
 
   /** Defines a list of restrictions functions of the component */
-  restrictions?: (
+  readonly restrictions?: (
     (this: Bouer, component: Component<Data> | IComponentOptions<Data>) => boolean | Promise<boolean>
   )[];
 
   /** Allow to set this component as the `default page` when the application loads */
-  isDefault?: boolean;
+  readonly isDefault?: boolean;
 
   /** Allow to set this component as the `not found page` when no route was found */
-  isNotFound?: boolean;
+  readonly isNotFound?: boolean;
 }
 
 export default IComponentOptions;
