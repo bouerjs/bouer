@@ -26,7 +26,8 @@ import {
   urlResolver,
   webRequest,
   where,
-  copyObject
+  copyObject,
+  trim
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Compiler from '../compiler/Compiler';
@@ -37,6 +38,7 @@ import ReactiveEvent from '../event/ReactiveEvent';
 import Reactive from '../reactive/Reactive';
 import Routing from '../routing/Routing';
 import Component from './Component';
+import IAsset from '../../definitions/interfaces/IAsset';
 
 type ComponentClass<Data extends {} = dynamic> = (new (...args: any[]) => Component<Data>);
 
@@ -52,6 +54,14 @@ export default class ComponentHandler {
   // Avoids adding multiple styles of the same component if it's already in use
   stylesController: { [key: string]: { styles: Element[], elements: Element[] }, } = {};
   activeComponents: Component[] = [];
+
+  private componentDefaultProps = new Set([
+    'name', 'path', 'title', 'route',
+    'template', 'data', 'keepAlive', 'assets',
+    'prefetch', 'children', 'restrictions',
+    'isDefault', 'isNotFound', 'isDestroyed',
+    'clazz', 'el', 'bouer', 'events', '_IRT_'
+  ]);
 
   constructor(bouer: Bouer) {
     this.bouer = bouer;
@@ -73,12 +83,11 @@ export default class ComponentHandler {
 
     this.requests[path] = [response];
 
-    const resolver = urlResolver(path);
-    const hasBaseElement = DOM.head.querySelector('base') != null;
-    const hasBaseURIInURL = resolver.baseURI === path.substring(0, resolver.baseURI.length);
-
+    const baseElement = DOM.head.querySelector('base');
+    const resolver = baseElement ?? urlResolver('/');
     // Building the URL according to the main path
-    const componentPath = urlCombine(hasBaseURIInURL ? resolver.origin : resolver.baseURI, resolver.pathname);
+
+    const componentPath = urlCombine(resolver.baseURI, path.replace(resolver.baseURI, ''));
 
     webRequest(componentPath, { headers: { 'Content-Type': 'text/plain' } })
       .then(response => {
@@ -92,7 +101,7 @@ export default class ComponentHandler {
         delete this.requests[path];
       })
       .catch(error => {
-        if (!hasBaseElement)
+        if (!baseElement)
           Logger.warn('It seems like you are not using the “<base href="/base/components/path/" />” ' +
             'element, try to add as the first child into “<head></head>” element.');
         forEach(this.requests[path], (request: dynamic) => request.fail(error, path));
@@ -104,7 +113,7 @@ export default class ComponentHandler {
     components: (Component | IComponentOptions | ComponentClass)[],
     parent?: Component
   ) {
-    forEach(components, (entry, index) => {
+    forEach(components, (entry) => {
       const isComponentClass = ((entry as ComponentClass).prototype instanceof Component);
 
       let component = entry as Component;
@@ -114,30 +123,32 @@ export default class ComponentHandler {
         component.clazz = entry as ComponentClass;
       }
 
-      if ((!component.path || isNull(component.path)) && (!component.template || isNull(component.template)))
-        return Logger.warn('The component at options.components[' + index + '] has not valid “path” or “template” ' +
-          'property defined, ' + 'then it was ignored.');
+      // In case of no-named-component, creates a name
+      if (isNull(component.name) || !component.name) {
+        // Generate a random name
+        (component as any).name = toLower(code(8, 'templ' + '-component-'));
 
-      if ((isNull(component.name) || !component.name)) {
-        if (!component.path || isNull(component.path))
-          return Logger.warn('Provide a “name” to component at options.components[' + index + '] position.');
+        // But, if the component has a path, generate a beautiful name for it
+        if (!isNull(component.path) || !component.path) {
+          const pathSplitted = component.path.toLowerCase().split('/');
+          let componentName = pathSplitted[pathSplitted.length - 1].replace('.html', '') || Component.name;
 
-        const pathSplitted = component.path.toLowerCase().split('/');
-        let componentName = pathSplitted[pathSplitted.length - 1].replace('.html', '');
+          // If the component name already exists generate a new one
+          if (this.components[componentName]) {
+            componentName = toLower(code(8, componentName + '-component-'));
+          }
 
-        // If the component name already exists generate a new one
-        if (this.components[componentName]) {
-          componentName = toLower(code(8, componentName + '-component-'));
+          (component as any).name = componentName;
         }
-
-        component.name = componentName;
       }
 
-      component.name = component.name.toLowerCase();
+      // Normalize the name
+      (component as any).name = component.name.toLowerCase();
       let parentRoute = '';
 
       if (this.components[component.name!])
-        return Logger.warn('The component name “' + component.name + '” is already define, try changing the name.');
+        return Logger.warn('The component name “' + component.name + '” is already define, ' +
+          'try changing the “component.name” property.');
 
       if (!isNull(parent)) {
         /** TODO: Inherit the parent info */
@@ -145,7 +156,7 @@ export default class ComponentHandler {
       }
 
       if (!isNull(component.route)) { // Completing the route
-        component.route = '/' + urlCombine(parentRoute, component.route!);
+        (component as any).route = '/' + urlCombine(parentRoute, component.route!);
       }
 
       if (Array.isArray(component.children))
@@ -159,7 +170,7 @@ export default class ComponentHandler {
 
         this.request(component.path!, {
           success: content => {
-            component.template = content;
+            (component as any).template = content;
           },
           fail: error => {
             Logger.error(buildError(error));
@@ -173,7 +184,7 @@ export default class ComponentHandler {
         return;
       }
 
-      if (!(component.prefetch = ifNullReturn(this.bouer.config.prefetch, true)))
+      if (!((component as any).prefetch = ifNullReturn(this.bouer.config.prefetch, true)))
         return;
 
       return getContent(component.path);
@@ -200,12 +211,14 @@ export default class ComponentHandler {
         if (mCom.keepAlive === true)
           this.components[$name] = mCom;
 
-        mCom.template = c.template;
+        (mCom as any).template = c.template;
         mCom.bouer = this.bouer;
         return mCom;
       };
 
-      if (component.template)
+      const isGroupableComponent = !component.template && !component.path;
+
+      if (component.template || isGroupableComponent)
         return this.insert(componentElement, resolveComponentInstance(component)!, data, onComponent);
 
       if (!component.path)
@@ -218,7 +231,7 @@ export default class ComponentHandler {
       // Make component request or Add
       this.request(component.path, {
         success: content => {
-          component.template = content;
+          (component as any).template = content;
           this.insert(componentElement, resolveComponentInstance(component)!, data, onComponent);
         },
         fail: (error) => {
@@ -356,7 +369,9 @@ export default class ComponentHandler {
     // Component Creation
     if (isKeepAlive === false || isNull(component.el)) {
       createEl('body', htmlSnippet => {
-        htmlSnippet.innerHTML = component.template!;
+        // If both .path and .template are invalid, it means that it's a groupable component
+        const template = !component.path && !component.template ? '<div></div>' : component.template!;
+        htmlSnippet.innerHTML = template;
 
         forEach([].slice.call(htmlSnippet.children), (asset: any) => {
           if (['SCRIPT', 'LINK', 'STYLE'].indexOf(asset.nodeName) === -1)
@@ -383,13 +398,14 @@ export default class ComponentHandler {
     if (isNull(rootElement)) return;
 
     // Transforming all unknown variables to reactive
-    const unknownVars = where(Object.keys(component), key => !(key in component));
-    if (unknownVars.length > 0)
+    const unknownVars = where(Object.keys(component), key => !this.componentDefaultProps.has(key));
+    if (unknownVars.length > 0) {
       Reactive.transform({
         context: component,
         data: component,
         keys: unknownVars
       });
+    }
 
     // Adding the listeners
     const createdEvent = this.addEvent('created', rootElement, component);
@@ -480,8 +496,6 @@ export default class ComponentHandler {
 
         // tranfering the attributes
         forEach(toArray(componentElement.attributes), (attr: Attr) => {
-          componentElement.removeAttribute(attr.name);
-
           // if the attr is the class, transfer the items to the root element
           if (attr.nodeName === 'class')
             return componentElement.classList.forEach(cls => {
@@ -489,7 +503,7 @@ export default class ComponentHandler {
             });
 
           // sets the attr to the root element
-          rootElement.attributes.setNamedItem(attr);
+          rootElement.setAttribute(attr.name, attr.value);
         });
 
         beforeMountEvent.emit();
@@ -686,5 +700,94 @@ export default class ComponentHandler {
         Logger.log(error);
       });
     });
+  }
+
+  /**
+   * Adds assets to the component
+   * @param {string|object} assets the list of assets to be included
+   */
+  static prepareAssets<Data extends {} = dynamic>(
+    component: Component<Data>, assets: (IAsset | string)[]
+  ) {
+    const $Assets: any[] = [];
+    const assetsTypeMapper: dynamic = {
+      js: 'script',
+      css: 'link',
+      scss: 'link',
+      sass: 'link',
+      less: 'link',
+      styl: 'link',
+      style: 'link',
+    };
+
+    const isValidAssetSrc = (src: string, index: number) => {
+      const isValid = (src || trim(src)) ? true : false;
+      if (!isValid) Logger.error('Invalid asset “src”, in assets[' + index + '].src');
+      return isValid;
+    };
+
+    const assetTypeGetter = (src: string, index: number) => {
+      const srcSplitted = src.split('.');
+      const type = assetsTypeMapper[toLower(srcSplitted[srcSplitted.length - 1])];
+
+      if (!type) return Logger.error('Couldn\'t find out what type of asset it is, provide ' +
+        'the “type” explicitly at assets[' + index + '].type');
+
+      return type;
+    };
+
+    forEach(assets, (asset, index) => {
+      let src = '';
+      let type = '';
+      let scoped = true;
+
+      if (typeof asset === 'string') { // String type
+        if (!isValidAssetSrc(asset, index)) return;
+        type = assetTypeGetter(trim(src = asset.replace(/\.less|\.s[ac]ss|\.styl/i, '.css')), index);
+      } else { // Object Type
+        if (!isValidAssetSrc(trim(src = asset.src.replace(/\.less|\.s[ac]ss\.styl/i, '.css')), index)) return;
+
+        if (!asset.type) {
+          if (!(type = assetTypeGetter(src, index))) return;
+        } else {
+          type = assetsTypeMapper[toLower(asset.type)] || asset.type;
+        }
+
+        scoped = ifNullReturn(asset.scoped, true);
+      }
+
+      const isRelativePathImport = src[0] === '.';
+
+      if (isRelativePathImport && (!component.path || isNull(component.path))) {
+        Logger.warn('Component with no `path` cannot use imported assets, check component: ' + component.path);
+        return;
+      }
+
+      if (isRelativePathImport) {
+        const pathSections = component.path.split('/').slice(0, -1);
+        if (pathSections[0] === '') pathSections.shift();
+        src = pathSections.join('/') + src.substring(1, src.length);
+      }
+
+      const $Asset = createAnyEl(type, el => {
+        if (ifNullReturn(scoped, true))
+          el.setAttribute('scoped', 'true');
+
+        switch (toLower(type)) {
+          case 'script': el.setAttribute('src', src); break;
+          case 'link':
+            el.setAttribute('href', src);
+            el.setAttribute('rel', 'stylesheet');
+            el.setAttribute('type', 'text/css');
+            break;
+          default: el.setAttribute('src', src); break;
+        }
+      }).build();
+
+      $Assets.push($Asset);
+    });
+
+    component.assets.splice(0, component.assets.length);
+    component.assets.push.apply(component.assets, $Assets);
   }
 }

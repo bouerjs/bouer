@@ -9,16 +9,10 @@ import IoC from '../../shared/helpers/IoCContainer';
 import Prop from '../../shared/helpers/Prop';
 import UriHandler from '../../shared/helpers/UriHandler';
 import {
-  createAnyEl,
   forEach,
-  ifNullReturn,
   isObject,
-  isString,
   setData,
-  toLower,
-  trim,
-  urlCombine,
-  urlResolver, where
+  where
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import EventHandler from '../event/EventHandler';
@@ -28,14 +22,14 @@ import ComponentHandler from './ComponentHandler';
 export default class Component<Data extends {} = dynamic> implements IComponentOptions<Data> {
   readonly _IRT_ = true;
 
-  name: string;
-  path: string;
-  data: DataType<Data, Component<Data>>;
-  template?: string;
-  keepAlive?: boolean;
-  prefetch?: boolean;
-  title?: string;
-  route?: string;
+  readonly name: string;
+  readonly path: string;
+  readonly data: DataType<Data, Component<Data>>;
+  readonly template?: string;
+  readonly keepAlive?: boolean;
+  readonly prefetch?: boolean;
+  readonly title?: string;
+  readonly route?: string;
 
   readonly isDefault?: boolean;
   readonly isNotFound?: boolean;
@@ -67,12 +61,12 @@ export default class Component<Data extends {} = dynamic> implements IComponentO
    * Default constructor
    * @param {string|object} optionsOrPath the path of the component or the compponent options
    */
-  constructor(optionsOrPath: string | IComponentOptions<Data>) {
+  constructor(optionsOrPath?: string | IComponentOptions<Data>, assets?: (IAsset | string)[]) {
     let _name: string | undefined = undefined;
     let _path: string | undefined = undefined;
     let _data: DataType<Data, Component<Data>> | undefined = undefined;
 
-    if (!isString(optionsOrPath)) {
+    if (isObject(optionsOrPath)) {
       _name = (optionsOrPath as IComponentOptions<Data>).name;
       _path = (optionsOrPath as IComponentOptions<Data>).path;
       _data = (optionsOrPath as IComponentOptions<Data>).data;
@@ -90,13 +84,15 @@ export default class Component<Data extends {} = dynamic> implements IComponentO
 
     // Store the content to avoid showing it unnecessary
     const template = {
-      value: (optionsOrPath as IComponentOptions).template
+      value: (optionsOrPath || {} as any).template || ''
     };
 
     Prop.set(this, 'template', {
       get: () => template.value,
       set: (v) => template.value = v
     });
+
+    ComponentHandler.prepareAssets(this, assets || []);
   }
 
   /**
@@ -210,86 +206,6 @@ export default class Component<Data extends {} = dynamic> implements IComponentO
       attachedNode: this.el!
     });
     this.events = where(this.events, evt => !(evt.eventName == eventName && evt.callback == callback));
-  }
-
-  /**
-   * Adds assets to the component
-   * @param {string|object} assets the list of assets to be included
-   */
-  addAssets(assets: (IAsset | string)[]) {
-    const $Assets: any[] = [];
-    const assetsTypeMapper: dynamic = {
-      js: 'script',
-      css: 'link',
-      scss: 'link',
-      sass: 'link',
-      less: 'link',
-      styl: 'link',
-      style: 'link',
-    };
-
-    const isValidAssetSrc = (src: string, index: number) => {
-      const isValid = (src || trim(src)) ? true : false;
-      if (!isValid) Logger.error('Invalid asset “src”, in assets[' + index + '].src');
-      return isValid;
-    };
-
-    const assetTypeGetter = (src: string, index: number) => {
-      const srcSplitted = src.split('.');
-      const type = assetsTypeMapper[toLower(srcSplitted[srcSplitted.length - 1])];
-
-      if (!type) return Logger.error('Couldn\'t find out what type of asset it is, provide ' +
-        'the “type” explicitly at assets[' + index + '].type');
-
-      return type;
-    };
-
-    forEach(assets, (asset, index) => {
-      let src = '';
-      let type = '';
-      let scoped = true;
-
-      if (typeof asset === 'string') { // String type
-        if (!isValidAssetSrc(asset, index)) return;
-        type = assetTypeGetter(trim(src = asset.replace(/\.less|\.s[ac]ss|\.styl/i, '.css')), index);
-      } else { // Object Type
-        if (!isValidAssetSrc(trim(src = asset.src.replace(/\.less|\.s[ac]ss\.styl/i, '.css')), index)) return;
-
-        if (!asset.type) {
-          if (!(type = assetTypeGetter(src, index))) return;
-        } else {
-          type = assetsTypeMapper[toLower(asset.type)] || asset.type;
-        }
-
-        scoped = ifNullReturn(asset.scoped, true);
-      }
-
-      if ((src[0] !== '.')) { // The src begins with dot (.)
-        const resolver = urlResolver(src);
-        const hasBaseURIInURL = resolver.baseURI === src.substring(0, resolver.baseURI.length);
-        // Building the URL according to the main path
-        src = urlCombine(hasBaseURIInURL ? resolver.origin : resolver.baseURI, resolver.pathname);
-      }
-
-      const $Asset = createAnyEl(type, el => {
-        if (ifNullReturn(scoped, true))
-          el.setAttribute('scoped', 'true');
-
-        switch (toLower(type)) {
-          case 'script': el.setAttribute('src', src); break;
-          case 'link':
-            el.setAttribute('href', src);
-            el.setAttribute('rel', 'stylesheet');
-            el.setAttribute('type', 'text/css');
-            break;
-          default: el.setAttribute('src', src); break;
-        }
-      }).build();
-
-      $Assets.push($Asset);
-    });
-
-    this.assets.push.apply(this.assets, $Assets);
   }
 
   /**
