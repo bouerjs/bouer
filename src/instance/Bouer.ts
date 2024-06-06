@@ -183,7 +183,7 @@ export default class Bouer
      * Retrieves the actives components matching the a provided expression
      * @param {string} expression the expression that matches the wanted components
      */
-    viewBy<Child extends Component>(expression: (component: Component) => boolean): Child[],
+    viewBy<Child extends Component>(expression: (component: Child) => boolean): Child[],
     /**
      * Retrieves the actives components matching the component name
      * @param {string} componentName the name of the wanted components
@@ -386,7 +386,8 @@ export default class Bouer
     this.$components = {
       add: component => componentHandler.prepare([component as Component]),
       get: name => componentHandler.components[name],
-      viewBy: (expression: (component: Component) => boolean) => ViewChild.by(this as Bouer, expression),
+      viewBy: <Child extends Component>(expression: (component: Child) => boolean) =>
+        ViewChild.by<Child>(this as Bouer, expression),
       viewByName: (componentName: string) => ViewChild.byName(this as Bouer, componentName),
       viewById: (componentId: string) => ViewChild.byId(this as Bouer, componentId),
     };
