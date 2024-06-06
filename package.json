@@ -16,7 +16,7 @@
     "build-r": "node scripts/build.js",
     "build-all": "node scripts/build.js --prod",
 
-    "publish": "node scripts/build.js --prod && npm pack && node ./scripts/test-pkg-json-updater.js",
+    "pack": "node scripts/build.js --prod && npm pack",
     "prepare": "husky install",
     "changelog": "auto-changelog -p -u"
   },
