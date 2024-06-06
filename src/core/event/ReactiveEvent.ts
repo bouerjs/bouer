@@ -76,3 +76,7 @@ export default class ReactiveEvent {
     }
   }
 }
+
+export {
+  ReactiveEventResult
+};
