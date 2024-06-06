@@ -9,7 +9,7 @@ export default class UriHandler {
     this.url = url || DOM.location.href;
   }
 
-  params(urlPattern?: string) {
+  params(urlPattern?: string): dynamic<string> {
     const mParams: dynamic<string> = {};
 
     if (urlPattern && isString(urlPattern)) {
@@ -30,7 +30,7 @@ export default class UriHandler {
 
     // Building from query string
     const queryStr = this.url.split('?')[1];
-    if (!queryStr) return this;
+    if (!queryStr) return mParams;
     const keys = queryStr.split('&');
     forEach(keys, key => {
       const pair = key.split('=');
