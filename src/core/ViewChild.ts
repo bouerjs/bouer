@@ -13,13 +13,13 @@ export default class ViewChild {
    */
   static by<Child extends Component>(
     bouer: Bouer,
-    expression: (component: Component) => boolean
+    expression: (component: Child) => boolean
   ): Child[] {
     // Retrieving the active component
     const activeComponents = IoC.app(bouer).resolve(ComponentHandler)!
-      .activeComponents;
+      .activeComponents as any[];
     // Applying filter to the find the component
-    return where(activeComponents, expression) as Child[];
+    return where(activeComponents as Child[], expression) as Child[];
   }
 
   /**
