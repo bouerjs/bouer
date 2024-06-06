@@ -5,10 +5,9 @@ import Bouer from '../../instance/Bouer';
 import Constants from '../../shared/helpers/Constants';
 import IoC from '../../shared/helpers/IoCContainer';
 import {
-  DOM,
+  findDirective,
   fnCall,
   forEach,
-  findDirective,
   isFunction,
   isString, toArray, toLower
 } from '../../shared/helpers/Utils';
@@ -235,11 +234,12 @@ export default class Compiler {
       let delimiterField: IDelimiterResponse | null;
       if ((delimiterField = this.delimiter.shorthand(node.nodeName))) {
         const element = ((node as any).ownerElement || node.parentNode) as Element;
-        const attr = DOM.createAttribute('e-' + delimiterField.expression);
 
-        attr.value = '{{ ' + delimiterField.expression + ' }}';
+        const attrName = 'e-' + delimiterField.expression;
+        const attrValue = '{{ ' + delimiterField.expression + ' }}';
+        element.setAttribute(attrName, attrValue);
 
-        element.attributes.setNamedItem(attr);
+        const attr = element.attributes.getNamedItem(attrName)!;
         element.attributes.removeNamedItem(delimiterField.field);
 
         return this.binder.create({
