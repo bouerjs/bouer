@@ -1,0 +1,15 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 6px 0;
+}
+
+.form>* {
+  margin: 1px 0;
+}
+
+ul.users {
+  list-style: none;
+}

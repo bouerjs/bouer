@@ -2,11 +2,13 @@ import {
   Component
 } from "../../../../dist/bouer.esm.js";
 
+// import html from './app-main.html';
+// import style from './app-main.css';
+
 export default class AppMain extends Component {
   name = 'AppMain';
-
   constructor() {
-    super("/components/main/app-main.html");
+    super("/components/main/app-main.html", ['./app-main.css']);
   }
 
   data = {
@@ -21,6 +23,9 @@ export default class AppMain extends Component {
     ]
   }
 
+  loaded() {
+  }
+
   add() {
     const bouer = this.bouer;
     const obj = bouer.toJsObj('.form');
@@ -32,9 +37,5 @@ export default class AppMain extends Component {
 
     bouer.refs.name.value = ''
     bouer.refs.username.value = ''
-  }
-
-  init() {
-    this.addAssets(['./app-main.css']);
   }
 }

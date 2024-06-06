@@ -6,9 +6,6 @@ export default class AppHeader extends Component {
   name = 'AppHeader';
 
   constructor() {
-    super("/components/header/app-header.html");
-  }
-  init() {
-    this.addAssets(['./app-header.css']);
+    super("/components/header/app-header.html", ['./app-header.css']);
   }
 }

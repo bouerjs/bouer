@@ -6,9 +6,9 @@ export default class UserItem extends Component {
   name = 'UserItem';
 
   constructor() {
-    super("/components/user-item/user-item.html");
+    super("components/user-item/user-item.html", ['./user-item.css']);
   }
-  init() {
-    this.addAssets(['./user-item.css']);
+
+  loaded() {
   }
 }

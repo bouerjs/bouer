@@ -1,0 +1,16 @@
+<div class="center">
+  <!-- Register form -->
+  <div class="form">
+    <input ref type="text" name="name" e-bind="$user['name']" placeholder="Name"> <br>
+    <input ref type="text" name="username" e-bind="$user['username']" placeholder="Username"> <br>
+    <input ref type="text" name="age" e-bind="$user['age']" placeholder="Age"> <br>
+  </div>
+
+  <hr>
+
+  <label> Name: {{ $user.name }} </label>
+
+  <label> Username: {{ $user.username }} </label>
+
+  <label> Age: {{ $user.age }} </label>
+</div>
