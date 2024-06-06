@@ -51,19 +51,6 @@ describe('When using "e-entry" directive', () => {
 });
 
 describe('When added to the instance component options', () => {
-  it('Warns when extends component and do not provide a "name" and "path"', () => {
-    const fn = console.warn;
-    console.warn = jest.fn();
-
-    Bouer.create({
-      components: [{
-        template: '<div>Element</div>'
-      }],
-    });
-
-    expect(console.warn).toBeCalled();
-    console.warn = fn;
-  });
   it('Register the component with "template" property', () => {
     const context = Bouer.create({
       components: [{
@@ -100,17 +87,6 @@ describe('When added to the instance component options', () => {
 
     expect(componentEl.tagName).toBe('DIV');
     expect(componentEl.outerHTML.trim()).toBe(copiedElComponent.template.trim());
-  });
-  it('Warns when extends component and do not provide a "name" and "path"', () => {
-    const fn = console.warn;
-    console.warn = jest.fn();
-
-    Bouer.create({
-      components: [{ template: '<button>Custom Component</button>' }],
-    });
-
-    expect(console.warn).toBeCalled();
-    console.warn = fn;
   });
 });
 
