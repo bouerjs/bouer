@@ -17,6 +17,7 @@ type ServiceItem<Service> = {
  */
 export default (function IoC() {
   let bouerId: number = 1;
+  const globalApp: any = 1100101;
   const serviceCollection: WeakMap<Bouer, WeakMap<ServiceClass<unknown>, ServiceItem<unknown>>> = new WeakMap();
 
   const add = <Service>(app: Bouer, clazz: ServiceClass<Service>, params?: unknown[], isSingleton?: boolean) => {
@@ -94,6 +95,23 @@ export default (function IoC() {
 
   return {
     /**
+     * Adds a service to generic app
+     * @param clazz the service that should be resolved future on
+     * @param params the parameter that needs to be resolved every time the service is requested.
+     * @param isSingleton mark the service as singleton to avoid creating an instance whenever it's requested
+     */
+    add<Service>(clazz: ServiceClass<Service>, params?: unknown[], isSingleton?: boolean): void {
+      return add(globalApp, clazz, params, isSingleton);
+    },
+    /**
+     * Resolves the Service with all it's dependencies
+     * @param clazz the class the needs to be resolved
+     * @returns the instance of the class resolved
+     */
+    resolve<Service>(clazz: (new (...args: any[]) => Service)): Service | null {
+      return resolve(globalApp, clazz);
+    },
+    /**
      * Defines the bouer app containing all the services that needs to be provided in this app
      * @param app the bouer instance
      * @returns all the available methods to perform
@@ -112,7 +130,7 @@ export default (function IoC() {
           return add(app as Bouer, clazz, params, isSingleton);
         },
         /**
-         * Resolve the Service with all it's dependencies
+         * Resolves the Service with all it's dependencies
          * @param clazz the class the needs to be resolved
          * @returns the instance of the class resolved
          */
@@ -127,7 +145,6 @@ export default (function IoC() {
         }
       };
     },
-
     /**
      * Creates a new instance of a class provided
      * @param clazz the class that the new instance should be created
@@ -142,7 +159,6 @@ export default (function IoC() {
       }
       return newInstance(clazz, params);
     },
-
     /**
      * Generates a unique Id for the application
      * @returns The next integer from the last one generated
