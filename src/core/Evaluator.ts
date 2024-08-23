@@ -51,7 +51,7 @@ export default class Evaluator {
     context?: RenderContext
   }) {
     try {
-      return Function('var d$=arguments[0].d;return(function(){var r$;with(d$){' +
+      return Function('var d$=arguments[0].d;return (function(){var r$;with(d$){' +
         (opts.isReturn === false ? '' : 'r$=') + opts.code + '}return r$;}).apply(this, arguments[0].a)')
         .call(opts.context, { d: opts.data || {}, a: opts.args });
     } catch (error) {
