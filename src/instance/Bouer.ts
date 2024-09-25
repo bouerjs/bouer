@@ -691,12 +691,14 @@ export default class Bouer
   emit(
     eventName: string,
     options?: {
+      data?: dynamic,
       element?: Node,
       init?: CustomEventInit,
       once?: boolean
     }
   ) {
     const mOptions = (options || {});
+    (mOptions.init ||{}).detail = mOptions.data;
     return IoC.app(this).resolve(EventHandler)!.emit({
       eventName: eventName,
       attachedNode: mOptions.element,
