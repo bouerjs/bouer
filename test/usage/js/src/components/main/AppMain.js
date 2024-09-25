@@ -4,7 +4,7 @@ import html from './AppMain.html';
 
 export default class AppMain extends Component {
   constructor() {
-    super(html);
+    super(html, [style]);
   }
 
   data = {
@@ -30,9 +30,5 @@ export default class AppMain extends Component {
 
     bouer.refs.name.value = '';
     bouer.refs.url.value = '';
-  }
-
-  init() {
-    this.addAssets([style]);
   }
 }
