@@ -1100,7 +1100,7 @@ var Evaluator = /** @class */ (function() {
   };
   Evaluator.run = function(opts) {
     try {
-      return Function('var d$=arguments[0].d;return(function(){var r$;with(d$){' +
+      return Function('var d$=arguments[0].d;return (function(){var r$;with(d$){' +
           (opts.isReturn === false ? '' : 'r$=') + opts.code + '}return r$;}).apply(this, arguments[0].a)')
         .call(opts.context, {
           d: opts.data || {},
@@ -1212,6 +1212,7 @@ var Skeleton = /** @class */ (function() {
  */
 var IoC = (function IoC() {
   var bouerId = 1;
+  var globalApp = 1100101;
   var serviceCollection = new WeakMap();
   var add = function(app, clazz, params, isSingleton) {
     if (app.isDestroyed)
@@ -1275,6 +1276,23 @@ var IoC = (function IoC() {
   };
   return {
     /**
+     * Adds a service to generic app
+     * @param clazz the service that should be resolved future on
+     * @param params the parameter that needs to be resolved every time the service is requested.
+     * @param isSingleton mark the service as singleton to avoid creating an instance whenever it's requested
+     */
+    add: function(clazz, params, isSingleton) {
+      return add(globalApp, clazz, params, isSingleton);
+    },
+    /**
+     * Resolves the Service with all it's dependencies
+     * @param clazz the class the needs to be resolved
+     * @returns the instance of the class resolved
+     */
+    resolve: function(clazz) {
+      return resolve(globalApp, clazz);
+    },
+    /**
      * Defines the bouer app containing all the services that needs to be provided in this app
      * @param app the bouer instance
      * @returns all the available methods to perform
@@ -1291,7 +1309,7 @@ var IoC = (function IoC() {
           return add(app, clazz, params, isSingleton);
         },
         /**
-         * Resolve the Service with all it's dependencies
+         * Resolves the Service with all it's dependencies
          * @param clazz the class the needs to be resolved
          * @returns the instance of the class resolved
          */
@@ -3643,18 +3661,18 @@ var Component = /** @class */ (function() {
       return;
     if (!this.keepAlive)
       this.isDestroyed = true;
-    this.emit('beforeDestroy');
+    var handler = IoC.app(this.bouer).resolve(ComponentHandler);
+    handler.emit(this, 'beforeDestroy');
     var container = this.el.parentElement;
     if (container)
       container.removeChild(this.el);
-    this.emit('destroyed');
+    handler.emit(this, 'destroyed');
     // Destroying all the events attached to the this instance
     forEach(this.events, function(evt) {
       return _this.off(evt.eventName, evt.callback);
     });
     this.events = [];
-    var components = IoC.app(this.bouer).resolve(ComponentHandler)
-      .activeComponents;
+    var components = handler.activeComponents;
     components.splice(components.indexOf(this), 1);
   };
   /**
@@ -3662,18 +3680,6 @@ var Component = /** @class */ (function() {
    */
   Component.prototype.params = function() {
     return new UriHandler().params(this.route);
-  };
-  /**
-   * Dispatch an event
-   * @param {string} eventName the event name
-   * @param {object?} init the CustomEventInit object where we can provid the event detail
-   */
-  Component.prototype.emit = function(eventName, init) {
-    IoC.app(this.bouer).resolve(EventHandler).emit({
-      eventName: eventName,
-      attachedNode: this.el,
-      init: init
-    });
   };
   /**
    * Add an Event listener to the component
@@ -4397,6 +4403,18 @@ var ComponentHandler = /** @class */ (function() {
     component.assets.splice(0, component.assets.length);
     component.assets.push.apply(component.assets, $Assets);
   };
+  /**
+   * Dispatch an event of the component
+   * @param {string} eventName the event name
+   * @param {object?} init the CustomEventInit object where we can provid the event detail
+   */
+  ComponentHandler.prototype.emit = function(component, eventName, init) {
+    IoC.app(this.bouer).resolve(EventHandler).emit({
+      eventName: eventName,
+      attachedNode: component.el,
+      init: init
+    });
+  };
   return ComponentHandler;
 }());
 var ViewChild = /** @class */ (function() {
@@ -4846,6 +4864,7 @@ var Bouer = /** @class */ (function() {
    */
   Bouer.prototype.emit = function(eventName, options) {
     var mOptions = (options || {});
+    (mOptions.init || {}).detail = mOptions.data;
     return IoC.app(this).resolve(EventHandler).emit({
       eventName: eventName,
       attachedNode: mOptions.element,
