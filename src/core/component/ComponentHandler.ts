@@ -790,4 +790,21 @@ export default class ComponentHandler {
     component.assets.splice(0, component.assets.length);
     component.assets.push.apply(component.assets, $Assets);
   }
+
+  /**
+   * Dispatch an event of the component
+   * @param {string} eventName the event name
+   * @param {object?} init the CustomEventInit object where we can provid the event detail
+   */
+  emit<TKey extends keyof ILifeCycleHooks>(
+    component: Component,
+    eventName: TKey,
+    init?: CustomEventInit
+  ) {
+    IoC.app(this.bouer!).resolve(EventHandler)!.emit({
+      eventName: eventName,
+      attachedNode: component.el!,
+      init: init
+    });
+  }
 }

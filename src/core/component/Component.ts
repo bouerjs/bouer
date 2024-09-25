@@ -121,19 +121,20 @@ export default class Component<Data extends {} = dynamic> implements IComponentO
     if (!this.keepAlive)
       this.isDestroyed = true;
 
-    this.emit('beforeDestroy');
+    const handler = IoC.app(this.bouer!).resolve(ComponentHandler)!;
+
+    handler.emit(this as Component, 'beforeDestroy');
 
     const container = this.el.parentElement;
     if (container) container.removeChild(this.el);
 
-    this.emit('destroyed');
+    handler.emit(this as Component, 'destroyed');
 
     // Destroying all the events attached to the this instance
     forEach(this.events, evt => this.off((evt.eventName as any), evt.callback));
     this.events = [];
 
-    const components = IoC.app(this.bouer!).resolve(ComponentHandler)!
-      .activeComponents;
+    const components = handler.activeComponents;
 
     components.splice(components.indexOf(this as Component<{}>), 1);
   }
@@ -143,22 +144,6 @@ export default class Component<Data extends {} = dynamic> implements IComponentO
    */
   params() {
     return new UriHandler().params(this.route);
-  }
-
-  /**
-   * Dispatch an event
-   * @param {string} eventName the event name
-   * @param {object?} init the CustomEventInit object where we can provid the event detail
-   */
-  emit<TKey extends keyof ILifeCycleHooks>(
-    eventName: TKey,
-    init?: CustomEventInit
-  ) {
-    IoC.app(this.bouer!).resolve(EventHandler)!.emit({
-      eventName: eventName,
-      attachedNode: this.el!,
-      init: init
-    });
   }
 
   /**
