@@ -698,7 +698,7 @@ export default class Bouer
     }
   ) {
     const mOptions = ifNullReturn(options, { init: { detail: {} } });
-    Extend.equalizer(mOptions.data || {}, mOptions.init.detail || {});
+    Extend.matcher(mOptions.data || {}, mOptions.init.detail || {});
     return IoC.app(this).resolve(EventHandler)!.emit({
       eventName: eventName,
       attachedNode: mOptions.element,

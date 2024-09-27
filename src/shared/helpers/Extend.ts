@@ -58,6 +58,26 @@ export default (function Extend() {
     return out as T;
   };
 
+  const matcher = <T1 extends dynamic = dynamic, T2 extends dynamic = any>(
+    t1: T1, t2: T2
+  ) => {
+
+    const exec = (src: any, dst: any) => {
+      forEach(Object.keys(src), key => {
+        if (key in dst) return;
+
+        const hasOwnProp = key in src;
+        Prop.transfer(dst, src, key);
+        if (hasOwnProp) {
+          src[key] = fnEmpty(src[key]);
+        }
+      });
+    };
+
+    exec(t1, t2);
+    exec(t2, t1);
+  };
+
   return {
     /**
      * Combines different object into a new one
@@ -79,6 +99,13 @@ export default (function Extend() {
      * @param {object} args arrays to be combined
      * @returns a new arrat having the items of all the arrays
      */
-    array
+    array,
+
+    /**
+     * transfers the props of first object to the second and the seconds to the first
+     * @param {object} t1 the first object
+     * @param {object} t2 the second object
+     */
+    matcher,
   };
 })();
