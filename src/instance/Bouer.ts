@@ -22,6 +22,7 @@ import RenderContext from '../definitions/types/RenderContext';
 import SkeletonOptions from '../definitions/types/SkeletonOptions';
 import WatchCallback from '../definitions/types/WatchCallback';
 import Constants from '../shared/helpers/Constants';
+import Extend from '../shared/helpers/Extend';
 import IoC from '../shared/helpers/IoCContainer';
 import Prop from '../shared/helpers/Prop';
 import Task from '../shared/helpers/Task';
@@ -487,17 +488,16 @@ export default class Bouer
     const skeleton = IoC.app(this).resolve(Skeleton)!;
     const compiler = IoC.app(this).resolve(Compiler)!;
 
-    forEach([options.beforeLoad, options.loaded, options.beforeDestroy, options.destroyed],
-      evt => {
-        if (typeof evt !== 'function') return;
-        eventHandler.on({
-          eventName: evt.name,
-          callback: evt as any,
-          attachedNode: el,
-          modifiers: { once: true },
-          context: app
-        });
+    forEach([options.beforeLoad, options.loaded, options.beforeDestroy, options.destroyed], hook => {
+      if (typeof hook !== 'function') return;
+      eventHandler.on({
+        eventName: hook.name,
+        callback: hook as any,
+        attachedNode: el,
+        modifiers: { once: true },
+        context: app
       });
+    });
 
     eventHandler.emit({ eventName: 'beforeLoad', attachedNode: el });
 
@@ -697,8 +697,8 @@ export default class Bouer
       once?: boolean
     }
   ) {
-    const mOptions = (options || {});
-    (mOptions.init ||{}).detail = mOptions.data;
+    const mOptions = ifNullReturn(options, { init: { detail: {} } });
+    Extend.equalizer(mOptions.data || {}, mOptions.init.detail || {});
     return IoC.app(this).resolve(EventHandler)!.emit({
       eventName: eventName,
       attachedNode: mOptions.element,
