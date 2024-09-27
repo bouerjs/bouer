@@ -47,6 +47,7 @@ export default class Component<Data extends {} = dynamic> implements IComponentO
   bouer?: Bouer;
 
   readonly children?: (Component | IComponentOptions | (new (...args: any[]) => Component))[] = [];
+
   /** All the assets attached to the component */
   readonly assets: (HTMLScriptElement | HTMLStyleElement | HTMLLinkElement)[] = [];
 
