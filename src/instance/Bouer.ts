@@ -697,8 +697,11 @@ export default class Bouer
       once?: boolean
     }
   ) {
-    const mOptions = ifNullReturn(options, { init: { detail: {} } });
-    Extend.matcher(mOptions.data || {}, mOptions.init.detail || {});
+    const mOptions = options || {};
+    mOptions.init = ifNullReturn(mOptions.init, {});
+    mOptions.init!.detail = ifNullReturn(mOptions.init!.detail, {});
+
+    Extend.matcher(mOptions.data || {}, mOptions.init!.detail || {});
     return IoC.app(this).resolve(EventHandler)!.emit({
       eventName: eventName,
       attachedNode: mOptions.element,

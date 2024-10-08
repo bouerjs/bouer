@@ -443,6 +443,21 @@ var Extend = (function Extend() {
     });
     return out;
   };
+  var matcher = function(t1, t2) {
+    var exec = function(src, dst) {
+      forEach(Object.keys(src), function(key) {
+        if (key in dst)
+          return;
+        var hasOwnProp = key in src;
+        Prop.transfer(dst, src, key);
+        if (hasOwnProp) {
+          src[key] = fnEmpty(src[key]);
+        }
+      });
+    };
+    exec(t1, t2);
+    exec(t2, t1);
+  };
   return {
     /**
      * Combines different object into a new one
@@ -462,7 +477,13 @@ var Extend = (function Extend() {
      * @param {object} args arrays to be combined
      * @returns a new arrat having the items of all the arrays
      */
-    array: array
+    array: array,
+    /**
+     * transfers the props of first object to the second and the seconds to the first
+     * @param {object} t1 the first object
+     * @param {object} t2 the second object
+     */
+    matcher: matcher,
   };
 })();
 // Quotes “'+  +'”
@@ -1963,25 +1984,16 @@ var Routing = /** @class */ (function() {
     this._IRT_ = true;
     this.routeView = null;
     this.activeAnchors = [];
+    this.isInitialized = false;
     // Store `href` value of the <base /> tag
     this.base = null;
     this.bouer = bouer;
   }
-  /** Initialize the routing the instance */
-  Routing.prototype.init = function() {
+  Routing.prototype.setRouteView = function(routeView) {
     var _this = this;
-    this.routeView = ifNullStop(this.bouer.el).querySelector('[route-view]');
-    if (isNull(this.routeView))
+    if (!routeView || this.routeView)
       return;
-    this.routeView.removeAttribute('route-view');
-    this.base = '/';
-    var base = DOM.head.querySelector('base');
-    if (base) {
-      var baseHref = base.attributes.getNamedItem('href');
-      if (!baseHref)
-        return Logger.error('The href="/" attribute is required in base element.');
-      this.base = baseHref.value;
-    }
+    this.routeView = routeView;
     if (this.defaultPage)
       this.navigate(DOM.location.href);
     // Listening to the page navigation
@@ -1991,6 +2003,20 @@ var Routing = /** @class */ (function() {
         setURL: false
       });
     });
+  };
+  /** Initialize the routing the instance */
+  Routing.prototype.init = function() {
+    var base = DOM.head.querySelector('base');
+    if (base) {
+      var baseHref = base.attributes.getNamedItem('href');
+      if (!baseHref)
+        return Logger.error('The href="/" attribute is required in base element.');
+      this.base = baseHref.value;
+    } else {
+      this.base = '/';
+    }
+    var routeView = ifNullStop(this.bouer.el).querySelector('[route-view]');
+    this.setRouteView(routeView);
   };
   /**
    * Navigates to a certain page without reloading all the page
@@ -3760,6 +3786,7 @@ var ComponentHandler = /** @class */ (function() {
     this.delimiter = IoC.app(bouer).resolve(DelimiterHandler);
     this.eventHandler = IoC.app(bouer).resolve(EventHandler);
     this.evaluator = IoC.app(bouer).resolve(Evaluator);
+    this.rounting = IoC.app(bouer).resolve(Routing);
   }
   ComponentHandler.prototype.check = function(nodeName) {
     return (nodeName in this.components);
@@ -4239,6 +4266,12 @@ var ComponentHandler = /** @class */ (function() {
             if (isFunction(onComponent))
               onComponent(component);
             loadedEvent.emit();
+            if (!_this.rounting.routeView) {
+              var routeView = rootElement.hasAttribute('route-vew') ?
+                rootElement : rootElement.querySelector('[route-view]');
+              if (routeView)
+                _this.rounting.setRouteView(routeView);
+            }
           },
           componentSlot: elementSlots,
           context: component,
@@ -4707,12 +4740,12 @@ var Bouer = /** @class */ (function() {
     var routing = IoC.app(this).resolve(Routing);
     var skeleton = IoC.app(this).resolve(Skeleton);
     var compiler = IoC.app(this).resolve(Compiler);
-    forEach([options.beforeLoad, options.loaded, options.beforeDestroy, options.destroyed], function(evt) {
-      if (typeof evt !== 'function')
+    forEach([options.beforeLoad, options.loaded, options.beforeDestroy, options.destroyed], function(hook) {
+      if (typeof hook !== 'function')
         return;
       eventHandler.on({
-        eventName: evt.name,
-        callback: evt,
+        eventName: hook.name,
+        callback: hook,
         attachedNode: el,
         modifiers: {
           once: true
@@ -4863,8 +4896,10 @@ var Bouer = /** @class */ (function() {
    * @param {object} options options for the emission
    */
   Bouer.prototype.emit = function(eventName, options) {
-    var mOptions = (options || {});
-    (mOptions.init || {}).detail = mOptions.data;
+    var mOptions = options || {};
+    mOptions.init = ifNullReturn(mOptions.init, {});
+    mOptions.init.detail = ifNullReturn(mOptions.init.detail, {});
+    Extend.matcher(mOptions.data || {}, mOptions.init.detail || {});
     return IoC.app(this).resolve(EventHandler).emit({
       eventName: eventName,
       attachedNode: mOptions.element,

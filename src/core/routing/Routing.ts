@@ -34,21 +34,10 @@ export default class Routing {
     this.bouer = bouer;
   }
 
-  /** Initialize the routing the instance */
-  init() {
-    this.routeView = ifNullStop(this.bouer.el).querySelector('[route-view]');
+  setRouteView(routeView: Element) {
+    if (!routeView || this.routeView) return;
 
-    if (isNull(this.routeView)) return;
-    this.routeView!.removeAttribute('route-view');
-    this.base = '/';
-
-    const base = DOM.head.querySelector('base');
-    if (base) {
-      const baseHref = base.attributes.getNamedItem('href');
-      if (!baseHref)
-        return Logger.error('The href="/" attribute is required in base element.');
-      this.base = baseHref.value;
-    }
+    this.routeView = routeView;
 
     if (this.defaultPage)
       this.navigate(DOM.location.href);
@@ -60,6 +49,25 @@ export default class Routing {
         setURL: false
       });
     });
+
+  }
+
+  /** Initialize the routing the instance */
+  init() {
+    const base = DOM.head.querySelector('base');
+
+    if (base) {
+      const baseHref = base.attributes.getNamedItem('href');
+      if (!baseHref)
+        return Logger.error('The href="/" attribute is required in base element.');
+      this.base = baseHref.value;
+    } else {
+      this.base = '/';
+    }
+
+    const routeView = ifNullStop(this.bouer.el).querySelector('[route-view]')!;
+
+    this.setRouteView(routeView);
   }
 
   /**

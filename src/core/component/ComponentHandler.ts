@@ -45,14 +45,17 @@ type ComponentClass<Data extends {} = dynamic> = (new (...args: any[]) => Compon
 export default class ComponentHandler {
   readonly _IRT_ = true;
   private bouer: Bouer;
+
   // Handle all the components web requests to avoid multiple requests
   private requests: dynamic = {};
+
   delimiter: DelimiterHandler;
   eventHandler: EventHandler;
   evaluator: Evaluator;
+  rounting: Routing;
   components: { [key: string]: Component | IComponentOptions } = {};
   // Avoids adding multiple styles of the same component if it's already in use
-  stylesController: { [key: string]: { styles: Element[], elements: Element[] }, } = {};
+  stylesController: { [key: string]: { styles: Element[], elements: Element[] } } = {};
   activeComponents: Component[] = [];
 
   private componentDefaultProps = new Set([
@@ -68,6 +71,7 @@ export default class ComponentHandler {
     this.delimiter = IoC.app(bouer).resolve(DelimiterHandler)!;
     this.eventHandler = IoC.app(bouer).resolve(EventHandler)!;
     this.evaluator = IoC.app(bouer).resolve(Evaluator)!;
+    this.rounting = IoC.app(bouer).resolve(Routing)!;
   }
 
   check(nodeName: string) {
@@ -609,6 +613,13 @@ export default class ComponentHandler {
             if (isFunction(onComponent))
               onComponent!(component);
             loadedEvent.emit();
+
+            if (!this.rounting.routeView) {
+              const routeView = rootElement.hasAttribute('route-vew') ?
+                rootElement : rootElement.querySelector('[route-view]');
+
+              if (routeView) this.rounting.setRouteView(routeView!);
+            }
           },
           componentSlot: elementSlots,
           context: component,
