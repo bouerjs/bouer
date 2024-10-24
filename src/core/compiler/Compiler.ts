@@ -35,14 +35,18 @@ export default class Compiler {
 
   constructor(
     bouer: Bouer,
-    directives?: CustomDirective,
+    binder: Binder,
+    delimiterHandler: DelimiterHandler,
+    eventHandler: EventHandler,
+    componentHandler: ComponentHandler,
+    directives?: CustomDirective
   ) {
     this.bouer = bouer;
     this.directives = directives ?? {};
-    this.binder = IoC.app(bouer).resolve(Binder)!;
-    this.delimiter = IoC.app(bouer).resolve(DelimiterHandler)!;
-    this.eventHandler = IoC.app(bouer).resolve(EventHandler)!;
-    this.component = IoC.app(bouer).resolve(ComponentHandler)!;
+    this.binder = binder; // IoC.app(bouer).resolve(Binder)!;
+    this.delimiter = delimiterHandler; // IoC.app(bouer).resolve(DelimiterHandler)!;
+    this.eventHandler = eventHandler; // IoC.app(bouer).resolve(EventHandler)!;
+    this.component = componentHandler; // IoC.app(bouer).resolve(ComponentHandler)!;
   }
 
   /**

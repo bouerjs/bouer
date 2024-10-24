@@ -45,9 +45,9 @@ export default class Binder {
     fromDataToInput: 'fromDataToInput',
   };
 
-  constructor(bouer: Bouer) {
+  constructor(bouer: Bouer, evaluator: Evaluator) {
     this.bouer = bouer;
-    this.evaluator = IoC.app(bouer).resolve(Evaluator)!;
+    this.evaluator = evaluator;
 
     this.cleanup();
   }

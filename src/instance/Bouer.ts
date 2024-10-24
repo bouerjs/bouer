@@ -16,6 +16,7 @@ import IBouerOptions from '../definitions/interfaces/IBouerOptions';
 import IComponentOptions from '../definitions/interfaces/IComponentOptions';
 import IDelimiter from '../definitions/interfaces/IDelimiter';
 import IEventSubscription from '../definitions/interfaces/IEventSubscription';
+import Constructor from '../definitions/types/Constructor';
 import DataType from '../definitions/types/DataType';
 import dynamic from '../definitions/types/Dynamic';
 import RenderContext from '../definitions/types/RenderContext';
@@ -39,23 +40,32 @@ import {
 } from '../shared/helpers/Utils';
 import Logger from '../shared/logger/Logger';
 
-export default class Bouer
-  <Data extends {} = dynamic, GlobalData extends {} = dynamic, Dependencies extends {} = dynamic> implements
-  IBouerOptions<Data, GlobalData, Dependencies> {
+type Data<T extends {} = {}> = T extends abstract new (...args: any) => infer R ? R : dynamic;
+
+const data: Data = {
+  abc: 2,
+  bbc: 4,
+  c() {}
+};
+
+data.abc; // Error: Property 'a' does not exist on type 'Data'
+
+export default class Bouer implements IBouerOptions {
   /** The name of the instance */
+  // Ignore Reactive Transformation
   readonly _IRT_ = true;
   readonly name = 'Bouer';
   readonly version = '3.1.0';
   readonly config: IBouerConfig;
-  readonly data: DataType<Data, Bouer<Data, GlobalData, Dependencies>>;
-  readonly globalData: DataType<GlobalData, Bouer<Data, GlobalData, Dependencies>>;
+  readonly data: DataType<Data, Bouer>;
+  readonly globalData: DataType<Data, Bouer>;
   readonly deps: Dependencies;
 
   /** Unique Id of the instance */
   readonly __id__: number = IoC.newId();
 
   /** App options provided in the instance */
-  readonly options: IBouerOptions<Data, GlobalData, Dependencies>;
+  readonly options: IBouerOptions;
 
   /**
    * Gets all the elemens having the `ref` attribute
@@ -173,7 +183,7 @@ export default class Bouer
      * @param {object} component the component to be added
      */
     add<Data extends {} = dynamic>(
-      component: Component<Data> | IComponentOptions<Data> | (new (...args: any[]) => Component<Data>)
+      component: Component<Data> | IComponentOptions<Data> | Constructor<Component<Data>>
     ): void;
     /**
      * Gets a component from the instance
@@ -269,17 +279,31 @@ export default class Bouer
 
     const delimiters = options.delimiters || [];
 
+    // const $bouer = (this as any) as Bouer;
+
     // Adding Dependency Injection Services
-    IoC.app(this).add(DataStore, [this], true);
-    IoC.app(this).add(Evaluator, [this], true);
-    IoC.app(this).add(Middleware, [this], true);
-    IoC.app(this).add(Binder, [this], true);
-    IoC.app(this).add(EventHandler, [this], true);
-    IoC.app(this).add(ComponentHandler, [this], true);
-    IoC.app(this).add(Skeleton, [this], true);
-    IoC.app(this).add(Routing, [this], true);
-    IoC.app(this).add(DelimiterHandler, [this, delimiters], true);
-    IoC.app(this).add(Compiler, [this, options.directives], true);
+    // IoC.app(this).add(DataStore, [], true);
+    IoC.app(this).add(Evaluator, [this as Bouer]);
+    // IoC.app(this).add(Middleware, [this as Bouer], true);
+
+
+    IoC.app(this).add(Binder, [this as Bouer, Evaluator], true);
+
+
+    // IoC.app(this).add(EventHandler, [this as Bouer], true);
+    // IoC.app(this).add(ComponentHandler, [this as Bouer], true);
+    // IoC.app(this).add(Skeleton, [this as Bouer], true);
+    // IoC.app(this).add(Routing, [this as Bouer], true);
+    // IoC.app(this).add(DelimiterHandler, [this as Bouer, delimiters], true);
+    // IoC.app(this).add(Compiler,
+    //   [
+    //     this as Bouer,
+    //     Binder,
+    //     DelimiterHandler,
+    //     EventHandler,
+    //     ComponentHandler,
+    //     options.directives
+    //   ], true);
 
     const dataStore = IoC.app(this).resolve(DataStore)!;
     const middleware = IoC.app(this).resolve(Middleware)!;

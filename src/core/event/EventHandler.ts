@@ -19,7 +19,7 @@ import {
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Evaluator from '../Evaluator';
-import IoC from '../../shared/helpers/IoCContainer';
+// import IoC from '../../shared/helpers/IoCContainer';
 
 export default class EventHandler {
   readonly _IRT_ = true;
@@ -30,7 +30,7 @@ export default class EventHandler {
 
   constructor(bouer: Bouer, evaluator: Evaluator) {
     this.bouer = bouer;
-    this.evaluator = IoC.app(bouer).resolve(Evaluator)!;
+    this.evaluator = evaluator; // IoC.app(bouer).resolve(Evaluator)!;
 
     this.cleanup();
   }

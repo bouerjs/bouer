@@ -1266,9 +1266,9 @@
         if (service.instance)
           return service.instance;
         // Otherwise, creates the singleton instance
-        return service.instance = newInstance(clazz, service.args);
+        return service.instance = newInstance(clazz, service.args, app);
       }
-      return newInstance(clazz, service.args);
+      return newInstance(clazz, service.args, app);
     };
     /**
      * Creates a new instance of a class provided
@@ -1276,7 +1276,7 @@
      * @param params the parameter list that will be injected in the constructor
      * @returns new intance of the class provided
      */
-    var newInstance = function(clazz, params) {
+    var newInstance = function(clazz, params, app) {
       var paramsToProvide = [];
       var mParams = params || [];
       var data = {
@@ -1286,6 +1286,18 @@
       forEach(mParams, function(paramValue, index) {
         // Creating a unique name for the argument
         var paramName = '__arg' + index;
+        var paraValueAsAny = paramValue;
+        // If the param is a class
+        // eslint-disable-next-line no-prototype-builtins
+        if (paramValue && paraValueAsAny.hasOwnProperty('prototype')) {
+          if (app) {
+            var paramInstance = resolve(app, paraValueAsAny);
+            if (!isNull(paraValueAsAny))
+              paramValue = paramInstance;
+          } else {
+            paramValue = null;
+          }
+        }
         // Setting the param name and value
         data[paramName] = paramValue;
         // Adding the unique name
@@ -1357,12 +1369,12 @@
        * @param params the parameter list that will be injected in the constructor
        * @returns new intance of the class provided
        */
-      new: function(clazz, params) {
+      new: function(clazz, params, app) {
         if (clazz instanceof Bouer) {
           Logger.error('Cannot create an instance of Bouer using IoC');
           return null;
         }
-        return newInstance(clazz, params);
+        return newInstance(clazz, params, app);
       },
       /**
        * Generates a unique Id for the application
@@ -1449,7 +1461,7 @@
     return Middleware;
   }());
   var Binder = /** @class */ (function() {
-    function Binder(bouer) {
+    function Binder(bouer, evaluator) {
       this.binds = [];
       this.DEFAULT_BINDER_PROPERTIES = {
         text: 'value',
@@ -1463,7 +1475,7 @@
         fromDataToInput: 'fromDataToInput',
       };
       this.bouer = bouer;
-      this.evaluator = IoC.app(bouer).resolve(Evaluator);
+      this.evaluator = evaluator; // IoC.app(bouer).resolve(Evaluator)!;
       this.cleanup();
     }
     Binder.prototype.create = function(options) {
@@ -1990,7 +2002,6 @@
       this._IRT_ = true;
       this.routeView = null;
       this.activeAnchors = [];
-      this.isInitialized = false;
       // Store `href` value of the <base /> tag
       this.base = null;
       this.bouer = bouer;
@@ -4540,7 +4551,7 @@
       IoC.app(this).add(DataStore, [this], true);
       IoC.app(this).add(Evaluator, [this], true);
       IoC.app(this).add(Middleware, [this], true);
-      IoC.app(this).add(Binder, [this], true);
+      IoC.app(this).add(Binder, [this, Evaluator], true);
       IoC.app(this).add(EventHandler, [this], true);
       IoC.app(this).add(ComponentHandler, [this], true);
       IoC.app(this).add(Skeleton, [this], true);

@@ -39,8 +39,9 @@ import Reactive from '../reactive/Reactive';
 import Routing from '../routing/Routing';
 import Component from './Component';
 import IAsset from '../../definitions/interfaces/IAsset';
+import Constructor from '../../definitions/types/Constructor';
 
-type ComponentClass<Data extends {} = dynamic> = (new (...args: any[]) => Component<Data>);
+type Class = Constructor<any>;
 
 export default class ComponentHandler {
   readonly _IRT_ = true;
@@ -114,17 +115,17 @@ export default class ComponentHandler {
   }
 
   prepare(
-    components: (Component | IComponentOptions | ComponentClass)[],
+    components: (Component | IComponentOptions | Class)[],
     parent?: Component
   ) {
     forEach(components, (entry) => {
-      const isComponentClass = ((entry as ComponentClass).prototype instanceof Component);
+      const isComponentClass = ((entry as Class).prototype instanceof Component);
 
       let component = entry as Component;
       if (isComponentClass) {
         // Resolve the instance of the class
-        component = IoC.app(this.bouer).resolve(entry as ComponentClass) || IoC.new(entry as ComponentClass)!;
-        component.clazz = entry as ComponentClass;
+        component = IoC.app(this.bouer).resolve(entry as Class) || IoC.new(entry as Class)!;
+        component.clazz = entry as Class;
       }
 
       // In case of no-named-component, creates a name

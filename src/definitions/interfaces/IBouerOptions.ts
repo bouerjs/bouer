@@ -8,26 +8,27 @@ import IDelimiter from './IDelimiter';
 import IMiddleware from './IMiddleware';
 import DataType from '../types/DataType';
 import dynamic from '../types/Dynamic';
+import Constructor from '../types/Constructor';
 
 
-interface IBouerOptions<Data extends dynamic, GlobalData extends dynamic, Dependencies extends dynamic> {
+interface IBouerOptions {
   /** The data of the instance */
-  readonly data?: DataType<Data, Bouer<Data, GlobalData, Dependencies>>,
+  readonly data?: DataType<dynamic, Bouer>,
 
   /** The data of the whole instance */
-  readonly globalData?: DataType<GlobalData, Bouer<Data, GlobalData, Dependencies>>
+  readonly globalData?: DataType<dynamic, Bouer>
 
   /** The configuration of the instance */
   readonly config?: IBouerConfig
 
   /** The components of the instance */
-  readonly components?: (Component | IComponentOptions | (new (...args: any[]) => Component))[];
+  readonly components?: (Component | IComponentOptions | Constructor<Component>)[];
 
   /** The custom directives for this instance */
   readonly directives?: CustomDirective,
 
   /** The dependencies of the instance */
-  readonly deps?: Dependencies;
+  readonly deps?: ;
 
   /** Appends delimiters to the instance */
   readonly delimiters?: IDelimiter[],

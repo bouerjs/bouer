@@ -1,5 +1,6 @@
 import Component from '../../core/component/Component';
 import Bouer from '../../instance/Bouer';
+import Constructor from '../types/Constructor';
 import DataType from '../types/DataType';
 import dynamic from '../types/Dynamic';
 import ILifeCycleHooks from './ILifeCycleHooks';
@@ -33,7 +34,7 @@ interface IComponentOptions<Data extends {} = dynamic> extends ILifeCycleHooks<D
   readonly prefetch?: boolean;
 
   /** The children of the component that should inherit the `route` of the father */
-  readonly children?: (Component | IComponentOptions | (new (...args: any[]) => Component))[];
+  readonly children?: (Component | IComponentOptions | Constructor<Component>)[];
 
   /** Defines a list of restrictions functions of the component */
   readonly restrictions?: (

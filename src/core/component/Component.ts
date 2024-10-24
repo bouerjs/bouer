@@ -2,6 +2,7 @@ import IAsset from '../../definitions/interfaces/IAsset';
 import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
 import IEventSubscription from '../../definitions/interfaces/IEventSubscription';
 import ILifeCycleHooks from '../../definitions/interfaces/ILifeCycleHooks';
+import Constructor from '../../definitions/types/Constructor';
 import DataType from '../../definitions/types/DataType';
 import dynamic from '../../definitions/types/Dynamic';
 import Bouer from '../../instance/Bouer';
@@ -38,7 +39,7 @@ export default class Component<Data extends {} = dynamic> implements IComponentO
   isDestroyed: boolean = false;
 
   /** The Component Class */
-  clazz: (new (...args: any[]) => Component<Data>) | undefined;
+  clazz: Constructor<any> | undefined;
 
   /** The root element of the component */
   el?: Element;
@@ -46,7 +47,7 @@ export default class Component<Data extends {} = dynamic> implements IComponentO
   /** Bouer instance of the component */
   bouer?: Bouer;
 
-  readonly children?: (Component | IComponentOptions | (new (...args: any[]) => Component))[] = [];
+  readonly children?: (Component | IComponentOptions | Constructor<Component>)[] = [];
 
   /** All the assets attached to the component */
   readonly assets: (HTMLScriptElement | HTMLStyleElement | HTMLLinkElement)[] = [];
