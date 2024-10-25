@@ -18,7 +18,9 @@
     "changelog": "auto-changelog -p -u"
   },
   "husky": {
-    "hooks": {}
+    "hooks": {
+      "pre-commit": "npm test"
+    }
   },
   "auto-changelog": {
     "output": "CHANGELOG.md",
