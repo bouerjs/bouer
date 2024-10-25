@@ -1,22 +1,23 @@
 import Component from '../../core/component/Component';
-import IMiddlewareResult from '../../core/middleware/IMiddlewareResult';
+import { MiddlewareConfigType } from '../../core/middleware/Middleware';
 import Bouer from '../../instance/Bouer';
+import Constructor from '../types/Constructor';
 import CustomDirective from '../types/CustomDirective';
+import DataType from '../types/DataType';
 import IBouerConfig from './IBouerConfig';
 import IComponentOptions from './IComponentOptions';
 import IDelimiter from './IDelimiter';
-import IMiddleware from './IMiddleware';
-import DataType from '../types/DataType';
-import dynamic from '../types/Dynamic';
-import Constructor from '../types/Constructor';
 
-
-interface IBouerOptions {
+interface IBouerOptions<
+  Data extends {} = {},
+  Global extends {} = {},
+  Deps extends {} = {}
+> {
   /** The data of the instance */
-  readonly data?: DataType<dynamic, Bouer>,
+  readonly data?: DataType<Data, Bouer>,
 
   /** The data of the whole instance */
-  readonly globalData?: DataType<dynamic, Bouer>
+  readonly globalData?: DataType<Global, Bouer>
 
   /** The configuration of the instance */
   readonly config?: IBouerConfig
@@ -28,7 +29,7 @@ interface IBouerOptions {
   readonly directives?: CustomDirective,
 
   /** The dependencies of the instance */
-  readonly deps?: ;
+  readonly deps?: DataType<Deps, Bouer>;
 
   /** Appends delimiters to the instance */
   readonly delimiters?: IDelimiter[],
@@ -39,29 +40,17 @@ interface IBouerOptions {
    * @param app the application instance
    */
   middleware?(
-    this: Bouer<Data, GlobalData, Dependencies>,
+    this: Bouer,
     subscribe: (
-      this: Bouer<Data, GlobalData, Dependencies>,
+      this: Bouer,
       /** The directive to be applied */
       directive: string,
       /** The actions where it should be applied */
       actions: (
         /** Actions that will be performed on bind */
-        onBind: (
-          /** Configure an action to be called when the directive is bound */
-          configure: (
-            this: Bouer<Data, GlobalData, Dependencies>,
-            context: IMiddleware
-          ) => IMiddlewareResult | Promise<IMiddlewareResult>
-        ) => void,
+        onBind: MiddlewareConfigType,
         /** Actions that will be performed on update */
-        onUpdate: (
-          /** Configure an action to be called when the directive is updated */
-          configure: (
-            this: Bouer<Data, GlobalData, Dependencies>,
-            context: IMiddleware
-          ) => IMiddlewareResult | Promise<IMiddlewareResult>
-        ) => void
+        onUpdate: MiddlewareConfigType
       ) => void) => void,
     app: Bouer
   ): void,
@@ -70,25 +59,25 @@ interface IBouerOptions {
    * The hook that should be called before the component is loaded
    * @param event the called event object
    */
-  beforeLoad?(this: Bouer<Data, GlobalData, Dependencies>, event: CustomEvent): void;
+  beforeLoad?(this: Bouer, event: CustomEvent): void;
 
   /**
    * The hook that should be called after the component is loaded (Compiled)
    * @param event the called event object
    */
-  loaded?(this: Bouer<Data, GlobalData, Dependencies>, event: CustomEvent): void;
+  loaded?(this: Bouer, event: CustomEvent): void;
 
   /**
    * The hook that should be called before the component is destroyed
    * @param event the called event object
    */
-  beforeDestroy?(this: Bouer<Data, GlobalData, Dependencies>, event: CustomEvent): void;
+  beforeDestroy?(this: Bouer, event: CustomEvent): void;
 
   /**
    * The hook that should be called after the component is destroyed
    * @param event the called event object
    */
-  destroyed?(this: Bouer<Data, GlobalData, Dependencies>, event: CustomEvent): void;
+  destroyed?(this: Bouer, event: CustomEvent): void;
 }
 
 export default IBouerOptions;

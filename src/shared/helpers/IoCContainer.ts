@@ -1,7 +1,6 @@
 import Evaluator from '../../core/Evaluator';
 import Constructor from '../../definitions/types/Constructor';
 import Params from '../../definitions/types/Parameters';
-import dynamic from '../../definitions/types/Dynamic';
 import Bouer from '../../instance/Bouer';
 import Logger from '../logger/Logger';
 import { forEach, ifNullReturn, isNull } from './Utils';
@@ -140,9 +139,7 @@ export default (function IoC() {
      * @param app the bouer instance
      * @returns all the available methods to perform
      */
-    app<Data extends {} = dynamic, GlobalData extends {} = dynamic, Dependencies extends {} = dynamic>(
-      app: Bouer<Data, GlobalData, Dependencies> | Bouer
-    ) {
+    app(app: Bouer) {
       return {
         /**
          * Adds a service to be provided in whole the app

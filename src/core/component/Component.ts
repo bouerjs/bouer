@@ -3,6 +3,7 @@ import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
 import IEventSubscription from '../../definitions/interfaces/IEventSubscription';
 import ILifeCycleHooks from '../../definitions/interfaces/ILifeCycleHooks';
 import Constructor from '../../definitions/types/Constructor';
+import Data from '../../definitions/types/Data';
 import DataType from '../../definitions/types/DataType';
 import dynamic from '../../definitions/types/Dynamic';
 import Bouer from '../../instance/Bouer';
@@ -20,12 +21,12 @@ import EventHandler from '../event/EventHandler';
 import Reactive from '../reactive/Reactive';
 import ComponentHandler from './ComponentHandler';
 
-export default class Component<Data extends {} = dynamic> implements IComponentOptions<Data> {
+export default class Component implements IComponentOptions {
   readonly _IRT_ = true;
 
   readonly name: string;
   readonly path: string;
-  readonly data: DataType<Data, Component<Data>>;
+  readonly data: DataType<Data, Component>;
   readonly template?: string;
   readonly keepAlive?: boolean;
   readonly prefetch?: boolean;
@@ -53,7 +54,7 @@ export default class Component<Data extends {} = dynamic> implements IComponentO
   readonly assets: (HTMLScriptElement | HTMLStyleElement | HTMLLinkElement)[] = [];
 
   readonly restrictions?: (
-    (this: Bouer, component: Component<Data> | IComponentOptions<Data>) => boolean | Promise<boolean>
+    (this: Bouer, component: Component | IComponentOptions) => boolean | Promise<boolean>
   )[];
 
   /** Store temporarily this component UI orders */
@@ -63,15 +64,15 @@ export default class Component<Data extends {} = dynamic> implements IComponentO
    * Default constructor
    * @param {string|object} optionsOrPath the path of the component or the compponent options
    */
-  constructor(optionsOrPath?: string | IComponentOptions<Data>, assets?: (IAsset | string)[]) {
+  constructor(optionsOrPath?: string | IComponentOptions, assets?: (IAsset | string)[]) {
     let _name: string | undefined = undefined;
     let _path: string | undefined = undefined;
-    let _data: DataType<Data, Component<Data>> | undefined = undefined;
+    let _data: DataType<Data, Component> | undefined = undefined;
 
     if (isObject(optionsOrPath)) {
-      _name = (optionsOrPath as IComponentOptions<Data>).name;
-      _path = (optionsOrPath as IComponentOptions<Data>).path;
-      _data = (optionsOrPath as IComponentOptions<Data>).data;
+      _name = (optionsOrPath as IComponentOptions).name;
+      _path = (optionsOrPath as IComponentOptions).path;
+      _data = (optionsOrPath as IComponentOptions).data;
       Object.assign(this, optionsOrPath);
     } else {
       _path = optionsOrPath as string;
@@ -138,7 +139,7 @@ export default class Component<Data extends {} = dynamic> implements IComponentO
 
     const components = handler.activeComponents;
 
-    components.splice(components.indexOf(this as Component<{}>), 1);
+    components.splice(components.indexOf(this as Component), 1);
   }
 
   /**

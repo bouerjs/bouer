@@ -291,7 +291,7 @@ export default class ComponentHandler {
     return mainExecutionWrapper();
   }
 
-  find(predicate: (item: (Component<any> | IComponentOptions<any>)) => boolean) {
+  find(predicate: (item: (Component | IComponentOptions)) => boolean) {
     const keys = Object.keys(this.components);
     for (let i = 0; i < keys.length; i++) {
       const component = this.components[keys[i]];
@@ -344,7 +344,7 @@ export default class ComponentHandler {
 
   insert(
     componentElement: Element,
-    component: Component<any>,
+    component: Component,
     data: object,
     onComponent?: (component: Component) => void
   ) {
@@ -718,8 +718,8 @@ export default class ComponentHandler {
    * Adds assets to the component
    * @param {string|object} assets the list of assets to be included
    */
-  static prepareAssets<Data extends {} = dynamic>(
-    component: Component<Data>, assets: (IAsset | string)[]
+  static prepareAssets(
+    component: Component, assets: (IAsset | string)[]
   ) {
     const $Assets: any[] = [];
     const assetsTypeMapper: dynamic = {

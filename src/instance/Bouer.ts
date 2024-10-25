@@ -17,6 +17,7 @@ import IComponentOptions from '../definitions/interfaces/IComponentOptions';
 import IDelimiter from '../definitions/interfaces/IDelimiter';
 import IEventSubscription from '../definitions/interfaces/IEventSubscription';
 import Constructor from '../definitions/types/Constructor';
+import Props from '../definitions/types/Data';
 import DataType from '../definitions/types/DataType';
 import dynamic from '../definitions/types/Dynamic';
 import RenderContext from '../definitions/types/RenderContext';
@@ -40,17 +41,11 @@ import {
 } from '../shared/helpers/Utils';
 import Logger from '../shared/logger/Logger';
 
-type Data<T extends {} = {}> = T extends abstract new (...args: any) => infer R ? R : dynamic;
-
-const data: Data = {
-  abc: 2,
-  bbc: 4,
-  c() {}
-};
-
-data.abc; // Error: Property 'a' does not exist on type 'Data'
-
-export default class Bouer implements IBouerOptions {
+export default class Bouer<
+  Data extends {} = {},
+  Global extends {} = {},
+  Deps extends {} = {}
+> implements IBouerOptions {
   /** The name of the instance */
   // Ignore Reactive Transformation
   readonly _IRT_ = true;
@@ -58,14 +53,14 @@ export default class Bouer implements IBouerOptions {
   readonly version = '3.1.0';
   readonly config: IBouerConfig;
   readonly data: DataType<Data, Bouer>;
-  readonly globalData: DataType<Data, Bouer>;
-  readonly deps: Dependencies;
+  readonly globalData: DataType<Global, Bouer>;
+  readonly deps: DataType<Deps, Bouer>;
 
   /** Unique Id of the instance */
   readonly __id__: number = IoC.newId();
 
   /** App options provided in the instance */
-  readonly options: IBouerOptions;
+  readonly options: IBouerOptions<Data, Global, Deps>;
 
   /**
    * Gets all the elemens having the `ref` attribute
@@ -182,8 +177,8 @@ export default class Bouer implements IBouerOptions {
      * Adds a component to the instance
      * @param {object} component the component to be added
      */
-    add<Data extends {} = dynamic>(
-      component: Component<Data> | IComponentOptions<Data> | Constructor<Component<Data>>
+    add(
+      component: Component | IComponentOptions | Constructor<Component>
     ): void;
     /**
      * Gets a component from the instance
@@ -263,7 +258,7 @@ export default class Bouer implements IBouerOptions {
    */
   constructor(
     selector: string,
-    options?: IBouerOptions<Data, GlobalData, Dependencies>
+    options?: IBouerOptions<Data, Global, Deps>
   ) {
     const app = this as Bouer;
 
@@ -283,11 +278,11 @@ export default class Bouer implements IBouerOptions {
 
     // Adding Dependency Injection Services
     // IoC.app(this).add(DataStore, [], true);
-    IoC.app(this).add(Evaluator, [this as Bouer]);
+    IoC.app(this).add(Evaluator, [this]);
     // IoC.app(this).add(Middleware, [this as Bouer], true);
 
 
-    IoC.app(this).add(Binder, [this as Bouer, Evaluator], true);
+    IoC.app(this).add(Binder, [this, Evaluator], true);
 
 
     // IoC.app(this).add(EventHandler, [this as Bouer], true);
@@ -453,8 +448,12 @@ export default class Bouer implements IBouerOptions {
    * @param {object?} options the options to the instance
    * @returns Bouer instance
    */
-  static create<Data extends {} = dynamic, GlobalData extends {} = dynamic, Dependencies extends {} = dynamic>(
-    options?: IBouerOptions<Data, GlobalData, Dependencies>
+  static create<
+    Data extends dynamic = {},
+    Global extends dynamic = {},
+    Deps extends dynamic = {}
+  >(
+    options?: IBouerOptions<Data, Global, Deps>
   ) {
     options = (options || {});
     (options.config as dynamic) = (options.config || {});
@@ -580,7 +579,7 @@ export default class Bouer implements IBouerOptions {
    * @param {object?} targetObject the target were the inputData
    * @returns the object with the data setted
    */
-  set<InputData extends {}, TargetObject extends {} = Data>(
+  set<InputData extends {}, TargetObject extends {} = Props>(
     inputData: InputData,
     targetObject?: TargetObject
   ): InputData & TargetObject {
@@ -620,7 +619,7 @@ export default class Bouer implements IBouerOptions {
    * @param {object} targetObject the target object having the property to watch
    * @returns the watch object having the method to destroy the watch
    */
-  watch<Key extends keyof TargetObject, TargetObject extends {} = Data>(
+  watch<Key extends keyof TargetObject, TargetObject extends {} = Props>(
     propertyName: Key,
     callback: WatchCallback<TargetObject[Key]>,
     targetObject?: TargetObject
@@ -635,12 +634,7 @@ export default class Bouer implements IBouerOptions {
    * @param {Function} watchableScope the function that should be called when the any reactive property change
    * @returns an object having all the watches and the method to destroy watches at once
    */
-  react(
-    watchableScope: (
-      this: Bouer<Data, GlobalData, Dependencies>,
-      app: Bouer<Data, GlobalData, Dependencies>
-    ) => void
-  ) {
+  react(watchableScope: (this: Bouer, app: Bouer) => void) {
     return IoC.app(this).resolve(Binder)!
       .onPropertyInScopeChange(watchableScope as () => void);
   }
@@ -655,7 +649,7 @@ export default class Bouer implements IBouerOptions {
    */
   on(
     eventName: string,
-    callback: (this: Bouer<Data, GlobalData, Dependencies>, event: CustomEvent) => void,
+    callback: (this: Bouer, event: CustomEvent) => void,
     options?: {
       attachedNode?: Node,
       modifiers?: {
@@ -685,7 +679,7 @@ export default class Bouer implements IBouerOptions {
    */
   off(
     eventName: string,
-    callback?: (this: Bouer<Data, GlobalData, Dependencies>, event: CustomEvent) => void,
+    callback?: (this: Bouer, event: CustomEvent) => void,
     attachedNode?: Node
   ) {
     return IoC.app(this).resolve(EventHandler)!.
@@ -740,7 +734,7 @@ export default class Bouer implements IBouerOptions {
    * @param {number} wait milliseconds to the be waited before the single execution
    * @returns executable function
    */
-  lazy(callback: (this: Bouer<Data, GlobalData, Dependencies>, ...args: any[]) => void, wait?: number) {
+  lazy(callback: (this: Bouer, ...args: any[]) => void, wait?: number) {
     const _this = this;
     let timeout: any; wait = isNull(wait) ? 500 : wait;
     const immediate = arguments[2];

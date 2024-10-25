@@ -1,11 +1,11 @@
 import Component from '../../core/component/Component';
 import Bouer from '../../instance/Bouer';
 import Constructor from '../types/Constructor';
+import Data from '../types/Data';
 import DataType from '../types/DataType';
-import dynamic from '../types/Dynamic';
 import ILifeCycleHooks from './ILifeCycleHooks';
 
-interface IComponentOptions<Data extends {} = dynamic> extends ILifeCycleHooks<Data> {
+interface IComponentOptions extends ILifeCycleHooks {
   /** The name of the component */
   readonly name?: string
 
@@ -22,7 +22,7 @@ interface IComponentOptions<Data extends {} = dynamic> extends ILifeCycleHooks<D
   readonly template?: string;
 
   /** The default data that should be injected in the component */
-  readonly data?: DataType<Data, Component<Data>>;
+  readonly data?: DataType<Data, Component>;
 
   /** Allow the component the keep the last state */
   readonly keepAlive?: boolean;
@@ -38,7 +38,7 @@ interface IComponentOptions<Data extends {} = dynamic> extends ILifeCycleHooks<D
 
   /** Defines a list of restrictions functions of the component */
   readonly restrictions?: (
-    (this: Bouer, component: Component<Data> | IComponentOptions<Data>) => boolean | Promise<boolean>
+    (this: Bouer, component: Component | IComponentOptions) => boolean | Promise<boolean>
   )[];
 
   /** Allow to set this component as the `default page` when the application loads */

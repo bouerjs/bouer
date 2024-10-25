@@ -3,6 +3,14 @@ import IMiddlewareObject from '../../definitions/interfaces/IMiddlewareObject';
 import Bouer from '../../instance/Bouer';
 import IMiddlewareResult from './IMiddlewareResult';
 
+type MiddlewareConfigType = (
+  /** Configure an action to be called when the directive is updated */
+  configure: (
+    this: Bouer,
+    context: IMiddleware
+  ) => IMiddlewareResult | Promise<IMiddlewareResult>
+) => void;
+
 export default class Middleware {
   readonly _IRT_ = true;
   private middlewareConfigContainer: { [key: string]: IMiddlewareObject[] } = {};
@@ -59,14 +67,8 @@ export default class Middleware {
 
   subscribe = (directive: string, actions: (
     this: Bouer,
-    onBind: (
-      this: Bouer,
-      configure: (this: Bouer, context: IMiddleware) => IMiddlewareResult | Promise<IMiddlewareResult>
-    ) => void,
-    onUpdate: (
-      this: Bouer,
-      configure: (this: Bouer, context: IMiddleware) => IMiddlewareResult | Promise<IMiddlewareResult>
-    ) => void
+    onBind: MiddlewareConfigType,
+    onUpdate: MiddlewareConfigType
   ) => void) => {
     if (!this.middlewareConfigContainer[directive])
       this.middlewareConfigContainer[directive] = [];
@@ -87,3 +89,5 @@ export default class Middleware {
     return middlewares.length > 0;
   };
 }
+
+export { MiddlewareConfigType };
