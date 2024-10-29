@@ -272,27 +272,27 @@ export function urlResolver(url: string) {
   let href = url;
   // Support: IE 9-11 only, /* doc.documentMode is only available on IE */
   if ('documentMode' in DOM) {
-    anchor.setAttribute('href', href);
-    href = anchor.href;
+    ANCHOR.setAttribute('href', href);
+    href = ANCHOR.href;
   }
 
-  anchor.href = href;
-  let hostname = anchor.hostname;
-  const ipv6InBrackets = anchor.hostname === '[::1]';
+  ANCHOR.href = href;
+  let hostname = ANCHOR.hostname;
+  const ipv6InBrackets = ANCHOR.hostname === '[::1]';
 
   if (!ipv6InBrackets && hostname.indexOf(':') > -1)
     hostname = '[' + hostname + ']';
 
   const $return = {
-    href: anchor.href,
-    baseURI: anchor.baseURI,
-    protocol: anchor.protocol ? anchor.protocol.replace(/:$/, '') : '',
-    host: anchor.host,
-    search: anchor.search ? anchor.search.replace(/^\?/, '') : '',
-    hash: anchor.hash ? anchor.hash.replace(/^#/, '') : '',
+    href: ANCHOR.href,
+    baseURI: ANCHOR.baseURI,
+    protocol: ANCHOR.protocol ? ANCHOR.protocol.replace(/:$/, '') : '',
+    host: ANCHOR.host,
+    search: ANCHOR.search ? ANCHOR.search.replace(/^\?/, '') : '',
+    hash: ANCHOR.hash ? ANCHOR.hash.replace(/^#/, '') : '',
     hostname: hostname,
-    port: anchor.port,
-    pathname: (anchor.pathname.charAt(0) === '/') ? anchor.pathname : '/' + anchor.pathname,
+    port: ANCHOR.port,
+    pathname: (ANCHOR.pathname.charAt(0) === '/') ? ANCHOR.pathname : '/' + ANCHOR.pathname,
     origin: ''
   };
 
@@ -657,4 +657,4 @@ export function errorMsgNodeValue(node: Node) {
 
 export const WIN = window;
 export const DOM = document;
-export const anchor = createEl('a').build();
+export const ANCHOR = createEl('a').build();
