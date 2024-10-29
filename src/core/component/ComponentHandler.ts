@@ -67,12 +67,18 @@ export default class ComponentHandler {
     'clazz', 'el', 'bouer', 'events', '_IRT_'
   ]);
 
-  constructor(bouer: Bouer) {
+  constructor(
+    bouer: Bouer,
+    delimiterHandler: DelimiterHandler,
+    eventHandler: EventHandler,
+    evaluator: Evaluator,
+    routing: Routing
+  ) {
     this.bouer = bouer;
-    this.delimiter = IoC.app(bouer).resolve(DelimiterHandler)!;
-    this.eventHandler = IoC.app(bouer).resolve(EventHandler)!;
-    this.evaluator = IoC.app(bouer).resolve(Evaluator)!;
-    this.rounting = IoC.app(bouer).resolve(Routing)!;
+    this.delimiter = delimiterHandler;
+    this.eventHandler = eventHandler;
+    this.evaluator = evaluator;
+    this.rounting = routing;
   }
 
   check(nodeName: string) {
