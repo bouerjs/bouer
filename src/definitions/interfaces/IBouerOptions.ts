@@ -14,10 +14,10 @@ interface IBouerOptions<
   Deps extends {} = {}
 > {
   /** The data of the instance */
-  readonly data?: DataType<Data, Bouer>,
+  readonly data?: DataType<Data, this>,
 
   /** The data of the whole instance */
-  readonly globalData?: DataType<Global, Bouer>
+  readonly globalData?: DataType<Global, this>
 
   /** The configuration of the instance */
   readonly config?: IBouerConfig
@@ -29,7 +29,7 @@ interface IBouerOptions<
   readonly directives?: CustomDirective,
 
   /** The dependencies of the instance */
-  readonly deps?: DataType<Deps, Bouer>;
+  readonly deps?: DataType<Deps, this>;
 
   /** Appends delimiters to the instance */
   readonly delimiters?: IDelimiter[],
@@ -59,25 +59,25 @@ interface IBouerOptions<
    * The hook that should be called before the component is loaded
    * @param event the called event object
    */
-  beforeLoad?(this: Bouer, event: CustomEvent): void;
+  beforeLoad?(this: this, event: CustomEvent): void;
 
   /**
    * The hook that should be called after the component is loaded (Compiled)
    * @param event the called event object
    */
-  loaded?(this: Bouer, event: CustomEvent): void;
+  loaded?(this: this, event: CustomEvent): void;
 
   /**
    * The hook that should be called before the component is destroyed
    * @param event the called event object
    */
-  beforeDestroy?(this: Bouer, event: CustomEvent): void;
+  beforeDestroy?(this: this, event: CustomEvent): void;
 
   /**
    * The hook that should be called after the component is destroyed
    * @param event the called event object
    */
-  destroyed?(this: Bouer, event: CustomEvent): void;
+  destroyed?(this: this, event: CustomEvent): void;
 }
 
 export default IBouerOptions;

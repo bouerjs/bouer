@@ -1,11 +1,10 @@
 import Component from '../../core/component/Component';
 import Bouer from '../../instance/Bouer';
 import Constructor from '../types/Constructor';
-import Data from '../types/Data';
 import DataType from '../types/DataType';
 import ILifeCycleHooks from './ILifeCycleHooks';
 
-interface IComponentOptions extends ILifeCycleHooks {
+interface IComponentOptions<Data extends {} = {}> extends ILifeCycleHooks {
   /** The name of the component */
   readonly name?: string
 
@@ -22,7 +21,7 @@ interface IComponentOptions extends ILifeCycleHooks {
   readonly template?: string;
 
   /** The default data that should be injected in the component */
-  readonly data?: DataType<Data, Component>;
+  readonly data?: DataType<Data, this>;
 
   /** Allow the component the keep the last state */
   readonly keepAlive?: boolean;
