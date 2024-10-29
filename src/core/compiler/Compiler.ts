@@ -43,10 +43,10 @@ export default class Compiler {
   ) {
     this.bouer = bouer;
     this.directives = directives ?? {};
-    this.binder = binder; // IoC.app(bouer).resolve(Binder)!;
-    this.delimiter = delimiterHandler; // IoC.app(bouer).resolve(DelimiterHandler)!;
-    this.eventHandler = eventHandler; // IoC.app(bouer).resolve(EventHandler)!;
-    this.component = componentHandler; // IoC.app(bouer).resolve(ComponentHandler)!;
+    this.binder = binder;
+    this.delimiter = delimiterHandler;
+    this.eventHandler = eventHandler;
+    this.component = componentHandler;
   }
 
   /**
@@ -89,7 +89,7 @@ export default class Compiler {
     if (!this.analize(rootElement.outerHTML))
       return rootElement;
 
-    const directive = new Directive(this.directives || {}, this, context as RenderContext);
+    const directive = new Directive(this, this.directives || {}, context);
 
     const walker = (node: Node, data: object) => {
       if (node.nodeName in this.NODES_TO_IGNORE_IN_COMPILATION)
@@ -217,7 +217,7 @@ export default class Compiler {
         return directive.bind(node, data);
 
       // Custom directive
-      if (Object.keys(directive.$custom).find(name => Constants.check(node, name)))
+      if (Object.keys(directive.customDirectives).find(name => Constants.check(node, name)))
         if (directive.custom(node, data))
           return;
 
