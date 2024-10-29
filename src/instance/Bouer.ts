@@ -30,14 +30,14 @@ import Prop from '../shared/helpers/Prop';
 import Task from '../shared/helpers/Task';
 import {
   createEl, DOM,
-  WIN,
   forEach,
   htmlToJsObj,
   ifNullReturn,
   ifNullStop,
   isNull,
   setData,
-  toArray, trim
+  toArray, trim,
+  WIN
 } from '../shared/helpers/Utils';
 import Logger from '../shared/logger/Logger';
 
@@ -52,9 +52,9 @@ export default class Bouer<
   readonly name = 'Bouer';
   readonly version = '3.1.0';
   readonly config: IBouerConfig;
-  readonly data: DataType<Data, Bouer>;
-  readonly globalData: DataType<Global, Bouer>;
-  readonly deps: DataType<Deps, Bouer>;
+  readonly data: DataType<Data, this>;
+  readonly globalData: DataType<Global, this>;
+  readonly deps: DataType<Deps, this>;
 
   /** Unique Id of the instance */
   readonly __id__: number = IoC.newId();
@@ -260,7 +260,6 @@ export default class Bouer<
     selector: string,
     options?: IBouerOptions<Data, Global, Deps>
   ) {
-    const app = this as Bouer;
 
     this.options = options = (options || {});
     this.config = options.config || {};
@@ -272,33 +271,24 @@ export default class Bouer<
       deps[key] = typeof value === 'function' ? value.bind(this) : value;
     });
 
+    const app = this;
     const delimiters = options.delimiters || [];
 
-    // const $bouer = (this as any) as Bouer;
-
     // Adding Dependency Injection Services
-    // IoC.app(this).add(DataStore, [], true);
+    IoC.app(this).add(DataStore, [], true);
     IoC.app(this).add(Evaluator, [this]);
-    // IoC.app(this).add(Middleware, [this as Bouer], true);
-
-
+    IoC.app(this).add(Middleware, [this], true);
     IoC.app(this).add(Binder, [this, Evaluator], true);
-
-
-    // IoC.app(this).add(EventHandler, [this as Bouer], true);
-    // IoC.app(this).add(ComponentHandler, [this as Bouer], true);
-    // IoC.app(this).add(Skeleton, [this as Bouer], true);
-    // IoC.app(this).add(Routing, [this as Bouer], true);
-    // IoC.app(this).add(DelimiterHandler, [this as Bouer, delimiters], true);
-    // IoC.app(this).add(Compiler,
-    //   [
-    //     this as Bouer,
-    //     Binder,
-    //     DelimiterHandler,
-    //     EventHandler,
-    //     ComponentHandler,
-    //     options.directives
-    //   ], true);
+    IoC.app(this).add(EventHandler, [this, Evaluator], true);
+    IoC.app(this).add(ComponentHandler, [
+      this, DelimiterHandler, EventHandler, Evaluator, Routing
+    ], true);
+    IoC.app(this).add(Skeleton, [this], true);
+    IoC.app(this).add(Routing, [this], true);
+    IoC.app(this).add(DelimiterHandler, [this, delimiters], true);
+    IoC.app(this).add(Compiler, [
+      this, Binder, DelimiterHandler, EventHandler, ComponentHandler, options.directives
+    ], true);
 
     const dataStore = IoC.app(this).resolve(DataStore)!;
     const middleware = IoC.app(this).resolve(Middleware)!;
@@ -309,16 +299,16 @@ export default class Bouer<
 
     // Register the middleware
     if (typeof options.middleware === 'function')
-      options.middleware.call(app as typeof this, (middleware.subscribe as () => void), app);
+      options.middleware.call(this, (middleware.subscribe as () => void), this);
 
     // Transform the data properties into a reative
     this.data = Reactive.transform({
       data: options.data || {},
-      context: app
+      context: this
     });
     this.globalData = Reactive.transform({
       data: options.globalData || {},
-      context: app
+      context: this
     });
 
     delimiters.push.apply(delimiters, [
@@ -404,12 +394,12 @@ export default class Bouer<
     };
 
     this.$components = {
-      add: component => componentHandler.prepare([component as Component]),
+      add: component => componentHandler.prepare([component]),
       get: name => componentHandler.components[name],
       viewBy: <Child extends Component>(expression: (component: Child) => boolean) =>
-        ViewChild.by<Child>(this as Bouer, expression),
-      viewByName: (componentName: string) => ViewChild.byName(this as Bouer, componentName),
-      viewById: (componentId: string) => ViewChild.byId(this as Bouer, componentId),
+        ViewChild.by<Child>(this, expression),
+      viewByName: (componentName: string) => ViewChild.byName(this, componentName),
+      viewById: (componentId: string) => ViewChild.byId(this, componentId),
     };
 
     Prop.set(this, 'refs', {
@@ -500,7 +490,7 @@ export default class Bouer<
     if (isNull(selector) || trim(selector) === '')
       throw Logger.error(new Error('Invalid selector provided to the instance.'));
 
-    const app = this as Bouer;
+    const app = this;
     const el = DOM.querySelector(selector);
     if (!(this.el = el)) throw Logger.error(new SyntaxError('Element with selector “' + selector + '” not found.'));
 
@@ -539,7 +529,7 @@ export default class Bouer<
     compiler.compile({
       el: this.el,
       data: this.data,
-      context: this as Bouer,
+      context: this,
       onDone: () => eventHandler.emit({
         eventName: 'loaded',
         attachedNode: el
@@ -583,7 +573,7 @@ export default class Bouer<
     inputData: InputData,
     targetObject?: TargetObject
   ): InputData & TargetObject {
-    return setData(this as Bouer, inputData, targetObject);
+    return setData(this, inputData, targetObject);
   }
 
   /**
@@ -634,7 +624,7 @@ export default class Bouer<
    * @param {Function} watchableScope the function that should be called when the any reactive property change
    * @returns an object having all the watches and the method to destroy watches at once
    */
-  react(watchableScope: (this: Bouer, app: Bouer) => void) {
+  react(watchableScope: (this: this, app: this) => void) {
     return IoC.app(this).resolve(Binder)!
       .onPropertyInScopeChange(watchableScope as () => void);
   }
@@ -649,7 +639,7 @@ export default class Bouer<
    */
   on(
     eventName: string,
-    callback: (this: Bouer, event: CustomEvent) => void,
+    callback: (this: this, event: CustomEvent) => void,
     options?: {
       attachedNode?: Node,
       modifiers?: {
@@ -667,7 +657,7 @@ export default class Bouer<
         callback: callback as (() => void),
         attachedNode: (options || {}).attachedNode,
         modifiers: (options || {}).modifiers,
-        context: this as Bouer
+        context: this
       });
   }
 
@@ -679,7 +669,7 @@ export default class Bouer<
    */
   off(
     eventName: string,
-    callback?: (this: Bouer, event: CustomEvent) => void,
+    callback?: (this: this, event: CustomEvent) => void,
     attachedNode?: Node
   ) {
     return IoC.app(this).resolve(EventHandler)!.
@@ -734,7 +724,7 @@ export default class Bouer<
    * @param {number} wait milliseconds to the be waited before the single execution
    * @returns executable function
    */
-  lazy(callback: (this: Bouer, ...args: any[]) => void, wait?: number) {
+  lazy(callback: (this: this, ...args: any[]) => void, wait?: number) {
     const _this = this;
     let timeout: any; wait = isNull(wait) ? 500 : wait;
     const immediate = arguments[2];
@@ -772,7 +762,7 @@ export default class Bouer<
       compile({
         el: options.el,
         data: options.data,
-        context: options.context || this as Bouer,
+        context: options.context || this,
         onDone: options.onDone
       });
   }

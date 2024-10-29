@@ -3,7 +3,6 @@ import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
 import IEventSubscription from '../../definitions/interfaces/IEventSubscription';
 import ILifeCycleHooks from '../../definitions/interfaces/ILifeCycleHooks';
 import Constructor from '../../definitions/types/Constructor';
-import Data from '../../definitions/types/Data';
 import DataType from '../../definitions/types/DataType';
 import dynamic from '../../definitions/types/Dynamic';
 import Bouer from '../../instance/Bouer';
@@ -21,12 +20,12 @@ import EventHandler from '../event/EventHandler';
 import Reactive from '../reactive/Reactive';
 import ComponentHandler from './ComponentHandler';
 
-export default class Component implements IComponentOptions {
+export default class Component<Data extends {} = {}> implements IComponentOptions {
   readonly _IRT_ = true;
 
   readonly name: string;
   readonly path: string;
-  readonly data: DataType<Data, Component>;
+  readonly data: DataType<Data, this>;
   readonly template?: string;
   readonly keepAlive?: boolean;
   readonly prefetch?: boolean;
@@ -67,12 +66,12 @@ export default class Component implements IComponentOptions {
   constructor(optionsOrPath?: string | IComponentOptions, assets?: (IAsset | string)[]) {
     let _name: string | undefined = undefined;
     let _path: string | undefined = undefined;
-    let _data: DataType<Data, Component> | undefined = undefined;
+    let _data: DataType<{}, Component> | undefined = undefined;
 
     if (isObject(optionsOrPath)) {
-      _name = (optionsOrPath as IComponentOptions).name;
-      _path = (optionsOrPath as IComponentOptions).path;
-      _data = (optionsOrPath as IComponentOptions).data;
+      _name = (optionsOrPath as Component).name;
+      _path = (optionsOrPath as Component).path;
+      _data = (optionsOrPath as Component).data;
       Object.assign(this, optionsOrPath);
     } else {
       _path = optionsOrPath as string;
@@ -81,7 +80,7 @@ export default class Component implements IComponentOptions {
     this.name = _name || '';
     this.path = _path || '';
     this.data = Reactive.transform({
-      context: this as any,
+      context: this,
       data: _data || {}
     });
 
@@ -126,12 +125,12 @@ export default class Component implements IComponentOptions {
 
     const handler = IoC.app(this.bouer!).resolve(ComponentHandler)!;
 
-    handler.emit(this as Component, 'beforeDestroy');
+    handler.emit(this, 'beforeDestroy');
 
     const container = this.el.parentElement;
     if (container) container.removeChild(this.el);
 
-    handler.emit(this as Component, 'destroyed');
+    handler.emit(this, 'destroyed');
 
     // Destroying all the events attached to the this instance
     forEach(this.events, evt => this.off((evt.eventName as any), evt.callback));
@@ -139,7 +138,7 @@ export default class Component implements IComponentOptions {
 
     const components = handler.activeComponents;
 
-    components.splice(components.indexOf(this as Component), 1);
+    components.splice(components.indexOf(this), 1);
   }
 
   /**
@@ -156,7 +155,7 @@ export default class Component implements IComponentOptions {
    */
   on<TKey extends keyof ILifeCycleHooks>(
     eventName: TKey,
-    callback: (event: CustomEvent) => void
+    callback: (this: this, event: CustomEvent) => void
   ) {
     const instanceHooksSet = new Set([
       'created', 'beforeMount', 'mounted', 'beforeLoad', 'loaded', 'beforeDestroy', 'destroyed'
@@ -173,7 +172,7 @@ export default class Component implements IComponentOptions {
       eventName,
       callback: callback as any,
       attachedNode: this.el!,
-      context: this as any,
+      context: this,
       modifiers: { once: instanceHooksSet.has(eventName), autodestroy: false },
     });
     this.events.push(evt);
@@ -186,12 +185,12 @@ export default class Component implements IComponentOptions {
    * @param {Function} callback the callback function of the event
    */
   off<TKey extends keyof ILifeCycleHooks>(
-    eventName: TKey, callback: (event: CustomEvent) => void
+    eventName: TKey, callback: (this: this, event: CustomEvent) => void
   ) {
     IoC.app(this.bouer!).resolve(EventHandler)!.off({
       eventName,
       callback: callback as any,
-      attachedNode: this.el!
+      attachedNode: this.el!,
     });
     this.events = where(this.events, evt => !(evt.eventName == eventName && evt.callback == callback));
   }
@@ -206,7 +205,7 @@ export default class Component implements IComponentOptions {
     inputData: InputData,
     targetObject?: TargetObject
   ): InputData & TargetObject {
-    const result = setData(this as Component, inputData, targetObject);
+    const result = setData(this, inputData, targetObject);
     forEach(Object.keys(inputData), key => Prop.transfer(this, inputData, key as keyof InputData));
     return result;
   }
