@@ -641,6 +641,20 @@ export function htmlToJsObj(input: string | HTMLElement,
   return builtObject;
 }
 
+export function toOwnerNode(node: Node) {
+  return (node as any).ownerElement || node.parentNode;
+}
+
+export function errorMsgEmptyNode(node: Node) {
+  return ('Expected an expression in “' + node.nodeName +
+    '” and got an <empty string>.');
+}
+
+export function errorMsgNodeValue(node: Node) {
+  return ('Expected an expression in “' + node.nodeName +
+    '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
+}
+
 export const WIN = window;
 export const DOM = document;
 export const anchor = createEl('a').build();

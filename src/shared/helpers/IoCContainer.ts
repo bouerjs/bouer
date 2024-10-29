@@ -148,7 +148,7 @@ export default (function IoC() {
          * @param isSingleton mark the service as singleton to avoid creating an instance whenever it's requested
          */
         add<S extends Constructor<any>>(ctor: S, params?: Params<S>, isSingleton?: boolean): void {
-          return add(app as Bouer, ctor, (params || []) as any, isSingleton);
+          return add(app, ctor, (params || []) as any, isSingleton);
         },
         /**
          * Resolves the Service with all it's dependencies
@@ -156,13 +156,13 @@ export default (function IoC() {
          * @returns the instance of the class resolved
          */
         resolve<S >(ctor: Constructor<S>): S | null {
-          return resolve(app as Bouer, ctor);
+          return resolve(app, ctor);
         },
         /**
          * Dispose all the added service of the current app
          */
         clear() {
-          clear(app as Bouer);
+          clear(app);
         }
       };
     },
