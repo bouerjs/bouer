@@ -720,24 +720,24 @@ function urlResolver(url) {
   var href = url;
   // Support: IE 9-11 only, /* doc.documentMode is only available on IE */
   if ('documentMode' in DOM) {
-    anchor.setAttribute('href', href);
-    href = anchor.href;
+    ANCHOR.setAttribute('href', href);
+    href = ANCHOR.href;
   }
-  anchor.href = href;
-  var hostname = anchor.hostname;
-  var ipv6InBrackets = anchor.hostname === '[::1]';
+  ANCHOR.href = href;
+  var hostname = ANCHOR.hostname;
+  var ipv6InBrackets = ANCHOR.hostname === '[::1]';
   if (!ipv6InBrackets && hostname.indexOf(':') > -1)
     hostname = '[' + hostname + ']';
   var $return = {
-    href: anchor.href,
-    baseURI: anchor.baseURI,
-    protocol: anchor.protocol ? anchor.protocol.replace(/:$/, '') : '',
-    host: anchor.host,
-    search: anchor.search ? anchor.search.replace(/^\?/, '') : '',
-    hash: anchor.hash ? anchor.hash.replace(/^#/, '') : '',
+    href: ANCHOR.href,
+    baseURI: ANCHOR.baseURI,
+    protocol: ANCHOR.protocol ? ANCHOR.protocol.replace(/:$/, '') : '',
+    host: ANCHOR.host,
+    search: ANCHOR.search ? ANCHOR.search.replace(/^\?/, '') : '',
+    hash: ANCHOR.hash ? ANCHOR.hash.replace(/^#/, '') : '',
     hostname: hostname,
-    port: anchor.port,
-    pathname: (anchor.pathname.charAt(0) === '/') ? anchor.pathname : '/' + anchor.pathname,
+    port: ANCHOR.port,
+    pathname: (ANCHOR.pathname.charAt(0) === '/') ? ANCHOR.pathname : '/' + ANCHOR.pathname,
     origin: ''
   };
   $return.origin = $return.protocol + '://' + $return.host;
@@ -1043,9 +1043,23 @@ function htmlToJsObj(input, options, onSet) {
   });
   return builtObject;
 }
+
+function toOwnerNode(node) {
+  return node.ownerElement || node.parentNode;
+}
+
+function errorMsgEmptyNode(node) {
+  return ('Expected an expression in “' + node.nodeName +
+    '” and got an <empty string>.');
+}
+
+function errorMsgNodeValue(node) {
+  return ('Expected an expression in “' + node.nodeName +
+    '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
+}
 var WIN = window;
 var DOM = document;
-var anchor = createEl('a').build();
+var ANCHOR = createEl('a').build();
 var DelimiterHandler = /** @class */ (function() {
   function DelimiterHandler(bouer, delimiters) {
     this.delimiters = [];
@@ -1237,16 +1251,18 @@ var Skeleton = /** @class */ (function() {
  */
 var IoC = (function IoC() {
   var bouerId = 1;
-  var globalApp = 1100101;
+  var globalApp = {
+    isDestroyed: false
+  };
   var serviceCollection = new WeakMap();
-  var add = function(app, clazz, params, isSingleton) {
+  var add = function(app, ctor, params, isSingleton) {
     if (app.isDestroyed)
       throw new Error('Application already disposed.');
     if (!serviceCollection.has(app))
       serviceCollection.set(app, new WeakMap());
     var collection = serviceCollection.get(app);
-    collection.set(clazz, {
-      clazz: clazz,
+    collection.set(ctor, {
+      ctor: ctor,
       isSingleton: ifNullReturn(isSingleton, false),
       args: params
     });
@@ -1284,14 +1300,18 @@ var IoC = (function IoC() {
     forEach(mParams, function(paramValue, index) {
       // Creating a unique name for the argument
       var paramName = '__arg' + index;
-      var paraValueAsAny = paramValue;
+      var paramValueAsAny = paramValue;
       // If the param is a class
       // eslint-disable-next-line no-prototype-builtins
-      if (paramValue && paraValueAsAny.hasOwnProperty('prototype')) {
+      if (paramValue && paramValueAsAny.hasOwnProperty('prototype')) {
         if (app) {
-          var paramInstance = resolve(app, paraValueAsAny);
-          if (!isNull(paraValueAsAny))
+          var paramInstance = resolve(app, paramValueAsAny);
+          if (!isNull(paramValueAsAny)) {
             paramValue = paramInstance;
+          } else {
+            Logger.warn('Could not create an instance of ' + paramValueAsAny.name || paramValueAsAny +
+              '. Make sure it is added as a service in IoC[.app].add(Service).');
+          }
         } else {
           paramValue = null;
         }
@@ -1314,20 +1334,20 @@ var IoC = (function IoC() {
   return {
     /**
      * Adds a service to generic app
-     * @param clazz the service that should be resolved future on
+     * @param ctor the service that should be resolved future on
      * @param params the parameter that needs to be resolved every time the service is requested.
      * @param isSingleton mark the service as singleton to avoid creating an instance whenever it's requested
      */
-    add: function(clazz, params, isSingleton) {
-      return add(globalApp, clazz, params, isSingleton);
+    add: function(ctor, params, isSingleton) {
+      return add(globalApp, ctor, (params || []), isSingleton);
     },
     /**
      * Resolves the Service with all it's dependencies
-     * @param clazz the class the needs to be resolved
+     * @param ctor the class the needs to be resolved
      * @returns the instance of the class resolved
      */
-    resolve: function(clazz) {
-      return resolve(globalApp, clazz);
+    resolve: function(ctor) {
+      return resolve(globalApp, ctor);
     },
     /**
      * Defines the bouer app containing all the services that needs to be provided in this app
@@ -1338,20 +1358,20 @@ var IoC = (function IoC() {
       return {
         /**
          * Adds a service to be provided in whole the app
-         * @param clazz the service that should be resolved future on
+         * @param ctor the service that should be resolved future on
          * @param params the parameter that needs to be resolved every time the service is requested.
          * @param isSingleton mark the service as singleton to avoid creating an instance whenever it's requested
          */
-        add: function(clazz, params, isSingleton) {
-          return add(app, clazz, params, isSingleton);
+        add: function(ctor, params, isSingleton) {
+          return add(app, ctor, (params || []), isSingleton);
         },
         /**
          * Resolves the Service with all it's dependencies
-         * @param clazz the class the needs to be resolved
+         * @param ctor the class the needs to be resolved
          * @returns the instance of the class resolved
          */
-        resolve: function(clazz) {
-          return resolve(app, clazz);
+        resolve: function(ctor) {
+          return resolve(app, ctor);
         },
         /**
          * Dispose all the added service of the current app
@@ -1363,16 +1383,18 @@ var IoC = (function IoC() {
     },
     /**
      * Creates a new instance of a class provided
-     * @param clazz the class that the new instance should be created
+     * @param ctor the class that the new instance should be created
      * @param params the parameter list that will be injected in the constructor
+     * @param app used to auto instantiate a parameter (DI Service), Optional if there isn't or
+     *  we do not want to instantiate
      * @returns new intance of the class provided
      */
-    new: function(clazz, params, app) {
-      if (clazz instanceof Bouer) {
+    new: function(ctor, params, app) {
+      if (ctor instanceof Bouer) {
         Logger.error('Cannot create an instance of Bouer using IoC');
         return null;
       }
-      return newInstance(clazz, params, app);
+      return newInstance(ctor, (params || []), app);
     },
     /**
      * Generates a unique Id for the application
@@ -1394,6 +1416,172 @@ var Task = (function Task() {
     }
   };
 })();
+var Routing = /** @class */ (function() {
+  function Routing(bouer) {
+    this._IRT_ = true;
+    this.routeView = null;
+    this.activeAnchors = [];
+    // Store `href` value of the <base /> tag
+    this.base = null;
+    this.bouer = bouer;
+  }
+  Routing.prototype.setRouteView = function(routeView) {
+    var _this = this;
+    if (!routeView || this.routeView)
+      return;
+    this.routeView = routeView;
+    if (this.defaultPage)
+      this.navigate(DOM.location.href);
+    // Listening to the page navigation
+    WIN.addEventListener('popstate', function(evt) {
+      evt.preventDefault();
+      _this.navigate(((evt.state || {}).url || location.href), {
+        setURL: false
+      });
+    });
+  };
+  /** Initialize the routing the instance */
+  Routing.prototype.init = function() {
+    var base = DOM.head.querySelector('base');
+    if (base) {
+      var baseHref = base.attributes.getNamedItem('href');
+      if (!baseHref)
+        return Logger.error('The href="/" attribute is required in base element.');
+      this.base = baseHref.value;
+    } else {
+      this.base = '/';
+    }
+    var routeView = ifNullStop(this.bouer.el).querySelector('[route-view]');
+    this.setRouteView(routeView);
+  };
+  /**
+   * Navigates to a certain page without reloading all the page
+   * @param {string} route the route to navigate to
+   * @param {object?} options navigation options
+   */
+  Routing.prototype.navigate = function(route, options) {
+    var _this = this;
+    if (!this.routeView)
+      return;
+    if (isNull(route))
+      return Logger.log('Invalid url provided to the navigation method.');
+    route = trim(route);
+    var resolver = urlResolver(route);
+    var usehash = ifNullReturn(this.bouer.config.usehash, true);
+    var navigatoTo = (usehash ? resolver.hash : resolver.pathname).split('?')[0];
+    options = options || {};
+    // In case of: /about/me/, remove the last forward slash
+    if (navigatoTo[navigatoTo.length - 1] === '/')
+      navigatoTo = navigatoTo.substring(0, navigatoTo.length - 1);
+    var page = this.toPage(navigatoTo);
+    this.clear();
+    if (!page)
+      return; // Page Not Found or Page Not Defined
+    // If it's not found and the url matches .html do nothing
+    if (!page && route.endsWith('.html'))
+      return;
+    var componentElement = createAnyEl(page.name, function(el) {
+        // Inherit the data scope by default
+        el.setAttribute('data', isObject(options.data) ? JSON.stringify(options.data) : '$data');
+      }).appendTo(this.routeView)
+      .build();
+    // Document info configuration
+    DOM.title = page.title || DOM.title;
+    if (ifNullReturn(options.setURL, true))
+      this.pushState(resolver.href, DOM.title);
+    var routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route);
+    IoC.app(this.bouer).resolve(ComponentHandler)
+      .order(componentElement, this.bouer.data, function() {
+        _this.markActiveAnchorsWithRoute(routeToSet);
+      });
+  };
+  Routing.prototype.pushState = function(url, title) {
+    url = urlResolver(url).href;
+    if (DOM.location.href === url)
+      return;
+    WIN.history.pushState({
+      url: url,
+      title: title
+    }, (title || ''), url);
+  };
+  Routing.prototype.popState = function(times) {
+    if (isNull(times))
+      times = -1;
+    WIN.history.go(times);
+  };
+  Routing.prototype.toPage = function(url) {
+    // Default Page
+    if (url === '' || url === '/' ||
+      url === '/' + urlCombine((this.base, 'index.html'))) {
+      return this.defaultPage;
+    }
+    // Search for the right page
+    return IoC.app(this.bouer).resolve(ComponentHandler)
+      .find(function(component) {
+        if (!component.route)
+          return false;
+        var routeRegExp = component.route.replace(/{(.*?)}/gi, '[\\S\\s]{1,}');
+        if (Array.isArray(new RegExp('^' + routeRegExp + '$', 'i').exec(url)))
+          return true;
+        return false;
+      }) || this.notFoundPage;
+  };
+  Routing.prototype.markActiveAnchorsWithRoute = function(route) {
+    var _this = this;
+    var className = this.bouer.config.activeClassName || 'active-link';
+    var appEl = ifNullStop(this.bouer.el);
+    var anchors = appEl.querySelectorAll('a');
+    if (isNull(route))
+      return;
+    // Removing the active mark
+    forEach(this.activeAnchors, function(anchor) {
+      return anchor.classList.remove(className);
+    });
+    // Removing the active mark
+    forEach([].slice.call(appEl.querySelectorAll('a.' + className)), function(anchor) {
+      return anchor.classList.remove(className);
+    });
+    this.activeAnchors = [];
+    // Adding the className and storing all the active anchors
+    forEach(toArray(anchors), function(anchor) {
+      if (anchor.href.split('?')[0] !== route.split('?')[0])
+        return;
+      anchor.classList.add(className);
+      _this.activeAnchors.push(anchor);
+    });
+  };
+  Routing.prototype.markActiveAnchor = function(anchor) {
+    var className = this.bouer.config.activeClassName || 'active-link';
+    if (isNull(anchor))
+      return;
+    forEach(this.activeAnchors, function(anchor) {
+      return anchor.classList.remove(className);
+    });
+    forEach([].slice.call(ifNullStop(this.bouer.el).querySelectorAll('a.' + className)), function(anchor) {
+      return anchor.classList.remove(className);
+    });
+    anchor.classList.add(className);
+    this.activeAnchors = [anchor];
+  };
+  Routing.prototype.clear = function() {
+    this.routeView.innerHTML = '';
+  };
+  /**
+   * Allow to configure the `Default Page` and `NotFound Page`
+   * @param {Component|IComponentOptions} component the component to be checked
+   */
+  Routing.prototype.configure = function(component) {
+    if (component.isDefault === true && !isNull(this.defaultPage))
+      return Logger.warn('There are multiple “Default Page” provided, check the “' + component.route + '” route.');
+    if (component.isNotFound === true && !isNull(this.notFoundPage))
+      return Logger.warn('There are multiple “NotFound Page” provided, check the “' + component.route + '” route.');
+    if (component.isDefault === true)
+      this.defaultPage = component;
+    if (component.isNotFound === true)
+      this.notFoundPage = component;
+  };
+  return Routing;
+}());
 var Middleware = /** @class */ (function() {
   function Middleware(bouer) {
     var _this = this;
@@ -1473,7 +1661,7 @@ var Binder = /** @class */ (function() {
       fromDataToInput: 'fromDataToInput',
     };
     this.bouer = bouer;
-    this.evaluator = evaluator; // IoC.app(bouer).resolve(Evaluator)!;
+    this.evaluator = evaluator;
     this.cleanup();
   }
   Binder.prototype.create = function(options) {
@@ -1812,13 +2000,14 @@ var Binder = /** @class */ (function() {
   };
   return Binder;
 }());
+// import IoC from '../../shared/helpers/IoCContainer';
 var EventHandler = /** @class */ (function() {
   function EventHandler(bouer, evaluator) {
     this._IRT_ = true;
     this.$events = {};
     this.input = createEl('input').build();
     this.bouer = bouer;
-    this.evaluator = IoC.app(bouer).resolve(Evaluator);
+    this.evaluator = evaluator; // IoC.app(bouer).resolve(Evaluator)!;
     this.cleanup();
   }
   EventHandler.prototype.compile = function(node, data, context) {
@@ -1995,172 +2184,419 @@ var EventHandler = /** @class */ (function() {
   };
   return EventHandler;
 }());
-var Routing = /** @class */ (function() {
-  function Routing(bouer) {
-    this._IRT_ = true;
-    this.routeView = null;
-    this.activeAnchors = [];
-    // Store `href` value of the <base /> tag
-    this.base = null;
-    this.bouer = bouer;
-  }
-  Routing.prototype.setRouteView = function(routeView) {
-    var _this = this;
-    if (!routeView || this.routeView)
-      return;
-    this.routeView = routeView;
-    if (this.defaultPage)
-      this.navigate(DOM.location.href);
-    // Listening to the page navigation
-    WIN.addEventListener('popstate', function(evt) {
-      evt.preventDefault();
-      _this.navigate(((evt.state || {}).url || location.href), {
-        setURL: false
-      });
-    });
+
+function $bind(opitons) {
+  var node = opitons.node,
+    binder = opitons.binder,
+    delimiter = opitons.delimiter,
+    context = opitons.context,
+    data = opitons.data;
+  var ownerNode = toOwnerNode(node);
+  var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  if (nodeValue === '')
+    return Logger.error(errorMsgEmptyNode(node));
+  if (delimiter.run(nodeValue).length !== 0)
+    return Logger.error(errorMsgNodeValue(node));
+  binder.create({
+    node: node,
+    isConnected: function() {
+      return ownerNode.isConnected;
+    },
+    fields: [{
+      field: nodeValue,
+      expression: nodeValue
+    }],
+    context: context,
+    data: data
+  });
+  ownerNode.removeAttribute(node.nodeName);
+}
+
+function $text(opitons) {
+  var node = opitons.node;
+  var ownerNode = toOwnerNode(node);
+  var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  if (nodeValue === '')
+    return Logger.error(errorMsgEmptyNode(node));
+  ownerNode.textContent = nodeValue;
+  ownerNode.removeAttribute(node.nodeName);
+}
+
+function $property(opitons) {
+  var node = opitons.node,
+    binder = opitons.binder,
+    delimiter = opitons.delimiter,
+    context = opitons.context,
+    evaluator = opitons.evaluator,
+    data = opitons.data;
+  var ownerNode = toOwnerNode(node);
+  var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  var execute = function(obj) {};
+  var errorInvalidValue = function(node) {
+    return ('Invalid value, expected an Object/Object Literal in “' +
+      node.nodeName + '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
   };
-  /** Initialize the routing the instance */
-  Routing.prototype.init = function() {
-    var base = DOM.head.querySelector('base');
-    if (base) {
-      var baseHref = base.attributes.getNamedItem('href');
-      if (!baseHref)
-        return Logger.error('The href="/" attribute is required in base element.');
-      this.base = baseHref.value;
-    } else {
-      this.base = '/';
+  if (nodeValue === '')
+    return Logger.error(errorInvalidValue(node));
+  if (delimiter.run(nodeValue).length !== 0)
+    return;
+  var inputData = evaluator.exec({
+    data: data,
+    code: nodeValue,
+    context: context
+  });
+  if (!isObject(inputData))
+    return Logger.error(errorInvalidValue(node));
+  binder.create({
+    data: data,
+    node: node,
+    isReplaceProperty: false,
+    context: context,
+    fields: [{
+      expression: nodeValue,
+      field: nodeValue
+    }],
+    isConnected: function() {
+      return ownerNode.isConnected;
+    },
+    onUpdate: function() {
+      return execute(evaluator.exec({
+        data: data,
+        code: nodeValue,
+        context: context
+      }));
     }
-    var routeView = ifNullStop(this.bouer.el).querySelector('[route-view]');
-    this.setRouteView(routeView);
-  };
-  /**
-   * Navigates to a certain page without reloading all the page
-   * @param {string} route the route to navigate to
-   * @param {object?} options navigation options
-   */
-  Routing.prototype.navigate = function(route, options) {
-    var _this = this;
-    if (!this.routeView)
+  });
+  ownerNode.removeAttribute(node.nodeName);
+  (execute = function(obj) {
+    var attrNameToSet = node.nodeName.substring(Constants.property.length);
+    var attr = ownerNode.attributes[attrNameToSet];
+    if (!attr) {
+      (ownerNode.setAttribute(attrNameToSet, ''));
+      attr = ownerNode.attributes[attrNameToSet];
+    }
+    forEach(Object.keys(obj), function(key) {
+      /* if has a falsy value remove the key */
+      if (!obj[key])
+        return attr.value = trim(attr.value.replace(key, ''));
+      attr.value = (attr.value.includes(key) ? attr.value : trim(attr.value + ' ' + key));
+    });
+    if (attr.value === '')
+      return ownerNode.removeAttribute(attrNameToSet);
+  })(inputData);
+}
+
+function $href(opitons) {
+  var node = opitons.node,
+    bouer = opitons.bouer,
+    binder = opitons.binder,
+    delimiter = opitons.delimiter,
+    context = opitons.context,
+    data = opitons.data;
+  var ownerNode = toOwnerNode(node);
+  var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  if (nodeValue === '')
+    return Logger.error(errorMsgEmptyNode(node));
+  ownerNode.removeAttribute(node.nodeName);
+  var usehash = ifNullReturn(bouer.config.usehash, true);
+  var routeToSet = urlCombine((usehash ? '#' : ''), nodeValue);
+  ownerNode.setAttribute('href', routeToSet);
+  var href = ownerNode.attributes['href'];
+  var delimiters = delimiter.run(nodeValue);
+  if (delimiters.length !== 0)
+    binder.create({
+      data: data,
+      node: href,
+      isConnected: function() {
+        return ownerNode.isConnected;
+      },
+      context: context,
+      fields: delimiters
+    });
+  ownerNode
+    .addEventListener('click', function(event) {
+      event.preventDefault();
+      IoC.app(bouer).resolve(Routing)
+        .navigate(href.value);
+    }, false);
+}
+
+function $entry(opitons) {
+  var node = opitons.node,
+    bouer = opitons.bouer,
+    delimiter = opitons.delimiter,
+    data = opitons.data;
+  var ownerNode = toOwnerNode(node);
+  var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  if (nodeValue === '')
+    return Logger.error(errorMsgEmptyNode(node));
+  if (delimiter.run(nodeValue).length !== 0)
+    return Logger.error(errorMsgNodeValue(node));
+  ownerNode.removeAttribute(node.nodeName);
+  IoC.app(bouer).resolve(ComponentHandler)
+    .prepare([
+      {
+        name: nodeValue,
+        template: ownerNode.outerHTML,
+        data: data
+        }
+    ]);
+}
+
+function $put(opitons) {
+  var node = opitons.node,
+    bouer = opitons.bouer,
+    binder = opitons.binder,
+    delimiter = opitons.delimiter,
+    context = opitons.context,
+    data = opitons.data;
+  var ownerNode = toOwnerNode(node);
+  var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  var execute = function() {};
+  if (nodeValue === '')
+    return Logger.error(errorMsgEmptyNode(node) + ' Direct <empty string> injection value is not allowed.');
+  if (delimiter.run(nodeValue).length !== 0)
+    return Logger.error('Expected an expression with no delimiter in “' + node.nodeName +
+      '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
+  binder.create({
+    data: data,
+    node: node,
+    isConnected: function() {
+      return ownerNode.isConnected;
+    },
+    fields: [{
+      expression: nodeValue,
+      field: nodeValue
+    }],
+    context: context,
+    isReplaceProperty: false,
+    onUpdate: function() {
+      return execute();
+    }
+  });
+  ownerNode.removeAttribute(node.nodeName);
+  (execute = function() {
+    ownerNode.innerHTML = '';
+    nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+    if (nodeValue === '')
       return;
-    if (isNull(route))
-      return Logger.log('Invalid url provided to the navigation method.');
-    route = trim(route);
-    var resolver = urlResolver(route);
-    var usehash = ifNullReturn(this.bouer.config.usehash, true);
-    var navigatoTo = (usehash ? resolver.hash : resolver.pathname).split('?')[0];
-    options = options || {};
-    // In case of: /about/me/, remove the last forward slash
-    if (navigatoTo[navigatoTo.length - 1] === '/')
-      navigatoTo = navigatoTo.substring(0, navigatoTo.length - 1);
-    var page = this.toPage(navigatoTo);
-    this.clear();
-    if (!page)
-      return; // Page Not Found or Page Not Defined
-    // If it's not found and the url matches .html do nothing
-    if (!page && route.endsWith('.html'))
-      return;
-    var componentElement = createAnyEl(page.name, function(el) {
-        // Inherit the data scope by default
-        el.setAttribute('data', isObject(options.data) ? JSON.stringify(options.data) : '$data');
-      }).appendTo(this.routeView)
+    var componentElement = createAnyEl(nodeValue)
+      .appendTo(ownerNode)
       .build();
-    // Document info configuration
-    DOM.title = page.title || DOM.title;
-    if (ifNullReturn(options.setURL, true))
-      this.pushState(resolver.href, DOM.title);
-    var routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route);
-    IoC.app(this.bouer).resolve(ComponentHandler)
-      .order(componentElement, this.bouer.data, function() {
-        _this.markActiveAnchorsWithRoute(routeToSet);
-      });
-  };
-  Routing.prototype.pushState = function(url, title) {
-    url = urlResolver(url).href;
-    if (DOM.location.href === url)
-      return;
-    WIN.history.pushState({
-      url: url,
-      title: title
-    }, (title || ''), url);
-  };
-  Routing.prototype.popState = function(times) {
-    if (isNull(times))
-      times = -1;
-    WIN.history.go(times);
-  };
-  Routing.prototype.toPage = function(url) {
-    // Default Page
-    if (url === '' || url === '/' ||
-      url === '/' + urlCombine((this.base, 'index.html'))) {
-      return this.defaultPage;
+    IoC.app(bouer).resolve(ComponentHandler)
+      .order(componentElement, data);
+  })();
+}
+
+function $if(opitons) {
+  var node = opitons.node,
+    binder = opitons.binder,
+    evaluator = opitons.evaluator,
+    compiler = opitons.compiler,
+    delimiter = opitons.delimiter,
+    context = opitons.context,
+    data = opitons.data;
+  var ownerNode = toOwnerNode(node);
+  var container = ownerNode.parentElement;
+  if (!container)
+    return;
+  var conditions = [];
+  var comment = createComment();
+  var nodeName = node.nodeName;
+  var execute = function() {};
+  if (nodeName === Constants.elseif || nodeName === Constants.else)
+    return;
+  var currentEl = ownerNode;
+  var reactives = [];
+  var _loop_1 = function() {
+    if (currentEl == null)
+      return "break";
+    var attr = findAttribute(currentEl, ['e-if', 'e-else-if', 'e-else']);
+    if (!attr)
+      return "break";
+    var firstCondition = conditions[0]; // if it already got an 'if',
+    if (attr.name === 'e-if' && firstCondition && (attr.name === firstCondition.attr.name))
+      return "break";
+    if ((attr.nodeName !== 'e-else') && (trim(ifNullReturn(attr.nodeValue, '')) === ''))
+      return {
+        value: Logger.error(errorMsgEmptyNode(attr))
+      };
+    if (delimiter.run(ifNullReturn(attr.nodeValue, '')).length !== 0)
+      return {
+        value: Logger.error(errorMsgNodeValue(attr))
+      };
+    conditions.push({
+      attr: attr,
+      node: currentEl
+    });
+    if (attr.nodeName === ('e-else')) {
+      currentEl.removeAttribute(attr.nodeName);
+      return "break";
     }
-    // Search for the right page
-    return IoC.app(this.bouer).resolve(ComponentHandler)
-      .find(function(component) {
-        if (!component.route)
-          return false;
-        var routeRegExp = component.route.replace(/{(.*?)}/gi, '[\\S\\s]{1,}');
-        if (Array.isArray(new RegExp('^' + routeRegExp + '$', 'i').exec(url)))
-          return true;
-        return false;
-      }) || this.notFoundPage;
+    // Listening to the property get only if the callback function is defined
+    ReactiveEvent.once('AfterGet', function(event) {
+      event.onemit = function(descriptor) {
+        // Avoiding multiple binding in the same property
+        if (reactives.findIndex(function(item) {
+            return item.descriptor.propName == descriptor.propName;
+          }) !== -1)
+          return;
+        reactives.push({
+          attr: attr,
+          descriptor: descriptor
+        });
+      };
+      evaluator.exec({
+        data: data,
+        code: attr.value,
+        context: context,
+      });
+    });
+    currentEl.removeAttribute(attr.nodeName);
   };
-  Routing.prototype.markActiveAnchorsWithRoute = function(route) {
-    var _this = this;
-    var className = this.bouer.config.activeClassName || 'active-link';
-    var appEl = ifNullStop(this.bouer.el);
-    var anchors = appEl.querySelectorAll('a');
-    if (isNull(route))
-      return;
-    // Removing the active mark
-    forEach(this.activeAnchors, function(anchor) {
-      return anchor.classList.remove(className);
+  do {
+    var state_1 = _loop_1();
+    if (typeof state_1 === "object")
+      return state_1.value;
+    if (state_1 === "break")
+      break;
+  } while (currentEl = currentEl.nextElementSibling);
+  var isChainConnected = function() {
+    return !isNull(Extend.array(conditions.map(function(x) {
+      return x.node;
+    }), comment).find(function(el) {
+      return el.isConnected;
+    }));
+  };
+  forEach(reactives, function(item) {
+    binder.binds.push({
+      // Binder is connected if at least one of the chain and the comment is still connected
+      isConnected: isChainConnected,
+      watch: item.descriptor.onChange(function() {
+        return execute();
+      }, item.attr)
     });
-    // Removing the active mark
-    forEach([].slice.call(appEl.querySelectorAll('a.' + className)), function(anchor) {
-      return anchor.classList.remove(className);
-    });
-    this.activeAnchors = [];
-    // Adding the className and storing all the active anchors
-    forEach(toArray(anchors), function(anchor) {
-      if (anchor.href.split('?')[0] !== route.split('?')[0])
+  });
+  (execute = function() {
+    forEach(conditions, function(chainItem) {
+      var element = getRootElement(chainItem.node);
+      if (!element.parentElement)
         return;
-      anchor.classList.add(className);
-      _this.activeAnchors.push(anchor);
+      if (comment.isConnected)
+        container.removeChild(element);
+      else
+        container.replaceChild(comment, element);
     });
-  };
-  Routing.prototype.markActiveAnchor = function(anchor) {
-    var className = this.bouer.config.activeClassName || 'active-link';
-    if (isNull(anchor))
-      return;
-    forEach(this.activeAnchors, function(anchor) {
-      return anchor.classList.remove(className);
+    var conditionalExpression = conditions.map(function(item, index) {
+      var $value = item.attr.value;
+      switch (item.attr.name) {
+        case Constants.if:
+          return 'if(' + $value + '){ __cb(' + index + '); }';
+        case Constants.elseif:
+          return 'else if(' + $value + '){ __cb(' + index + '); }';
+        case Constants.else:
+          return 'else{ __cb(' + index + '); }';
+      }
+    }).join(' ');
+    evaluator.exec({
+      data: data,
+      isReturn: false,
+      code: conditionalExpression,
+      context: context,
+      aditional: {
+        __cb: function(chainIndex) {
+          var mElement = conditions[chainIndex].node;
+          var element = getRootElement(mElement);
+          container.replaceChild(element, comment);
+          compiler.compile({
+            el: element,
+            data: data,
+            context: context,
+            isConnected: isChainConnected
+          });
+        }
+      }
     });
-    forEach([].slice.call(ifNullStop(this.bouer.el).querySelectorAll('a.' + className)), function(anchor) {
-      return anchor.classList.remove(className);
-    });
-    anchor.classList.add(className);
-    this.activeAnchors = [anchor];
-  };
-  Routing.prototype.clear = function() {
-    this.routeView.innerHTML = '';
-  };
-  /**
-   * Allow to configure the `Default Page` and `NotFound Page`
-   * @param {Component|IComponentOptions} component the component to be checked
-   */
-  Routing.prototype.configure = function(component) {
-    if (component.isDefault === true && !isNull(this.defaultPage))
-      return Logger.warn('There are multiple “Default Page” provided, check the “' + component.route + '” route.');
-    if (component.isNotFound === true && !isNull(this.notFoundPage))
-      return Logger.warn('There are multiple “NotFound Page” provided, check the “' + component.route + '” route.');
-    if (component.isDefault === true)
-      this.defaultPage = component;
-    if (component.isNotFound === true)
-      this.notFoundPage = component;
-  };
-  return Routing;
-}());
+  })();
+}
+
+function $show(opitons) {
+  var node = opitons.node,
+    binder = opitons.binder,
+    evaluator = opitons.evaluator,
+    delimiter = opitons.delimiter,
+    context = opitons.context,
+    data = opitons.data;
+  var ownerNode = toOwnerNode(node);
+  var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  var execute = function(el) {};
+  if (nodeValue === '')
+    return Logger.error(errorMsgEmptyNode(node));
+  if (delimiter.run(nodeValue).length !== 0)
+    return Logger.error(errorMsgNodeValue(node));
+  var bindResult = binder.create({
+    data: data,
+    node: node,
+    isConnected: function() {
+      return ownerNode.isConnected;
+    },
+    fields: [{
+      expression: nodeValue,
+      field: nodeValue
+    }],
+    context: context,
+    onUpdate: function() {
+      return execute(ownerNode);
+    }
+  });
+  (execute = function(element) {
+    element.style.display = evaluator.exec({
+      data: data,
+      code: nodeValue,
+      context: context,
+    }) ? '' : 'none';
+  })(ownerNode);
+  ownerNode.removeAttribute(bindResult.node.nodeName);
+}
+
+function custom(opitons) {
+  var node = opitons.node,
+    binder = opitons.binder,
+    delimiter = opitons.delimiter,
+    $custom = opitons.customDirectives,
+    context = opitons.context,
+    data = opitons.data;
+  var ownerNode = toOwnerNode(node);
+  var nodeName = node.nodeName;
+  var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  var delimiters = delimiter.run(nodeValue);
+  var $CustomDirective = $custom[nodeName];
+  var bindConfig = binder.create({
+    data: data,
+    node: node,
+    fields: delimiters,
+    isReplaceProperty: false,
+    context: context,
+    isConnected: function() {
+      return ownerNode.isConnected;
+    },
+    onUpdate: function() {
+      if (typeof $CustomDirective.onUpdate === 'function')
+        $CustomDirective.onUpdate(node, bindConfig);
+    }
+  });
+  if (ifNullReturn($CustomDirective.removable, true))
+    ownerNode.removeAttribute(nodeName);
+  var modifiers = nodeName.split('.');
+  modifiers.shift();
+  // my-custom-dir:arg.mod1.mod2
+  var argument = (nodeName.split(':')[1] || '').split('.')[0];
+  bindConfig.modifiers = modifiers;
+  bindConfig.argument = argument;
+  if (typeof $CustomDirective.onBind === 'function')
+    return ifNullReturn($CustomDirective.onBind(node, bindConfig), false);
+  return false;
+}
 var DataStore = /** @class */ (function() {
   function DataStore() {
     this._IRT_ = true;
@@ -2184,248 +2620,441 @@ var DataStore = /** @class */ (function() {
   };
   return DataStore;
 }());
-var Directive = /** @class */ (function() {
-  function Directive(customDirective, compiler, compilerContext) {
-    this._IRT_ = true;
-    this.$custom = {};
-    this.errorMsgEmptyNode = function(node) {
-      return ('Expected an expression in “' + node.nodeName +
-        '” and got an <empty string>.');
-    };
-    this.errorMsgNodeValue = function(node) {
-      return ('Expected an expression in “' + node.nodeName +
-        '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
-    };
-    this.compiler = compiler;
-    this.context = compilerContext;
-    this.bouer = compiler.bouer;
-    this.$custom = customDirective;
-    this.evaluator = IoC.app(this.bouer).resolve(Evaluator);
-    this.delimiter = IoC.app(this.bouer).resolve(DelimiterHandler);
-    this.binder = IoC.app(this.bouer).resolve(Binder);
-    this.eventHandler = IoC.app(this.bouer).resolve(EventHandler);
+
+function $data(opitons) {
+  var node = opitons.node,
+    bouer = opitons.bouer,
+    delimiter = opitons.delimiter,
+    context = opitons.context,
+    evaluator = opitons.evaluator,
+    compiler = opitons.compiler,
+    data = opitons.data;
+  var ownerNode = toOwnerNode(node);
+  var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  if (delimiter.run(nodeValue).length !== 0)
+    return Logger.error('The “data” attribute cannot contain delimiter.');
+  ownerNode.removeAttribute(node.nodeName);
+  var inputData = {};
+  var mData = Extend.obj(data, {
+    $data: data
+  });
+  var reactiveEvent = ReactiveEvent.on('AfterGet', function(descriptor) {
+    if (!(descriptor.propName in inputData))
+      inputData[descriptor.propName] = undefined;
+    Prop.set(inputData, descriptor.propName, descriptor);
+  });
+  // If data value is empty gets the main scope value
+  if (nodeValue === '')
+    inputData = Extend.obj(bouer.data);
+  else {
+    // Other wise, compiles the object provided
+    var mInputData_1 = evaluator.exec({
+      data: mData,
+      code: nodeValue,
+      context: context
+    });
+    if (!isObject(mInputData_1))
+      return Logger.error('Expected a valid Object Literal expression in “' + node.nodeName +
+        '” and got “' + nodeValue + '”.');
+    // Adding all non-existing properties
+    forEach(Object.keys(mInputData_1), function(key) {
+      if (!(key in inputData))
+        inputData[key] = mInputData_1[key];
+    });
   }
-  // Helper functions
-  Directive.prototype.toOwnerNode = function(node) {
-    return node.ownerElement || node.parentNode;
-  };
-  // Directives
-  Directive.prototype.skip = function(node) {
-    node.nodeValue = 'true';
-  };
-  Directive.prototype.if = function(node, data) {
-    var _this = this;
-    var ownerNode = this.toOwnerNode(node);
-    var container = ownerNode.parentElement;
-    if (!container)
+  ReactiveEvent.off('AfterGet', reactiveEvent.callback);
+  var dataKey = node.nodeName.split(':')[1];
+  if (dataKey) {
+    dataKey = dataKey.replace(/\[|\]/g, '');
+    IoC.app(bouer).resolve(DataStore).set('data', dataKey, inputData);
+  }
+  Reactive.transform({
+    context: context,
+    data: inputData
+  });
+  return compiler.compile({
+    data: inputData,
+    el: ownerNode,
+    context: context,
+  });
+}
+
+function $def(opitons) {
+  var node = opitons.node,
+    bouer = opitons.bouer,
+    delimiter = opitons.delimiter,
+    context = opitons.context,
+    evaluator = opitons.evaluator,
+    data = opitons.data;
+  var ownerNode = toOwnerNode(node);
+  var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  if (nodeValue === '')
+    return Logger.error(errorMsgEmptyNode(node));
+  if (delimiter.run(nodeValue).length !== 0)
+    return Logger.error(errorMsgNodeValue(node));
+  var inputData = {};
+  var reactiveEvent = ReactiveEvent.on('AfterGet', function(descriptor) {
+    if (!(descriptor.propName in inputData))
+      inputData[descriptor.propName] = undefined;
+    Prop.set(inputData, descriptor.propName, descriptor);
+  });
+  var mInputData = evaluator.exec({
+    data: data,
+    code: nodeValue,
+    context: context
+  });
+  if (!isObject(mInputData))
+    return Logger.error('Expected a valid Object Literal expression in “' + node.nodeName +
+      '” and got “' + nodeValue + '”.');
+  // Adding all non-existing properties
+  forEach(Object.keys(mInputData), function(key) {
+    if (!(key in inputData))
+      inputData[key] = mInputData[key];
+  });
+  ReactiveEvent.off('AfterGet', reactiveEvent.callback);
+  bouer.set(inputData, data);
+  ownerNode.removeAttribute(node.nodeName);
+}
+
+function $wait(options) {
+  var node = options.node,
+    bouer = options.bouer,
+    delimiter = options.delimiter,
+    compiler = options.compiler,
+    context = options.context;
+  var ownerNode = toOwnerNode(node);
+  var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  if (nodeValue === '')
+    return Logger.error(errorMsgEmptyNode(node));
+  if (delimiter.run(nodeValue).length !== 0)
+    return Logger.error(errorMsgNodeValue(node));
+  ownerNode.removeAttribute(node.nodeName);
+  var dataStore = IoC.app(bouer).resolve(DataStore);
+  var mWait = dataStore.wait[nodeValue];
+  if (mWait) {
+    mWait.nodes.push(ownerNode);
+    // No data exposed yet
+    if (!mWait.data)
       return;
-    var conditions = [];
-    var comment = createComment();
-    var nodeName = node.nodeName;
-    var execute = function() {};
-    if (nodeName === Constants.elseif || nodeName === Constants.else)
-      return;
-    var currentEl = ownerNode;
-    var reactives = [];
-    var _loop_1 = function() {
-      if (currentEl == null)
-        return "break";
-      var attr = findAttribute(currentEl, ['e-if', 'e-else-if', 'e-else']);
-      if (!attr)
-        return "break";
-      var firstCondition = conditions[0]; // if it already got an 'if',
-      if (attr.name === 'e-if' && firstCondition && (attr.name === firstCondition.attr.name))
-        return "break";
-      if ((attr.nodeName !== 'e-else') && (trim(ifNullReturn(attr.nodeValue, '')) === ''))
-        return {
-          value: Logger.error(this_1.errorMsgEmptyNode(attr))
-        };
-      if (this_1.delimiter.run(ifNullReturn(attr.nodeValue, '')).length !== 0)
-        return {
-          value: Logger.error(this_1.errorMsgNodeValue(attr))
-        };
-      conditions.push({
-        attr: attr,
-        node: currentEl
-      });
-      if (attr.nodeName === ('e-else')) {
-        currentEl.removeAttribute(attr.nodeName);
-        return "break";
-      }
-      // Listening to the property get only if the callback function is defined
-      ReactiveEvent.once('AfterGet', function(event) {
-        event.onemit = function(descriptor) {
-          // Avoiding multiple binding in the same property
-          if (reactives.findIndex(function(item) {
-              return item.descriptor.propName == descriptor.propName;
-            }) !== -1)
-            return;
-          reactives.push({
-            attr: attr,
-            descriptor: descriptor
-          });
-        };
-        _this.evaluator.exec({
-          data: data,
-          code: attr.value,
-          context: _this.context,
-        });
-      });
-      currentEl.removeAttribute(attr.nodeName);
-    };
-    var this_1 = this;
-    do {
-      var state_1 = _loop_1();
-      if (typeof state_1 === "object")
-        return state_1.value;
-      if (state_1 === "break")
-        break;
-    } while (currentEl = currentEl.nextElementSibling);
-    var isChainConnected = function() {
-      return !isNull(Extend.array(conditions.map(function(x) {
-        return x.node;
-      }), comment).find(function(el) {
-        return el.isConnected;
-      }));
-    };
-    forEach(reactives, function(item) {
-      _this.binder.binds.push({
-        // Binder is connected if at least one of the chain and the comment is still connected
-        isConnected: isChainConnected,
-        watch: item.descriptor.onChange(function() {
-          return execute();
-        }, item.attr)
+    // Compile all the waiting nodes
+    forEach(mWait.nodes, function(nodeWaiting) {
+      compiler.compile({
+        el: nodeWaiting,
+        context: mWait.context,
+        data: Reactive.transform({
+          context: mWait.context,
+          data: mWait.data
+        }),
       });
     });
-    (execute = function() {
-      forEach(conditions, function(chainItem) {
-        var element = getRootElement(chainItem.node);
-        if (!element.parentElement)
-          return;
-        if (comment.isConnected)
-          container.removeChild(element);
-        else
-          container.replaceChild(comment, element);
-      });
-      var conditionalExpression = conditions.map(function(item, index) {
-        var $value = item.attr.value;
-        switch (item.attr.name) {
-          case Constants.if:
-            return 'if(' + $value + '){ __cb(' + index + '); }';
-          case Constants.elseif:
-            return 'else if(' + $value + '){ __cb(' + index + '); }';
-          case Constants.else:
-            return 'else{ __cb(' + index + '); }';
-        }
-      }).join(' ');
-      _this.evaluator.exec({
-        data: data,
-        isReturn: false,
-        code: conditionalExpression,
-        context: _this.context,
-        aditional: {
-          __cb: function(chainIndex) {
-            var mElement = conditions[chainIndex].node;
-            var element = getRootElement(mElement);
-            container.replaceChild(element, comment);
-            _this.compiler.compile({
-              el: element,
-              data: data,
-              context: _this.context,
-              isConnected: isChainConnected
-            });
-          }
-        }
-      });
-    })();
+    if (ifNullReturn(mWait.once, false))
+      delete dataStore.wait[nodeValue];
+  }
+  return dataStore.wait[nodeValue] = {
+    nodes: [ownerNode],
+    context: context
   };
-  Directive.prototype.show = function(node, data) {
-    var _this = this;
-    var ownerNode = this.toOwnerNode(node);
-    var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-    var execute = function(el) {};
-    if (nodeValue === '')
-      return Logger.error(this.errorMsgEmptyNode(node));
-    if (this.delimiter.run(nodeValue).length !== 0)
-      return Logger.error(this.errorMsgNodeValue(node));
-    var bindResult = this.binder.create({
+}
+
+function $req(opitons) {
+  var node = opitons.node,
+    bouer = opitons.bouer,
+    delimiter = opitons.delimiter,
+    context = opitons.context,
+    compiler = opitons.compiler,
+    binder = opitons.binder,
+    eventHandler = opitons.eventHandler,
+    data = opitons.data;
+  var ownerNode = toOwnerNode(node);
+  var container = toOwnerNode(ownerNode);
+  var nodeName = node.nodeName;
+  var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  if (!nodeValue.includes(' of ') && !nodeValue.includes(' as '))
+    return Logger.error(('Expected a valid “for” expression in “' + nodeName +
+      '” and got “' + nodeValue + '”.' + '\nValid: e-req="item of url".'));
+  if (ownerNode.hasAttribute('skeleton-cloned'))
+    return;
+  var delimiters = delimiter.run(nodeValue);
+  var localDataStore = {};
+  var dataKey = (node.nodeName.split(':')[1] || '').replace(/\[|\]/g, '');
+  var comment = createComment(undefined, 'request-' + (dataKey || code(6)));
+  var onInsertOrUpdate = function() {};
+  var onUpdate = function() {};
+  var binderConfig = {
+    node: node,
+    data: data,
+    nodeName: nodeName,
+    nodeValue: nodeValue,
+    fields: delimiters,
+    parent: ownerNode,
+    value: nodeValue,
+  };
+  // Inserting the comment node
+  container.insertBefore(comment, ownerNode);
+  var skeleton = IoC.app(bouer).resolve(Skeleton);
+  // Only insert if the type is `of
+  if (nodeValue.includes(' of '))
+    skeleton.insertItems(ownerNode);
+  if (delimiters.length !== 0)
+    binderConfig = binder.create({
       data: data,
       node: node,
+      fields: delimiters,
+      context: context,
+      isReplaceProperty: false,
       isConnected: function() {
-        return ownerNode.isConnected;
+        return comment.isConnected;
       },
-      fields: [{
-        expression: nodeValue,
-        field: nodeValue
-      }],
-      context: this.context,
       onUpdate: function() {
-        return execute(ownerNode);
+        return onUpdate();
       }
     });
-    (execute = function(element) {
-      element.style.display = _this.evaluator.exec({
-        data: data,
-        code: nodeValue,
-        context: _this.context,
-      }) ? '' : 'none';
-    })(ownerNode);
-    ownerNode.removeAttribute(bindResult.node.nodeName);
+  ownerNode.removeAttribute(node.nodeName);
+  // Mutating the `isConnected` property of the e-req node
+  Prop.set(ownerNode, 'isConnected', {
+    get: function() {
+      return comment.isConnected;
+    }
+  });
+  var subcribeEvent = function(eventName) {
+    var attr = ownerNode.attributes.getNamedItem(Constants.on + eventName);
+    if (attr)
+      eventHandler.compile(attr, data, context);
+    return {
+      emit: function(detailObj) {
+        eventHandler.emit({
+          attachedNode: ownerNode,
+          eventName: eventName,
+          init: {
+            detail: detailObj
+          },
+        });
+      }
+    };
   };
-  Directive.prototype.for = function(node, data) {
-    var _this = this;
-    var ownerNode = this.toOwnerNode(node);
-    var container = ownerNode.parentElement;
-    if (!container)
+  var builder = function(expression) {
+    var filters = expression.split('|').map(function(item) {
+      return trim(item);
+    });
+    // Removing and retrieving the Request Expression
+    var reqExpression = filters.shift().replace(/\(|\)/g, '');
+    var reqSeparator = ' of ';
+    var reqParts = reqExpression.split(reqSeparator);
+    if (!(reqParts.length > 1))
+      reqParts = reqExpression.split(reqSeparator = ' as ');
+    return {
+      filters: filters,
+      type: trim(reqSeparator),
+      expression: trim(reqExpression),
+      variables: trim(reqParts[0]),
+      path: trim(reqParts[1])
+    };
+  };
+  var isValidResponse = function(response, requestType) {
+    if (!response) {
+      Logger.error(('the return must be an object containing “data” property. ' +
+        'Example: { data: {} | [] }'));
+      return false;
+    }
+    if (!('data' in response)) {
+      Logger.error(('the return must contain the “data” property. Example: { data: {} | [] }'));
+      return false;
+    }
+    if ((requestType === 'of' && !Array.isArray(response.data))) {
+      Logger.error(('Using e-req="... “of” ..." the response must be a list of items, and got ' +
+        '“' + typeof response.data + '”.'));
+      return false;
+    }
+    if ((requestType === 'as' && !(typeof response.data === 'object'))) {
+      Logger.error(('Using e-req="... “as” ..." the response must be a list of items, and got ' +
+        '“' + typeof response.data + '”.'));
+      return false;
+    }
+    return true;
+  };
+  var middleware = IoC.app(bouer).resolve(Middleware);
+  if (!middleware.has('req'))
+    return Logger.error('There is no “req” middleware provided for the “e-req” directive requests.');
+  var createMiddlewareContext = function(expObject) {
+    return {
+      binder: binderConfig,
+      detail: {
+        requestType: expObject.type,
+        requestPath: expObject.path,
+        reponseData: localDataStore
+      }
+    };
+  };
+  (onInsertOrUpdate = function() {
+    var expObject = builder(trim(node.nodeValue || ''));
+    var responseHandler = function(response) {
+      var _a;
+      if (!isValidResponse(response, expObject.type))
+        return;
+      Reactive.transform({
+        context: context,
+        data: response
+      });
+      if (dataKey)
+        IoC.app(bouer).resolve(DataStore).set('req', dataKey, response);
+      subcribeEvent(Constants.builtInEvents.response).emit({
+        response: response
+      });
+      // Handle Content Insert/Update
+      if (!('data' in localDataStore)) {
+        // Store the data
+        localDataStore.data = undefined;
+        Prop.transfer(localDataStore, response, 'data');
+      } else {
+        // Update de local data
+        return localDataStore.data = response.data;
+      }
+      if (expObject.type === 'as') {
+        // Removing the: “(...)”  “,”  and getting only the variable
+        var variable = trim(expObject.variables.split(',')[0].replace(/\(|\)/g, ''));
+        if (variable in data)
+          return Logger.error('There is already a “' + variable + '” defined in the current scope. ' +
+            'Provide another variable name in order to continue.');
+        data[variable] = response.data;
+        return compiler.compile({
+          el: ownerNode,
+          data: Reactive.transform({
+            context: context,
+            data: data
+          }),
+          context: context,
+          isConnected: function() {
+            return comment.isConnected;
+          }
+        });
+      }
+      if (expObject.type === 'of') {
+        skeleton.clearItems(ownerNode);
+        var resUniqueName = code(8, 'res');
+        var forDirectiveContent = expObject.expression.replace(expObject.path, resUniqueName);
+        var mData = Extend.obj((_a = {}, _a[resUniqueName] = response.data, _a), data);
+        ownerNode.setAttribute(Constants.for, Extend.array([forDirectiveContent], expObject.filters).join(' | '));
+        Prop.set(mData, resUniqueName, Prop.descriptor(response, 'data'));
+        return compiler.compile({
+          el: ownerNode,
+          data: mData,
+          context: context,
+          isConnected: function() {
+            return comment.isConnected;
+          }
+        });
+      }
+    };
+    subcribeEvent(Constants.builtInEvents.request).emit();
+    middleware.run('req', {
+      type: 'onBind',
+      action: function(middlewareRequest) {
+        middlewareRequest(createMiddlewareContext(expObject), {
+          success: function(response) {
+            responseHandler(response);
+          },
+          fail: function(error) {
+            return subcribeEvent(Constants.builtInEvents.fail).emit({
+              error: error
+            });
+          },
+          done: function() {
+            return subcribeEvent(Constants.builtInEvents.done).emit();
+          }
+        });
+      }
+    });
+  })();
+  onUpdate = function() {
+    var expObject = builder(trim(node.nodeValue || ''));
+    middleware.run('req', {
+      type: 'onUpdate',
+      default: function() {
+        return onInsertOrUpdate();
+      },
+      action: function(middlewareRequest) {
+        middlewareRequest(createMiddlewareContext(expObject), {
+          success: function(response) {
+            if (!isValidResponse(response, expObject.type))
+              return;
+            localDataStore.data = response.data;
+          },
+          fail: function(error) {
+            return subcribeEvent(Constants.builtInEvents.fail).emit({
+              error: error
+            });
+          },
+          done: function() {
+            return subcribeEvent(Constants.builtInEvents.done).emit();
+          }
+        });
+      }
+    });
+  };
+}
+
+function $for(opitons) {
+  var node = opitons.node,
+    binder = opitons.binder,
+    evaluator = opitons.evaluator,
+    compiler = opitons.compiler,
+    eventHandler = opitons.eventHandler,
+    delimiter = opitons.delimiter,
+    context = opitons.context,
+    data = opitons.data; {
+    var ownerNode = toOwnerNode(node);
+    var container_1 = ownerNode.parentElement;
+    if (!container_1)
       return;
     if (ownerNode.hasAttribute('skeleton-cloned'))
       return;
-    var comment = createComment();
-    var nodeName = node.nodeName;
-    var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-    var listedItemsHandler = [];
-    var hasWhereFilter = false;
-    var hasOrderFilter = false;
-    var execute = function() {};
-    if (nodeValue === '')
-      return Logger.error(this.errorMsgEmptyNode(node));
-    if (!nodeValue.includes(' of ') && !nodeValue.includes(' in '))
-      return Logger.error('Expected a valid “for” expression in “' + nodeName + '” and got “' + nodeValue + '”.' +
-        '\nValid: e-for="item of items".');
+    var comment_1 = createComment();
+    var nodeName_1 = node.nodeName;
+    var nodeValue_1 = trim(ifNullReturn(node.nodeValue, ''));
+    var listedItemsHandler_1 = [];
+    var hasWhereFilter_1 = false;
+    var hasOrderFilter_1 = false;
+    var execute_1 = function() {};
+    if (nodeValue_1 === '')
+      return Logger.error(errorMsgEmptyNode(node));
+    if (!nodeValue_1.includes(' of ') && !nodeValue_1.includes(' in '))
+      return Logger.error('Expected a valid “for” expression in “' +
+        nodeName_1 + '” and got “' + nodeValue_1 +
+        '”.' + '\nValid: e-for="item of items".');
     // Binding the e-for if got delimiters
-    var delimiters = this.delimiter.run(nodeValue);
+    var delimiters = delimiter.run(nodeValue_1);
     if (delimiters.length !== 0)
-      this.binder.create({
+      binder.create({
         node: node,
         data: data,
         fields: delimiters,
         isReplaceProperty: true,
-        context: this.context,
+        context: context,
         isConnected: function() {
-          return comment.isConnected;
+          return comment_1.isConnected;
         },
         onUpdate: function() {
-          return execute();
+          return execute_1();
         }
       });
-    ownerNode.removeAttribute(nodeName);
+    ownerNode.removeAttribute(nodeName_1);
     // Cloning the element
-    var forItem = ownerNode.cloneNode(true);
+    var forItem_1 = ownerNode.cloneNode(true);
     // Replacing the comment reference
-    container.replaceChild(comment, ownerNode);
+    container_1.replaceChild(comment_1, ownerNode);
     // Filters the list of items
-    var $Where = function(list, filterConfigParts) {
-      hasWhereFilter = true;
+    var $Where_1 = function(list, filterConfigParts) {
+      hasWhereFilter_1 = true;
       var wKeys = filterConfigParts[2];
       var wValue = filterConfigParts[1];
       if (isNull(wValue) || wValue === '') {
-        Logger.error('Invalid where-value in “' + nodeName + '” with “' + nodeValue + '” expression.');
+        Logger.error('Invalid where-value in “' + nodeName_1 + '” with “' + nodeValue_1 + '” expression.');
         return list;
       }
-      wValue = _this.evaluator.exec({
+      wValue = evaluator.exec({
         data: data,
         code: wValue,
-        context: _this.context
+        context: context
       });
       // where:filterFunction
       if (typeof wValue === 'function') {
@@ -2433,7 +3062,7 @@ var Directive = /** @class */ (function() {
       } else {
         // where:search:name?
         if ((isNull(wKeys) || wKeys === '') && isObject(list[0] || '')) {
-          Logger.error(('Invalid where-keys in “' + nodeName + '” with “' + nodeValue + '” expression, ' +
+          Logger.error(('Invalid where-keys in “' + nodeName_1 + '” with “' + nodeValue_1 + '” expression, ' +
             'at least one where-key to be provided when using list of object.'));
           return list;
         }
@@ -2448,10 +3077,10 @@ var Directive = /** @class */ (function() {
             });
             for (var i = 0; i < keysList.length; i++) {
               var prop = keysList[i];
-              var propValue = _this.evaluator.exec({
+              var propValue = evaluator.exec({
                 data: item,
                 code: prop,
-                context: _this.context
+                context: context
               });
               if (toStr(propValue).toLowerCase().includes(wValue.toLowerCase())) {
                 isValid = true;
@@ -2467,8 +3096,8 @@ var Directive = /** @class */ (function() {
       return list;
     };
     // Order the list of items
-    var $Order = function(list, type, prop) {
-      hasOrderFilter = true;
+    var $Order_1 = function(list, type, prop) {
+      hasOrderFilter_1 = true;
       if (!type)
         type = 'asc';
       return list.sort(function(a, b) {
@@ -2481,7 +3110,7 @@ var Directive = /** @class */ (function() {
             case 'desc':
               return desc ? -1 : 1;
             default:
-              Logger.log('The “' + type + '” order type is invalid: “' + nodeValue +
+              Logger.log('The “' + type + '” order type is invalid: “' + nodeValue_1 +
                 '”. Available types are: “asc”  for order ascendent and “desc” for order descendent.');
               return 0;
           }
@@ -2492,11 +3121,11 @@ var Directive = /** @class */ (function() {
       });
     };
     // Prepare the item before to insert
-    var $PrepareForItem = function(item, index) {
-      expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
-      var leftHandParts = expObj.leftHandParts;
-      var sourceValue = expObj.sourceValue;
-      var isForOf = expObj.isForOf;
+    var $PrepareForItem_1 = function(item, index) {
+      expObj_1 = expObj_1 || $ExpressionBuilder_1(trim(ifNullReturn(node.nodeValue, '')));
+      var leftHandParts = expObj_1.leftHandParts;
+      var sourceValue = expObj_1.sourceValue;
+      var isForOf = expObj_1.isForOf;
       var forData = Extend.obj(data);
       var itemKey = leftHandParts[0];
       var indexOrValue = leftHandParts[1] || '_index_or_value';
@@ -2506,22 +3135,22 @@ var Directive = /** @class */ (function() {
       forData[mIndex] = index;
       return Reactive.transform({
         data: forData,
-        context: _this.context
+        context: context
       });
     };
     // Inserts an element in the DOM
-    var $InsertForItem = function(options) {
+    var $InsertForItem_1 = function(options) {
       // Preparing the data to be inserted
-      var forData = $PrepareForItem(options.item, options.index);
+      var forData = $PrepareForItem_1(options.item, options.index);
       // Inserting in the DOM
-      var forClonedItem = container.insertBefore(forItem.cloneNode(true), options.reference || comment);
+      var forClonedItem = container_1.insertBefore(forItem_1.cloneNode(true), options.reference || comment_1);
       // Compiling the inserted data
-      _this.compiler.compile({
+      compiler.compile({
         el: forClonedItem,
         data: forData,
-        context: _this.context,
+        context: context,
         onDone: function(el) {
-          return _this.eventHandler.emit({
+          return eventHandler.emit({
             eventName: Constants.builtInEvents.add,
             attachedNode: el,
             once: true
@@ -2529,23 +3158,23 @@ var Directive = /** @class */ (function() {
         }
       });
       // Updating the handler
-      listedItemsHandler.splice(options.index, 0, {
+      listedItemsHandler_1.splice(options.index, 0, {
         el: forClonedItem,
         data: forData
       });
       return forClonedItem;
     };
     // Builds the expression to an object
-    var $ExpressionBuilder = function(expression) {
+    var $ExpressionBuilder_1 = function(expression) {
       var filters = expression.split('|').map(function(item) {
         return trim(item);
       });
       var forExpression = filters[0].replace(/\(|\)/g, '');
       filters.shift();
       // for types:
-      // e-for="item of items",  e-for="(item, index) of items"
-      // e-for="key in object", e-for="(key, value) in object"
-      // e-for="(key, value, index) in object"
+      // e-for='item of items',  e-for='(item, index) of items'
+      // e-for='key in object', e-for='(key, value) in object'
+      // e-for='(key, value, index) in object'
       var forSeparator = ' of ';
       var forParts = forExpression.split(forSeparator);
       if (!(forParts.length > 1))
@@ -2557,10 +3186,10 @@ var Directive = /** @class */ (function() {
       });
       var isForOf = trim(forSeparator) === 'of';
       var iterable = isForOf ? rightHand : 'Object.keys(' + rightHand + ')';
-      var sourceValue = _this.evaluator.exec({
+      var sourceValue = evaluator.exec({
         data: data,
         code: rightHand,
-        context: _this.context
+        context: context
       });
       return {
         filters: filters,
@@ -2574,19 +3203,19 @@ var Directive = /** @class */ (function() {
       };
     };
     // Handler the UI when the Array changes
-    var $OnArrayChanges = function(detail) {
-      if (hasWhereFilter || hasOrderFilter)
-        return execute(); // Reorganize re-insert all the items
+    var $OnArrayChanges_1 = function(detail) {
+      if (hasWhereFilter_1 || hasOrderFilter_1)
+        return execute_1(); // Reorganize re-insert all the items
       detail = detail || {};
       var method = detail.method;
       var args = detail.args;
-      var mListedItems = listedItemsHandler;
+      var mListedItems = listedItemsHandler_1;
       var reOrganizeIndexes = function() {
         // In case of unshift re-organize the indexes
         // Was wrapped into a promise in case of large amount of data
         return Promise.resolve(function(array) {
-          expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
-          var leftHandParts = expObj.leftHandParts;
+          expObj_1 = expObj_1 || $ExpressionBuilder_1(trim(ifNullReturn(node.nodeValue, '')));
+          var leftHandParts = expObj_1.leftHandParts;
           var indexOrValue = leftHandParts[1] || '_index_or_value';
           if (indexOrValue === '_index_or_value')
             return;
@@ -2594,7 +3223,7 @@ var Directive = /** @class */ (function() {
             item.data[indexOrValue] = index;
           });
         }).then(function(mCaller) {
-          return mCaller(listedItemsHandler);
+          return mCaller(listedItemsHandler_1);
         });
       };
       switch (method) {
@@ -2615,16 +3244,16 @@ var Directive = /** @class */ (function() {
           forEach(removedItems, function(item) {
             return removeEl(getRootElement(item.el));
           });
-          expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
-          var leftHandParts = expObj.leftHandParts;
+          expObj_1 = expObj_1 || $ExpressionBuilder_1(trim(ifNullReturn(node.nodeValue, '')));
+          var leftHandParts = expObj_1.leftHandParts;
           var indexOrValue = leftHandParts[1] || '_index_or_value';
           var insertArgs = [].slice.call(args, 2);
           // Adding the items to the dom
           forEach(insertArgs, function(item) {
             index_1++;
-            $InsertForItem({
+            $InsertForItem_1({
               // Getting the next reference
-              reference: getRootElement(listedItemsHandler[index_1].el) || comment,
+              reference: getRootElement(listedItemsHandler_1[index_1].el) || comment_1,
               index: index_1,
               item: item,
             });
@@ -2632,8 +3261,8 @@ var Directive = /** @class */ (function() {
           if (indexOrValue === '_index_or_value')
             return;
           // Fixing the index value
-          for (; index_1 < listedItemsHandler.length; index_1++) {
-            var item = listedItemsHandler[index_1].data;
+          for (; index_1 < listedItemsHandler_1.length; index_1++) {
+            var item = listedItemsHandler_1[index_1].data;
             if (typeof item[indexOrValue] === 'number')
               item[indexOrValue] = index_1;
           }
@@ -2643,12 +3272,12 @@ var Directive = /** @class */ (function() {
         case 'unshift': { // Addition handler
           // Gets the last item as default
           var isUnshift_1 = method == 'unshift';
-          var element = (listedItemsHandler[0] || {}).el || comment;
+          var element = (listedItemsHandler_1[0] || {}).el || comment_1;
           var indexRef_1 = isUnshift_1 ? 0 : mListedItems.length;
-          var reference_1 = isUnshift_1 ? getRootElement(element) : comment;
+          var reference_1 = isUnshift_1 ? getRootElement(element) : comment_1;
           // Adding the items to the dom
           forEach([].slice.call(args), function(item) {
-            var ref = $InsertForItem({
+            var ref = $InsertForItem_1({
               index: indexRef_1++,
               reference: reference_1,
               item: item,
@@ -2661,65 +3290,65 @@ var Directive = /** @class */ (function() {
           return;
         }
         default:
-          return execute();
+          return execute_1();
       }
     };
-    var applyWhere = function(listCopy, config) {
+    var applyWhere_1 = function(listCopy, config) {
       var parts = config.split(':').map(function(item) {
         return trim(item);
       });
       if (parts.length == 1) {
-        Logger.error(('Invalid “' + nodeName + '” where expression “' + nodeValue +
+        Logger.error(('Invalid “' + nodeName_1 + '” where expression “' + nodeValue_1 +
           '”, at least a where-value and where-keys, or a filter-function must be provided'));
       } else {
-        return $Where(listCopy, parts);
+        return $Where_1(listCopy, parts);
       }
     };
     var reactivePropertyEvent = ReactiveEvent.on('AfterGet', function(descriptor) {
-      _this.binder.binds.push({
+      binder.binds.push({
         isConnected: function() {
-          return comment.isConnected;
+          return comment_1.isConnected;
         },
         watch: descriptor.onChange(function(_n, _o, detail) {
-          return $OnArrayChanges(detail);
+          return $OnArrayChanges_1(detail);
         }, node)
       });
     });
-    var expObj = $ExpressionBuilder(nodeValue);
-    var filters = expObj.filters;
-    var findFilter = function(fName) {
-      return filters.filter(function(item) {
+    var expObj_1 = $ExpressionBuilder_1(nodeValue_1);
+    var filters_1 = expObj_1.filters;
+    var findFilter_1 = function(fName) {
+      return filters_1.filter(function(item) {
         return item.substring(0, fName.length) === fName;
       });
     };
-    var whereFilterConfigs = findFilter('where');
+    var whereFilterConfigs_1 = findFilter_1('where');
     // Applying the filter before rendering the items
-    forEach(whereFilterConfigs, function(config) {
-      return applyWhere(expObj.sourceValue, config);
+    forEach(whereFilterConfigs_1, function(config) {
+      return applyWhere_1(expObj_1.sourceValue, config);
     });
     reactivePropertyEvent.off();
-    (execute = function() {
-      expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
-      var iterable = expObj.iterableExpression;
-      var orderFilterConfigs = findFilter('order');
+    (execute_1 = function() {
+      expObj_1 = expObj_1 || $ExpressionBuilder_1(trim(ifNullReturn(node.nodeValue, '')));
+      var iterable = expObj_1.iterableExpression;
+      var orderFilterConfigs = findFilter_1('order');
       // Cleaning the existing items
-      forEach(listedItemsHandler, function(item) {
+      forEach(listedItemsHandler_1, function(item) {
         var element = getRootElement(item.el);
         if (!element.parentElement)
           return;
-        container.removeChild(element);
+        container_1.removeChild(element);
       });
-      listedItemsHandler = [];
-      _this.evaluator.exec({
+      listedItemsHandler_1 = [];
+      evaluator.exec({
         data: data,
         isReturn: false,
-        context: _this.context,
+        context: context,
         code: 'var __e = __each, __fl = __filters, __f = __for; ' +
           '__f(__fl(' + iterable + '), function($$itm, $$idx) { __e($$itm, $$idx); })',
         aditional: {
           __for: forEach,
           __each: function(item, index) {
-            return $InsertForItem({
+            return $InsertForItem_1({
               index: index,
               item: item
             });
@@ -2727,8 +3356,8 @@ var Directive = /** @class */ (function() {
           __filters: function(list) {
             var listCopy = Extend.array(list);
             // applying where:
-            forEach(whereFilterConfigs, function(config) {
-              return listCopy = applyWhere(listCopy, config);
+            forEach(whereFilterConfigs_1, function(config) {
+              return listCopy = applyWhere_1(listCopy, config);
             });
             // applying order:
             var applyOrder = function(config) {
@@ -2736,10 +3365,10 @@ var Directive = /** @class */ (function() {
                 return trim(item);
               });
               if (parts.length == 1) {
-                Logger.error(('Invalid “' + nodeName + '” order  expression “' + nodeValue +
+                Logger.error(('Invalid “' + nodeName_1 + '” order  expression “' + nodeValue_1 +
                   '”, at least the order type must be provided'));
               } else {
-                listCopy = $Order(listCopy, parts[1], parts[2]);
+                listCopy = $Order_1(listCopy, parts[1], parts[2]);
               }
             };
             forEach(orderFilterConfigs, function(config) {
@@ -2749,576 +3378,200 @@ var Directive = /** @class */ (function() {
           }
         }
       });
-      expObj = null;
+      expObj_1 = null;
     })();
-  };
-  Directive.prototype.def = function(node, data) {
-    var ownerNode = this.toOwnerNode(node);
-    var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-    if (nodeValue === '')
-      return Logger.error(this.errorMsgEmptyNode(node));
-    if (this.delimiter.run(nodeValue).length !== 0)
-      return Logger.error(this.errorMsgNodeValue(node));
-    var inputData = {};
-    var reactiveEvent = ReactiveEvent.on('AfterGet', function(descriptor) {
-      if (!(descriptor.propName in inputData))
-        inputData[descriptor.propName] = undefined;
-      Prop.set(inputData, descriptor.propName, descriptor);
+  }
+}
+
+function $skeleton(opitons) {
+  var _a;
+  var node = opitons.node,
+    bouer = opitons.bouer;
+  var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  if (nodeValue !== '')
+    return;
+  var ownerNode = toOwnerNode(node);
+  ownerNode.removeAttribute(node.nodeName);
+  var uid = ownerNode.getAttribute('skeleton-clone-code');
+  if (!uid)
+    return;
+  ownerNode.removeAttribute('skeleton-clone-code');
+  forEach([].slice.call((_a = bouer.el) === null || _a === void 0 ? void 0 : _a.querySelectorAll('[="' + uid + '"]')), function(el) {
+    (el.parentElement || el.parentNode).removeChild(el);
+  });
+}
+
+function $skip(options) {
+  var node = options.node;
+  node.nodeValue = 'true';
+}
+var Directive = /** @class */ (function() {
+  function Directive(compiler, customDirective, compilerContext) {
+    this._IRT_ = true;
+    this.customDirectives = {};
+    this.compiler = compiler;
+    this.context = compilerContext;
+    this.bouer = compiler.bouer;
+    this.customDirectives = customDirective;
+    this.evaluator = IoC.app(this.bouer).resolve(Evaluator);
+    this.delimiter = IoC.app(this.bouer).resolve(DelimiterHandler);
+    this.binder = IoC.app(this.bouer).resolve(Binder);
+    this.eventHandler = IoC.app(this.bouer).resolve(EventHandler);
+  }
+  // Directives
+  Directive.prototype.skip = function(node) {
+    return $skip({
+      node: node
     });
-    var mInputData = this.evaluator.exec({
-      data: data,
-      code: nodeValue,
-      context: this.context
-    });
-    if (!isObject(mInputData))
-      return Logger.error('Expected a valid Object Literal expression in “' + node.nodeName +
-        '” and got “' + nodeValue + '”.');
-    // Adding all non-existing properties
-    forEach(Object.keys(mInputData), function(key) {
-      if (!(key in inputData))
-        inputData[key] = mInputData[key];
-    });
-    ReactiveEvent.off('AfterGet', reactiveEvent.callback);
-    this.bouer.set(inputData, data);
-    ownerNode.removeAttribute(node.nodeName);
   };
-  Directive.prototype.text = function(node) {
-    var ownerNode = this.toOwnerNode(node);
-    var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-    if (nodeValue === '')
-      return Logger.error(this.errorMsgEmptyNode(node));
-    ownerNode.textContent = nodeValue;
-    ownerNode.removeAttribute(node.nodeName);
-  };
-  Directive.prototype.bind = function(node, data) {
-    var ownerNode = this.toOwnerNode(node);
-    var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-    if (nodeValue === '')
-      return Logger.error(this.errorMsgEmptyNode(node));
-    if (this.delimiter.run(nodeValue).length !== 0)
-      return Logger.error(this.errorMsgNodeValue(node));
-    this.binder.create({
-      node: node,
-      isConnected: function() {
-        return ownerNode.isConnected;
-      },
-      fields: [{
-        field: nodeValue,
-        expression: nodeValue
-      }],
+  Directive.prototype.if = function(node, data) {
+    return $if({
+      binder: this.binder,
+      compiler: this.compiler,
       context: this.context,
+      delimiter: this.delimiter,
+      evaluator: this.evaluator,
+      data: data,
+      node: node
+    });
+  };
+  Directive.prototype.show = function(node, data) {
+    return $show({
+      binder: this.binder,
+      evaluator: this.evaluator,
+      delimiter: this.delimiter,
+      context: this.context,
+      node: node,
       data: data
     });
-    ownerNode.removeAttribute(node.nodeName);
+  };
+  Directive.prototype.for = function(node, data) {
+    return $for({
+      binder: this.binder,
+      compiler: this.compiler,
+      context: this.context,
+      delimiter: this.delimiter,
+      evaluator: this.evaluator,
+      eventHandler: this.eventHandler,
+      data: data,
+      node: node
+    });
+  };
+  Directive.prototype.def = function(node, data) {
+    return $def({
+      bouer: this.bouer,
+      context: this.context,
+      delimiter: this.delimiter,
+      evaluator: this.evaluator,
+      data: data,
+      node: node
+    });
+  };
+  Directive.prototype.text = function(node) {
+    return $text({
+      node: node
+    });
+  };
+  Directive.prototype.bind = function(node, data) {
+    return $bind({
+      binder: this.binder,
+      context: this.context,
+      delimiter: this.delimiter,
+      data: data,
+      node: node
+    });
   };
   Directive.prototype.property = function(node, data) {
-    var _this = this;
-    var ownerNode = this.toOwnerNode(node);
-    var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-    var execute = function(obj) {};
-    var errorInvalidValue = function(node) {
-      return ('Invalid value, expected an Object/Object Literal in “' +
-        node.nodeName + '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
-    };
-    if (nodeValue === '')
-      return Logger.error(errorInvalidValue(node));
-    if (this.delimiter.run(nodeValue).length !== 0)
-      return;
-    var inputData = this.evaluator.exec({
-      data: data,
-      code: nodeValue,
-      context: this.context
-    });
-    if (!isObject(inputData))
-      return Logger.error(errorInvalidValue(node));
-    this.binder.create({
-      data: data,
-      node: node,
-      isReplaceProperty: false,
+    return $property({
+      binder: this.binder,
       context: this.context,
-      fields: [{
-        expression: nodeValue,
-        field: nodeValue
-      }],
-      isConnected: function() {
-        return ownerNode.isConnected;
-      },
-      onUpdate: function() {
-        return execute(_this.evaluator.exec({
-          data: data,
-          code: nodeValue,
-          context: _this.context
-        }));
-      }
+      delimiter: this.delimiter,
+      evaluator: this.evaluator,
+      node: node,
+      data: data
     });
-    ownerNode.removeAttribute(node.nodeName);
-    (execute = function(obj) {
-      var attrNameToSet = node.nodeName.substring(Constants.property.length);
-      var attr = ownerNode.attributes[attrNameToSet];
-      if (!attr) {
-        (ownerNode.setAttribute(attrNameToSet, ''));
-        attr = ownerNode.attributes[attrNameToSet];
-      }
-      forEach(Object.keys(obj), function(key) {
-        /* if has a falsy value remove the key */
-        if (!obj[key])
-          return attr.value = trim(attr.value.replace(key, ''));
-        attr.value = (attr.value.includes(key) ? attr.value : trim(attr.value + ' ' + key));
-      });
-      if (attr.value === '')
-        return ownerNode.removeAttribute(attrNameToSet);
-    })(inputData);
   };
   Directive.prototype.data = function(node, data) {
-    var ownerNode = this.toOwnerNode(node);
-    var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-    if (this.delimiter.run(nodeValue).length !== 0)
-      return Logger.error('The “data” attribute cannot contain delimiter.');
-    ownerNode.removeAttribute(node.nodeName);
-    var inputData = {};
-    var mData = Extend.obj(data, {
-      $data: data
-    });
-    var reactiveEvent = ReactiveEvent.on('AfterGet', function(descriptor) {
-      if (!(descriptor.propName in inputData))
-        inputData[descriptor.propName] = undefined;
-      Prop.set(inputData, descriptor.propName, descriptor);
-    });
-    // If data value is empty gets the main scope value
-    if (nodeValue === '')
-      inputData = Extend.obj(this.bouer.data);
-    else {
-      // Other wise, compiles the object provided
-      var mInputData_1 = this.evaluator.exec({
-        data: mData,
-        code: nodeValue,
-        context: this.context
-      });
-      if (!isObject(mInputData_1))
-        return Logger.error('Expected a valid Object Literal expression in “' + node.nodeName +
-          '” and got “' + nodeValue + '”.');
-      // Adding all non-existing properties
-      forEach(Object.keys(mInputData_1), function(key) {
-        if (!(key in inputData))
-          inputData[key] = mInputData_1[key];
-      });
-    }
-    ReactiveEvent.off('AfterGet', reactiveEvent.callback);
-    var dataKey = node.nodeName.split(':')[1];
-    if (dataKey) {
-      dataKey = dataKey.replace(/\[|\]/g, '');
-      IoC.app(this.bouer).resolve(DataStore).set('data', dataKey, inputData);
-    }
-    Reactive.transform({
+    return $data({
+      bouer: this.bouer,
+      compiler: this.compiler,
+      delimiter: this.delimiter,
+      evaluator: this.evaluator,
       context: this.context,
-      data: inputData
-    });
-    return this.compiler.compile({
-      data: inputData,
-      el: ownerNode,
-      context: this.context,
+      node: node,
+      data: data
     });
   };
   Directive.prototype.href = function(node, data) {
-    var _this = this;
-    var ownerNode = this.toOwnerNode(node);
-    var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-    if (nodeValue === '')
-      return Logger.error(this.errorMsgEmptyNode(node));
-    ownerNode.removeAttribute(node.nodeName);
-    var usehash = ifNullReturn(this.bouer.config.usehash, true);
-    var routeToSet = urlCombine((usehash ? '#' : ''), nodeValue);
-    ownerNode.setAttribute('href', routeToSet);
-    var href = ownerNode.attributes['href'];
-    var delimiters = this.delimiter.run(nodeValue);
-    if (delimiters.length !== 0)
-      this.binder.create({
-        data: data,
-        node: href,
-        isConnected: function() {
-          return ownerNode.isConnected;
-        },
-        context: this.context,
-        fields: delimiters
-      });
-    ownerNode
-      .addEventListener('click', function(event) {
-        event.preventDefault();
-        IoC.app(_this.bouer).resolve(Routing)
-          .navigate(href.value);
-      }, false);
+    return $href({
+      bouer: this.bouer,
+      binder: this.binder,
+      delimiter: this.delimiter,
+      context: this.context,
+      node: node,
+      data: data
+    });
   };
   Directive.prototype.entry = function(node, data) {
-    var ownerNode = this.toOwnerNode(node);
-    var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-    if (nodeValue === '')
-      return Logger.error(this.errorMsgEmptyNode(node));
-    if (this.delimiter.run(nodeValue).length !== 0)
-      return Logger.error(this.errorMsgNodeValue(node));
-    ownerNode.removeAttribute(node.nodeName);
-    IoC.app(this.bouer).resolve(ComponentHandler)
-      .prepare([
-        {
-          name: nodeValue,
-          template: ownerNode.outerHTML,
-          data: data
-            }
-        ]);
+    return $entry({
+      bouer: this.bouer,
+      delimiter: this.delimiter,
+      node: node,
+      data: data
+    });
   };
   Directive.prototype.put = function(node, data) {
-    var _this = this;
-    var ownerNode = this.toOwnerNode(node);
-    var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-    var execute = function() {};
-    if (nodeValue === '')
-      return Logger.error(this.errorMsgEmptyNode(node) + ' Direct <empty string> injection value is not allowed.');
-    if (this.delimiter.run(nodeValue).length !== 0)
-      return Logger.error('Expected an expression with no delimiter in “' + node.nodeName +
-        '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
-    this.binder.create({
-      data: data,
-      node: node,
-      isConnected: function() {
-        return ownerNode.isConnected;
-      },
-      fields: [{
-        expression: nodeValue,
-        field: nodeValue
-      }],
+    return $put({
+      bouer: this.bouer,
+      binder: this.binder,
+      delimiter: this.delimiter,
       context: this.context,
-      isReplaceProperty: false,
-      onUpdate: function() {
-        return execute();
-      }
+      node: node,
+      data: data
     });
-    ownerNode.removeAttribute(node.nodeName);
-    (execute = function() {
-      ownerNode.innerHTML = '';
-      nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-      if (nodeValue === '')
-        return;
-      var componentElement = createAnyEl(nodeValue)
-        .appendTo(ownerNode)
-        .build();
-      IoC.app(_this.bouer).resolve(ComponentHandler)
-        .order(componentElement, data);
-    })();
   };
   Directive.prototype.req = function(node, data) {
-    var _this = this;
-    var ownerNode = this.toOwnerNode(node);
-    var container = this.toOwnerNode(ownerNode);
-    var nodeName = node.nodeName;
-    var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-    if (!nodeValue.includes(' of ') && !nodeValue.includes(' as '))
-      return Logger.error(('Expected a valid “for” expression in “' + nodeName +
-        '” and got “' + nodeValue + '”.' + '\nValid: e-req="item of url".'));
-    if (ownerNode.hasAttribute('skeleton-cloned'))
-      return;
-    var delimiters = this.delimiter.run(nodeValue);
-    var localDataStore = {};
-    var dataKey = (node.nodeName.split(':')[1] || '').replace(/\[|\]/g, '');
-    var comment = createComment(undefined, 'request-' + (dataKey || code(6)));
-    var onInsertOrUpdate = function() {};
-    var onUpdate = function() {};
-    var binderConfig = {
+    return $req({
+      bouer: this.bouer,
+      compiler: this.compiler,
+      delimiter: this.delimiter,
+      context: this.context,
+      eventHandler: this.eventHandler,
+      binder: this.binder,
       node: node,
-      data: data,
-      nodeName: nodeName,
-      nodeValue: nodeValue,
-      fields: delimiters,
-      parent: ownerNode,
-      value: nodeValue,
-    };
-    // Inserting the comment node
-    container.insertBefore(comment, ownerNode);
-    var skeleton = IoC.app(this.bouer).resolve(Skeleton);
-    // Only insert if the type is `of
-    if (nodeValue.includes(' of '))
-      skeleton.insertItems(ownerNode);
-    if (delimiters.length !== 0)
-      binderConfig = this.binder.create({
-        data: data,
-        node: node,
-        fields: delimiters,
-        context: this.context,
-        isReplaceProperty: false,
-        isConnected: function() {
-          return comment.isConnected;
-        },
-        onUpdate: function() {
-          return onUpdate();
-        }
-      });
-    ownerNode.removeAttribute(node.nodeName);
-    // Mutating the `isConnected` property of the e-req node
-    Prop.set(ownerNode, 'isConnected', {
-      get: function() {
-        return comment.isConnected;
-      }
+      data: data
     });
-    var subcribeEvent = function(eventName) {
-      var attr = ownerNode.attributes.getNamedItem(Constants.on + eventName);
-      if (attr)
-        _this.eventHandler.compile(attr, data, _this.context);
-      return {
-        emit: function(detailObj) {
-          _this.eventHandler.emit({
-            attachedNode: ownerNode,
-            eventName: eventName,
-            init: {
-              detail: detailObj
-            },
-          });
-        }
-      };
-    };
-    var builder = function(expression) {
-      var filters = expression.split('|').map(function(item) {
-        return trim(item);
-      });
-      // Removing and retrieving the Request Expression
-      var reqExpression = filters.shift().replace(/\(|\)/g, '');
-      var reqSeparator = ' of ';
-      var reqParts = reqExpression.split(reqSeparator);
-      if (!(reqParts.length > 1))
-        reqParts = reqExpression.split(reqSeparator = ' as ');
-      return {
-        filters: filters,
-        type: trim(reqSeparator),
-        expression: trim(reqExpression),
-        variables: trim(reqParts[0]),
-        path: trim(reqParts[1])
-      };
-    };
-    var isValidResponse = function(response, requestType) {
-      if (!response) {
-        Logger.error(('the return must be an object containing “data” property. ' +
-          'Example: { data: {} | [] }'));
-        return false;
-      }
-      if (!('data' in response)) {
-        Logger.error(('the return must contain the “data” property. Example: { data: {} | [] }'));
-        return false;
-      }
-      if ((requestType === 'of' && !Array.isArray(response.data))) {
-        Logger.error(('Using e-req="... “of” ..." the response must be a list of items, and got ' +
-          '“' + typeof response.data + '”.'));
-        return false;
-      }
-      if ((requestType === 'as' && !(typeof response.data === 'object'))) {
-        Logger.error(('Using e-req="... “as” ..." the response must be a list of items, and got ' +
-          '“' + typeof response.data + '”.'));
-        return false;
-      }
-      return true;
-    };
-    var middleware = IoC.app(this.bouer).resolve(Middleware);
-    if (!middleware.has('req'))
-      return Logger.error('There is no “req” middleware provided for the “e-req” directive requests.');
-    var createMiddlewareContext = function(expObject) {
-      return {
-        binder: binderConfig,
-        detail: {
-          requestType: expObject.type,
-          requestPath: expObject.path,
-          reponseData: localDataStore
-        }
-      };
-    };
-    (onInsertOrUpdate = function() {
-      var expObject = builder(trim(node.nodeValue || ''));
-      var responseHandler = function(response) {
-        var _a;
-        if (!isValidResponse(response, expObject.type))
-          return;
-        Reactive.transform({
-          context: _this.context,
-          data: response
-        });
-        if (dataKey)
-          IoC.app(_this.bouer).resolve(DataStore).set('req', dataKey, response);
-        subcribeEvent(Constants.builtInEvents.response).emit({
-          response: response
-        });
-        // Handle Content Insert/Update
-        if (!('data' in localDataStore)) {
-          // Store the data
-          localDataStore.data = undefined;
-          Prop.transfer(localDataStore, response, 'data');
-        } else {
-          // Update de local data
-          return localDataStore.data = response.data;
-        }
-        if (expObject.type === 'as') {
-          // Removing the: “(...)”  “,”  and getting only the variable
-          var variable = trim(expObject.variables.split(',')[0].replace(/\(|\)/g, ''));
-          if (variable in data)
-            return Logger.error('There is already a “' + variable + '” defined in the current scope. ' +
-              'Provide another variable name in order to continue.');
-          data[variable] = response.data;
-          return _this.compiler.compile({
-            el: ownerNode,
-            data: Reactive.transform({
-              context: _this.context,
-              data: data
-            }),
-            context: _this.context,
-            isConnected: function() {
-              return comment.isConnected;
-            }
-          });
-        }
-        if (expObject.type === 'of') {
-          skeleton.clearItems(ownerNode);
-          var resUniqueName = code(8, 'res');
-          var forDirectiveContent = expObject.expression.replace(expObject.path, resUniqueName);
-          var mData = Extend.obj((_a = {}, _a[resUniqueName] = response.data, _a), data);
-          ownerNode.setAttribute(Constants.for, Extend.array([forDirectiveContent], expObject.filters).join(' | '));
-          Prop.set(mData, resUniqueName, Prop.descriptor(response, 'data'));
-          return _this.compiler.compile({
-            el: ownerNode,
-            data: mData,
-            context: _this.context,
-            isConnected: function() {
-              return comment.isConnected;
-            }
-          });
-        }
-      };
-      subcribeEvent(Constants.builtInEvents.request).emit();
-      middleware.run('req', {
-        type: 'onBind',
-        action: function(middlewareRequest) {
-          middlewareRequest(createMiddlewareContext(expObject), {
-            success: function(response) {
-              responseHandler(response);
-            },
-            fail: function(error) {
-              return subcribeEvent(Constants.builtInEvents.fail).emit({
-                error: error
-              });
-            },
-            done: function() {
-              return subcribeEvent(Constants.builtInEvents.done).emit();
-            }
-          });
-        }
-      });
-    })();
-    onUpdate = function() {
-      var expObject = builder(trim(node.nodeValue || ''));
-      middleware.run('req', {
-        type: 'onUpdate',
-        default: function() {
-          return onInsertOrUpdate();
-        },
-        action: function(middlewareRequest) {
-          middlewareRequest(createMiddlewareContext(expObject), {
-            success: function(response) {
-              if (!isValidResponse(response, expObject.type))
-                return;
-              localDataStore.data = response.data;
-            },
-            fail: function(error) {
-              return subcribeEvent(Constants.builtInEvents.fail).emit({
-                error: error
-              });
-            },
-            done: function() {
-              return subcribeEvent(Constants.builtInEvents.done).emit();
-            }
-          });
-        }
-      });
-    };
   };
   Directive.prototype.wait = function(node) {
-    var _this = this;
-    var ownerNode = this.toOwnerNode(node);
-    var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-    if (nodeValue === '')
-      return Logger.error(this.errorMsgEmptyNode(node));
-    if (this.delimiter.run(nodeValue).length !== 0)
-      return Logger.error(this.errorMsgNodeValue(node));
-    ownerNode.removeAttribute(node.nodeName);
-    var dataStore = IoC.app(this.bouer).resolve(DataStore);
-    var mWait = dataStore.wait[nodeValue];
-    if (mWait) {
-      mWait.nodes.push(ownerNode);
-      // No data exposed yet
-      if (!mWait.data)
-        return;
-      // Compile all the waiting nodes
-      forEach(mWait.nodes, function(nodeWaiting) {
-        _this.compiler.compile({
-          el: nodeWaiting,
-          context: mWait.context,
-          data: Reactive.transform({
-            context: mWait.context,
-            data: mWait.data
-          }),
-        });
-      });
-      if (ifNullReturn(mWait.once, false))
-        delete dataStore.wait[nodeValue];
-    }
-    return dataStore.wait[nodeValue] = {
-      nodes: [ownerNode],
-      context: this.context
-    };
+    return $wait({
+      bouer: this.bouer,
+      compiler: this.compiler,
+      delimiter: this.delimiter,
+      context: this.context,
+      node: node,
+    });
   };
   Directive.prototype.custom = function(node, data) {
-    var ownerNode = this.toOwnerNode(node);
-    var nodeName = node.nodeName;
-    var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-    var delimiters = this.delimiter.run(nodeValue);
-    var $CustomDirective = this.$custom[nodeName];
-    var bindConfig = this.binder.create({
-      data: data,
-      node: node,
-      fields: delimiters,
-      isReplaceProperty: false,
+    return custom({
+      binder: this.binder,
+      evaluator: this.evaluator,
+      delimiter: this.delimiter,
       context: this.context,
-      isConnected: function() {
-        return ownerNode.isConnected;
-      },
-      onUpdate: function() {
-        if (typeof $CustomDirective.onUpdate === 'function')
-          $CustomDirective.onUpdate(node, bindConfig);
-      }
+      customDirectives: this.customDirectives,
+      node: node,
+      data: data,
     });
-    if (ifNullReturn($CustomDirective.removable, true))
-      ownerNode.removeAttribute(nodeName);
-    var modifiers = nodeName.split('.');
-    modifiers.shift();
-    // my-custom-dir:arg.mod1.mod2
-    var argument = (nodeName.split(':')[1] || '').split('.')[0];
-    bindConfig.modifiers = modifiers;
-    bindConfig.argument = argument;
-    if (typeof $CustomDirective.onBind === 'function')
-      return ifNullReturn($CustomDirective.onBind(node, bindConfig), false);
-    return false;
   };
   Directive.prototype.skeleton = function(node) {
-    var _a;
-    var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-    if (nodeValue !== '')
-      return;
-    var ownerNode = this.toOwnerNode(node);
-    ownerNode.removeAttribute(node.nodeName);
-    var uid = ownerNode.getAttribute('skeleton-clone-code');
-    if (!uid)
-      return;
-    ownerNode.removeAttribute('skeleton-clone-code');
-    forEach([].slice.call((_a = this.bouer.el) === null || _a === void 0 ? void 0 : _a.querySelectorAll('[="' + uid + '"]')), function(el) {
-      (el.parentElement || el.parentNode).removeChild(el);
+    return $skeleton({
+      node: node,
+      bouer: this.bouer
     });
   };
   return Directive;
 }());
 var Compiler = /** @class */ (function() {
-  function Compiler(bouer, directives) {
+  function Compiler(bouer, binder, delimiterHandler, eventHandler, componentHandler, directives) {
     this._IRT_ = true;
     this.NODES_TO_IGNORE_IN_COMPILATION = {
       'SCRIPT': 1,
@@ -3326,10 +3579,10 @@ var Compiler = /** @class */ (function() {
     };
     this.bouer = bouer;
     this.directives = directives !== null && directives !== void 0 ? directives : {};
-    this.binder = IoC.app(bouer).resolve(Binder);
-    this.delimiter = IoC.app(bouer).resolve(DelimiterHandler);
-    this.eventHandler = IoC.app(bouer).resolve(EventHandler);
-    this.component = IoC.app(bouer).resolve(ComponentHandler);
+    this.binder = binder;
+    this.delimiter = delimiterHandler;
+    this.eventHandler = eventHandler;
+    this.component = componentHandler;
   }
   /**
    * Compiles an html element
@@ -3349,7 +3602,7 @@ var Compiler = /** @class */ (function() {
       return Logger.error('Invalid element provided to the compiler.');
     if (!this.analize(rootElement.outerHTML))
       return rootElement;
-    var directive = new Directive(this.directives || {}, this, context);
+    var directive = new Directive(this, this.directives || {}, context);
     var walker = function(node, data) {
       if (node.nodeName in _this.NODES_TO_IGNORE_IN_COMPILATION)
         return;
@@ -3452,7 +3705,7 @@ var Compiler = /** @class */ (function() {
       if (Constants.check(node, Constants.bind))
         return directive.bind(node, data);
       // Custom directive
-      if (Object.keys(directive.$custom).find(function(name) {
+      if (Object.keys(directive.customDirectives).find(function(name) {
           return Constants.check(node, name);
         }))
         if (directive.custom(node, data))
@@ -3759,7 +4012,7 @@ var Component = /** @class */ (function() {
     IoC.app(this.bouer).resolve(EventHandler).off({
       eventName: eventName,
       callback: callback,
-      attachedNode: this.el
+      attachedNode: this.el,
     });
     this.events = where(this.events, function(evt) {
       return !(evt.eventName == eventName && evt.callback == callback);
@@ -3782,7 +4035,7 @@ var Component = /** @class */ (function() {
   return Component;
 }());
 var ComponentHandler = /** @class */ (function() {
-  function ComponentHandler(bouer) {
+  function ComponentHandler(bouer, delimiterHandler, eventHandler, evaluator, routing) {
     this._IRT_ = true;
     // Handle all the components web requests to avoid multiple requests
     this.requests = {};
@@ -3798,10 +4051,10 @@ var ComponentHandler = /** @class */ (function() {
             'clazz', 'el', 'bouer', 'events', '_IRT_'
         ]);
     this.bouer = bouer;
-    this.delimiter = IoC.app(bouer).resolve(DelimiterHandler);
-    this.eventHandler = IoC.app(bouer).resolve(EventHandler);
-    this.evaluator = IoC.app(bouer).resolve(Evaluator);
-    this.rounting = IoC.app(bouer).resolve(Routing);
+    this.delimiter = delimiterHandler;
+    this.eventHandler = eventHandler;
+    this.evaluator = evaluator;
+    this.rounting = routing;
   }
   ComponentHandler.prototype.check = function(nodeName) {
     return (nodeName in this.components);
@@ -4521,6 +4774,7 @@ var Bouer = /** @class */ (function() {
   function Bouer(selector, options) {
     var _this_1 = this;
     /** The name of the instance */
+    // Ignore Reactive Transformation
     this._IRT_ = true;
     this.name = 'Bouer';
     this.version = '3.1.0';
@@ -4535,7 +4789,6 @@ var Bouer = /** @class */ (function() {
     this.isDestroyed = false;
     /** Provides state of the app, if it is already initialized */
     this.isInitialized = false;
-    var app = this;
     this.options = options = (options || {});
     this.config = options.config || {};
     this.deps = options.deps || {};
@@ -4544,18 +4797,23 @@ var Bouer = /** @class */ (function() {
       var value = deps[key];
       deps[key] = typeof value === 'function' ? value.bind(_this_1) : value;
     });
+    var app = this;
     var delimiters = options.delimiters || [];
     // Adding Dependency Injection Services
-    IoC.app(this).add(DataStore, [this], true);
-    IoC.app(this).add(Evaluator, [this], true);
+    IoC.app(this).add(DataStore, [], true);
+    IoC.app(this).add(Evaluator, [this]);
     IoC.app(this).add(Middleware, [this], true);
     IoC.app(this).add(Binder, [this, Evaluator], true);
-    IoC.app(this).add(EventHandler, [this], true);
-    IoC.app(this).add(ComponentHandler, [this], true);
+    IoC.app(this).add(EventHandler, [this, Evaluator], true);
+    IoC.app(this).add(ComponentHandler, [
+            this, DelimiterHandler, EventHandler, Evaluator, Routing
+        ], true);
     IoC.app(this).add(Skeleton, [this], true);
     IoC.app(this).add(Routing, [this], true);
     IoC.app(this).add(DelimiterHandler, [this, delimiters], true);
-    IoC.app(this).add(Compiler, [this, options.directives], true);
+    IoC.app(this).add(Compiler, [
+            this, Binder, DelimiterHandler, EventHandler, ComponentHandler, options.directives
+        ], true);
     var dataStore = IoC.app(this).resolve(DataStore);
     var middleware = IoC.app(this).resolve(Middleware);
     var componentHandler = IoC.app(this).resolve(ComponentHandler);
@@ -4564,15 +4822,15 @@ var Bouer = /** @class */ (function() {
     var delimiter = IoC.app(this).resolve(DelimiterHandler);
     // Register the middleware
     if (typeof options.middleware === 'function')
-      options.middleware.call(app, middleware.subscribe, app);
+      options.middleware.call(this, middleware.subscribe, this);
     // Transform the data properties into a reative
     this.data = Reactive.transform({
       data: options.data || {},
-      context: app
+      context: this
     });
     this.globalData = Reactive.transform({
       data: options.globalData || {},
-      context: app
+      context: this
     });
     delimiters.push.apply(delimiters, [
       {
@@ -4989,6 +5247,7 @@ var Bouer = /** @class */ (function() {
   };
   return Bouer;
 }());
+exports.ANCHOR = ANCHOR;
 exports.Compiler = Compiler;
 exports.Component = Component;
 exports.DOM = DOM;
@@ -5000,7 +5259,6 @@ exports.Routing = Routing;
 exports.ViewChild = ViewChild;
 exports.WIN = WIN;
 exports.Watch = Watch;
-exports.anchor = anchor;
 exports.buildError = buildError;
 exports.code = code;
 exports.copyObject = copyObject;
@@ -5008,6 +5266,8 @@ exports.createAnyEl = createAnyEl;
 exports.createComment = createComment;
 exports.createEl = createEl;
 exports["default"] = Bouer;
+exports.errorMsgEmptyNode = errorMsgEmptyNode;
+exports.errorMsgNodeValue = errorMsgNodeValue;
 exports.findAttribute = findAttribute;
 exports.findDirective = findDirective;
 exports.fnCall = fnCall;
@@ -5031,6 +5291,7 @@ exports.setData = setData;
 exports.startWith = startWith;
 exports.toArray = toArray;
 exports.toLower = toLower;
+exports.toOwnerNode = toOwnerNode;
 exports.toStr = toStr;
 exports.trim = trim;
 exports.urlCombine = urlCombine;
