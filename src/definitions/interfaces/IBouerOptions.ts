@@ -14,10 +14,10 @@ interface IBouerOptions<
   Deps extends {} = {}
 > {
   /** The data of the instance */
-  readonly data?: DataType<Data, this>,
+  readonly data?: DataType<Data, Bouer<Data, Global, Deps>>,
 
   /** The data of the whole instance */
-  readonly globalData?: DataType<Global, this>
+  readonly globalData?: DataType<Global, Bouer<Data, Global, Deps>>
 
   /** The configuration of the instance */
   readonly config?: IBouerConfig
@@ -29,7 +29,7 @@ interface IBouerOptions<
   readonly directives?: CustomDirective,
 
   /** The dependencies of the instance */
-  readonly deps?: DataType<Deps, this>;
+  readonly deps?: DataType<Deps, Bouer<Data, Global, Deps>>;
 
   /** Appends delimiters to the instance */
   readonly delimiters?: IDelimiter[],
@@ -40,9 +40,9 @@ interface IBouerOptions<
    * @param app the application instance
    */
   middleware?(
-    this: Bouer,
+    this: Bouer<Data, Global, Deps>,
     subscribe: (
-      this: Bouer,
+      this: Bouer<Data, Global, Deps>,
       /** The directive to be applied */
       directive: string,
       /** The actions where it should be applied */
@@ -52,32 +52,32 @@ interface IBouerOptions<
         /** Actions that will be performed on update */
         onUpdate: MiddlewareConfigType
       ) => void) => void,
-    app: Bouer
+    app: Bouer<Data, Global, Deps>
   ): void,
 
   /**
    * The hook that should be called before the component is loaded
    * @param event the called event object
    */
-  beforeLoad?(this: this, event: CustomEvent): void;
+  beforeLoad?(this: Bouer<Data, Global, Deps>, event: CustomEvent): void;
 
   /**
    * The hook that should be called after the component is loaded (Compiled)
    * @param event the called event object
    */
-  loaded?(this: this, event: CustomEvent): void;
+  loaded?(this: Bouer<Data, Global, Deps>, event: CustomEvent): void;
 
   /**
    * The hook that should be called before the component is destroyed
    * @param event the called event object
    */
-  beforeDestroy?(this: this, event: CustomEvent): void;
+  beforeDestroy?(this: Bouer<Data, Global, Deps>, event: CustomEvent): void;
 
   /**
    * The hook that should be called after the component is destroyed
    * @param event the called event object
    */
-  destroyed?(this: this, event: CustomEvent): void;
+  destroyed?(this: Bouer<Data, Global, Deps>, event: CustomEvent): void;
 }
 
 export default IBouerOptions;

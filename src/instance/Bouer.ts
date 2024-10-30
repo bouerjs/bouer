@@ -3,6 +3,7 @@ import Evaluator from '../core/Evaluator';
 import Skeleton from '../core/Skeleton';
 import ViewChild from '../core/ViewChild';
 import Binder from '../core/binder/Binder';
+import Watch from '../core/binder/Watch';
 import Compiler from '../core/compiler/Compiler';
 import Component from '../core/component/Component';
 import ComponentHandler from '../core/component/ComponentHandler';
@@ -613,7 +614,7 @@ export default class Bouer<
     propertyName: Key,
     callback: WatchCallback<TargetObject[Key]>,
     targetObject?: TargetObject
-  ) {
+  ): Watch<TargetObject[Key], TargetObject> | undefined {
     return IoC.app(this).resolve(Binder)!.onPropertyChange(
       propertyName, callback, (targetObject || this.data) as TargetObject
     );
@@ -624,7 +625,10 @@ export default class Bouer<
    * @param {Function} watchableScope the function that should be called when the any reactive property change
    * @returns an object having all the watches and the method to destroy watches at once
    */
-  react(watchableScope: (this: this, app: this) => void) {
+  react(watchableScope: (this: this, app: this) => void): {
+    watches: Watch<any, any>[],
+    destroy: () => void
+  } {
     return IoC.app(this).resolve(Binder)!
       .onPropertyInScopeChange(watchableScope as () => void);
   }
@@ -671,7 +675,7 @@ export default class Bouer<
     eventName: string,
     callback?: (this: this, event: CustomEvent) => void,
     attachedNode?: Node
-  ) {
+  ): void {
     return IoC.app(this).resolve(EventHandler)!.
       off({
         eventName,
@@ -686,7 +690,7 @@ export default class Bouer<
    * @param {string} boundAttrName the bound attribute name
    * @param {string} boundPropName the bound property name
    */
-  unbind(boundNode: Node, boundAttrName?: string, boundPropName?: string) {
+  unbind(boundNode: Node, boundAttrName?: string, boundPropName?: string): void {
     return IoC.app(this).resolve(Binder)!.
       remove(boundNode, boundPropName, boundAttrName);
   }
@@ -704,7 +708,7 @@ export default class Bouer<
       init?: CustomEventInit,
       once?: boolean
     }
-  ) {
+  ): void {
     const mOptions = options || {};
     mOptions.init = ifNullReturn(mOptions.init, {});
     mOptions.init!.detail = ifNullReturn(mOptions.init!.detail, {});
@@ -724,7 +728,7 @@ export default class Bouer<
    * @param {number} wait milliseconds to the be waited before the single execution
    * @returns executable function
    */
-  lazy(callback: (this: this, ...args: any[]) => void, wait?: number) {
+  lazy(callback: (this: this, ...args: any[]) => void, wait?: number): () => void {
     const _this = this;
     let timeout: any; wait = isNull(wait) ? 500 : wait;
     const immediate = arguments[2];
