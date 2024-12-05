@@ -25,7 +25,7 @@ export default class Component<Data extends {} = {}> implements IComponentOption
 
   readonly name: string;
   readonly path: string;
-  readonly data: DataType<Data, this>;
+  readonly data: DataType<Data, this> & dynamic;
   readonly template?: string;
   readonly keepAlive?: boolean;
   readonly prefetch?: boolean;

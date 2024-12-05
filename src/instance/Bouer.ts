@@ -53,8 +53,8 @@ export default class Bouer<
   readonly name = 'Bouer';
   readonly version = '3.1.0';
   readonly config: IBouerConfig;
-  readonly data: DataType<Data, this>;
-  readonly globalData: DataType<Global, this>;
+  readonly data: DataType<Data, this> & dynamic;
+  readonly globalData: DataType<Global, this> & dynamic;
   readonly deps: DataType<Deps, this>;
 
   /** Unique Id of the instance */
