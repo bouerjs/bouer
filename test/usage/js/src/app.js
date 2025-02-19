@@ -12,8 +12,8 @@ new Bouer('#app', {
     version: '3.0.0',
   },
   components: [
-    new AppHeader(),
-    new AppMain(),
-    new AppFooter()
+    AppHeader,
+    AppMain,
+    AppFooter
   ]
 });

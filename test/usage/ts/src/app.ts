@@ -11,9 +11,6 @@ new Bouer('#app', {
   data: {
     // Props
     version: '3.0.0',
-    func() {
-      // const _ =  this.data;
-    }
   },
   components: [
     AppHeader,
