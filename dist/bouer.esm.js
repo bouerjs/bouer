@@ -1,6 +1,6 @@
 /*!
  * Bouer.js v3.1.0
- * Copyright Easy.js 2018-2020 | 2021-2024 Afonso Matumona
+ * Copyright Easy.js 2018-2020 | 2021-2025 Afonso Matumona
  * Released under the MIT License.
  */
 var Logger = (function Logger() {
