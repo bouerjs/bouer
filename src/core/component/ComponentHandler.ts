@@ -513,6 +513,7 @@ export default class ComponentHandler {
               rootElement.classList.add(cls);
             });
 
+          if (Constants.silent == attr.name) return;
           // sets the attr to the root element
           rootElement.setAttribute(attr.name, attr.value);
         });
