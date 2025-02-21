@@ -1,5 +1,5 @@
 /*!
- * Bouer.js v3.1.0
+ * Bouer.js v3.1.1
  * Copyright Easy.js 2018-2020 | 2021-2025 Afonso Matumona
  * Released under the MIT License.
  */
@@ -4437,6 +4437,8 @@ var ComponentHandler = /** @class */ (function() {
             return componentElement.classList.forEach(function(cls) {
               rootElement.classList.add(cls);
             });
+          if (Constants.silent == attr.name)
+            return;
           // sets the attr to the root element
           rootElement.setAttribute(attr.name, attr.value);
         });
@@ -4777,7 +4779,7 @@ var Bouer = /** @class */ (function() {
     // Ignore Reactive Transformation
     this._IRT_ = true;
     this.name = 'Bouer';
-    this.version = '3.1.0';
+    this.version = '3.1.1';
     /** Unique Id of the instance */
     this.__id__ = IoC.newId();
     /**
