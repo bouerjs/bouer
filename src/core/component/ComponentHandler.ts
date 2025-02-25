@@ -721,6 +721,59 @@ export default class ComponentHandler {
     });
   }
 
+  slot(options: {
+    node: Element,
+    data: dynamic,
+    walker: (el: Node, data: dynamic) => void,
+    componentSlot: Element
+  }) {
+    const data = options.data;
+    const node = options.node;
+    const walker = options.walker;
+    const componentSlot = options.componentSlot;
+
+    const insertSlot = (slot: Element, reference: Node) => {
+      const $Walker = (child: Node) => {
+        const cloned = child.cloneNode(true);
+        reference.parentNode!.insertBefore(cloned, reference);
+        walker(cloned, data);
+      };
+
+      if (slot.nodeName === 'SLOTCONTAINER' || slot.nodeName === 'SLOT')
+        forEach(toArray(slot.childNodes), (child: Node) => $Walker(child));
+      else
+        $Walker(slot);
+
+      reference.parentNode!.removeChild(reference);
+    };
+
+    if (node.hasAttribute('default')) {
+      if (componentSlot.childNodes.length == 0)
+        return;
+
+      // In case of default slot insertion
+      return insertSlot(componentSlot, node);
+    } else if (node.hasAttribute('name')) {
+      // In case of target slot insertion
+      const target = node.attributes.getNamedItem('name') as Attr;
+
+      return (function $Walker(element: Element) {
+        const slotValue = element.getAttribute(Constants.slot);
+        if (slotValue && slotValue === target.value) {
+          element.removeAttribute(Constants.slot);
+          return insertSlot(element, node);
+        }
+
+        if (element.children.length === 0)
+          return null;
+
+        forEach(toArray(element.children), (child: Element) => {
+          $Walker(child);
+        });
+      })(componentSlot);
+    }
+  }
+
   /**
    * Adds assets to the component
    * @param {string|object} assets the list of assets to be included
