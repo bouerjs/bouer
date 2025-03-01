@@ -548,20 +548,25 @@ export default class ComponentHandler {
             if (!rule) continue;
 
             const mRule = rule as dynamic;
+            // .item .title, .item .desc
             const ruleText = mRule.selectorText;
 
             if (ruleText) {
-              const firstRule = (ruleText as string).split(' ')[0];
-              const selector = (firstRule[0] == '.' || firstRule[0] == '#')
-                ? firstRule.substring(1) : firstRule;
-              const separator = rootClassList[selector] ? '' : ' ';
-              const uniqueIdentifier = '.' + styleId;
-              const selectorTextSplitted = mRule.selectorText.split(' ');
+              const classStyleId = '.' + styleId;
 
-              if (selectorTextSplitted[0] === toLower(rootElement.tagName))
-                selectorTextSplitted.shift();
-
-              mRule.selectorText = uniqueIdentifier + separator + selectorTextSplitted.join(' ');
+              /**
+               * From: [.item .title, .item .desc]
+               *
+               * To: [
+               *  .e-A1bcD.item .title,
+               *  .e-A1bcD .item .title,
+               *  .e-A1bcD.item .desc
+               *  .e-A1bcD .item .desc
+               * ]
+               */
+              mRule.selectorText = ruleText.split(',')
+                .flatMap(($selector: string) => [classStyleId + $selector, classStyleId + ' ' + $selector])
+                .join(',');
             }
 
             // Adds the cssText only if the element is <style>
@@ -595,7 +600,7 @@ export default class ComponentHandler {
             });
           }
 
-          const styleId = code(7, 'bouer-s');
+          const styleId = code(5, 'e-');
           mStyle.setAttribute(styleAttrName, styleId);
 
           if ((mStyle instanceof HTMLLinkElement) && mStyle.hasAttribute('scoped'))
