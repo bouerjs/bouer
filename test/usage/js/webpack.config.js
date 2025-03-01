@@ -60,10 +60,6 @@ module.exports = {
           context: './src',
         }
       },
-      // Extracts the content from css-loader
-      'extract-loader',
-      // Translates CSS into CommonJS
-      'css-loader',
       // Compiles Sass to CSS
       'sass-loader',
       ],
