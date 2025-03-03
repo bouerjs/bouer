@@ -1,4 +1,5 @@
 import IDelimiterResponse from '../../definitions/interfaces/IDelimiterResponse';
+import INode from '../../definitions/interfaces/INode';
 import CustomDirective from '../../definitions/types/CustomDirective';
 import RenderContext from '../../definitions/types/RenderContext';
 import Bouer from '../../instance/Bouer';
@@ -61,30 +62,22 @@ export default class Compiler {
     /** The data that should be injected in the compilation */
     data?: Data,
 
-    /**
-     * In case of components having content inside of the definition,
-     * a wrapper (Example: <div>) with the content need to be provided
-     * in `componentSlot` property in order to be replaced on the compilation.
-     */
-    componentSlot?: Element,
-
     /** The function that should be fired when the compilation is done */
     onDone?: (this: typeof options.context, element: Element, data?: Data) => void | Promise<any>,
 
     /** The context of this compilation process */
     context: RenderContext,
-
-    /* Allow to provide the connectivity source of the element to be compiled */
-    isConnected?: () => boolean
   }) {
     const rootElement = options.el;
     const context = options.context || this.bouer;
     const data = (options.data || this.bouer.data!);
-    const isConnected = (options.isConnected || (() => rootElement.isConnected));
     const routing = IoC.app(this.bouer).resolve(Routing)!;
 
     if (!rootElement)
       return Logger.error('Invalid element provided to the compiler.');
+
+    const iNode = rootElement as INode;
+    const isActive = iNode.isActive = iNode.isActive ?? (() => rootElement.isConnected);
 
     if (!this.analize(rootElement.outerHTML))
       return rootElement;
@@ -100,18 +93,6 @@ export default class Compiler {
         // e-skip directive
         if (Constants.skip in node.attributes)
           return directive.skip(node);
-
-        // In case of slots
-        if ((node.localName.toLowerCase() === Constants.slot || node.tagName.toLowerCase() === Constants.slot)
-          && options.componentSlot) {
-
-          this.component.slot({
-            data,
-            node,
-            walker,
-            componentSlot: options.componentSlot,
-          });
-        }
 
         // e-def="{...}" directive
         if (Constants.def in node.attributes)
@@ -214,7 +195,6 @@ export default class Compiler {
 
         return this.binder.create({
           node: attr,
-          isConnected: isConnected,
           fields: [{ expression: delimiterField.expression, field: attr.value }],
           context: context as RenderContext,
           data: data
@@ -227,15 +207,16 @@ export default class Compiler {
         && delimitersFields.length !== 0) {
         this.binder.create({
           node: node,
-          isConnected: isConnected,
           fields: delimitersFields,
           context: context as RenderContext,
           data: data
         });
       }
 
-      forEach(toArray(node.childNodes), (childNode: Node) =>
-        walker(childNode, data));
+      forEach(toArray(node.childNodes), (childNode: INode) => {
+        childNode.isActive = isActive;
+        walker(childNode, data);
+      });
     };
 
     walker(rootElement, data);

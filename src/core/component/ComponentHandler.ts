@@ -371,10 +371,10 @@ export default class ComponentHandler {
     if (!this.activeComponents.includes(component))
       this.activeComponents.push(component);
 
-    const elementSlots = createAnyEl('SlotContainer', el => {
+    const slotContainer = createAnyEl('SlotContainer', el => {
       el.innerHTML = componentElement.innerHTML;
       componentElement.innerHTML = '';
-    }).build();
+    }).build() as Element;
 
     const isKeepAlive = componentElement.hasAttribute('keep-alive') || ifNullReturn(component.keepAlive, false);
     // Component Creation
@@ -407,6 +407,69 @@ export default class ComponentHandler {
     const rootElement = component.el!;
 
     if (isNull(rootElement)) return;
+
+    // Handling Slots
+    if (slotContainer.childNodes.length > 0) {
+
+      const hasSkippedParent = (child: Element): boolean => {
+        if (child.hasAttribute(Constants.skip)) return true;
+        const parent = child.parentElement;
+        if (parent == null) return false;
+        return hasSkippedParent(parent);
+      };
+
+      // # slot[default]
+      const slotContainerChildren = toArray(slotContainer.children);
+      const slotDefaults = toArray(rootElement.querySelectorAll('slot[default]'));
+      // Looping all the slots defaults target
+      forEach(slotDefaults, (slotTarget: Node) => {
+        if (hasSkippedParent(slotTarget as Element)) return;
+
+        const slotTargetContainer = slotTarget.parentElement!;
+        // Adding the children
+        forEach(slotContainerChildren, (child: Node) => {
+          slotTargetContainer.insertBefore(child.cloneNode(true), slotTarget);
+        });
+
+        // Removing the targets
+        slotTargetContainer.removeChild(slotTarget);
+      });
+
+      // # div[slot='name'] || slot[slot=name]
+      const slotNamed = toArray(rootElement.querySelectorAll('slot[name]'));
+      // Looping all the slots defaults target
+      forEach(slotNamed, (slotTarget: Element) => {
+        if (hasSkippedParent(slotTarget as Element)) return;
+        const slotTargetContainer = slotTarget.parentElement!;
+        const slotName = slotTarget.getAttribute('name');
+
+        // Adding the children
+        forEach(slotContainerChildren, (child: Element) => {
+          if ( // slot[slot='name']
+            child.nodeName.toLowerCase() == 'slot' &&
+            child.getAttribute('slot') == slotName
+          ) {
+            // Adding the children
+            forEach(toArray(child.childNodes), (child: Node) => {
+              slotTargetContainer.insertBefore(child.cloneNode(true), slotTarget);
+            });
+          }
+
+          if ( // div[slot='name']
+            child.nodeName.toLowerCase() != 'slot' &&
+            child.getAttribute('slot') == slotName
+          ) {
+            const inserted = slotTargetContainer.insertBefore(
+              child.cloneNode(true), slotTarget
+            ) as Element;
+            inserted.removeAttribute('slot');
+          }
+        });
+
+        // Removing the target
+        slotTargetContainer.removeChild(slotTarget);
+      });
+    }
 
     // Transforming all unknown variables to reactive
     const unknownVars = where(Object.keys(component), key => !this.componentDefaultProps.has(key));
@@ -558,14 +621,18 @@ export default class ComponentHandler {
                * From: [.item .title, .item .desc]
                *
                * To: [
-               *  .e-A1bcD.item .title,
+               *  .item.e-A1bcD .title,
                *  .e-A1bcD .item .title,
-               *  .e-A1bcD.item .desc
+               *  .item.e-A1bcD .desc
                *  .e-A1bcD .item .desc
                * ]
                */
               mRule.selectorText = ruleText.split(',')
-                .flatMap(($selector: string) => [classStyleId + $selector, classStyleId + ' ' + $selector])
+                .flatMap(($selector: string) => {
+                  const $selectors = $selector.split(' ');
+                  $selectors[0] = $selectors[0] + classStyleId;
+                  return [$selectors.join(' '), classStyleId + ' ' + $selector];
+                })
                 .join(',');
             }
 
@@ -621,6 +688,8 @@ export default class ComponentHandler {
         beforeLoadEvent.emit();
         // Compiling the rootElement
         compiler.compile({
+          el: rootElement,
+          context: component,
           data: Reactive.transform({ context: component, data: component.data }),
           onDone: () => {
             if (isFunction(onComponent))
@@ -633,10 +702,7 @@ export default class ComponentHandler {
 
               if (routeView) this.rounting.setRouteView(routeView!);
             }
-          },
-          componentSlot: elementSlots,
-          context: component,
-          el: rootElement,
+          }
         });
 
         const autoComponentDestroy = ifNullReturn(this.bouer.config.autoComponentDestroy, true);
@@ -724,59 +790,6 @@ export default class ComponentHandler {
         Logger.log(error);
       });
     });
-  }
-
-  slot(options: {
-    node: Element,
-    data: dynamic,
-    walker: (el: Node, data: dynamic) => void,
-    componentSlot: Element
-  }) {
-    const data = options.data;
-    const node = options.node;
-    const walker = options.walker;
-    const componentSlot = options.componentSlot;
-
-    const insertSlot = (slot: Element, reference: Node) => {
-      const $Walker = (child: Node) => {
-        const cloned = child.cloneNode(true);
-        reference.parentNode!.insertBefore(cloned, reference);
-        walker(cloned, data);
-      };
-
-      if (slot.nodeName === 'SLOTCONTAINER' || slot.nodeName === 'SLOT')
-        forEach(toArray(slot.childNodes), (child: Node) => $Walker(child));
-      else
-        $Walker(slot);
-
-      reference.parentNode!.removeChild(reference);
-    };
-
-    if (node.hasAttribute('default')) {
-      if (componentSlot.childNodes.length == 0)
-        return;
-
-      // In case of default slot insertion
-      return insertSlot(componentSlot, node);
-    } else if (node.hasAttribute('name')) {
-      // In case of target slot insertion
-      const target = node.attributes.getNamedItem('name') as Attr;
-
-      return (function $Walker(element: Element) {
-        const slotValue = element.getAttribute(Constants.slot);
-        if (slotValue && slotValue === target.value) {
-          element.removeAttribute(Constants.slot);
-          return insertSlot(element, node);
-        }
-
-        if (element.children.length === 0)
-          return null;
-
-        forEach(toArray(element.children), (child: Element) => {
-          $Walker(child);
-        });
-      })(componentSlot);
-    }
   }
 
   /**
