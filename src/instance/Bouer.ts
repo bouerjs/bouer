@@ -51,7 +51,7 @@ export default class Bouer<
   // Ignore Reactive Transformation
   readonly _IRT_ = true;
   readonly name = 'Bouer';
-  readonly version = '3.1.1';
+  readonly version = '3.1.2';
   readonly config: IBouerConfig;
   readonly data: DataType<Data, this> & dynamic;
   readonly globalData: DataType<Global, this> & dynamic;
