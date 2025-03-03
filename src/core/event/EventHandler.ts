@@ -19,7 +19,7 @@ import {
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Evaluator from '../Evaluator';
-// import IoC from '../../shared/helpers/IoCContainer';
+import INode from '../../definitions/interfaces/INode';
 
 export default class EventHandler {
   readonly _IRT_ = true;
@@ -210,8 +210,12 @@ export default class EventHandler {
       forEach(Object.keys(this.$events), key => {
         this.$events[key] = where(this.$events[key], event => {
           if ((event.modifiers || {}).autodestroy === false) return true;
+
           if (!event.attachedNode) return true;
-          if (event.attachedNode.isConnected) return true;
+
+          const isActive = (event.attachedNode as INode).isActive!
+            ?? (() => event.attachedNode!.isConnected);
+          if (isActive()) return true;
         });
       });
     });

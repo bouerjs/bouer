@@ -18,9 +18,6 @@ interface IBinderOptions {
   /** The context of the binding */
   context: RenderContext,
 
-  /** Allow to check if the bound element/parent-element is still connected to the DOM  */
-  isConnected: () => boolean,
-
   /** Fires whenever the data property is updated */
   onUpdate?: (value: any, node: Node) => void,
 }

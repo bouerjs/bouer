@@ -1,6 +1,6 @@
+import INode from '../../../definitions/interfaces/INode';
 import RenderContext from '../../../definitions/types/RenderContext';
 import Constants from '../../../shared/helpers/Constants';
-import Extend from '../../../shared/helpers/Extend';
 import {
   createComment,
   errorMsgEmptyNode,
@@ -8,7 +8,6 @@ import {
   findAttribute,
   forEach, getRootElement,
   ifNullReturn,
-  isNull,
   toOwnerNode,
   trim
 } from '../../../shared/helpers/Utils';
@@ -45,20 +44,27 @@ export function $if(opitons: {
   if (!container) return;
 
   const conditions: { attr: Attr, node: Element }[] = [];
+  const isActive = (container as INode).isActive!;
   const comment = createComment();
   const nodeName = node.nodeName;
   let execute = () => { };
+
 
   if (nodeName === Constants.elseif || nodeName === Constants.else) return;
 
   let currentEl: Element | null = ownerNode;
   const reactives: { attr: Attr, descriptor: Reactive<any, any> }[] = [];
 
+  // Inserting the comment ref
+  container.insertBefore(comment, currentEl);
+
   do { // Searching for 'e-else-if' and 'e-else' to complete the conditional chain
     if (currentEl == null) break;
 
     const attr = findAttribute(currentEl, ['e-if', 'e-else-if', 'e-else']);
     if (!attr) break;
+
+    (currentEl as INode).isActive = (container as INode).isActive;
 
     const firstCondition = conditions[0]; // if it already got an 'if',
     if (attr.name === 'e-if' && firstCondition && (attr.name === firstCondition.attr.name))
@@ -72,7 +78,7 @@ export function $if(opitons: {
 
     conditions.push({ attr: attr, node: currentEl });
 
-    if (attr.nodeName === ('e-else')) {
+    if (attr.nodeName === 'e-else') {
       currentEl.removeAttribute(attr.nodeName);
       break;
     }
@@ -96,15 +102,10 @@ export function $if(opitons: {
     currentEl.removeAttribute(attr.nodeName);
   } while (currentEl = currentEl.nextElementSibling);
 
-  const isChainConnected = () => !isNull(Extend.array(
-    conditions.map(x => x.node),
-    comment as any
-  ).find((el: Element) => el.isConnected));
-
   forEach(reactives, item => {
     binder.binds.push({
       // Binder is connected if at least one of the chain and the comment is still connected
-      isConnected: isChainConnected,
+      isConnected: isActive,
       watch: item.descriptor.onChange(() => execute(), item.attr)
     });
   });
@@ -112,13 +113,8 @@ export function $if(opitons: {
   (execute = () => {
     forEach(conditions, chainItem => {
       const element = getRootElement(chainItem.node);
-
       if (!element.parentElement) return;
-
-      if (comment.isConnected)
-        container.removeChild(element);
-      else
-        container.replaceChild(comment, element);
+      container.removeChild(element);
     });
 
     const conditionalExpression = conditions.map((item, index) => {
@@ -139,12 +135,12 @@ export function $if(opitons: {
         __cb: (chainIndex: number) => {
           const { node: mElement } = conditions[chainIndex];
           const element = getRootElement(mElement);
-          container.replaceChild(element, comment);
+          container.insertBefore(element, comment);
+
           compiler.compile({
             el: element,
             data: data,
-            context: context,
-            isConnected: isChainConnected
+            context: context
           });
         }
       }
@@ -182,7 +178,6 @@ export function $show(opitons: {
   const bindResult = binder.create({
     data: data,
     node: node,
-    isConnected: () => ownerNode.isConnected,
     fields: [{ expression: nodeValue, field: nodeValue }],
     context: context,
     onUpdate: () => execute(ownerNode)

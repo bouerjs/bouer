@@ -1,5 +1,6 @@
 import IBinderConfig from '../../definitions/interfaces/IBinderConfig';
 import IBinderOptions from '../../definitions/interfaces/IBinderOptions';
+import INode from '../../definitions/interfaces/INode';
 import dynamic from '../../definitions/types/Dynamic';
 import WatchCallback from '../../definitions/types/WatchCallback';
 import Bouer from '../../instance/Bouer';
@@ -59,6 +60,7 @@ export default class Binder {
     const ownerNode = (node as any).ownerElement || node.parentNode;
     const middleware = IoC.app(this.bouer).resolve(Middleware)!;
     const onUpdate = options.onUpdate || ((v: any, n: Node) => { });
+    const isActive: () => boolean = ownerNode.isActive;
 
     // Clousure cache property settings
     const propertyBindConfig: IBinderConfig = {
@@ -143,10 +145,11 @@ export default class Binder {
           .children();
 
         ownerNode.innerHTML = '';
-        forEach(htmlSnippets, snippetNode => {
+        forEach(htmlSnippets, (snippetNode: INode) => {
           ownerNode.appendChild(snippetNode);
+          snippetNode.isActive = isActive;
           IoC.app(this.bouer).resolve(Compiler)!.compile({
-            el: snippetNode,
+            el: snippetNode as Element,
             data: data,
             context: context,
           });
@@ -156,7 +159,7 @@ export default class Binder {
       ReactiveEvent.once('AfterGet', (event) => {
         event.onemit = (descriptor) => {
           this.binds.push({
-            isConnected: options.isConnected,
+            isConnected: isActive,
             watch: descriptor.onChange(() => {
               $RunDirectiveMiddlewares('onUpdate');
               setter();
@@ -333,7 +336,7 @@ export default class Binder {
         // Adding the event on emittion
         evt.onemit = (descriptor) => {
           this.binds.push({
-            isConnected: options.isConnected,
+            isConnected: isActive,
             watch: descriptor.onChange(() => {
               $RunDirectiveMiddlewares('onUpdate');
               const value = getValue();

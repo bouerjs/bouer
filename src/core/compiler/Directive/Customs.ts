@@ -34,7 +34,6 @@ export function custom(opitons: {
     fields: delimiters,
     isReplaceProperty: false,
     context: context,
-    isConnected: () => ownerNode.isConnected,
     onUpdate: () => {
       if (typeof $CustomDirective.onUpdate === 'function')
         $CustomDirective.onUpdate(node, bindConfig);

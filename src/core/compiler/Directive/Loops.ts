@@ -1,3 +1,4 @@
+import INode from '../../../definitions/interfaces/INode';
 import dynamic from '../../../definitions/types/Dynamic';
 import RenderContext from '../../../definitions/types/RenderContext';
 import Constants from '../../../shared/helpers/Constants';
@@ -46,6 +47,7 @@ export function $for(opitons: {
     data
   } = opitons;
   const ownerNode = toOwnerNode(node) as Element;
+  const isActive = (ownerNode as INode).isActive!;
   const container = ownerNode.parentElement;
 
   if (!container) return;
@@ -94,7 +96,6 @@ export function $for(opitons: {
       fields: delimiters,
       isReplaceProperty: true,
       context: context,
-      isConnected: () => comment.isConnected,
       onUpdate: () => execute()
     });
 
@@ -102,6 +103,7 @@ export function $for(opitons: {
 
   // Cloning the element
   const forItem = ownerNode.cloneNode(true);
+
   // Replacing the comment reference
   container.replaceChild(comment, ownerNode);
 
@@ -389,7 +391,7 @@ export function $for(opitons: {
   const reactivePropertyEvent = ReactiveEvent.on('AfterGet',
     descriptor => {
       binder.binds.push({
-        isConnected: () => comment.isConnected,
+        isConnected: isActive,
         watch: descriptor.onChange((_n, _o, detail) =>
           $OnArrayChanges(detail), node)
       });

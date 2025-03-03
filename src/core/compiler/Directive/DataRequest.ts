@@ -84,13 +84,10 @@ export function $req(opitons: {
       fields: delimiters,
       context: context,
       isReplaceProperty: false,
-      isConnected: () => comment.isConnected,
       onUpdate: () => onUpdate()
     });
 
   ownerNode.removeAttribute(node.nodeName);
-  // Mutating the `isConnected` property of the e-req node
-  Prop.set(ownerNode, 'isConnected', { get: () => comment.isConnected });
 
   const subcribeEvent = (eventName: string) => {
     const attr = ownerNode.attributes.getNamedItem(Constants.on + eventName);
@@ -218,8 +215,7 @@ export function $req(opitons: {
         return compiler.compile({
           el: ownerNode,
           data: Reactive.transform({ context: context, data: data }),
-          context: context,
-          isConnected: () => comment.isConnected
+          context: context
         });
       }
 
@@ -238,8 +234,7 @@ export function $req(opitons: {
         return compiler.compile({
           el: ownerNode,
           data: mData,
-          context: context,
-          isConnected: () => comment.isConnected
+          context: context
         });
       }
     };

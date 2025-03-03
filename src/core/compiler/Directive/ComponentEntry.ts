@@ -73,7 +73,6 @@ export function $put(opitons: {
   binder.create({
     data: data,
     node: node,
-    isConnected: () => ownerNode.isConnected,
     fields: [{ expression: nodeValue, field: nodeValue }],
     context: context,
     isReplaceProperty: false,
