@@ -43,7 +43,6 @@ export function $bind(opitons: {
 
   binder.create({
     node: node,
-    isConnected: () => ownerNode.isConnected,
     fields: [{ field: nodeValue, expression: nodeValue }],
     context: context,
     data: data
@@ -111,7 +110,6 @@ export function $property(opitons: {
     isReplaceProperty: false,
     context: context,
     fields: [{ expression: nodeValue, field: nodeValue }],
-    isConnected: () => ownerNode.isConnected,
     onUpdate: () => execute(evaluator.exec({
       data: data,
       code: nodeValue,
@@ -162,8 +160,6 @@ export function $href(opitons: {
   if (nodeValue === '')
     return Logger.error(errorMsgEmptyNode(node));
 
-  ownerNode.removeAttribute(node.nodeName);
-
   const usehash = ifNullReturn(bouer.config.usehash, true);
   const routeToSet = urlCombine((usehash ? '#' : ''), nodeValue);
 
@@ -175,10 +171,11 @@ export function $href(opitons: {
     binder.create({
       data: data,
       node: href,
-      isConnected: () => ownerNode.isConnected,
       context: context,
       fields: delimiters
     });
+
+  ownerNode.removeAttribute(node.nodeName);
 
   (ownerNode as HTMLAnchorElement)
     .addEventListener('click', event => {
