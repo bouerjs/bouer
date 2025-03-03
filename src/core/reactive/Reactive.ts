@@ -224,7 +224,7 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
               case 'push': case 'unshift':
                 forEach(toArray(args), (arg: any) => {
                   if (!isObject(arg) && !Array.isArray(arg)) return;
-                  executer(arg, visiting, visited);
+                  executer(arg, [], []);
                 });
             }
 
