@@ -18,7 +18,7 @@ interface IBinderConfig {
   fields: IDelimiterResponse[],
   /** directive modifiers (e-dir:arg:mod1.mod2) */
   modifiers?: string[],
-  /** the value o of the bound node */
+  /** the value of the bound node */
   value: string
 }
 
