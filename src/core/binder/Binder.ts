@@ -41,11 +41,6 @@ export default class Binder {
     contenteditable: 'textContent',
   };
 
-  private BindingDirection = {
-    fromInputToData: 'fromInputToData',
-    fromDataToInput: 'fromDataToInput',
-  };
-
   constructor(bouer: Bouer, evaluator: Evaluator) {
     this.bouer = bouer;
     this.evaluator = evaluator;
@@ -97,16 +92,21 @@ export default class Binder {
       // One-Way Data Binding
       let nodeToBind = node;
 
-      // If definable property e-[?]=""..."
+      // If definable property e-[?]=""..." Ex: e-src => src
       if (
-        originalName.substring(0, Constants.property.length) ===
-        Constants.property &&
+        // If: [e-]src === [e-]
+        originalName.substring(0, Constants.property.length) === Constants.property &&
+        // And isn't replaceable
         isNull(isReplaceProperty)
       ) {
+        // Original bound property name e-src => src
         propertyBindConfig.nodeName = originalName.substring(
           Constants.property.length
         );
+
+        // Set the new attr
         ownerNode.setAttribute(propertyBindConfig.nodeName, originalValue);
+        // Retrieve the new attr set
         nodeToBind = ownerNode.attributes[propertyBindConfig.nodeName];
 
         // Removing the e-[?] attr
@@ -120,10 +120,13 @@ export default class Binder {
 
         // Looping all the fields to be setted
         forEach(fields, (field) => {
+          // Retrieving the delimiter used in this field
           const delimiter = field.delimiter;
 
+          // Mark isHtml as true if it's a HTML delimiter type
           if (delimiter && delimiter.name === 'html') isHtml = true;
 
+          // Evaluate the expression from the delimiter
           let result = this.evaluator.exec({
             data: data,
             code: field.expression,
@@ -131,6 +134,7 @@ export default class Binder {
           });
 
           result = isNull(result) ? '' : result;
+          // Replacing each field with the specific value
           valueToSet = valueToSet.replace(field.field, toStr(result));
 
           if (delimiter && typeof delimiter.onUpdate === 'function')
@@ -180,26 +184,31 @@ export default class Binder {
       let propertyNameToBind = '';
       let binderTarget = ownerNode.type;
 
+      // Changing the target to the binding, as it is contenteditable element type
       if (ownerNode.hasAttribute('contenteditable'))
         binderTarget = 'contenteditable';
 
+      // If the 'type' property has not valid value, target the name of the node. Example: value
       binderTarget = binderTarget || ownerNode.localName;
 
+      // If the original name is e-bind, load the default binding value by the target
       if (Constants.bind === originalName)
-        propertyNameToBind =
-          this.DEFAULT_BINDER_PROPERTIES[binderTarget] || 'value';
+        propertyNameToBind = this.DEFAULT_BINDER_PROPERTIES[binderTarget] || 'value';
       else propertyNameToBind = originalName.split(':')[1]; // e-bind:value -> value
 
       const isSelect = ownerNode instanceof HTMLSelectElement;
       const isSelectMultiple = isSelect && ownerNode.multiple === true;
+
+      // Finding the :value 'binding model' for the node that is being bound
       const modelAttribute = findAttribute(ownerNode, [':value'], true);
       const dataBindModel: any = modelAttribute ? modelAttribute.value : '\'' + ownerNode.value + '\'';
+
       const dataBindProperty = trim(originalValue);
 
       let boundPropertyValue: any;
       let boundModelValue: any;
 
-      const $Setter: { [key: string]: (v: any) => void } = {
+      const bindingDirection: { [key: string]: (v: any) => void } = {
         fromDataToInput: (value: any) => {
           // Normal Property Set
           if (!Array.isArray(boundPropertyValue)) {
@@ -297,7 +306,7 @@ export default class Binder {
         },
       };
 
-      const callback = (direction: string, value: any) => {
+      const setter = (direction: 'fromInputToData' | 'fromDataToInput', value: any) => {
         if (
           isSelect &&
           !isSelectMultiple &&
@@ -322,9 +331,10 @@ export default class Binder {
           );
         }
 
-        return $Setter[direction](value);
+        return bindingDirection[direction](value);
       };
 
+      // Subscribing the bind to the property
       ReactiveEvent.once('AfterGet', (evt) => {
         const getValue = () =>
           this.evaluator.exec({
@@ -340,7 +350,7 @@ export default class Binder {
             watch: descriptor.onChange(() => {
               $RunDirectiveMiddlewares('onUpdate');
               const value = getValue();
-              callback(this.BindingDirection.fromDataToInput, value);
+              setter('fromDataToInput', value);
               onUpdate(value, node);
             }, node),
           });
@@ -351,8 +361,11 @@ export default class Binder {
       });
 
       $RunDirectiveMiddlewares('onBind');
-      callback(this.BindingDirection.fromDataToInput, boundPropertyValue);
 
+      // Running the first value setting: { } -> Element
+      setter('fromDataToInput', boundPropertyValue);
+
+      // Adding custom listeners according to the node name
       const listeners = ['input', 'propertychange', 'change'];
       if (listeners.indexOf(ownerNode.localName) === -1)
         listeners.push(ownerNode.localName);
@@ -361,25 +374,22 @@ export default class Binder {
       forEach(listeners, (listener) => {
         if (listener === 'change' && ownerNode.localName !== 'select') return;
 
+        // Adding the event to listen to the element change event
         ownerNode.addEventListener(
-          listener,
-          () => {
-            callback(
-              this.BindingDirection.fromInputToData,
-              ownerNode[propertyNameToBind]
-            );
-          },
-          false
+          listener, () => setter('fromInputToData', ownerNode[propertyNameToBind]), false
         );
       });
 
-      // Removing the e-bind attr
+      // Removing the e-bind attr from the node
       ownerNode.removeAttribute(node.nodeName);
       return propertyBindConfig; // Stop Two-Way Data Binding Process
     };
 
+    // Apply TwoWay if: e-bind
     if (originalName.substring(0, Constants.bind.length) === Constants.bind)
       return $BindTwoWay();
+
+    // Apply OneWay if any other type of binding
     return $BindOneWay();
   }
 
