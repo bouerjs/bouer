@@ -407,12 +407,6 @@ export function getRootElement(el: Element): Element {
   return (el as any).root || el;
 }
 
-export function copyObject<TObject extends dynamic>(object: TObject) {
-  const out: dynamic = Object.create(object.__proto__);
-  forEach(Object.keys(object), key => out[key] = object[key]);
-  return out as TObject;
-}
-
 export function setData<
   InputData extends dynamic, TargetObject extends dynamic, DataResult extends InputData & TargetObject
 >(

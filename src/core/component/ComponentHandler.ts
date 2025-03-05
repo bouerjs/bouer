@@ -26,7 +26,6 @@ import {
   urlResolver,
   webRequest,
   where,
-  copyObject,
   trim
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
@@ -215,7 +214,7 @@ export default class ComponentHandler {
         if ((c instanceof Component) && (c as Component).clazz)
           mCom = IoC.app(this.bouer).resolve(c.clazz!) || IoC.new(c.clazz!)!;
         else if (c instanceof Component)
-          mCom = copyObject(c);
+          mCom = structuredClone(c);
         else
           mCom = new Component(c);
 
