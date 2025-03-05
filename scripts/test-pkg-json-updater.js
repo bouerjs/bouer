@@ -22,8 +22,8 @@ const path = require('path');
       const deps = packageJsonObject.dependencies || {};
 
       packageJsonObject.dependencies = {
-        bouerjs: `file:../../../${newPackedName}`,
-        ...deps
+        ...deps,
+        bouerjs: `file:../../../${newPackedName}`
       };
 
       fs.writeFileSync(

@@ -38,6 +38,6 @@
     "webpack-dev-server": "^4.7.3"
   },
   "dependencies": {
-    "bouerjs": "file:../../../bouerjs-3.1.1.tgz"
+    "bouerjs": "file:../../../bouerjs-3.1.2.tgz"
   }
 }

@@ -13,7 +13,7 @@
     "build": "rollup --config rollup.config.js --configPlugin typescript",
     "build-r": "node scripts/build.js",
     "build-all": "node scripts/build.js --prod",
-    "pack": "node scripts/build.js --prod && npm pack",
+    "pack": "node scripts/build.js --prod && npm pack && node scripts/test-pkg-json-updater.js",
     "prepare": "husky install",
     "changelog": "auto-changelog -p -u"
   },
