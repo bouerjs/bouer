@@ -1,5 +1,5 @@
 /*!
- * Bouer.js v3.1.1
+ * Bouer.js v3.1.2
  * Copyright Easy.js 2018-2020 | 2021-2025 Afonso Matumona
  * Released under the MIT License.
  */
@@ -300,7 +300,7 @@
                   forEach(toArray(args), function(arg) {
                     if (!isObject(arg) && !Array.isArray(arg))
                       return;
-                    executer(arg, visiting, visited);
+                    executer(arg, [], []);
                   });
               }
               var result = reference_1[method].apply(inputArray_1, args);
@@ -851,14 +851,6 @@
 
   function getRootElement(el) {
     return el.root || el;
-  }
-
-  function copyObject(object) {
-    var out = Object.create(object.__proto__);
-    forEach(Object.keys(object), function(key) {
-      return out[key] = object[key];
-    });
-    return out;
   }
 
   function setData(context, inputData, targetObject) {
@@ -1658,10 +1650,6 @@
         radio: 'value',
         contenteditable: 'textContent',
       };
-      this.BindingDirection = {
-        fromInputToData: 'fromInputToData',
-        fromDataToInput: 'fromDataToInput',
-      };
       this.bouer = bouer;
       this.evaluator = evaluator;
       this.cleanup();
@@ -1678,6 +1666,7 @@
       var ownerNode = node.ownerElement || node.parentNode;
       var middleware = IoC.app(this.bouer).resolve(Middleware);
       var onUpdate = options.onUpdate || (function(v, n) {});
+      var isActive = ownerNode.isActive;
       // Clousure cache property settings
       var propertyBindConfig = {
         node: node,
@@ -1707,12 +1696,17 @@
       var $BindOneWay = function() {
         // One-Way Data Binding
         var nodeToBind = node;
-        // If definable property e-[?]=""..."
-        if (originalName.substring(0, Constants.property.length) ===
-          Constants.property &&
+        // If definable property e-[?]=""..." Ex: e-src => src
+        if (
+          // If: [e-]src === [e-]
+          originalName.substring(0, Constants.property.length) === Constants.property &&
+          // And isn't replaceable
           isNull(isReplaceProperty)) {
+          // Original bound property name e-src => src
           propertyBindConfig.nodeName = originalName.substring(Constants.property.length);
+          // Set the new attr
           ownerNode.setAttribute(propertyBindConfig.nodeName, originalValue);
+          // Retrieve the new attr set
           nodeToBind = ownerNode.attributes[propertyBindConfig.nodeName];
           // Removing the e-[?] attr
           ownerNode.removeAttribute(node.nodeName);
@@ -1723,15 +1717,19 @@
           var isHtml = false;
           // Looping all the fields to be setted
           forEach(fields, function(field) {
+            // Retrieving the delimiter used in this field
             var delimiter = field.delimiter;
+            // Mark isHtml as true if it's a HTML delimiter type
             if (delimiter && delimiter.name === 'html')
               isHtml = true;
+            // Evaluate the expression from the delimiter
             var result = _this.evaluator.exec({
               data: data,
               code: field.expression,
               context: context,
             });
             result = isNull(result) ? '' : result;
+            // Replacing each field with the specific value
             valueToSet = valueToSet.replace(field.field, toStr(result));
             if (delimiter && typeof delimiter.onUpdate === 'function')
               valueToSet = delimiter.onUpdate(valueToSet, node, data);
@@ -1746,6 +1744,7 @@
           ownerNode.innerHTML = '';
           forEach(htmlSnippets, function(snippetNode) {
             ownerNode.appendChild(snippetNode);
+            snippetNode.isActive = isActive;
             IoC.app(_this.bouer).resolve(Compiler).compile({
               el: snippetNode,
               data: data,
@@ -1756,7 +1755,7 @@
         ReactiveEvent.once('AfterGet', function(event) {
           event.onemit = function(descriptor) {
             _this.binds.push({
-              isConnected: options.isConnected,
+              isConnected: isActive,
               watch: descriptor.onChange(function() {
                 $RunDirectiveMiddlewares('onUpdate');
                 setter();
@@ -1773,22 +1772,25 @@
       var $BindTwoWay = function() {
         var propertyNameToBind = '';
         var binderTarget = ownerNode.type;
+        // Changing the target to the binding, as it is contenteditable element type
         if (ownerNode.hasAttribute('contenteditable'))
           binderTarget = 'contenteditable';
+        // If the 'type' property has not valid value, target the name of the node. Example: value
         binderTarget = binderTarget || ownerNode.localName;
+        // If the original name is e-bind, load the default binding value by the target
         if (Constants.bind === originalName)
-          propertyNameToBind =
-          _this.DEFAULT_BINDER_PROPERTIES[binderTarget] || 'value';
+          propertyNameToBind = _this.DEFAULT_BINDER_PROPERTIES[binderTarget] || 'value';
         else
           propertyNameToBind = originalName.split(':')[1]; // e-bind:value -> value
         var isSelect = ownerNode instanceof HTMLSelectElement;
         var isSelectMultiple = isSelect && ownerNode.multiple === true;
+        // Finding the :value 'binding model' for the node that is being bound
         var modelAttribute = findAttribute(ownerNode, [':value'], true);
         var dataBindModel = modelAttribute ? modelAttribute.value : '\'' + ownerNode.value + '\'';
         var dataBindProperty = trim(originalValue);
         var boundPropertyValue;
         var boundModelValue;
-        var $Setter = {
+        var bindingDirection = {
           fromDataToInput: function(value) {
             // Normal Property Set
             if (!Array.isArray(boundPropertyValue)) {
@@ -1870,7 +1872,7 @@
               boundPropertyValue.splice(boundPropertyValue.indexOf(boundModelValue), 1);
           },
         };
-        var callback = function(direction, value) {
+        var setter = function(direction, value) {
           if (isSelect &&
             !isSelectMultiple &&
             Array.isArray(boundPropertyValue) &&
@@ -1885,8 +1887,9 @@
             return Logger.error('Since it\'s an array binding it expects a model but it has not been defined' +
               ', provide a model as it follows: value="String-Model" or :value="Object-Model".');
           }
-          return $Setter[direction](value);
+          return bindingDirection[direction](value);
         };
+        // Subscribing the bind to the property
         ReactiveEvent.once('AfterGet', function(evt) {
           var getValue = function() {
             return _this.evaluator.exec({
@@ -1898,11 +1901,11 @@
           // Adding the event on emittion
           evt.onemit = function(descriptor) {
             _this.binds.push({
-              isConnected: options.isConnected,
+              isConnected: isActive,
               watch: descriptor.onChange(function() {
                 $RunDirectiveMiddlewares('onUpdate');
                 var value = getValue();
-                callback(_this.BindingDirection.fromDataToInput, value);
+                setter('fromDataToInput', value);
                 onUpdate(value, node);
               }, node),
             });
@@ -1911,7 +1914,9 @@
           boundPropertyValue = getValue();
         });
         $RunDirectiveMiddlewares('onBind');
-        callback(_this.BindingDirection.fromDataToInput, boundPropertyValue);
+        // Running the first value setting: { } -> Element
+        setter('fromDataToInput', boundPropertyValue);
+        // Adding custom listeners according to the node name
         var listeners = ['input', 'propertychange', 'change'];
         if (listeners.indexOf(ownerNode.localName) === -1)
           listeners.push(ownerNode.localName);
@@ -1919,16 +1924,19 @@
         forEach(listeners, function(listener) {
           if (listener === 'change' && ownerNode.localName !== 'select')
             return;
+          // Adding the event to listen to the element change event
           ownerNode.addEventListener(listener, function() {
-            callback(_this.BindingDirection.fromInputToData, ownerNode[propertyNameToBind]);
+            return setter('fromInputToData', ownerNode[propertyNameToBind]);
           }, false);
         });
-        // Removing the e-bind attr
+        // Removing the e-bind attr from the node
         ownerNode.removeAttribute(node.nodeName);
         return propertyBindConfig; // Stop Two-Way Data Binding Process
       };
+      // Apply TwoWay if: e-bind
       if (originalName.substring(0, Constants.bind.length) === Constants.bind)
         return $BindTwoWay();
+      // Apply OneWay if any other type of binding
       return $BindOneWay();
     };
     Binder.prototype.remove = function(boundNode, boundAttrName, boundPropName) {
@@ -2002,7 +2010,6 @@
     };
     return Binder;
   }());
-  // import IoC from '../../shared/helpers/IoCContainer';
   var EventHandler = /** @class */ (function() {
     function EventHandler(bouer, evaluator) {
       this._IRT_ = true;
@@ -2174,11 +2181,15 @@
       Task.run(function() {
         forEach(Object.keys(_this.$events), function(key) {
           _this.$events[key] = where(_this.$events[key], function(event) {
+            var _a;
             if ((event.modifiers || {}).autodestroy === false)
               return true;
             if (!event.attachedNode)
               return true;
-            if (event.attachedNode.isConnected)
+            var isActive = (_a = event.attachedNode.isActive) !== null && _a !== void 0 ? _a : (function() {
+              return event.attachedNode.isConnected;
+            });
+            if (isActive())
               return true;
           });
         });
@@ -2392,9 +2403,6 @@
       return Logger.error(errorMsgNodeValue(node));
     binder.create({
       node: node,
-      isConnected: function() {
-        return ownerNode.isConnected;
-      },
       fields: [{
         field: nodeValue,
         expression: nodeValue
@@ -2449,9 +2457,6 @@
         expression: nodeValue,
         field: nodeValue
       }],
-      isConnected: function() {
-        return ownerNode.isConnected;
-      },
       onUpdate: function() {
         return execute(evaluator.exec({
           data: data,
@@ -2490,7 +2495,6 @@
     var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
     if (nodeValue === '')
       return Logger.error(errorMsgEmptyNode(node));
-    ownerNode.removeAttribute(node.nodeName);
     var usehash = ifNullReturn(bouer.config.usehash, true);
     var routeToSet = urlCombine((usehash ? '#' : ''), nodeValue);
     ownerNode.setAttribute('href', routeToSet);
@@ -2500,12 +2504,10 @@
       binder.create({
         data: data,
         node: href,
-        isConnected: function() {
-          return ownerNode.isConnected;
-        },
         context: context,
         fields: delimiters
       });
+    ownerNode.removeAttribute(node.nodeName);
     ownerNode
       .addEventListener('click', function(event) {
         event.preventDefault();
@@ -2554,9 +2556,6 @@
     binder.create({
       data: data,
       node: node,
-      isConnected: function() {
-        return ownerNode.isConnected;
-      },
       fields: [{
         expression: nodeValue,
         field: nodeValue
@@ -2594,6 +2593,7 @@
     if (!container)
       return;
     var conditions = [];
+    var isActive = container.isActive;
     var comment = createComment();
     var nodeName = node.nodeName;
     var execute = function() {};
@@ -2601,12 +2601,15 @@
       return;
     var currentEl = ownerNode;
     var reactives = [];
+    // Inserting the comment ref
+    container.insertBefore(comment, currentEl);
     var _loop_1 = function() {
       if (currentEl == null)
         return "break";
       var attr = findAttribute(currentEl, ['e-if', 'e-else-if', 'e-else']);
       if (!attr)
         return "break";
+      currentEl.isActive = container.isActive;
       var firstCondition = conditions[0]; // if it already got an 'if',
       if (attr.name === 'e-if' && firstCondition && (attr.name === firstCondition.attr.name))
         return "break";
@@ -2622,7 +2625,7 @@
         attr: attr,
         node: currentEl
       });
-      if (attr.nodeName === ('e-else')) {
+      if (attr.nodeName === 'e-else') {
         currentEl.removeAttribute(attr.nodeName);
         return "break";
       }
@@ -2654,17 +2657,10 @@
       if (state_1 === "break")
         break;
     } while (currentEl = currentEl.nextElementSibling);
-    var isChainConnected = function() {
-      return !isNull(Extend.array(conditions.map(function(x) {
-        return x.node;
-      }), comment).find(function(el) {
-        return el.isConnected;
-      }));
-    };
     forEach(reactives, function(item) {
       binder.binds.push({
         // Binder is connected if at least one of the chain and the comment is still connected
-        isConnected: isChainConnected,
+        isConnected: isActive,
         watch: item.descriptor.onChange(function() {
           return execute();
         }, item.attr)
@@ -2675,10 +2671,7 @@
         var element = getRootElement(chainItem.node);
         if (!element.parentElement)
           return;
-        if (comment.isConnected)
-          container.removeChild(element);
-        else
-          container.replaceChild(comment, element);
+        container.removeChild(element);
       });
       var conditionalExpression = conditions.map(function(item, index) {
         var $value = item.attr.value;
@@ -2700,12 +2693,11 @@
           __cb: function(chainIndex) {
             var mElement = conditions[chainIndex].node;
             var element = getRootElement(mElement);
-            container.replaceChild(element, comment);
+            container.insertBefore(element, comment);
             compiler.compile({
               el: element,
               data: data,
-              context: context,
-              isConnected: isChainConnected
+              context: context
             });
           }
         }
@@ -2730,9 +2722,6 @@
     var bindResult = binder.create({
       data: data,
       node: node,
-      isConnected: function() {
-        return ownerNode.isConnected;
-      },
       fields: [{
         expression: nodeValue,
         field: nodeValue
@@ -2770,9 +2759,6 @@
       fields: delimiters,
       isReplaceProperty: false,
       context: context,
-      isConnected: function() {
-        return ownerNode.isConnected;
-      },
       onUpdate: function() {
         if (typeof $CustomDirective.onUpdate === 'function')
           $CustomDirective.onUpdate(node, bindConfig);
@@ -2995,20 +2981,11 @@
         fields: delimiters,
         context: context,
         isReplaceProperty: false,
-        isConnected: function() {
-          return comment.isConnected;
-        },
         onUpdate: function() {
           return onUpdate();
         }
       });
     ownerNode.removeAttribute(node.nodeName);
-    // Mutating the `isConnected` property of the e-req node
-    Prop.set(ownerNode, 'isConnected', {
-      get: function() {
-        return comment.isConnected;
-      }
-    });
     var subcribeEvent = function(eventName) {
       var attr = ownerNode.attributes.getNamedItem(Constants.on + eventName);
       if (attr)
@@ -3115,10 +3092,7 @@
               context: context,
               data: data
             }),
-            context: context,
-            isConnected: function() {
-              return comment.isConnected;
-            }
+            context: context
           });
         }
         if (expObject.type === 'of') {
@@ -3131,10 +3105,7 @@
           return compiler.compile({
             el: ownerNode,
             data: mData,
-            context: context,
-            isConnected: function() {
-              return comment.isConnected;
-            }
+            context: context
           });
         }
       };
@@ -3194,386 +3165,381 @@
       eventHandler = opitons.eventHandler,
       delimiter = opitons.delimiter,
       context = opitons.context,
-      data = opitons.data; {
-      var ownerNode = toOwnerNode(node);
-      var container_1 = ownerNode.parentElement;
-      if (!container_1)
-        return;
-      if (ownerNode.hasAttribute('skeleton-cloned'))
-        return;
-      var comment_1 = createComment();
-      var nodeName_1 = node.nodeName;
-      var nodeValue_1 = trim(ifNullReturn(node.nodeValue, ''));
-      var listedItemsHandler_1 = [];
-      var hasWhereFilter_1 = false;
-      var hasOrderFilter_1 = false;
-      var execute_1 = function() {};
-      if (nodeValue_1 === '')
-        return Logger.error(errorMsgEmptyNode(node));
-      if (!nodeValue_1.includes(' of ') && !nodeValue_1.includes(' in '))
-        return Logger.error('Expected a valid “for” expression in “' +
-          nodeName_1 + '” and got “' + nodeValue_1 +
-          '”.' + '\nValid: e-for="item of items".');
-      // Binding the e-for if got delimiters
-      var delimiters = delimiter.run(nodeValue_1);
-      if (delimiters.length !== 0)
-        binder.create({
-          node: node,
-          data: data,
-          fields: delimiters,
-          isReplaceProperty: true,
-          context: context,
-          isConnected: function() {
-            return comment_1.isConnected;
-          },
-          onUpdate: function() {
-            return execute_1();
-          }
-        });
-      ownerNode.removeAttribute(nodeName_1);
-      // Cloning the element
-      var forItem_1 = ownerNode.cloneNode(true);
-      // Replacing the comment reference
-      container_1.replaceChild(comment_1, ownerNode);
-      // Filters the list of items
-      var $Where_1 = function(list, filterConfigParts) {
-        hasWhereFilter_1 = true;
-        var wKeys = filterConfigParts[2];
-        var wValue = filterConfigParts[1];
-        if (isNull(wValue) || wValue === '') {
-          Logger.error('Invalid where-value in “' + nodeName_1 + '” with “' + nodeValue_1 + '” expression.');
+      data = opitons.data;
+    var ownerNode = toOwnerNode(node);
+    var isActive = ownerNode.isActive;
+    var container = ownerNode.parentElement;
+    if (!container)
+      return;
+    if (ownerNode.hasAttribute('skeleton-cloned'))
+      return;
+    var comment = createComment();
+    var nodeName = node.nodeName;
+    var nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+    var listedItemsHandler = [];
+    var hasWhereFilter = false;
+    var hasOrderFilter = false;
+    var execute = function() {};
+    if (nodeValue === '')
+      return Logger.error(errorMsgEmptyNode(node));
+    if (!nodeValue.includes(' of ') && !nodeValue.includes(' in '))
+      return Logger.error('Expected a valid “for” expression in “' +
+        nodeName + '” and got “' + nodeValue +
+        '”.' + '\nValid: e-for="item of items".');
+    // Binding the e-for if got delimiters
+    var delimiters = delimiter.run(nodeValue);
+    if (delimiters.length !== 0)
+      binder.create({
+        node: node,
+        data: data,
+        fields: delimiters,
+        isReplaceProperty: true,
+        context: context,
+        onUpdate: function() {
+          return execute();
+        }
+      });
+    ownerNode.removeAttribute(nodeName);
+    // Cloning the element
+    var forItem = ownerNode.cloneNode(true);
+    // Replacing the comment reference
+    container.replaceChild(comment, ownerNode);
+    // Filters the list of items
+    var $Where = function(list, filterConfigParts) {
+      hasWhereFilter = true;
+      var wKeys = filterConfigParts[2];
+      var wValue = filterConfigParts[1];
+      if (isNull(wValue) || wValue === '') {
+        Logger.error('Invalid where-value in “' + nodeName + '” with “' + nodeValue + '” expression.');
+        return list;
+      }
+      wValue = evaluator.exec({
+        data: data,
+        code: wValue,
+        context: context
+      });
+      // where:filterFunction
+      if (typeof wValue === 'function') {
+        list = wValue(list);
+      } else {
+        // where:search:name?
+        if ((isNull(wKeys) || wKeys === '') && isObject(list[0] || '')) {
+          Logger.error(('Invalid where-keys in “' + nodeName + '” with “' + nodeValue + '” expression, ' +
+            'at least one where-key to be provided when using list of object.'));
           return list;
         }
-        wValue = evaluator.exec({
-          data: data,
-          code: wValue,
-          context: context
-        });
-        // where:filterFunction
-        if (typeof wValue === 'function') {
-          list = wValue(list);
-        } else {
-          // where:search:name?
-          if ((isNull(wKeys) || wKeys === '') && isObject(list[0] || '')) {
-            Logger.error(('Invalid where-keys in “' + nodeName_1 + '” with “' + nodeValue_1 + '” expression, ' +
-              'at least one where-key to be provided when using list of object.'));
-            return list;
-          }
-          var newListCopy_1 = [];
-          forEach(list, function(item) {
-            var isValid = false;
-            if (isNull(wKeys)) {
-              isValid = toStr(item).toLowerCase().includes(wValue.toLowerCase());
-            } else {
-              var keysList = wKeys.split(',').map(function(m) {
-                return trim(m);
+        var newListCopy_1 = [];
+        forEach(list, function(item) {
+          var isValid = false;
+          if (isNull(wKeys)) {
+            isValid = toStr(item).toLowerCase().includes(wValue.toLowerCase());
+          } else {
+            var keysList = wKeys.split(',').map(function(m) {
+              return trim(m);
+            });
+            for (var i = 0; i < keysList.length; i++) {
+              var prop = keysList[i];
+              var propValue = evaluator.exec({
+                data: item,
+                code: prop,
+                context: context
               });
-              for (var i = 0; i < keysList.length; i++) {
-                var prop = keysList[i];
-                var propValue = evaluator.exec({
-                  data: item,
-                  code: prop,
-                  context: context
-                });
-                if (toStr(propValue).toLowerCase().includes(wValue.toLowerCase())) {
-                  isValid = true;
-                  break;
-                }
+              if (toStr(propValue).toLowerCase().includes(wValue.toLowerCase())) {
+                isValid = true;
+                break;
               }
             }
-            if (isValid)
-              newListCopy_1.push(item);
-          });
-          list = newListCopy_1;
-        }
-        return list;
-      };
-      // Order the list of items
-      var $Order_1 = function(list, type, prop) {
-        hasOrderFilter_1 = true;
-        if (!type)
-          type = 'asc';
-        return list.sort(function(a, b) {
-          var comparison = function(asc, desc) {
-            if (isNull(asc) || isNull(desc))
+          }
+          if (isValid)
+            newListCopy_1.push(item);
+        });
+        list = newListCopy_1;
+      }
+      return list;
+    };
+    // Order the list of items
+    var $Order = function(list, type, prop) {
+      hasOrderFilter = true;
+      if (!type)
+        type = 'asc';
+      return list.sort(function(a, b) {
+        var comparison = function(asc, desc) {
+          if (isNull(asc) || isNull(desc))
+            return 0;
+          switch (toLower(type)) {
+            case 'asc':
+              return asc ? 1 : -1;
+            case 'desc':
+              return desc ? -1 : 1;
+            default:
+              Logger.log('The “' + type + '” order type is invalid: “' + nodeValue +
+                '”. Available types are: “asc”  for order ascendent and “desc” for order descendent.');
               return 0;
-            switch (toLower(type)) {
-              case 'asc':
-                return asc ? 1 : -1;
-              case 'desc':
-                return desc ? -1 : 1;
-              default:
-                Logger.log('The “' + type + '” order type is invalid: “' + nodeValue_1 +
-                  '”. Available types are: “asc”  for order ascendent and “desc” for order descendent.');
-                return 0;
-            }
-          };
-          if (!prop)
-            return comparison(a > b, b < a);
-          return comparison(a[prop] > b[prop], b[prop] < a[prop]);
-        });
-      };
-      // Prepare the item before to insert
-      var $PrepareForItem_1 = function(item, index) {
-        expObj_1 = expObj_1 || $ExpressionBuilder_1(trim(ifNullReturn(node.nodeValue, '')));
-        var leftHandParts = expObj_1.leftHandParts;
-        var sourceValue = expObj_1.sourceValue;
-        var isForOf = expObj_1.isForOf;
-        var forData = Extend.obj(data);
-        var itemKey = leftHandParts[0];
-        var indexOrValue = leftHandParts[1] || '_index_or_value';
-        var mIndex = leftHandParts[2] || '_for_in_index';
-        forData[itemKey] = item;
-        forData[indexOrValue] = isForOf ? index : sourceValue[item];
-        forData[mIndex] = index;
-        return Reactive.transform({
-          data: forData,
-          context: context
-        });
-      };
-      // Inserts an element in the DOM
-      var $InsertForItem_1 = function(options) {
-        // Preparing the data to be inserted
-        var forData = $PrepareForItem_1(options.item, options.index);
-        // Inserting in the DOM
-        var forClonedItem = container_1.insertBefore(forItem_1.cloneNode(true), options.reference || comment_1);
-        // Compiling the inserted data
-        compiler.compile({
-          el: forClonedItem,
-          data: forData,
-          context: context,
-          onDone: function(el) {
-            return eventHandler.emit({
-              eventName: Constants.builtInEvents.add,
-              attachedNode: el,
-              once: true
-            });
           }
-        });
-        // Updating the handler
-        listedItemsHandler_1.splice(options.index, 0, {
-          el: forClonedItem,
-          data: forData
-        });
-        return forClonedItem;
-      };
-      // Builds the expression to an object
-      var $ExpressionBuilder_1 = function(expression) {
-        var filters = expression.split('|').map(function(item) {
-          return trim(item);
-        });
-        var forExpression = filters[0].replace(/\(|\)/g, '');
-        filters.shift();
-        // for types:
-        // e-for='item of items',  e-for='(item, index) of items'
-        // e-for='key in object', e-for='(key, value) in object'
-        // e-for='(key, value, index) in object'
-        var forSeparator = ' of ';
-        var forParts = forExpression.split(forSeparator);
-        if (!(forParts.length > 1))
-          forParts = forExpression.split(forSeparator = ' in ');
-        var leftHand = forParts[0];
-        var rightHand = forParts[1];
-        var leftHandParts = leftHand.split(',').map(function(x) {
-          return trim(x);
-        });
-        var isForOf = trim(forSeparator) === 'of';
-        var iterable = isForOf ? rightHand : 'Object.keys(' + rightHand + ')';
-        var sourceValue = evaluator.exec({
-          data: data,
-          code: rightHand,
-          context: context
-        });
-        return {
-          filters: filters,
-          type: forSeparator,
-          leftHand: leftHand,
-          rightHand: rightHand,
-          sourceValue: sourceValue,
-          leftHandParts: leftHandParts,
-          iterableExpression: iterable,
-          isForOf: trim(forSeparator) === 'of',
         };
-      };
-      // Handler the UI when the Array changes
-      var $OnArrayChanges_1 = function(detail) {
-        if (hasWhereFilter_1 || hasOrderFilter_1)
-          return execute_1(); // Reorganize re-insert all the items
-        detail = detail || {};
-        var method = detail.method;
-        var args = detail.args;
-        var mListedItems = listedItemsHandler_1;
-        var reOrganizeIndexes = function() {
-          // In case of unshift re-organize the indexes
-          // Was wrapped into a promise in case of large amount of data
-          return Promise.resolve(function(array) {
-            expObj_1 = expObj_1 || $ExpressionBuilder_1(trim(ifNullReturn(node.nodeValue, '')));
-            var leftHandParts = expObj_1.leftHandParts;
-            var indexOrValue = leftHandParts[1] || '_index_or_value';
-            if (indexOrValue === '_index_or_value')
-              return;
-            forEach(array, function(item, index) {
-              item.data[indexOrValue] = index;
-            });
-          }).then(function(mCaller) {
-            return mCaller(listedItemsHandler_1);
+        if (!prop)
+          return comparison(a > b, b < a);
+        return comparison(a[prop] > b[prop], b[prop] < a[prop]);
+      });
+    };
+    // Prepare the item before to insert
+    var $PrepareForItem = function(item, index) {
+      expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
+      var leftHandParts = expObj.leftHandParts;
+      var sourceValue = expObj.sourceValue;
+      var isForOf = expObj.isForOf;
+      var forData = Extend.obj(data);
+      var itemKey = leftHandParts[0];
+      var indexOrValue = leftHandParts[1] || '_index_or_value';
+      var mIndex = leftHandParts[2] || '_for_in_index';
+      forData[itemKey] = item;
+      forData[indexOrValue] = isForOf ? index : sourceValue[item];
+      forData[mIndex] = index;
+      return Reactive.transform({
+        data: forData,
+        context: context
+      });
+    };
+    // Inserts an element in the DOM
+    var $InsertForItem = function(options) {
+      // Preparing the data to be inserted
+      var forData = $PrepareForItem(options.item, options.index);
+      // Inserting in the DOM
+      var forClonedItem = container.insertBefore(forItem.cloneNode(true), options.reference || comment);
+      // Compiling the inserted data
+      compiler.compile({
+        el: forClonedItem,
+        data: forData,
+        context: context,
+        onDone: function(el) {
+          return eventHandler.emit({
+            eventName: Constants.builtInEvents.add,
+            attachedNode: el,
+            once: true
           });
-        };
-        switch (method) {
-          case 'pop':
-          case 'shift': { // First or Last item removal handler
-            var item = mListedItems[method]();
-            if (isNull(item))
-              return;
-            removeEl(getRootElement(item.el));
-            if (method === 'pop')
-              return;
-            return reOrganizeIndexes();
-          }
-          case 'splice': { // Indexed removal handler
-            var index_1 = args[0];
-            var deleteCount = args[1];
-            var removedItems = mListedItems.splice(index_1, deleteCount);
-            forEach(removedItems, function(item) {
-              return removeEl(getRootElement(item.el));
-            });
-            expObj_1 = expObj_1 || $ExpressionBuilder_1(trim(ifNullReturn(node.nodeValue, '')));
-            var leftHandParts = expObj_1.leftHandParts;
-            var indexOrValue = leftHandParts[1] || '_index_or_value';
-            var insertArgs = [].slice.call(args, 2);
-            // Adding the items to the dom
-            forEach(insertArgs, function(item) {
-              index_1++;
-              $InsertForItem_1({
-                // Getting the next reference
-                reference: getRootElement(listedItemsHandler_1[index_1].el) || comment_1,
-                index: index_1,
-                item: item,
-              });
-            });
-            if (indexOrValue === '_index_or_value')
-              return;
-            // Fixing the index value
-            for (; index_1 < listedItemsHandler_1.length; index_1++) {
-              var item = listedItemsHandler_1[index_1].data;
-              if (typeof item[indexOrValue] === 'number')
-                item[indexOrValue] = index_1;
-            }
+        }
+      });
+      // Updating the handler
+      listedItemsHandler.splice(options.index, 0, {
+        el: forClonedItem,
+        data: forData
+      });
+      return forClonedItem;
+    };
+    // Builds the expression to an object
+    var $ExpressionBuilder = function(expression) {
+      var filters = expression.split('|').map(function(item) {
+        return trim(item);
+      });
+      var forExpression = filters[0].replace(/\(|\)/g, '');
+      filters.shift();
+      // for types:
+      // e-for='item of items',  e-for='(item, index) of items'
+      // e-for='key in object', e-for='(key, value) in object'
+      // e-for='(key, value, index) in object'
+      var forSeparator = ' of ';
+      var forParts = forExpression.split(forSeparator);
+      if (!(forParts.length > 1))
+        forParts = forExpression.split(forSeparator = ' in ');
+      var leftHand = forParts[0];
+      var rightHand = forParts[1];
+      var leftHandParts = leftHand.split(',').map(function(x) {
+        return trim(x);
+      });
+      var isForOf = trim(forSeparator) === 'of';
+      var iterable = isForOf ? rightHand : 'Object.keys(' + rightHand + ')';
+      var sourceValue = evaluator.exec({
+        data: data,
+        code: rightHand,
+        context: context
+      });
+      return {
+        filters: filters,
+        type: forSeparator,
+        leftHand: leftHand,
+        rightHand: rightHand,
+        sourceValue: sourceValue,
+        leftHandParts: leftHandParts,
+        iterableExpression: iterable,
+        isForOf: trim(forSeparator) === 'of',
+      };
+    };
+    // Handler the UI when the Array changes
+    var $OnArrayChanges = function(detail) {
+      if (hasWhereFilter || hasOrderFilter)
+        return execute(); // Reorganize re-insert all the items
+      detail = detail || {};
+      var method = detail.method;
+      var args = detail.args;
+      var mListedItems = listedItemsHandler;
+      var reOrganizeIndexes = function() {
+        // In case of unshift re-organize the indexes
+        // Was wrapped into a promise in case of large amount of data
+        return Promise.resolve(function(array) {
+          expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
+          var leftHandParts = expObj.leftHandParts;
+          var indexOrValue = leftHandParts[1] || '_index_or_value';
+          if (indexOrValue === '_index_or_value')
             return;
+          forEach(array, function(item, index) {
+            item.data[indexOrValue] = index;
+          });
+        }).then(function(mCaller) {
+          return mCaller(listedItemsHandler);
+        });
+      };
+      switch (method) {
+        case 'pop':
+        case 'shift': { // First or Last item removal handler
+          var item = mListedItems[method]();
+          if (isNull(item))
+            return;
+          removeEl(getRootElement(item.el));
+          if (method === 'pop')
+            return;
+          return reOrganizeIndexes();
+        }
+        case 'splice': { // Indexed removal handler
+          var index_1 = args[0];
+          var deleteCount = args[1];
+          var removedItems = mListedItems.splice(index_1, deleteCount);
+          forEach(removedItems, function(item) {
+            return removeEl(getRootElement(item.el));
+          });
+          expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
+          var leftHandParts = expObj.leftHandParts;
+          var indexOrValue = leftHandParts[1] || '_index_or_value';
+          var insertArgs = [].slice.call(args, 2);
+          // Adding the items to the dom
+          forEach(insertArgs, function(item) {
+            index_1++;
+            $InsertForItem({
+              // Getting the next reference
+              reference: getRootElement(listedItemsHandler[index_1].el) || comment,
+              index: index_1,
+              item: item,
+            });
+          });
+          if (indexOrValue === '_index_or_value')
+            return;
+          // Fixing the index value
+          for (; index_1 < listedItemsHandler.length; index_1++) {
+            var item = listedItemsHandler[index_1].data;
+            if (typeof item[indexOrValue] === 'number')
+              item[indexOrValue] = index_1;
           }
-          case 'push':
-          case 'unshift': { // Addition handler
-            // Gets the last item as default
-            var isUnshift_1 = method == 'unshift';
-            var element = (listedItemsHandler_1[0] || {}).el || comment_1;
-            var indexRef_1 = isUnshift_1 ? 0 : mListedItems.length;
-            var reference_1 = isUnshift_1 ? getRootElement(element) : comment_1;
-            // Adding the items to the dom
-            forEach([].slice.call(args), function(item) {
-              var ref = $InsertForItem_1({
-                index: indexRef_1++,
-                reference: reference_1,
-                item: item,
-              });
-              if (isUnshift_1)
-                reference_1 = ref;
+          return;
+        }
+        case 'push':
+        case 'unshift': { // Addition handler
+          // Gets the last item as default
+          var isUnshift_1 = method == 'unshift';
+          var element = (listedItemsHandler[0] || {}).el || comment;
+          var indexRef_1 = isUnshift_1 ? 0 : mListedItems.length;
+          var reference_1 = isUnshift_1 ? getRootElement(element) : comment;
+          // Adding the items to the dom
+          forEach([].slice.call(args), function(item) {
+            var ref = $InsertForItem({
+              index: indexRef_1++,
+              reference: reference_1,
+              item: item,
             });
             if (isUnshift_1)
-              reOrganizeIndexes();
-            return;
-          }
-          default:
-            return execute_1();
+              reference_1 = ref;
+          });
+          if (isUnshift_1)
+            reOrganizeIndexes();
+          return;
         }
-      };
-      var applyWhere_1 = function(listCopy, config) {
-        var parts = config.split(':').map(function(item) {
-          return trim(item);
-        });
-        if (parts.length == 1) {
-          Logger.error(('Invalid “' + nodeName_1 + '” where expression “' + nodeValue_1 +
-            '”, at least a where-value and where-keys, or a filter-function must be provided'));
-        } else {
-          return $Where_1(listCopy, parts);
-        }
-      };
-      var reactivePropertyEvent = ReactiveEvent.on('AfterGet', function(descriptor) {
-        binder.binds.push({
-          isConnected: function() {
-            return comment_1.isConnected;
+        default:
+          return execute();
+      }
+    };
+    var applyWhere = function(listCopy, config) {
+      var parts = config.split(':').map(function(item) {
+        return trim(item);
+      });
+      if (parts.length == 1) {
+        Logger.error(('Invalid “' + nodeName + '” where expression “' + nodeValue +
+          '”, at least a where-value and where-keys, or a filter-function must be provided'));
+      } else {
+        return $Where(listCopy, parts);
+      }
+    };
+    var reactivePropertyEvent = ReactiveEvent.on('AfterGet', function(descriptor) {
+      binder.binds.push({
+        isConnected: isActive,
+        watch: descriptor.onChange(function(_n, _o, detail) {
+          return $OnArrayChanges(detail);
+        }, node)
+      });
+    });
+    var expObj = $ExpressionBuilder(nodeValue);
+    var filters = expObj.filters;
+    var findFilter = function(fName) {
+      return filters.filter(function(item) {
+        return item.substring(0, fName.length) === fName;
+      });
+    };
+    var whereFilterConfigs = findFilter('where');
+    // Applying the filter before rendering the items
+    forEach(whereFilterConfigs, function(config) {
+      return applyWhere(expObj.sourceValue, config);
+    });
+    reactivePropertyEvent.off();
+    (execute = function() {
+      expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
+      var iterable = expObj.iterableExpression;
+      var orderFilterConfigs = findFilter('order');
+      // Cleaning the existing items
+      forEach(listedItemsHandler, function(item) {
+        var element = getRootElement(item.el);
+        if (!element.parentElement)
+          return;
+        container.removeChild(element);
+      });
+      listedItemsHandler = [];
+      evaluator.exec({
+        data: data,
+        isReturn: false,
+        context: context,
+        code: 'var __e = __each, __fl = __filters, __f = __for; ' +
+          '__f(__fl(' + iterable + '), function($$itm, $$idx) { __e($$itm, $$idx); })',
+        aditional: {
+          __for: forEach,
+          __each: function(item, index) {
+            return $InsertForItem({
+              index: index,
+              item: item
+            });
           },
-          watch: descriptor.onChange(function(_n, _o, detail) {
-            return $OnArrayChanges_1(detail);
-          }, node)
-        });
-      });
-      var expObj_1 = $ExpressionBuilder_1(nodeValue_1);
-      var filters_1 = expObj_1.filters;
-      var findFilter_1 = function(fName) {
-        return filters_1.filter(function(item) {
-          return item.substring(0, fName.length) === fName;
-        });
-      };
-      var whereFilterConfigs_1 = findFilter_1('where');
-      // Applying the filter before rendering the items
-      forEach(whereFilterConfigs_1, function(config) {
-        return applyWhere_1(expObj_1.sourceValue, config);
-      });
-      reactivePropertyEvent.off();
-      (execute_1 = function() {
-        expObj_1 = expObj_1 || $ExpressionBuilder_1(trim(ifNullReturn(node.nodeValue, '')));
-        var iterable = expObj_1.iterableExpression;
-        var orderFilterConfigs = findFilter_1('order');
-        // Cleaning the existing items
-        forEach(listedItemsHandler_1, function(item) {
-          var element = getRootElement(item.el);
-          if (!element.parentElement)
-            return;
-          container_1.removeChild(element);
-        });
-        listedItemsHandler_1 = [];
-        evaluator.exec({
-          data: data,
-          isReturn: false,
-          context: context,
-          code: 'var __e = __each, __fl = __filters, __f = __for; ' +
-            '__f(__fl(' + iterable + '), function($$itm, $$idx) { __e($$itm, $$idx); })',
-          aditional: {
-            __for: forEach,
-            __each: function(item, index) {
-              return $InsertForItem_1({
-                index: index,
-                item: item
+          __filters: function(list) {
+            var listCopy = Extend.array(list);
+            // applying where:
+            forEach(whereFilterConfigs, function(config) {
+              return listCopy = applyWhere(listCopy, config);
+            });
+            // applying order:
+            var applyOrder = function(config) {
+              var parts = config.split(':').map(function(item) {
+                return trim(item);
               });
-            },
-            __filters: function(list) {
-              var listCopy = Extend.array(list);
-              // applying where:
-              forEach(whereFilterConfigs_1, function(config) {
-                return listCopy = applyWhere_1(listCopy, config);
-              });
-              // applying order:
-              var applyOrder = function(config) {
-                var parts = config.split(':').map(function(item) {
-                  return trim(item);
-                });
-                if (parts.length == 1) {
-                  Logger.error(('Invalid “' + nodeName_1 + '” order  expression “' + nodeValue_1 +
-                    '”, at least the order type must be provided'));
-                } else {
-                  listCopy = $Order_1(listCopy, parts[1], parts[2]);
-                }
-              };
-              forEach(orderFilterConfigs, function(config) {
-                return applyOrder(config);
-              });
-              return listCopy;
-            }
+              if (parts.length == 1) {
+                Logger.error(('Invalid “' + nodeName + '” order  expression “' + nodeValue +
+                  '”, at least the order type must be provided'));
+              } else {
+                listCopy = $Order(listCopy, parts[1], parts[2]);
+              }
+            };
+            forEach(orderFilterConfigs, function(config) {
+              return applyOrder(config);
+            });
+            return listCopy;
           }
-        });
-        expObj_1 = null;
-      })();
-    }
+        }
+      });
+      expObj = null;
+    })();
   }
 
   function $skeleton(opitons) {
@@ -3784,15 +3750,17 @@
      */
     Compiler.prototype.compile = function(options) {
       var _this = this;
+      var _a;
       var rootElement = options.el;
       var context = options.context || this.bouer;
       var data = (options.data || this.bouer.data);
-      var isConnected = (options.isConnected || (function() {
-        return rootElement.isConnected;
-      }));
       var routing = IoC.app(this.bouer).resolve(Routing);
       if (!rootElement)
         return Logger.error('Invalid element provided to the compiler.');
+      var iNode = rootElement;
+      var isActive = iNode.isActive = (_a = iNode.isActive) !== null && _a !== void 0 ? _a : (function() {
+        return rootElement.isConnected;
+      });
       if (!this.analize(rootElement.outerHTML))
         return rootElement;
       var directive = new Directive(this, this.directives || {}, context);
@@ -3804,46 +3772,6 @@
           // e-skip directive
           if (Constants.skip in node.attributes)
             return directive.skip(node);
-          // In case of slots
-          if ((node.localName.toLowerCase() === Constants.slot || node.tagName.toLowerCase() === Constants.slot) &&
-            options.componentSlot) {
-            var componentSlot = options.componentSlot;
-            var insertSlot_1 = function(slot, reference) {
-              var $Walker = function(child) {
-                var cloned = child.cloneNode(true);
-                reference.parentNode.insertBefore(cloned, reference);
-                walker(cloned, data);
-              };
-              if (slot.nodeName === 'SLOTCONTAINER' || slot.nodeName === 'SLOT')
-                forEach(toArray(slot.childNodes), function(child) {
-                  return $Walker(child);
-                });
-              else
-                $Walker(slot);
-              reference.parentNode.removeChild(reference);
-            };
-            if (node.hasAttribute('default')) {
-              if (componentSlot.childNodes.length == 0)
-                return;
-              // In case of default slot insertion
-              return insertSlot_1(componentSlot, node);
-            } else if (node.hasAttribute('name')) {
-              // In case of target slot insertion
-              var target_1 = node.attributes.getNamedItem('name');
-              return (function $Walker(element) {
-                var slotValue = element.getAttribute(Constants.slot);
-                if (slotValue && slotValue === target_1.value) {
-                  element.removeAttribute(Constants.slot);
-                  return insertSlot_1(element, node);
-                }
-                if (element.children.length === 0)
-                  return null;
-                forEach(toArray(element.children), function(child) {
-                  $Walker(child);
-                });
-              })(componentSlot);
-            }
-          }
           // e-def="{...}" directive
           if (Constants.def in node.attributes)
             directive.def(findDirective(node, Constants.def), data);
@@ -3924,7 +3852,6 @@
           element.attributes.removeNamedItem(delimiterField.field);
           return _this.binder.create({
             node: attr,
-            isConnected: isConnected,
             fields: [{
               expression: delimiterField.expression,
               field: attr.value
@@ -3939,14 +3866,14 @@
           delimitersFields.length !== 0) {
           _this.binder.create({
             node: node,
-            isConnected: isConnected,
             fields: delimitersFields,
             context: context,
             data: data
           });
         }
         forEach(toArray(node.childNodes), function(childNode) {
-          return walker(childNode, data);
+          childNode.isActive = isActive;
+          walker(childNode, data);
         });
       };
       walker(rootElement, data);
@@ -4172,7 +4099,7 @@
           if ((c instanceof Component) && c.clazz)
             mCom = IoC.app(_this.bouer).resolve(c.clazz) || IoC.new(c.clazz);
           else if (c instanceof Component)
-            mCom = copyObject(c);
+            mCom = structuredClone(c);
           else
             mCom = new Component(c);
           if (mCom.keepAlive === true)
@@ -4314,7 +4241,7 @@
       // Adding the component to the active component list if it is not added
       if (!this.activeComponents.includes(component))
         this.activeComponents.push(component);
-      var elementSlots = createAnyEl('SlotContainer', function(el) {
+      var slotContainer = createAnyEl('SlotContainer', function(el) {
         el.innerHTML = componentElement.innerHTML;
         componentElement.innerHTML = '';
       }).build();
@@ -4343,6 +4270,60 @@
       var rootElement = component.el;
       if (isNull(rootElement))
         return;
+      // Handling Slots
+      if (slotContainer.childNodes.length > 0) {
+        var hasSkippedParent_1 = function(child) {
+          if (child.hasAttribute(Constants.skip))
+            return true;
+          var parent = child.parentElement;
+          if (parent == null)
+            return false;
+          return hasSkippedParent_1(parent);
+        };
+        // # slot[default]
+        var slotContainerChildren_1 = toArray(slotContainer.children);
+        var slotDefaults = toArray(rootElement.querySelectorAll('slot[default]'));
+        // Looping all the slots defaults target
+        forEach(slotDefaults, function(slotTarget) {
+          if (hasSkippedParent_1(slotTarget))
+            return;
+          var slotTargetContainer = slotTarget.parentElement;
+          // Adding the children
+          forEach(slotContainerChildren_1, function(child) {
+            slotTargetContainer.insertBefore(child.cloneNode(true), slotTarget);
+          });
+          // Removing the targets
+          slotTargetContainer.removeChild(slotTarget);
+        });
+        // # div[slot='name'] || slot[slot=name]
+        var slotNamed = toArray(rootElement.querySelectorAll('slot[name]'));
+        // Looping all the slots defaults target
+        forEach(slotNamed, function(slotTarget) {
+          if (hasSkippedParent_1(slotTarget))
+            return;
+          var slotTargetContainer = slotTarget.parentElement;
+          var slotName = slotTarget.getAttribute('name');
+          // Adding the children
+          forEach(slotContainerChildren_1, function(child) {
+            if ( // slot[slot='name']
+              child.nodeName.toLowerCase() == 'slot' &&
+              child.getAttribute('slot') == slotName) {
+              // Adding the children
+              forEach(toArray(child.childNodes), function(child) {
+                slotTargetContainer.insertBefore(child.cloneNode(true), slotTarget);
+              });
+            }
+            if ( // div[slot='name']
+              child.nodeName.toLowerCase() != 'slot' &&
+              child.getAttribute('slot') == slotName) {
+              var inserted = slotTargetContainer.insertBefore(child.cloneNode(true), slotTarget);
+              inserted.removeAttribute('slot');
+            }
+          });
+          // Removing the target
+          slotTargetContainer.removeChild(slotTarget);
+        });
+      }
       // Transforming all unknown variables to reactive
       var unknownVars = where(Object.keys(component), function(key) {
         return !_this.componentDefaultProps.has(key);
@@ -4465,26 +4446,39 @@
             if (!style.sheet)
               return;
             var cssRules = style.sheet.cssRules;
-            for (var i = 0; i < cssRules.length; i++) {
+            var _loop_1 = function(i) {
               var rule = cssRules.item(i);
               if (!rule)
-                continue;
+                return "continue";
               var mRule = rule;
+              // .item .title, .item .desc
               var ruleText = mRule.selectorText;
               if (ruleText) {
-                var firstRule = ruleText.split(' ')[0];
-                var selector = (firstRule[0] == '.' || firstRule[0] == '#') ?
-                  firstRule.substring(1) : firstRule;
-                var separator = rootClassList_1[selector] ? '' : ' ';
-                var uniqueIdentifier = '.' + styleId;
-                var selectorTextSplitted = mRule.selectorText.split(' ');
-                if (selectorTextSplitted[0] === toLower(rootElement.tagName))
-                  selectorTextSplitted.shift();
-                mRule.selectorText = uniqueIdentifier + separator + selectorTextSplitted.join(' ');
+                var classStyleId_1 = '.' + styleId;
+                /**
+                 * From: [.item .title, .item .desc]
+                 *
+                 * To: [
+                 *  .item.e-A1bcD .title,
+                 *  .e-A1bcD .item .title,
+                 *  .item.e-A1bcD .desc
+                 *  .e-A1bcD .item .desc
+                 * ]
+                 */
+                mRule.selectorText = ruleText.split(',')
+                  .flatMap(function($selector) {
+                    var $selectors = $selector.split(' ');
+                    $selectors[0] = $selectors[0] + classStyleId_1;
+                    return [$selectors.join(' '), classStyleId_1 + ' ' + $selector];
+                  })
+                  .join(',');
               }
               // Adds the cssText only if the element is <style>
               if (isStyle)
                 rules.push(mRule.cssText);
+            };
+            for (var i = 0; i < cssRules.length; i++) {
+              _loop_1(i);
             }
             if (isStyle)
               style.innerText = rules.join(' ');
@@ -4511,7 +4505,7 @@
                 rootElement.classList.add($style.getAttribute(styleAttrName_1));
               });
             }
-            var styleId = code(7, 'bouer-s');
+            var styleId = code(5, 'e-');
             mStyle.setAttribute(styleAttrName_1, styleId);
             if ((mStyle instanceof HTMLLinkElement) && mStyle.hasAttribute('scoped'))
               mStyle.onload = function(evt) {
@@ -4530,6 +4524,8 @@
           beforeLoadEvent.emit();
           // Compiling the rootElement
           compiler.compile({
+            el: rootElement,
+            context: component,
             data: Reactive.transform({
               context: component,
               data: component.data
@@ -4544,10 +4540,7 @@
                 if (routeView)
                   _this.rounting.setRouteView(routeView);
               }
-            },
-            componentSlot: elementSlots,
-            context: component,
-            el: rootElement,
+            }
           });
           var autoComponentDestroy = ifNullReturn(_this.bouer.config.autoComponentDestroy, true);
           if (autoComponentDestroy === false)
@@ -4781,7 +4774,7 @@
       // Ignore Reactive Transformation
       this._IRT_ = true;
       this.name = 'Bouer';
-      this.version = '3.1.1';
+      this.version = '3.1.2';
       /** Unique Id of the instance */
       this.__id__ = IoC.newId();
       /**
