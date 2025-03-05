@@ -1,10 +1,29 @@
+# v3.1.2
+[2025-03-05]
+
+### Fixes
+
+* fix: modified component slot handling ([`865d278`](https://github.com/bouerjs/bouer/commit/865d278f064854ce291c298716c3ce5891b96986))
+* fix: modified the approach to realise if the node is still connected to the DOM, before we used 'isConnected' and now we added a method 'isActive' that links the children to the rootElement ([`a584b8b`](https://github.com/bouerjs/bouer/commit/a584b8bb064a27864132846c312afae7d00575b8))
+* fix: fixed rootCompomentElement style bug, when a class is added after the component is compiled the style is not rendered and modified component-style value ([`d9b7b2a`](https://github.com/bouerjs/bouer/commit/d9b7b2a27dbe1cdd3839c2dd4df443950e2b9b9f))
+* fix: modified the approach to realise if the node is still connected to the DOM, before we used 'isConnected' and now we added a method 'isActive' that links the children to the rootElement ([`9784924`](https://github.com/bouerjs/bouer/commit/97849248f6908ab24fcd92c2fb69543b8fe68f56))
+* fix: avoid passing the global visiting and visited vars to the internal array executer on push and unshift ([`c4fe277`](https://github.com/bouerjs/bouer/commit/c4fe277ef61dd86a004f1e489f7a3589c985cdd2))
+
 # v3.1.1
 [2025-02-21]
+
+### Fixes
+
+* fix: fixed silent directive (--s) issue ([`d840375`](https://github.com/bouerjs/bouer/commit/d8403750144c2b0c751d0f03e388597fada7c429))
+
+# v3.1.0
+[2025-02-19]
 
 ### Features
 
 * feat: Now is possible to create an empty component (without path and template), giving the possibility to use a component as groupable component ([`338ab4a`](https://github.com/bouerjs/bouer/commit/338ab4aff0f2966f7bdbe4c3face0430fe474233))
 * feat: changed the order of data-attribute is processed to be able to use when the component script is executed ([`4cb7661`](https://github.com/bouerjs/bouer/commit/4cb76615dfd11fed5864d14ce321753459986b8f))
+* feat: removed empty CustomDirective from Compiler instantiation ([`020ac9b`](https://github.com/bouerjs/bouer/commit/020ac9b0ef9595290ec3c43fb6c26bf4023b10eb))
 * feat: types definition in the interfaces ([`6444b69`](https://github.com/bouerjs/bouer/commit/6444b698cbfcaf4a31929f6548bf6831dad655d0))
 * feat: added html code analizer to avoid syntax error in component code snippet ([`67d48aa`](https://github.com/bouerjs/bouer/commit/67d48aa1bd646e04b7424128225db53a70f745fe))
 * feat: added number of items in skeleton using e-req directive ([`2720a95`](https://github.com/bouerjs/bouer/commit/2720a95fc683dd9acf7e0768479e5cfadef77a29))
@@ -18,14 +37,18 @@
 * feat: Enabled multiple html element insertion using template with html delimiter {{:html [...] }} ([`9f4ff1d`](https://github.com/bouerjs/bouer/commit/9f4ff1deb12903ad979f58257afd351df8153e46))
 * feat: empty object property properties remap, meaning, if the object is empty (no properties) in the first instance and then bound future properties to elements, after the set of the object all the properties will be remapped to be able to mantain realtime UI update ([`e9645e6`](https://github.com/bouerjs/bouer/commit/e9645e60834cfd718b663e31b2411862abe6529c))
 * feat: implemented `set` method to the component instance to be able to set data directly to the component.data without resorting to the `set` method of the Bouer instance ([`78b1758`](https://github.com/bouerjs/bouer/commit/78b175843cbf4c9b4234642917dc7210019dcb68))
+* feat: added destroy method the event result to be able to destroy the event without using off method ([`bdfc3bb`](https://github.com/bouerjs/bouer/commit/bdfc3bbffe0e424b72e6fc1e336d5b9cde03e98d))
 * feat: added component class registration ([`0ac9f94`](https://github.com/bouerjs/bouer/commit/0ac9f94c37357823eaddec2fa74a1888de677896))
 * feat: assume Component Class name if no specific name was provided ([`d2d4157`](https://github.com/bouerjs/bouer/commit/d2d415700153cb17f31455e335184e836108a7ef))
 * feat: linked the Component Element (the tag inserted to the DOM) to the Root Element of the component after the compilation ([`c597937`](https://github.com/bouerjs/bouer/commit/c597937755769406c8c01112dbe122fe0007a0d5))
 * feat: inverted 'e-for' and 'component reading' order to be able to deal with component element instead of the root element ([`c65bfe4`](https://github.com/bouerjs/bouer/commit/c65bfe486d4ff401a6698612e840b474892fafd1))
+* feat: made CustomDirective injection optional ([`8071395`](https://github.com/bouerjs/bouer/commit/80713959344ad6780a0597d592d5947d31c47612))
 * feat: exported IoC Container class ([`97b5179`](https://github.com/bouerjs/bouer/commit/97b5179a412dd1c1e01d038f93121f81af1316e8))
+* feat: added destroy property to the interface ([`f3f0652`](https://github.com/bouerjs/bouer/commit/f3f0652da042abfb33543269fec87545b9c44b6e))
 * feat: added data to the emit method to make the data transfer easier ([`8ff94c5`](https://github.com/bouerjs/bouer/commit/8ff94c54060b820730d8ac8d6641c77fc284b7de))
 * feat: exported Prop class for property transfering using module ([`7c5958d`](https://github.com/bouerjs/bouer/commit/7c5958ded1151b2ec6f12a2af3d922a15a61ff49))
 * feat: added npm pack and script to update test package.json ([`ca45838`](https://github.com/bouerjs/bouer/commit/ca45838723d1d4d62c17a670e4cc40942f7cf1ec))
+* feat: handle method to compile ([`f25d2f9`](https://github.com/bouerjs/bouer/commit/f25d2f960208d7015539490236c484a7c841688b))
 
 ### Fixes
 
@@ -41,31 +64,16 @@
 * fix: avoid double default page loading bug when using Routing ([`e90a86c`](https://github.com/bouerjs/bouer/commit/e90a86c14004eb0efb85a1141fa042f682d0ef63))
 * fix: this.$components.viewBy types correction, now the class provided in by&lt;Child&gt;() will be shown in the filters expression ([`9392d08`](https://github.com/bouerjs/bouer/commit/9392d08dd3db9cd28295d273c48608a4bfeafb06))
 * fix: removed unnecessary code in script execution ([`1271d4c`](https://github.com/bouerjs/bouer/commit/1271d4c727ecc2b3a390af088ca6c76c89f7e6c7))
+* fix: added globalData to the Evalutor ([`b139b4c`](https://github.com/bouerjs/bouer/commit/b139b4c41c42eb8fe892e70aa76040dc44e9efbd))
 * fix: removed unnecessary UrlParams instance from .params() method calling ([`aca846f`](https://github.com/bouerjs/bouer/commit/aca846fda103abfb1a55c11cba5ed13d1263b105))
 * fix: added case insensitive to 'e-for' directive where filters ([`802c22c`](https://github.com/bouerjs/bouer/commit/802c22cebd5c37b890edb4be0387c582eced0cd5))
 * fix: fixed error when looping children on e-for testing ([`95a1d46`](https://github.com/bouerjs/bouer/commit/95a1d46a98fc7696e3d44009294511038d02aa11))
 * fix: restricted skeleton items insertion only to e-req `of` type ([`398ddac`](https://github.com/bouerjs/bouer/commit/398ddac8d0d3341cfa6ebe9bf837adf12e084015))
 * fix: added insensitive case route params handling ([`3b500fc`](https://github.com/bouerjs/bouer/commit/3b500fc9e0bad4b851a387c7e96ab0ab5a0ebb2e))
 * fix: fixed {{: html [...] }} bug on rendering the html snippet ([`729fc7c`](https://github.com/bouerjs/bouer/commit/729fc7c84075a0f75aca0fd206423abc6c49b581))
-* fix: fixed silent directive (--s) issue ([`d840375`](https://github.com/bouerjs/bouer/commit/d8403750144c2b0c751d0f03e388597fada7c429))
-* fix: added style content to the skeleton css ([`50d3006`](https://github.com/bouerjs/bouer/commit/50d30068731620885ec7f748095637b9bdd4878c))
-
-# v3.1.0
-[2022-06-28]
-
-### Features
-
-* feat: removed empty CustomDirective from Compiler instantiation ([`020ac9b`](https://github.com/bouerjs/bouer/commit/020ac9b0ef9595290ec3c43fb6c26bf4023b10eb))
-* feat: added destroy method the event result to be able to destroy the event without using off method ([`bdfc3bb`](https://github.com/bouerjs/bouer/commit/bdfc3bbffe0e424b72e6fc1e336d5b9cde03e98d))
-* feat: made CustomDirective injection optional ([`8071395`](https://github.com/bouerjs/bouer/commit/80713959344ad6780a0597d592d5947d31c47612))
-* feat: added destroy property to the interface ([`f3f0652`](https://github.com/bouerjs/bouer/commit/f3f0652da042abfb33543269fec87545b9c44b6e))
-* feat: handle method to compile ([`f25d2f9`](https://github.com/bouerjs/bouer/commit/f25d2f960208d7015539490236c484a7c841688b))
-
-### Fixes
-
-* fix: added globalData to the Evalutor ([`b139b4c`](https://github.com/bouerjs/bouer/commit/b139b4c41c42eb8fe892e70aa76040dc44e9efbd))
 * fix: fixed route mapping issue ([`c0a891b`](https://github.com/bouerjs/bouer/commit/c0a891b47421d8a179061be586c87db6883ee52a))
 * fix: updated single comment ([`efffe79`](https://github.com/bouerjs/bouer/commit/efffe7983b2d22c489b2e82d94515a9d64befec5))
+* fix: added style content to the skeleton css ([`50d3006`](https://github.com/bouerjs/bouer/commit/50d30068731620885ec7f748095637b9bdd4878c))
 
 # v3.0.0
 [2022-03-28]
