@@ -4,7 +4,7 @@ import Bouer from '../../instance/Bouer';
 import Constructor from '../types/Constructor';
 import CustomDirective from '../types/CustomDirective';
 import DataType from '../types/DataType';
-import dynamic from '../types/Dynamic';
+import Pipe from '../types/Pipe';
 import IBouerConfig from './IBouerConfig';
 import IComponentOptions from './IComponentOptions';
 import IDelimiter from './IDelimiter';
@@ -36,8 +36,8 @@ interface IBouerOptions<
   /** Appends delimiters to the instance */
   readonly delimiters?: IDelimiter[],
 
-  /** Appends delimiters to the instance */
-  readonly pipes?: dynamic<(<T>() => T)>,
+  /** Add pipes to the instance */
+  readonly pipes?: Pipe;
 
   /**
    * Middlewares that should be used in the application

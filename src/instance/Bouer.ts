@@ -21,6 +21,7 @@ import Constructor from '../definitions/types/Constructor';
 import Props from '../definitions/types/Data';
 import DataType from '../definitions/types/DataType';
 import dynamic from '../definitions/types/Dynamic';
+import Pipe from '../definitions/types/Pipe';
 import RenderContext from '../definitions/types/RenderContext';
 import SkeletonOptions from '../definitions/types/SkeletonOptions';
 import WatchCallback from '../definitions/types/WatchCallback';
@@ -51,11 +52,12 @@ export default class Bouer<
   // Ignore Reactive Transformation
   readonly _IRT_ = true;
   readonly name = 'Bouer';
-  readonly version = '3.1.2';
+  readonly version = '3.2.0';
   readonly config: IBouerConfig;
   readonly data: DataType<Data, this> & dynamic;
   readonly globalData: DataType<Global, this> & dynamic;
   readonly deps: DataType<Deps, this>;
+  readonly pipes: Pipe;
 
   /** Unique Id of the instance */
   readonly __id__: number = IoC.newId();
@@ -252,9 +254,6 @@ export default class Bouer<
     markActiveAnchorsWithRoute(route: string): void
   };
 
-  /** Appends delimiters to the instance */
-  readonly pipes?: dynamic<(<T>() => T)>;
-
   /**
    * Default constructor
    * @param {string} selector the selector of the element to be controlled by the instance
@@ -265,9 +264,10 @@ export default class Bouer<
     options?: IBouerOptions<Data, Global, Deps>
   ) {
 
-    this.options = options = (options || {});
-    this.config = options.config || {};
-    this.deps = options.deps || {} as any;
+    const $options = (options || {});
+    this.options = $options;
+    this.config = $options.config || {};
+    this.deps = $options.deps || {} as any;
 
     forEach(Object.keys(this.deps as {}), key => {
       const deps = this.deps as any;
@@ -276,7 +276,7 @@ export default class Bouer<
     });
 
     const app = this;
-    const delimiters = options.delimiters || [];
+    const delimiters = $options.delimiters || [];
 
     // Adding Dependency Injection Services
     IoC.app(this).add(DataStore, [], true);
@@ -291,7 +291,7 @@ export default class Bouer<
     IoC.app(this).add(Routing, [this], true);
     IoC.app(this).add(DelimiterHandler, [this, delimiters], true);
     IoC.app(this).add(Compiler, [
-      this, Binder, DelimiterHandler, EventHandler, ComponentHandler, options.directives
+      this, Binder, DelimiterHandler, EventHandler, ComponentHandler, $options.directives
     ], true);
 
     const dataStore = IoC.app(this).resolve(DataStore)!;
@@ -302,16 +302,20 @@ export default class Bouer<
     const delimiter = IoC.app(this).resolve(DelimiterHandler)!;
 
     // Register the middleware
-    if (typeof options.middleware === 'function')
-      options.middleware.call(this, (middleware.subscribe as () => void), this);
+    if (typeof $options.middleware === 'function')
+      $options.middleware.call(this, (middleware.subscribe as () => void), this);
 
     // Transform the data properties into a reative
     this.data = Reactive.transform({
-      data: options.data || {},
+      data: $options.data || {},
       context: this
     });
     this.globalData = Reactive.transform({
-      data: options.globalData || {},
+      data: $options.globalData || {},
+      context: this
+    });
+    this.pipes = Reactive.transform({
+      data: $options.pipes || {},
       context: this
     });
 
@@ -431,7 +435,7 @@ export default class Bouer<
     });
 
     // Registering all the components
-    componentHandler.prepare(options.components || []);
+    componentHandler.prepare($options.components || []);
 
     if (!isNull(selector) && trim(selector) !== '')
       this.init(selector);
