@@ -252,6 +252,9 @@ export default class Bouer<
     markActiveAnchorsWithRoute(route: string): void
   };
 
+  /** Appends delimiters to the instance */
+  readonly pipes?: dynamic<(<T>() => T)>;
+
   /**
    * Default constructor
    * @param {string} selector the selector of the element to be controlled by the instance
