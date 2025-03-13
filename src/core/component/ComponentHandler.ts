@@ -786,7 +786,7 @@ export default class ComponentHandler {
         error.stack = '';
         Logger.error(('Error loading the <script src=\'' + url + '\'></script> in ' +
           '<' + $name + '/> component, remove it in order to be compiled.'));
-        Logger.log(error);
+        Logger.error(error);
       });
     });
   }

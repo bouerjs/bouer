@@ -336,7 +336,7 @@ export default class Bouer<
       get: key => key ? dataStore.data[key] : null,
       set: (key, data, toReactive) => {
         if (key in dataStore.data)
-          return Logger.log('There is already a data stored with this key “' + key + '”.');
+          return Logger.warn('There is already a data stored with this key “' + key + '”.');
 
         if (ifNullReturn(toReactive, false) === true)
           Reactive.transform({

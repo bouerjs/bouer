@@ -83,7 +83,7 @@ export default class Routing {
       return;
 
     if (isNull(route))
-      return Logger.log('Invalid url provided to the navigation method.');
+      return Logger.error('Invalid url provided to the navigation method.');
 
     route = trim(route);
 
