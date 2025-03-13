@@ -187,15 +187,15 @@ export default class Compiler {
         const element = ((node as any).ownerElement || node.parentNode) as Element;
 
         const attrName = 'e-' + delimiterField.expression;
-        const attrValue = '{{ ' + delimiterField.expression + ' }}';
-        element.setAttribute(attrName, attrValue);
+        element.setAttribute(attrName, delimiterField.field);
 
-        const attr = element.attributes.getNamedItem(attrName)!;
+        const attr = element.attributes.getNamedItem(attrName)! as INode;
+        attr.isActive = isActive;
         element.attributes.removeNamedItem(delimiterField.field);
 
         return this.binder.create({
           node: attr,
-          fields: [{ expression: delimiterField.expression, field: attr.value }],
+          fields: [delimiterField],
           context: context as RenderContext,
           data: data
         });

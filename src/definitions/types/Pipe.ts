@@ -1,7 +1,10 @@
-type R = object|string|number|boolean|symbol|bigint|never;
+type PipeFunction = (
+  value: unknown,
+  ...args: unknown[]
+) => object | string | number | boolean | symbol | bigint | never;
 
 type Pipe = {
-  [key: string]: (...args: unknown[]) => R
+  [key: string]: PipeFunction
 }
 
 export default Pipe;

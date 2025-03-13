@@ -47,10 +47,32 @@ export default class DelimiterHandler {
     return result.map(item => {
       const matches = checkContent(item) as RegExpMatchArray;
 
+      const delimiterField = matches[0];
+      const delimiterExpression = matches[1];
+
+      // Composing the expression: price | currency:$ -> [ price, currency:$ ]
+      const expressionComposed = delimiterExpression.trim().split(' | ').map(e => trim(e));
+
+      // Extracting the field only
+      const expression = expressionComposed.shift()!;
+
+      // Builing the pipes structure
+      const pipes = expressionComposed.map(e => {
+        // currency:$ -> currency [ $ ]
+        const args = e.split(':');
+        const fn = args.shift()!;
+
+        return {
+          fn: fn,
+          args: args as unknown[]
+        };
+      });
+
       return {
-        field: matches[0],
-        expression: trim(matches[1]),
-        delimiter: mDelimiter!
+        field: delimiterField,
+        expression: trim(expression),
+        delimiter: mDelimiter!,
+        pipes: pipes
       };
     });
   }
@@ -58,13 +80,9 @@ export default class DelimiterHandler {
   shorthand(attrName: string): IDelimiterResponse | null {
     if (isNull(attrName) || trim(attrName) === '') return null;
 
-    const result = attrName.match(new RegExp('{([\\w{$,-}]*?)}'));
+    const match = attrName.match(new RegExp('{([\\w{$,-}]*?)}'));
+    if (!match) return null;
 
-    if (!result) return null;
-
-    return {
-      field: result[0],
-      expression: trim(result[1])
-    };
+    return this.run('{{' + trim(match[1]) + '}}')[0];
   }
 }
