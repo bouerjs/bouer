@@ -497,7 +497,7 @@ export function htmlToJsObj(input: string | HTMLElement,
 
   // If the element is not
   if (isNull(element))
-    throw Logger.error('Invalid element provided at app.toJsObj(> "' + input + '" <).');
+    throw Logger.error('Invalid element provided at app.toJsObj(“'+ input +'”).');
 
   options = options || {};
 
@@ -519,6 +519,7 @@ export function htmlToJsObj(input: string | HTMLElement,
   // Elements that skipped on serialization process
   const escapes: dynamic = { BUTTON: true };
   const checkables: dynamic = { checkbox: true, radio: true };
+  onSet = (typeof onSet === 'function') ? onSet : (...args: any[]) => {};
 
   type ObjectType = {} & dynamic;
   type ReturnType = ObjectType | ObjectType[];
@@ -554,7 +555,7 @@ export function htmlToJsObj(input: string | HTMLElement,
         $$obj[attrValue] = $oldValue.concat($value);
       }
 
-      if (typeof onSet === 'function') onSet($$obj, attrValue, $value, el);
+      onSet($$obj, attrValue, $value, el);
       return $$obj;
     }
 
@@ -587,7 +588,7 @@ export function htmlToJsObj(input: string | HTMLElement,
         $$obj[attrName] = $oldValue.concat($oldValue);
       }
 
-      if (typeof onSet === 'function') onSet($$obj, attrName, attrValue, el);
+      onSet($$obj, attrName, attrValue, el);
     }
 
     forEach([].slice.call(el.children), child => walker(child, $obj));
