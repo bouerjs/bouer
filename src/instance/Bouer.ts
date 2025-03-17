@@ -268,6 +268,7 @@ export default class Bouer<
     this.options = $options;
     this.config = $options.config || {};
     this.deps = $options.deps || {} as any;
+    this.pipes = $options.pipes || {};
 
     forEach(Object.keys(this.deps as {}), key => {
       const deps = this.deps as any;
@@ -312,10 +313,6 @@ export default class Bouer<
     });
     this.globalData = Reactive.transform({
       data: $options.globalData || {},
-      context: this
-    });
-    this.pipes = Reactive.transform({
-      data: $options.pipes || {},
       context: this
     });
 

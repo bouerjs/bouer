@@ -12,6 +12,7 @@ import Task from '../../shared/helpers/Task';
 import {
   createEl,
   findAttribute,
+  fnCallResolver,
   fnEmpty,
   forEach,
   ifNullReturn,
@@ -477,7 +478,14 @@ export default class Binder {
       return $value;
 
     forEach(field.pipes || [], pipe => {
-      const args = pipe.args.slice();
+      const args = pipe.args.slice().map(a => {
+        return this.evaluator.exec({
+          code: a as any,
+          context: this.bouer,
+          isReturn: true,
+          data: this.bouer.data
+        });
+      });
       const fn = this.bouer.pipes[pipe.fn]!;
 
       if (typeof fn !== 'function')
@@ -488,10 +496,7 @@ export default class Binder {
       if (isNull(processed))
         return Logger.error('Pipe function “' + pipe.fn + '” cannot return null | undefined | void');
 
-      if (processed instanceof Promise)
-        return Logger.error('Pipe function “' + pipe.fn + '” cannot return a Promise');
-
-      $value = processed;
+      $value = fnCallResolver(processed);
     });
 
     return $value;
