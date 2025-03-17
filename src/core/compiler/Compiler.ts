@@ -7,7 +7,7 @@ import Constants from '../../shared/helpers/Constants';
 import IoC from '../../shared/helpers/IoCContainer';
 import {
   findDirective,
-  fnCall,
+  fnCallResolver,
   forEach,
   isFunction,
   isString, toArray, toLower
@@ -169,7 +169,7 @@ export default class Compiler {
           return;
 
       // e-[?]="..." directive
-      if (Constants.check(node, Constants.property) && !Constants.isConstant(node.nodeName))
+      if (Constants.check(node, Constants.property))
         directive.property(node, data);
 
       // e-skeleton directive
@@ -225,7 +225,7 @@ export default class Compiler {
       rootElement.removeAttribute(Constants.silent);
 
     if (isFunction(options.onDone)) {
-      fnCall(options.onDone!.call(context, rootElement));
+      fnCallResolver(options.onDone!.call(context, rootElement));
     }
 
     this.eventHandler.emit({
