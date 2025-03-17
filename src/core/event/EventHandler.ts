@@ -15,7 +15,7 @@ import {
   trim,
   where,
   ifNullReturn,
-  fnCall
+  fnCallResolver
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Evaluator from '../Evaluator';
@@ -30,7 +30,7 @@ export default class EventHandler {
 
   constructor(bouer: Bouer, evaluator: Evaluator) {
     this.bouer = bouer;
-    this.evaluator = evaluator; // IoC.app(bouer).resolve(Evaluator)!;
+    this.evaluator = evaluator;
 
     this.cleanup();
   }
@@ -78,7 +78,7 @@ export default class EventHandler {
 
       if (isFunction(isResultFunction)) {
         try {
-          (isResultFunction as Function).apply(context, mArguments);
+          fnCallResolver((isResultFunction as Function).apply(context, mArguments));
         } catch (error) {
           Logger.error(buildError(error));
         }
@@ -198,7 +198,7 @@ export default class EventHandler {
       }
 
       // Otherwise, dispatch the event
-      fnCall(evt.callback.call(this.bouer, new CustomEvent(eventName, init)));
+      fnCallResolver(evt.callback.call(this.bouer, new CustomEvent(eventName, init)));
       return !isOnceEvent;
     });
   }

@@ -3,7 +3,7 @@ import RenderContext from '../../definitions/types/RenderContext';
 import WatchCallback from '../../definitions/types/WatchCallback';
 import Prop from '../../shared/helpers/Prop';
 import {
-  fnCall,
+  fnCallResolver,
   forEach,
   isFunction,
   isNull,
@@ -81,7 +81,7 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
 
     ReactiveEvent.emit('BeforeGet', this);
     this.propValue = this.isComputed ?
-      fnCall(computedGet.call(this.context)) : this.propValue;
+      fnCallResolver(computedGet.call(this.context)) : this.propValue;
     const value = this.propValue;
     ReactiveEvent.emit('AfterGet', this);
     return value;
@@ -94,7 +94,7 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
     const computedSet = this.computed().set;
 
     if (this.isComputed && computedSet)
-      fnCall(computedSet.call(this.context, value));
+      fnCallResolver(computedSet.call(this.context, value));
     else if (this.isComputed && isNull(computedSet))
       return;
 

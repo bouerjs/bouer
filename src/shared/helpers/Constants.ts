@@ -3,9 +3,6 @@ import { startWith } from './Utils';
 const Constants = {
   skip: 'e-skip',
 
-  build: 'e-build',
-  array: 'e-array',
-
   if: 'e-if',
   elseif: 'e-else-if',
   else: 'e-else',
@@ -46,11 +43,9 @@ const Constants = {
   },
 
   check(node: Node, cmd: string) {
+    if (node.nodeName in { 'e-build': 1, 'e-build:array': 1, 'e-array': 1 })
+      return false;
     return startWith(node.nodeName, cmd);
-  },
-
-  isConstant(value: string) {
-    return (Object.keys(this).map(key => (this as any)[key] as string).indexOf(value) !== -1);
   }
 };
 

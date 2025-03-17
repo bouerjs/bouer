@@ -8,12 +8,11 @@ import Prop from '../../shared/helpers/Prop';
 import IoC from '../../shared/helpers/IoCContainer';
 import Task from '../../shared/helpers/Task';
 import {
-  createAnyEl,
   createEl,
   buildError,
   code,
   DOM,
-  fnCall,
+  fnCallResolver,
   forEach,
   findDirective,
   ifNullReturn,
@@ -370,10 +369,10 @@ export default class ComponentHandler {
     if (!this.activeComponents.includes(component))
       this.activeComponents.push(component);
 
-    const slotContainer = createAnyEl('SlotContainer', el => {
+    const slotContainer = createEl('SlotContainer', el => {
       el.innerHTML = componentElement.innerHTML;
       componentElement.innerHTML = '';
-    }).build() as Element;
+    }).build();
 
     const isKeepAlive = componentElement.hasAttribute('keep-alive') || ifNullReturn(component.keepAlive, false);
     // Component Creation
@@ -493,7 +492,7 @@ export default class ComponentHandler {
     const initializer = component.init;
 
     if (isFunction(initializer))
-      fnCall(initializer!.call(component));
+      fnCallResolver(initializer!.call(component));
 
     const processDataAttr = (attr: Attr) => {
       let inputData: dynamic = {};
@@ -858,7 +857,7 @@ export default class ComponentHandler {
         src = pathSections.join('/') + src.substring(1, src.length);
       }
 
-      const $Asset = createAnyEl(type, el => {
+      const $Asset = createEl(type, el => {
         if (ifNullReturn(scoped, true))
           el.setAttribute('scoped', 'true');
 
