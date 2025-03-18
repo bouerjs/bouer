@@ -12,7 +12,6 @@ import Task from '../../shared/helpers/Task';
 import {
   createEl,
   findAttribute,
-  fnCallResolver,
   fnEmpty,
   forEach,
   ifNullReturn,
@@ -496,7 +495,10 @@ export default class Binder {
       if (isNull(processed))
         return Logger.error('Pipe function “' + pipe.fn + '” cannot return null | undefined | void');
 
-      $value = fnCallResolver(processed);
+      if (processed instanceof Promise)
+        return Logger.error('Pipe function “' + pipe.fn + '” cannot return a Promise');
+
+      $value = processed;
     });
 
     return $value;

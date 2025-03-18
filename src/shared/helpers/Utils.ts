@@ -360,12 +360,22 @@ export function fnEmpty(input?: any) {
   return input;
 }
 
-export function fnCallResolver(fn?: any) {
+export function fnCallResolver(fn?: any, cb?: (v: any) => void) {
   if (isNull(fn))
     return fn;
+
+  cb = typeof cb === 'function' ? cb : (v: any) => { };
+
   if (!(fn instanceof Promise))
-    return fn;
-  return fn.then((value) => value);
+    return Promise.resolve(fn).then(value => {
+      cb(value);
+      return value;
+    });
+
+  return fn.then(value => {
+    cb(value);
+    return value;
+  });
 }
 
 export function findAttribute(
