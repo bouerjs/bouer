@@ -364,16 +364,14 @@ export function fnCallResolver(fn?: any, cb?: (v: any) => void) {
   if (isNull(fn))
     return fn;
 
-  cb = typeof cb === 'function' ? cb : (v: any) => { };
-
   if (!(fn instanceof Promise))
     return Promise.resolve(fn).then(value => {
-      cb(value);
+      if (typeof cb === 'function') cb(value);
       return value;
     });
 
   return fn.then(value => {
-    cb(value);
+    if (typeof cb === 'function') cb(value);
     return value;
   });
 }
