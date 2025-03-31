@@ -27,8 +27,8 @@ It's a javascript library really easy to use that provides to you a simple way t
 const obj = app.toJsObj('form');
 // Result `obj`:
 {
-  name: '',
-  age: ''
+  name: 'John Doe',
+  age: '20'
 }
 ```
 
