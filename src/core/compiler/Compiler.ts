@@ -191,7 +191,7 @@ export default class Compiler {
 
         const attr = element.attributes.getNamedItem(attrName)! as INode;
         attr.isActive = isActive;
-        element.attributes.removeNamedItem(delimiterField.field);
+        element.attributes.removeNamedItem(node.nodeName);
 
         return this.binder.create({
           node: attr,

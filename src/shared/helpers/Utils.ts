@@ -361,19 +361,28 @@ export function fnEmpty(input?: any) {
 }
 
 export function fnCallResolver(fn?: any, cb?: (v: any) => any) {
-  if (isNull(fn))
-    return fn;
+  let fnValue = fn;
 
-  if (!(fn instanceof Promise))
-    return Promise.resolve(fn).then(value => {
+  if (isNull(fnValue))
+    return fnValue;
+
+  cb = cb || fnEmpty;
+
+  if (typeof fnValue === 'function')
+    fnValue = fn();
+
+  if (!(fnValue instanceof Promise))
+    return fnValue;
+
+  if (fnValue instanceof Promise) {
+    fnValue.then(value => {
       if (typeof cb === 'function') cb(value);
       return value;
     });
+  }
 
-  return fn.then(value => {
-    if (typeof cb === 'function') cb(value);
-    return value;
-  });
+  cb(fnValue);
+  return fnValue;
 }
 
 export function findAttribute(
