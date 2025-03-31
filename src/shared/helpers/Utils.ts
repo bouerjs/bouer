@@ -360,7 +360,7 @@ export function fnEmpty(input?: any) {
   return input;
 }
 
-export function fnCallResolver(fn?: any, cb?: (v: any) => void) {
+export function fnCallResolver(fn?: any, cb?: (v: any) => any) {
   if (isNull(fn))
     return fn;
 
@@ -410,12 +410,14 @@ export function getRootElement(el: Element): Element {
 }
 
 export function setData<
-  InputData extends dynamic, TargetObject extends dynamic, DataResult extends InputData & TargetObject
+  InData extends dynamic,
+  Data extends dynamic,
+  OutData extends InData & Data
 >(
   context: RenderContext,
-  inputData: InputData,
-  targetObject?: TargetObject
-): DataResult {
+  inputData: InData,
+  targetObject?: Data
+): OutData {
   if (isNull(targetObject))
     targetObject = context.data as any;
 
@@ -442,7 +444,7 @@ export function setData<
 
     ReactiveEvent.once('AfterGet', evt => {
       evt.onemit = descriptor => source = descriptor;
-      Prop.descriptor(inputData, key as keyof InputData)!.get!();
+      Prop.descriptor(inputData, key as keyof InData)!.get!();
     });
 
     ReactiveEvent.once('AfterGet', evt => {
@@ -464,10 +466,11 @@ export function setData<
     source.notify();
   });
 
-  return (targetObject! as any) as DataResult;
+  return (targetObject! as any) as OutData;
 }
 
-export function htmlToJsObj(input: string | HTMLElement,
+export function htmlToJsObj(
+  input: string | HTMLElement,
   options?: {
     /**
     * attributes that tells the compiler to lookup to the element, e.g: [name],[data-name].

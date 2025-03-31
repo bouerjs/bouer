@@ -1,14 +1,15 @@
 <div class="input-field">
   <label e-text="{{ label }}"> Label Name </label>
   <slot default></slot>
-  <small e-show="enableWarn" e-text="{{ required }}"></small>
+  <small e-show="!isValid && !isFirstRun" e-text="{{ required }}"></small>
 </div>
 <script>
   let watch;
 
   this.on('loaded', (evt) => {
     watch = this.bouer.watch('value', (v) => {
-      this.data.enableWarn = (v === '');
+      this.data.isFirstRun = false;
+      this.data.isValid = !(v === '');
     }, this.data);
   });
 
@@ -17,7 +18,8 @@
   });
 
   this.export({
-    enableWarn: false,
+    isFirstRun: true,
+    isValid: false,
     required: 'The Field "'+ this.data.label +'" is Required *'
   });
 </script>
