@@ -268,6 +268,7 @@ export default class Bouer<
     this.options = $options;
     this.config = $options.config || {};
     this.deps = $options.deps || {} as any;
+    this.pipes = $options.pipes || {};
 
     forEach(Object.keys(this.deps as {}), key => {
       const deps = this.deps as any;
@@ -314,10 +315,6 @@ export default class Bouer<
       data: $options.globalData || {},
       context: this
     });
-    this.pipes = Reactive.transform({
-      data: $options.pipes || {},
-      context: this
-    });
 
     delimiters.push.apply(delimiters, [
       { name: 'html', delimiter: { open: '{{:html ', close: '}}' } },
@@ -336,7 +333,7 @@ export default class Bouer<
       get: key => key ? dataStore.data[key] : null,
       set: (key, data, toReactive) => {
         if (key in dataStore.data)
-          return Logger.log('There is already a data stored with this key “' + key + '”.');
+          return Logger.warn('There is already a data stored with this key “' + key + '”.');
 
         if (ifNullReturn(toReactive, false) === true)
           Reactive.transform({

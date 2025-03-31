@@ -6,8 +6,6 @@ import Reactive from '../../core/reactive/Reactive';
 import dynamic from '../../definitions/types/Dynamic';
 import RenderContext from '../../definitions/types/RenderContext';
 import Logger from '../logger/Logger';
-import Constants from './Constants';
-import Extend from './Extend';
 import Prop from './Prop';
 
 export function webRequest(url: string, options?: {
@@ -223,26 +221,25 @@ export function createComment(id?: string, content?: string) {
   return comment;
 }
 
-export function createAnyEl(
-  elName: string,
-  callback?: (element: HTMLElement, dom: Document) => void
-) {
-  return createEl(elName as any, callback);
-}
-
-export function createEl<Key extends keyof HTMLElementTagNameMap>(
+export function createEl<Key extends string>(
   elName: Key,
-  callback?: (element: HTMLElementTagNameMap[Key], dom: Document) => void
+  callback?: (
+    element: Key extends keyof HTMLElementTagNameMap
+      ? HTMLElementTagNameMap[Key]
+      : HTMLElement,
+    dom: Document
+  ) => void
 ) {
+  type ElType = (Key extends keyof HTMLElementTagNameMap ? HTMLElementTagNameMap[Key] : HTMLElement);
   const el = DOM.createElement(elName);
-  if (isFunction(callback)) callback!(el, DOM);
+  if (isFunction(callback)) callback!(el as ElType, DOM);
 
   const returnObj = {
     appendTo: (target: Element) => {
       target.appendChild(el);
       return returnObj;
     },
-    build: () => el,
+    build: () => el as ElType,
     child: () => el.children[0] as Element,
     children: () => [].slice.call(el.childNodes) as Element[],
   };
@@ -363,15 +360,29 @@ export function fnEmpty(input?: any) {
   return input;
 }
 
-export function fnCall(fn?: any) {
-  if (fn instanceof Promise)
-    fn.then(result => {
-      if (isFunction(result))
-        result.call();
-      else if (result instanceof Promise)
-        result.then();
-    }).catch(err => Logger.error(err));
-  return fn;
+export function fnCallResolver(fn?: any, cb?: (v: any) => any) {
+  let fnValue = fn;
+
+  if (isNull(fnValue))
+    return fnValue;
+
+  cb = cb || fnEmpty;
+
+  if (typeof fnValue === 'function')
+    fnValue = fn();
+
+  if (!(fnValue instanceof Promise))
+    return fnValue;
+
+  if (fnValue instanceof Promise) {
+    fnValue.then(value => {
+      if (typeof cb === 'function') cb(value);
+      return value;
+    });
+  }
+
+  cb(fnValue);
+  return fnValue;
 }
 
 export function findAttribute(
@@ -408,12 +419,14 @@ export function getRootElement(el: Element): Element {
 }
 
 export function setData<
-  InputData extends dynamic, TargetObject extends dynamic, DataResult extends InputData & TargetObject
+  InData extends dynamic,
+  Data extends dynamic,
+  OutData extends InData & Data
 >(
   context: RenderContext,
-  inputData: InputData,
-  targetObject?: TargetObject
-): DataResult {
+  inputData: InData,
+  targetObject?: Data
+): OutData {
   if (isNull(targetObject))
     targetObject = context.data as any;
 
@@ -440,7 +453,7 @@ export function setData<
 
     ReactiveEvent.once('AfterGet', evt => {
       evt.onemit = descriptor => source = descriptor;
-      Prop.descriptor(inputData, key as keyof InputData)!.get!();
+      Prop.descriptor(inputData, key as keyof InData)!.get!();
     });
 
     ReactiveEvent.once('AfterGet', evt => {
@@ -462,10 +475,11 @@ export function setData<
     source.notify();
   });
 
-  return (targetObject! as any) as DataResult;
+  return (targetObject! as any) as OutData;
 }
 
-export function htmlToJsObj(input: string | HTMLElement,
+export function htmlToJsObj(
+  input: string | HTMLElement,
   options?: {
     /**
     * attributes that tells the compiler to lookup to the element, e.g: [name],[data-name].
@@ -481,20 +495,19 @@ export function htmlToJsObj(input: string | HTMLElement,
   onSet?: (
     builtObject: object, propName: string, value: any, element: Element
   ) => void
-): object | null {
-  let element: Element | undefined = undefined;
+) {
+
+  let element: Element | null | undefined = undefined;
   // If it's not a HTML Element, just return
   if ((input instanceof HTMLElement))
     element = input;
   // If it's a string try to get the element
   else if (typeof input === 'string') {
     try {
-      const $el = DOM.querySelector(input);
-      if (!$el) {
+      if (!(element = DOM.querySelector(input))) {
         Logger.error('Element with "' + input + '" selector Not Found.');
         return null;
       }
-      element = $el;
     } catch (error) {
       // Unknown error
       Logger.error(buildError(error));
@@ -504,7 +517,7 @@ export function htmlToJsObj(input: string | HTMLElement,
 
   // If the element is not
   if (isNull(element))
-    throw Logger.error('Invalid element provided at app.toJsObj(> "' + input + '" <).');
+    throw Logger.error('Invalid element provided at app.toJsObj(“'+ input +'”).');
 
   options = options || {};
 
@@ -523,116 +536,87 @@ export function htmlToJsObj(input: string | HTMLElement,
     return val;
   };
 
-  const objBuilder = (element: Element) => {
-    const builtObject: dynamic = {};
+  // Elements that skipped on serialization process
+  const escapes: dynamic = { BUTTON: true };
+  const checkables: dynamic = { checkbox: true, radio: true };
+  onSet = (typeof onSet === 'function') ? onSet : (...args: any[]) => {};
 
-    // Elements that skipped on serialization process
-    const escapes: dynamic = { BUTTON: true };
-    const checkables: dynamic = { checkbox: true, radio: true };
+  type ObjectType = {} & dynamic;
+  type ReturnType = ObjectType | ObjectType[];
 
-    (function walker(el: Element) {
-      const attr = findAttribute(el, mNames);
-      if (attr) {
-        const propName = attr.value;
+  const $object: ReturnType = (function walker(el: Element | HTMLCollection, $obj: ReturnType): ReturnType {
+    if (el instanceof HTMLCollection) {
+      forEach([].slice.call(el), child => walker(child, $obj));
+      return $obj;
+    }
 
-        if (escapes[el.tagName] === true) return;
+    const $$obj = $obj as ObjectType;
 
-        if ((el instanceof HTMLInputElement) && (checkables[el.type] === true && el.checked === false))
-          return;
+    // Handling builds => e-build
+    // Checking for e-build property
+    const attrBuild = findAttribute(el, ['e-build', 'e-build:array']);
+    if (attrBuild) {
+      const attrValue = attrBuild.value;
+      const attrName = attrBuild.name;
+      // Building the object
+      const $value = walker(el.children, {});
 
-        const propOldValue = builtObject[propName];
-        const isBuildAsArray = el.hasAttribute(Constants.array);
-        const value = tryGetValue(el);
+      // Retrieving the value if it needs to be build as arry property
+      const isArray = attrName === 'e-build:array' || findAttribute(el, ['e-array']) != null;
 
-        if (value !== '') {
-          if (isBuildAsArray) {
-            (propOldValue) ?
-              // Add item to the array
-              builtObject[propName] = Extend.array(propOldValue, value) :
-              // Set the new value
-              builtObject[propName] = [value];
-          } else {
-            (propOldValue) ?
-              // Spread and add properties
-              builtObject[propName] = Extend.array(propOldValue, value) :
-              // Set the new value
-              builtObject[propName] = value;
-          }
-        }
+      // if it is not an array built type, just set the value
+      if (!isArray) {
+        $$obj[attrValue] = $value;
+      } else {
+        // Getting the value from if exists, otherwise set default value as empty array
+        const $oldValue: ObjectType[] = $$obj[attrValue] || [];
 
-        // Calling on set function
-        if (isFunction(onSet))
-          fnCall(onSet!(builtObject, propName, value, el));
+        // Seeting the value
+        $$obj[attrValue] = $oldValue.concat($value);
       }
 
-      forEach(toArray(el.children), (child: Element) => {
-        if (!findAttribute(child, [Constants.build]))
-          walker(child);
-      });
-    })(element);
+      onSet($$obj, attrValue, $value, el);
+      return $$obj;
+    }
 
-    return builtObject;
-  };
+    // Handling the inputs in/out e-build
+    const attr = findAttribute(el, mNames);
+    // Checking if the element has the names on it
+    if (attr) {
+      const $$obj = $obj as ObjectType;
+      const attrName = attr.value;
 
-  const builtObject = objBuilder(element!);
-  const builds = toArray(element!.querySelectorAll(`[${Constants.build}]`));
+      // If is escapable, stop
+      if (escapes[el.tagName] === true) return $$obj;
 
-  forEach(builds, (buildElement: Element) => {
-    // Getting the e-build attr value
-    const buildPath = getValue(buildElement, Constants.build) as string;
-    const isBuildAsArray = buildElement.hasAttribute(Constants.array);
-    const builtObjValue = objBuilder(buildElement);
+      // If it's is checkable and it's not selected, stop
+      if ((el instanceof HTMLInputElement) && (checkables[el.type] === true && el.checked === false))
+        return $$obj;
 
-    // If the object is empty (has all fields with `null` value)
-    if (!isFilledObj(builtObjValue)) return;
+      const attrValue = tryGetValue(el);
 
-    (function objStructurer(remainPath, lastLayer) {
-      const splittedPath = remainPath.split('.');
-      const leadElement = splittedPath[0];
-
-      // Remove the lead element of the array
-      splittedPath.shift();
-
-      const objPropertyValue = lastLayer[leadElement];
-
-      if (isNull(objPropertyValue))
-        lastLayer[leadElement] = {};
-
-      // If it's the last element of the array
-      if (splittedPath.length === 0) {
-        if (isBuildAsArray) {
-          // Handle Array
-          if (isObject(objPropertyValue) && !isEmptyObject(objPropertyValue)) {
-            lastLayer[leadElement] = [Extend.obj(objPropertyValue, builtObjValue)];
-          } else if (Array.isArray(objPropertyValue)) {
-            objPropertyValue.push(builtObjValue);
-          } else {
-            lastLayer[leadElement] = [builtObjValue];
-          }
-        } else {
-          isNull(objPropertyValue) ?
-            // Set the new property
-            lastLayer[leadElement] = builtObjValue :
-            // Spread and add the new fields into the object
-            lastLayer[leadElement] = Extend.obj(objPropertyValue, builtObjValue);
-        }
-        if (isFunction(onSet))
-          fnCall(onSet!(lastLayer, leadElement, builtObjValue, buildElement));
-
-        return;
+      // Retrieving the value if it needs to be build as arry property
+      const isArray = findAttribute(el, ['e-array']) != null;
+      // if it is not an array built type, just set the value
+      if (!isArray) {
+        // Setting the value
+        $$obj[attrName] = attrValue;
+      } else {
+        // Getting the value from if exists, otherwise set default value as empty array
+        const $oldValue: unknown[] = $$obj[attrName] || [];
+        // Seeting the value
+        $$obj[attrName] = $oldValue.concat($oldValue);
       }
 
-      if (Array.isArray(objPropertyValue)) {
-        return forEach(objPropertyValue, item => {
-          objStructurer(splittedPath.join('.'), item);
-        });
-      }
+      onSet($$obj, attrName, attrValue, el);
+    }
 
-      objStructurer(splittedPath.join('.'), lastLayer[leadElement]);
-    })(buildPath, builtObject);
-  });
+    forEach([].slice.call(el.children), child => walker(child, $obj));
 
-  return builtObject;
+    return $obj;
+  })(element!, {});
+
+  return $object;
 }
 
 export function toOwnerNode(node: Node) {

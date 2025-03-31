@@ -178,7 +178,7 @@ export function $show(opitons: {
   const bindResult = binder.create({
     data: data,
     node: node,
-    fields: [{ expression: nodeValue, field: nodeValue }],
+    fields: [{ expression: nodeValue, field: nodeValue, pipes: [] }],
     context: context,
     onUpdate: () => execute(ownerNode)
   });

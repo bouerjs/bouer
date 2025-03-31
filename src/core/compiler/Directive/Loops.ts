@@ -170,7 +170,7 @@ export function $for(opitons: {
         switch (toLower(type)) {
           case 'asc': return asc ? 1 : -1;
           case 'desc': return desc ? -1 : 1;
-          default: Logger.log('The “' + type + '” order type is invalid: “' + nodeValue +
+          default: Logger.error('The “' + type + '” order type is invalid: “' + nodeValue +
             '”. Available types are: “asc”  for order ascendent and “desc” for order descendent.');
             return 0;
         }

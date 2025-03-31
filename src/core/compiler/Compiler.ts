@@ -7,7 +7,7 @@ import Constants from '../../shared/helpers/Constants';
 import IoC from '../../shared/helpers/IoCContainer';
 import {
   findDirective,
-  fnCall,
+  fnCallResolver,
   forEach,
   isFunction,
   isString, toArray, toLower
@@ -169,7 +169,7 @@ export default class Compiler {
           return;
 
       // e-[?]="..." directive
-      if (Constants.check(node, Constants.property) && !Constants.isConstant(node.nodeName))
+      if (Constants.check(node, Constants.property))
         directive.property(node, data);
 
       // e-skeleton directive
@@ -187,15 +187,15 @@ export default class Compiler {
         const element = ((node as any).ownerElement || node.parentNode) as Element;
 
         const attrName = 'e-' + delimiterField.expression;
-        const attrValue = '{{ ' + delimiterField.expression + ' }}';
-        element.setAttribute(attrName, attrValue);
+        element.setAttribute(attrName, delimiterField.field);
 
-        const attr = element.attributes.getNamedItem(attrName)!;
-        element.attributes.removeNamedItem(delimiterField.field);
+        const attr = element.attributes.getNamedItem(attrName)! as INode;
+        attr.isActive = isActive;
+        element.attributes.removeNamedItem(node.nodeName);
 
         return this.binder.create({
           node: attr,
-          fields: [{ expression: delimiterField.expression, field: attr.value }],
+          fields: [delimiterField],
           context: context as RenderContext,
           data: data
         });
@@ -225,7 +225,7 @@ export default class Compiler {
       rootElement.removeAttribute(Constants.silent);
 
     if (isFunction(options.onDone)) {
-      fnCall(options.onDone!.call(context, rootElement));
+      fnCallResolver(options.onDone!.call(context, rootElement));
     }
 
     this.eventHandler.emit({

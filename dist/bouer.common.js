@@ -1,5 +1,5 @@
 /*!
- * Bouer.js v3.1.2
+ * Bouer.js v3.2.0
  * Copyright Easy.js 2018-2020 | 2021-2025 Afonso Matumona
  * Released under the MIT License.
  */
@@ -11,7 +11,7 @@ var Logger = (function Logger() {
   var prefix = '[Bouer]';
   return {
     log: function(l) {
-      console.log.apply(null, [prefix].concat(Error(l)));
+      console.log.apply(null, [prefix].concat(l));
     },
     error: function(e) {
       console.error.apply(null, [prefix].concat(Error(e)));
@@ -20,7 +20,7 @@ var Logger = (function Logger() {
       console.warn.apply(null, [prefix].concat(Error(w)));
     },
     info: function(i) {
-      console.info.apply(null, [prefix].concat(Error(i)));
+      console.info.apply(null, [prefix].concat(i));
     }
   };
 })();
@@ -147,7 +147,7 @@ var Reactive = /** @class */ (function() {
       var computedGet = _this.computed().get;
       ReactiveEvent.emit('BeforeGet', _this);
       _this.propValue = _this.isComputed ?
-        fnCall(computedGet.call(_this.context)) : _this.propValue;
+        fnCallResolver(computedGet.call(_this.context)) : _this.propValue;
       var value = _this.propValue;
       ReactiveEvent.emit('AfterGet', _this);
       return value;
@@ -157,7 +157,7 @@ var Reactive = /** @class */ (function() {
         return;
       var computedSet = _this.computed().set;
       if (_this.isComputed && computedSet)
-        fnCall(computedSet.call(_this.context, value));
+        fnCallResolver(computedSet.call(_this.context, value));
       else if (_this.isComputed && isNull(computedSet))
         return;
       _this.propValueOld = _this.propValue;
@@ -348,148 +348,6 @@ var Reactive = /** @class */ (function() {
   };
   return Reactive;
 }());
-var Constants = {
-  skip: 'e-skip',
-  build: 'e-build',
-  array: 'e-array',
-  if: 'e-if',
-  elseif: 'e-else-if',
-  else: 'e-else',
-  show: 'e-show',
-  req: 'e-req',
-  for: 'e-for',
-  data: 'data',
-  def: 'e-def',
-  wait: 'wait-data',
-  text: 'e-text',
-  bind: 'e-bind',
-  property: 'e-',
-  skeleton: 'e-skeleton',
-  route: 'route-view',
-  href: ':href',
-  entry: 'e-entry',
-  on: 'on:',
-  silent: '--s',
-  slot: 'slot',
-  ref: 'ref',
-  put: 'e-put',
-  builtInEvents: {
-    add: 'add',
-    compile: 'compile',
-    request: 'request',
-    response: 'response',
-    fail: 'fail',
-    done: 'done',
-  },
-  check: function(node, cmd) {
-    return startWith(node.nodeName, cmd);
-  },
-  isConstant: function(value) {
-    var _this = this;
-    return (Object.keys(this).map(function(key) {
-      return _this[key];
-    }).indexOf(value) !== -1);
-  }
-};
-var Extend = (function Extend() {
-  var obj = function() {
-    var args = [];
-    for (var _i = 0; _i < arguments.length; _i++) {
-      args[_i] = arguments[_i];
-    }
-    var out = {};
-    forEach(args, function(arg) {
-      if (isNull(arg))
-        return;
-      forEach(Object.keys(arg), function(key) {
-        Prop.transfer(out, arg, key);
-      });
-    });
-    return out;
-  };
-  var mixin = function(out) {
-    var args = [];
-    for (var _i = 1; _i < arguments.length; _i++) {
-      args[_i - 1] = arguments[_i];
-    }
-    // Props to mix with out object
-    var props = obj.apply({}, args);
-    forEach(Object.keys(props), function(key) {
-      var hasOwnProp = key in out;
-      Prop.transfer(out, props, key);
-      if (hasOwnProp) {
-        var mOut = out;
-        mOut[key] = fnEmpty(mOut[key]);
-      }
-    });
-    return out;
-  };
-  var array = function() {
-    var args = [];
-    for (var _i = 0; _i < arguments.length; _i++) {
-      args[_i] = arguments[_i];
-    }
-    var out = [];
-    forEach(args, function(arg) {
-      if (isNull(arg))
-        return;
-      if (!Array.isArray(arg))
-        return out.push(arg);
-      forEach(Object.keys(arg), function(key) {
-        var value = arg[key];
-        if (isNull(value))
-          return;
-        if (Array.isArray(value))
-                    [].push.apply(out, value);
-        else
-          out.push(value);
-      });
-    });
-    return out;
-  };
-  var matcher = function(t1, t2) {
-    var exec = function(src, dst) {
-      forEach(Object.keys(src), function(key) {
-        if (key in dst)
-          return;
-        var hasOwnProp = key in src;
-        Prop.transfer(dst, src, key);
-        if (hasOwnProp) {
-          src[key] = fnEmpty(src[key]);
-        }
-      });
-    };
-    exec(t1, t2);
-    exec(t2, t1);
-  };
-  return {
-    /**
-     * Combines different object into a new one
-     * @param {object} args Objects to be combined
-     * @returns A new object having the properties of all the objects
-     */
-    obj: obj,
-    /**
-     * Adds properties to the first object provided
-     * @param {object} out the object that should be added all the properties from the other one
-     * @param {object} args the objects where the properties should be extracted from
-     * @returns the first object with all the new properties added on
-     */
-    mixin: mixin,
-    /**
-     * Combines different arrays into a new one
-     * @param {object} args arrays to be combined
-     * @returns a new arrat having the items of all the arrays
-     */
-    array: array,
-    /**
-     * transfers the props of first object to the second and the seconds to the first
-     * @param {object} t1 the first object
-     * @param {object} t2 the second object
-     */
-    matcher: matcher,
-  };
-})();
 // Quotes “'+  +'”
 function webRequest(url, options) {
   if (!url)
@@ -672,10 +530,6 @@ function createComment(id, content) {
   return comment;
 }
 
-function createAnyEl(elName, callback) {
-  return createEl(elName, callback);
-}
-
 function createEl(elName, callback) {
   var el = DOM.createElement(elName);
   if (isFunction(callback))
@@ -811,17 +665,20 @@ function fnEmpty(input) {
   return input;
 }
 
-function fnCall(fn) {
-  if (fn instanceof Promise)
-    fn.then(function(result) {
-      if (isFunction(result))
-        result.call();
-      else if (result instanceof Promise)
-        result.then();
-    }).catch(function(err) {
-      return Logger.error(err);
+function fnCallResolver(fn, cb) {
+  if (isNull(fn))
+    return fn;
+  if (!(fn instanceof Promise))
+    return Promise.resolve(fn).then(function(value) {
+      if (typeof cb === 'function')
+        cb(value);
+      return value;
     });
-  return fn;
+  return fn.then(function(value) {
+    if (typeof cb === 'function')
+      cb(value);
+    return value;
+  });
 }
 
 function findAttribute(element, attrs, removeIfFound) {
@@ -907,12 +764,10 @@ function htmlToJsObj(input, options, onSet) {
   // If it's a string try to get the element
   else if (typeof input === 'string') {
     try {
-      var $el = DOM.querySelector(input);
-      if (!$el) {
+      if (!(element = DOM.querySelector(input))) {
         Logger.error('Element with "' + input + '" selector Not Found.');
         return null;
       }
-      element = $el;
     } catch (error) {
       // Unknown error
       Logger.error(buildError(error));
@@ -921,7 +776,7 @@ function htmlToJsObj(input, options, onSet) {
   }
   // If the element is not
   if (isNull(element))
-    throw Logger.error('Invalid element provided at app.toJsObj(> "' + input + '" <).');
+    throw Logger.error('Invalid element provided at app.toJsObj(“' + input + '”).');
   options = options || {};
   // Remove `[ ]` and `,` and return an array of the names provided
   var mNames = (options.names || '[name]').replace(/\[|\]/g, '').split(',');
@@ -938,102 +793,78 @@ function htmlToJsObj(input, options, onSet) {
     });
     return val;
   };
-  var objBuilder = function(element) {
-    var builtObject = {};
-    // Elements that skipped on serialization process
-    var escapes = {
-      BUTTON: true
-    };
-    var checkables = {
-      checkbox: true,
-      radio: true
-    };
-    (function walker(el) {
-      var attr = findAttribute(el, mNames);
-      if (attr) {
-        var propName = attr.value;
-        if (escapes[el.tagName] === true)
-          return;
-        if ((el instanceof HTMLInputElement) && (checkables[el.type] === true && el.checked === false))
-          return;
-        var propOldValue = builtObject[propName];
-        var isBuildAsArray = el.hasAttribute(Constants.array);
-        var value = tryGetValue(el);
-        if (value !== '') {
-          if (isBuildAsArray) {
-            (propOldValue) ?
-            // Add item to the array
-            builtObject[propName] = Extend.array(propOldValue, value):
-              // Set the new value
-              builtObject[propName] = [value];
-          } else {
-            (propOldValue) ?
-            // Spread and add properties
-            builtObject[propName] = Extend.array(propOldValue, value):
-              // Set the new value
-              builtObject[propName] = value;
-          }
-        }
-        // Calling on set function
-        if (isFunction(onSet))
-          fnCall(onSet(builtObject, propName, value, el));
-      }
-      forEach(toArray(el.children), function(child) {
-        if (!findAttribute(child, [Constants.build]))
-          walker(child);
-      });
-    })(element);
-    return builtObject;
+  // Elements that skipped on serialization process
+  var escapes = {
+    BUTTON: true
   };
-  var builtObject = objBuilder(element);
-  var builds = toArray(element.querySelectorAll("[".concat(Constants.build, "]")));
-  forEach(builds, function(buildElement) {
-    // Getting the e-build attr value
-    var buildPath = getValue(buildElement, Constants.build);
-    var isBuildAsArray = buildElement.hasAttribute(Constants.array);
-    var builtObjValue = objBuilder(buildElement);
-    // If the object is empty (has all fields with `null` value)
-    if (!isFilledObj(builtObjValue))
-      return;
-    (function objStructurer(remainPath, lastLayer) {
-      var splittedPath = remainPath.split('.');
-      var leadElement = splittedPath[0];
-      // Remove the lead element of the array
-      splittedPath.shift();
-      var objPropertyValue = lastLayer[leadElement];
-      if (isNull(objPropertyValue))
-        lastLayer[leadElement] = {};
-      // If it's the last element of the array
-      if (splittedPath.length === 0) {
-        if (isBuildAsArray) {
-          // Handle Array
-          if (isObject(objPropertyValue) && !isEmptyObject(objPropertyValue)) {
-            lastLayer[leadElement] = [Extend.obj(objPropertyValue, builtObjValue)];
-          } else if (Array.isArray(objPropertyValue)) {
-            objPropertyValue.push(builtObjValue);
-          } else {
-            lastLayer[leadElement] = [builtObjValue];
-          }
-        } else {
-          isNull(objPropertyValue) ?
-            // Set the new property
-            lastLayer[leadElement] = builtObjValue :
-            // Spread and add the new fields into the object
-            lastLayer[leadElement] = Extend.obj(objPropertyValue, builtObjValue);
-        }
-        if (isFunction(onSet))
-          fnCall(onSet(lastLayer, leadElement, builtObjValue, buildElement));
-        return;
+  var checkables = {
+    checkbox: true,
+    radio: true
+  };
+  onSet = (typeof onSet === 'function') ? onSet : function() {};
+  var $object = (function walker(el, $obj) {
+    if (el instanceof HTMLCollection) {
+      forEach([].slice.call(el), function(child) {
+        return walker(child, $obj);
+      });
+      return $obj;
+    }
+    var $$obj = $obj;
+    // Handling builds => e-build
+    // Checking for e-build property
+    var attrBuild = findAttribute(el, ['e-build', 'e-build:array']);
+    if (attrBuild) {
+      var attrValue = attrBuild.value;
+      var attrName = attrBuild.name;
+      // Building the object
+      var $value = walker(el.children, {});
+      // Retrieving the value if it needs to be build as arry property
+      var isArray = attrName === 'e-build:array' || findAttribute(el, ['e-array']) != null;
+      // if it is not an array built type, just set the value
+      if (!isArray) {
+        $$obj[attrValue] = $value;
+      } else {
+        // Getting the value from if exists, otherwise set default value as empty array
+        var $oldValue = $$obj[attrValue] || [];
+        // Seeting the value
+        $$obj[attrValue] = $oldValue.concat($value);
       }
-      if (Array.isArray(objPropertyValue)) {
-        return forEach(objPropertyValue, function(item) {
-          objStructurer(splittedPath.join('.'), item);
-        });
+      onSet($$obj, attrValue, $value, el);
+      return $$obj;
+    }
+    // Handling the inputs in/out e-build
+    var attr = findAttribute(el, mNames);
+    // Checking if the element has the names on it
+    if (attr) {
+      var $$obj_1 = $obj;
+      var attrName = attr.value;
+      // If is escapable, stop
+      if (escapes[el.tagName] === true)
+        return $$obj_1;
+      // If it's is checkable and it's not selected, stop
+      if ((el instanceof HTMLInputElement) && (checkables[el.type] === true && el.checked === false))
+        return $$obj_1;
+      var attrValue = tryGetValue(el);
+      // Retrieving the value if it needs to be build as arry property
+      var isArray = findAttribute(el, ['e-array']) != null;
+      // if it is not an array built type, just set the value
+      if (!isArray) {
+        // Setting the value
+        $$obj_1[attrName] = attrValue;
+      } else {
+        // Getting the value from if exists, otherwise set default value as empty array
+        var $oldValue = $$obj_1[attrName] || [];
+        // Seeting the value
+        $$obj_1[attrName] = $oldValue.concat($oldValue);
       }
-      objStructurer(splittedPath.join('.'), lastLayer[leadElement]);
-    })(buildPath, builtObject);
-  });
-  return builtObject;
+      onSet($$obj_1, attrName, attrValue, el);
+    }
+    forEach([].slice.call(el.children), function(child) {
+      return walker(child, $obj);
+    });
+    return $obj;
+  })(element, {});
+  return $object;
 }
 
 function toOwnerNode(node) {
@@ -1088,26 +919,141 @@ var DelimiterHandler = /** @class */ (function() {
       return [];
     return result.map(function(item) {
       var matches = checkContent(item);
+      var delimiterField = matches[0];
+      var delimiterExpression = matches[1];
+      // Composing the expression: price | currency:$ -> [ price, currency:$ ]
+      var expressionComposed = delimiterExpression.trim().split(' | ').map(function(e) {
+        return trim(e);
+      });
+      // Extracting the field only
+      var expression = expressionComposed.shift();
+      // Builing the pipes structure
+      var pipes = expressionComposed.map(function(e) {
+        // currency:$ -> currency [ $ ]
+        var args = e.split(':');
+        var fn = args.shift();
+        return {
+          fn: fn,
+          args: args
+        };
+      });
       return {
-        field: matches[0],
-        expression: trim(matches[1]),
-        delimiter: mDelimiter
+        field: delimiterField,
+        expression: trim(expression),
+        delimiter: mDelimiter,
+        pipes: pipes
       };
     });
   };
   DelimiterHandler.prototype.shorthand = function(attrName) {
     if (isNull(attrName) || trim(attrName) === '')
       return null;
-    var result = attrName.match(new RegExp('{([\\w{$,-}]*?)}'));
-    if (!result)
+    var match = attrName.match(new RegExp('{([\\w{$,-}]*?)}'));
+    if (!match)
       return null;
-    return {
-      field: result[0],
-      expression: trim(result[1])
-    };
+    return this.run('{{' + trim(match[1]) + '}}')[0];
   };
   return DelimiterHandler;
 }());
+var Extend = (function Extend() {
+  var obj = function() {
+    var args = [];
+    for (var _i = 0; _i < arguments.length; _i++) {
+      args[_i] = arguments[_i];
+    }
+    var out = {};
+    forEach(args, function(arg) {
+      if (isNull(arg))
+        return;
+      forEach(Object.keys(arg), function(key) {
+        Prop.transfer(out, arg, key);
+      });
+    });
+    return out;
+  };
+  var mixin = function(out) {
+    var args = [];
+    for (var _i = 1; _i < arguments.length; _i++) {
+      args[_i - 1] = arguments[_i];
+    }
+    // Props to mix with out object
+    var props = obj.apply({}, args);
+    forEach(Object.keys(props), function(key) {
+      var hasOwnProp = key in out;
+      Prop.transfer(out, props, key);
+      if (hasOwnProp) {
+        var mOut = out;
+        mOut[key] = fnEmpty(mOut[key]);
+      }
+    });
+    return out;
+  };
+  var array = function() {
+    var args = [];
+    for (var _i = 0; _i < arguments.length; _i++) {
+      args[_i] = arguments[_i];
+    }
+    var out = [];
+    forEach(args, function(arg) {
+      if (isNull(arg))
+        return;
+      if (!Array.isArray(arg))
+        return out.push(arg);
+      forEach(Object.keys(arg), function(key) {
+        var value = arg[key];
+        if (isNull(value))
+          return;
+        if (Array.isArray(value))
+                    [].push.apply(out, value);
+        else
+          out.push(value);
+      });
+    });
+    return out;
+  };
+  var matcher = function(t1, t2) {
+    var exec = function(src, dst) {
+      forEach(Object.keys(src), function(key) {
+        if (key in dst)
+          return;
+        var hasOwnProp = key in src;
+        Prop.transfer(dst, src, key);
+        if (hasOwnProp) {
+          src[key] = fnEmpty(src[key]);
+        }
+      });
+    };
+    exec(t1, t2);
+    exec(t2, t1);
+  };
+  return {
+    /**
+     * Combines different object into a new one
+     * @param {object} args Objects to be combined
+     * @returns A new object having the properties of all the objects
+     */
+    obj: obj,
+    /**
+     * Adds properties to the first object provided
+     * @param {object} out the object that should be added all the properties from the other one
+     * @param {object} args the objects where the properties should be extracted from
+     * @returns the first object with all the new properties added on
+     */
+    mixin: mixin,
+    /**
+     * Combines different arrays into a new one
+     * @param {object} args arrays to be combined
+     * @returns a new arrat having the items of all the arrays
+     */
+    array: array,
+    /**
+     * transfers the props of first object to the second and the seconds to the first
+     * @param {object} t1 the first object
+     * @param {object} t2 the second object
+     */
+    matcher: matcher,
+  };
+})();
 var Evaluator = /** @class */ (function() {
   function Evaluator(bouer) {
     this.bouer = bouer;
@@ -1143,6 +1089,47 @@ var Evaluator = /** @class */ (function() {
   };
   return Evaluator;
 }());
+var Constants = {
+  skip: 'e-skip',
+  if: 'e-if',
+  elseif: 'e-else-if',
+  else: 'e-else',
+  show: 'e-show',
+  req: 'e-req',
+  for: 'e-for',
+  data: 'data',
+  def: 'e-def',
+  wait: 'wait-data',
+  text: 'e-text',
+  bind: 'e-bind',
+  property: 'e-',
+  skeleton: 'e-skeleton',
+  route: 'route-view',
+  href: ':href',
+  entry: 'e-entry',
+  on: 'on:',
+  silent: '--s',
+  slot: 'slot',
+  ref: 'ref',
+  put: 'e-put',
+  builtInEvents: {
+    add: 'add',
+    compile: 'compile',
+    request: 'request',
+    response: 'response',
+    fail: 'fail',
+    done: 'done',
+  },
+  check: function(node, cmd) {
+    if (node.nodeName in {
+        'e-build': 1,
+        'e-build:array': 1,
+        'e-array': 1
+      })
+      return false;
+    return startWith(node.nodeName, cmd);
+  }
+};
 var Skeleton = /** @class */ (function() {
   function Skeleton(bouer) {
     var _this = this;
@@ -1456,7 +1443,7 @@ var Routing = /** @class */ (function() {
     if (!this.routeView)
       return;
     if (isNull(route))
-      return Logger.log('Invalid url provided to the navigation method.');
+      return Logger.error('Invalid url provided to the navigation method.');
     route = trim(route);
     var resolver = urlResolver(route);
     var usehash = ifNullReturn(this.bouer.config.usehash, true);
@@ -1472,7 +1459,7 @@ var Routing = /** @class */ (function() {
     // If it's not found and the url matches .html do nothing
     if (!page && route.endsWith('.html'))
       return;
-    var componentElement = createAnyEl(page.name, function(el) {
+    var componentElement = createEl(page.name, function(el) {
         // Inherit the data scope by default
         el.setAttribute('data', isObject(options.data) ? JSON.stringify(options.data) : '$data');
       }).appendTo(this.routeView)
@@ -1574,6 +1561,17 @@ var Routing = /** @class */ (function() {
   };
   return Routing;
 }());
+
+function __spreadArray(to, from, pack) {
+  if (pack || arguments.length === 2)
+    for (var i = 0, l = from.length, ar; i < l; i++) {
+      if (ar || !(i in from)) {
+        if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+        ar[i] = from[i];
+      }
+    }
+  return to.concat(ar || Array.prototype.slice.call(from));
+}
 var Middleware = /** @class */ (function() {
   function Middleware(bouer) {
     var _this = this;
@@ -1727,6 +1725,7 @@ var Binder = /** @class */ (function() {
             context: context,
           });
           result = isNull(result) ? '' : result;
+          result = _this.applyPipes(result, field);
           // Replacing each field with the specific value
           valueToSet = valueToSet.replace(field.field, toStr(result));
           if (delimiter && typeof delimiter.onUpdate === 'function')
@@ -1992,6 +1991,32 @@ var Binder = /** @class */ (function() {
       }
     };
   };
+  Binder.prototype.applyPipes = function(value, field) {
+    var _this = this;
+    var $value = value;
+    if (isNull($value) || trim($value + '') === '')
+      return $value;
+    forEach(field.pipes || [], function(pipe) {
+      var args = pipe.args.slice().map(function(a) {
+        return _this.evaluator.exec({
+          code: a,
+          context: _this.bouer,
+          isReturn: true,
+          data: _this.bouer.data
+        });
+      });
+      var fn = _this.bouer.pipes[pipe.fn];
+      if (typeof fn !== 'function')
+        return Logger.error('Pipe “' + pipe.fn + '” not defined');
+      var processed = fn.apply(null, __spreadArray([$value], args, true));
+      if (isNull(processed))
+        return Logger.error('Pipe function “' + pipe.fn + '” cannot return null | undefined | void');
+      if (processed instanceof Promise)
+        return Logger.error('Pipe function “' + pipe.fn + '” cannot return a Promise');
+      $value = processed;
+    });
+    return $value;
+  };
   /** Creates a process to unbind properties that is not connected to the DOM anymone */
   Binder.prototype.cleanup = function() {
     var _this = this;
@@ -2014,7 +2039,7 @@ var EventHandler = /** @class */ (function() {
     this.$events = {};
     this.input = createEl('input').build();
     this.bouer = bouer;
-    this.evaluator = evaluator; // IoC.app(bouer).resolve(Evaluator)!;
+    this.evaluator = evaluator;
     this.cleanup();
   }
   EventHandler.prototype.compile = function(node, data, context) {
@@ -2055,7 +2080,7 @@ var EventHandler = /** @class */ (function() {
       });
       if (isFunction(isResultFunction)) {
         try {
-          isResultFunction.apply(context, mArguments);
+          fnCallResolver(isResultFunction.apply(context, mArguments));
         } catch (error) {
           Logger.error(buildError(error));
         }
@@ -2167,7 +2192,7 @@ var EventHandler = /** @class */ (function() {
         return !isOnceEvent;
       }
       // Otherwise, dispatch the event
-      fnCall(evt.callback.call(_this.bouer, new CustomEvent(eventName, init)));
+      fnCallResolver(evt.callback.call(_this.bouer, new CustomEvent(eventName, init)));
       return !isOnceEvent;
     });
   };
@@ -2212,7 +2237,8 @@ function $bind(opitons) {
     node: node,
     fields: [{
       field: nodeValue,
-      expression: nodeValue
+      expression: nodeValue,
+      pipes: []
     }],
     context: context,
     data: data
@@ -2258,11 +2284,12 @@ function $property(opitons) {
   binder.create({
     data: data,
     node: node,
-    isReplaceProperty: false,
     context: context,
+    isReplaceProperty: false,
     fields: [{
       expression: nodeValue,
-      field: nodeValue
+      field: nodeValue,
+      pipes: []
     }],
     onUpdate: function() {
       return execute(evaluator.exec({
@@ -2365,7 +2392,8 @@ function $put(opitons) {
     node: node,
     fields: [{
       expression: nodeValue,
-      field: nodeValue
+      field: nodeValue,
+      pipes: []
     }],
     context: context,
     isReplaceProperty: false,
@@ -2379,7 +2407,7 @@ function $put(opitons) {
     nodeValue = trim(ifNullReturn(node.nodeValue, ''));
     if (nodeValue === '')
       return;
-    var componentElement = createAnyEl(nodeValue)
+    var componentElement = createEl(nodeValue)
       .appendTo(ownerNode)
       .build();
     IoC.app(bouer).resolve(ComponentHandler)
@@ -2531,7 +2559,8 @@ function $show(opitons) {
     node: node,
     fields: [{
       expression: nodeValue,
-      field: nodeValue
+      field: nodeValue,
+      pipes: []
     }],
     context: context,
     onUpdate: function() {
@@ -3079,7 +3108,7 @@ function $for(opitons) {
           case 'desc':
             return desc ? -1 : 1;
           default:
-            Logger.log('The “' + type + '” order type is invalid: “' + nodeValue +
+            Logger.error('The “' + type + '” order type is invalid: “' + nodeValue +
               '”. Available types are: “asc”  for order ascendent and “desc” for order descendent.');
             return 0;
         }
@@ -3639,7 +3668,7 @@ var Compiler = /** @class */ (function() {
         if (directive.custom(node, data))
           return;
       // e-[?]="..." directive
-      if (Constants.check(node, Constants.property) && !Constants.isConstant(node.nodeName))
+      if (Constants.check(node, Constants.property))
         directive.property(node, data);
       // e-skeleton directive
       if (Constants.check(node, Constants.skeleton))
@@ -3653,16 +3682,13 @@ var Compiler = /** @class */ (function() {
       if ((delimiterField = _this.delimiter.shorthand(node.nodeName))) {
         var element = (node.ownerElement || node.parentNode);
         var attrName = 'e-' + delimiterField.expression;
-        var attrValue = '{{ ' + delimiterField.expression + ' }}';
-        element.setAttribute(attrName, attrValue);
+        element.setAttribute(attrName, delimiterField.field);
         var attr = element.attributes.getNamedItem(attrName);
+        attr.isActive = isActive;
         element.attributes.removeNamedItem(delimiterField.field);
         return _this.binder.create({
           node: attr,
-          fields: [{
-            expression: delimiterField.expression,
-            field: attr.value
-          }],
+          fields: [delimiterField],
           context: context,
           data: data
         });
@@ -3687,7 +3713,7 @@ var Compiler = /** @class */ (function() {
     if (rootElement.hasAttribute && rootElement.hasAttribute(Constants.silent))
       rootElement.removeAttribute(Constants.silent);
     if (isFunction(options.onDone)) {
-      fnCall(options.onDone.call(context, rootElement));
+      fnCallResolver(options.onDone.call(context, rootElement));
     }
     this.eventHandler.emit({
       eventName: Constants.builtInEvents.compile,
@@ -3865,7 +3891,7 @@ var Component = /** @class */ (function() {
   Component.prototype.export = function(data) {
     var _this = this;
     if (!isObject(data))
-      return Logger.log('Invalid object for component.export(...), only "Object Literal" is allowed.');
+      return Logger.error('Invalid object for component.export(...), only "Object Literal" is allowed.');
     return forEach(Object.keys(data), function(key) {
       _this.data[key] = data[key];
       Prop.transfer(_this.data, data, key);
@@ -4239,7 +4265,7 @@ var ComponentHandler = /** @class */ (function() {
     // Adding the component to the active component list if it is not added
     if (!this.activeComponents.includes(component))
       this.activeComponents.push(component);
-    var slotContainer = createAnyEl('SlotContainer', function(el) {
+    var slotContainer = createEl('SlotContainer', function(el) {
       el.innerHTML = componentElement.innerHTML;
       componentElement.innerHTML = '';
     }).build();
@@ -4346,7 +4372,7 @@ var ComponentHandler = /** @class */ (function() {
     });
     var initializer = component.init;
     if (isFunction(initializer))
-      fnCall(initializer.call(component));
+      fnCallResolver(initializer.call(component));
     var processDataAttr = function(attr) {
       var inputData = {};
       var mData = Extend.obj(data, {
@@ -4614,7 +4640,7 @@ var ComponentHandler = /** @class */ (function() {
         error.stack = '';
         Logger.error(('Error loading the <script src=\'' + url + '\'></script> in ' +
           '<' + $name + '/> component, remove it in order to be compiled.'));
-        Logger.log(error);
+        Logger.error(error);
       });
     });
   };
@@ -4677,7 +4703,7 @@ var ComponentHandler = /** @class */ (function() {
           pathSections.shift();
         src = pathSections.join('/') + src.substring(1, src.length);
       }
-      var $Asset = createAnyEl(type, function(el) {
+      var $Asset = createEl(type, function(el) {
         if (ifNullReturn(scoped, true))
           el.setAttribute('scoped', 'true');
         switch (toLower(type)) {
@@ -4772,7 +4798,7 @@ var Bouer = /** @class */ (function() {
     // Ignore Reactive Transformation
     this._IRT_ = true;
     this.name = 'Bouer';
-    this.version = '3.1.2';
+    this.version = '3.2.0';
     /** Unique Id of the instance */
     this.__id__ = IoC.newId();
     /**
@@ -4784,16 +4810,18 @@ var Bouer = /** @class */ (function() {
     this.isDestroyed = false;
     /** Provides state of the app, if it is already initialized */
     this.isInitialized = false;
-    this.options = options = (options || {});
-    this.config = options.config || {};
-    this.deps = options.deps || {};
+    var $options = (options || {});
+    this.options = $options;
+    this.config = $options.config || {};
+    this.deps = $options.deps || {};
+    this.pipes = $options.pipes || {};
     forEach(Object.keys(this.deps), function(key) {
       var deps = _this_1.deps;
       var value = deps[key];
       deps[key] = typeof value === 'function' ? value.bind(_this_1) : value;
     });
     var app = this;
-    var delimiters = options.delimiters || [];
+    var delimiters = $options.delimiters || [];
     // Adding Dependency Injection Services
     IoC.app(this).add(DataStore, [], true);
     IoC.app(this).add(Evaluator, [this]);
@@ -4807,7 +4835,7 @@ var Bouer = /** @class */ (function() {
     IoC.app(this).add(Routing, [this], true);
     IoC.app(this).add(DelimiterHandler, [this, delimiters], true);
     IoC.app(this).add(Compiler, [
-            this, Binder, DelimiterHandler, EventHandler, ComponentHandler, options.directives
+            this, Binder, DelimiterHandler, EventHandler, ComponentHandler, $options.directives
         ], true);
     var dataStore = IoC.app(this).resolve(DataStore);
     var middleware = IoC.app(this).resolve(Middleware);
@@ -4816,15 +4844,15 @@ var Bouer = /** @class */ (function() {
     var skeleton = IoC.app(this).resolve(Skeleton);
     var delimiter = IoC.app(this).resolve(DelimiterHandler);
     // Register the middleware
-    if (typeof options.middleware === 'function')
-      options.middleware.call(this, middleware.subscribe, this);
+    if (typeof $options.middleware === 'function')
+      $options.middleware.call(this, middleware.subscribe, this);
     // Transform the data properties into a reative
     this.data = Reactive.transform({
-      data: options.data || {},
+      data: $options.data || {},
       context: this
     });
     this.globalData = Reactive.transform({
-      data: options.globalData || {},
+      data: $options.globalData || {},
       context: this
     });
     delimiters.push.apply(delimiters, [
@@ -4857,7 +4885,7 @@ var Bouer = /** @class */ (function() {
       },
       set: function(key, data, toReactive) {
         if (key in dataStore.data)
-          return Logger.log('There is already a data stored with this key “' + key + '”.');
+          return Logger.warn('There is already a data stored with this key “' + key + '”.');
         if (ifNullReturn(toReactive, false) === true)
           Reactive.transform({
             context: app,
@@ -4961,7 +4989,7 @@ var Bouer = /** @class */ (function() {
       }
     });
     // Registering all the components
-    componentHandler.prepare(options.components || []);
+    componentHandler.prepare($options.components || []);
     if (!isNull(selector) && trim(selector) !== '')
       this.init(selector);
   }
@@ -5256,7 +5284,6 @@ exports.WIN = WIN;
 exports.Watch = Watch;
 exports.buildError = buildError;
 exports.code = code;
-exports.createAnyEl = createAnyEl;
 exports.createComment = createComment;
 exports.createEl = createEl;
 exports["default"] = Bouer;
@@ -5264,7 +5291,7 @@ exports.errorMsgEmptyNode = errorMsgEmptyNode;
 exports.errorMsgNodeValue = errorMsgNodeValue;
 exports.findAttribute = findAttribute;
 exports.findDirective = findDirective;
-exports.fnCall = fnCall;
+exports.fnCallResolver = fnCallResolver;
 exports.fnEmpty = fnEmpty;
 exports.forEach = forEach;
 exports.getRootElement = getRootElement;

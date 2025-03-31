@@ -10,14 +10,13 @@ export default class AppMain extends Component {
   }
 
   data = {
-    $user: {}
+    $product: {}
   }
 
   loaded() {
-    this.data.$user = {
-      name: 'afonso matumona',
-      username: 'ame',
-      age: 16
+    this.data.$product = {
+      name: 'Coca Cola',
+      price: 6
     };
   }
 }

@@ -2,7 +2,6 @@ import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
 import Bouer from '../../instance/Bouer';
 import IoC from '../../shared/helpers/IoCContainer';
 import {
-  createAnyEl,
   DOM,
   forEach,
   WIN,
@@ -13,7 +12,8 @@ import {
   trim,
   urlCombine,
   urlResolver,
-  ifNullStop
+  ifNullStop,
+  createEl,
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Component from '../component/Component';
@@ -83,7 +83,7 @@ export default class Routing {
       return;
 
     if (isNull(route))
-      return Logger.log('Invalid url provided to the navigation method.');
+      return Logger.error('Invalid url provided to the navigation method.');
 
     route = trim(route);
 
@@ -105,7 +105,7 @@ export default class Routing {
     // If it's not found and the url matches .html do nothing
     if (!page && route.endsWith('.html')) return;
 
-    const componentElement = createAnyEl(page.name!, el => {
+    const componentElement = createEl(page.name!, el => {
       // Inherit the data scope by default
       el.setAttribute('data', isObject(options!.data) ? JSON.stringify(options!.data) : '$data');
     }).appendTo(this.routeView!)

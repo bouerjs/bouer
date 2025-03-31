@@ -43,7 +43,7 @@ export function $bind(opitons: {
 
   binder.create({
     node: node,
-    fields: [{ field: nodeValue, expression: nodeValue }],
+    fields: [{ field: nodeValue, expression: nodeValue, pipes: [] }],
     context: context,
     data: data
   });
@@ -107,9 +107,9 @@ export function $property(opitons: {
   binder.create({
     data: data,
     node: node,
-    isReplaceProperty: false,
     context: context,
-    fields: [{ expression: nodeValue, field: nodeValue }],
+    isReplaceProperty: false,
+    fields: [{ expression: nodeValue, field: nodeValue, pipes: [] }],
     onUpdate: () => execute(evaluator.exec({
       data: data,
       code: nodeValue,

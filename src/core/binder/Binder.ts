@@ -1,5 +1,6 @@
 import IBinderConfig from '../../definitions/interfaces/IBinderConfig';
 import IBinderOptions from '../../definitions/interfaces/IBinderOptions';
+import IDelimiterResponse from '../../definitions/interfaces/IDelimiterResponse';
 import INode from '../../definitions/interfaces/INode';
 import dynamic from '../../definitions/types/Dynamic';
 import WatchCallback from '../../definitions/types/WatchCallback';
@@ -89,6 +90,7 @@ export default class Binder {
     };
 
     const $BindOneWay = () => {
+
       // One-Way Data Binding
       let nodeToBind = node;
 
@@ -134,6 +136,9 @@ export default class Binder {
           });
 
           result = isNull(result) ? '' : result;
+
+          result = this.applyPipes(result, field);
+
           // Replacing each field with the specific value
           valueToSet = valueToSet.replace(field.field, toStr(result));
 
@@ -463,6 +468,40 @@ export default class Binder {
       watches: watches,
       destroy: () => forEach(watches, w => w.destroy())
     };
+  }
+
+  applyPipes(value: unknown, field: IDelimiterResponse) {
+    let $value: unknown = value;
+
+    if (isNull($value) || trim($value + '') === '')
+      return $value;
+
+    forEach(field.pipes || [], pipe => {
+      const args = pipe.args.slice().map(a => {
+        return this.evaluator.exec({
+          code: a as any,
+          context: this.bouer,
+          isReturn: true,
+          data: this.bouer.data
+        });
+      });
+      const fn = this.bouer.pipes[pipe.fn]!;
+
+      if (typeof fn !== 'function')
+        return Logger.error('Pipe “' + pipe.fn + '” not defined');
+
+      const processed = fn.apply(null, [$value, ...args]);
+
+      if (isNull(processed))
+        return Logger.error('Pipe function “' + pipe.fn + '” cannot return null | undefined | void');
+
+      if (processed instanceof Promise)
+        return Logger.error('Pipe function “' + pipe.fn + '” cannot return a Promise');
+
+      $value = processed;
+    });
+
+    return $value;
   }
 
   /** Creates a process to unbind properties that is not connected to the DOM anymone */

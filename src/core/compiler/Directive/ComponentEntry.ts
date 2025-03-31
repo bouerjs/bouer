@@ -1,6 +1,6 @@
 import Bouer, { IoC, RenderContext } from '../../..';
 import {
-  createAnyEl,
+  createEl,
   errorMsgEmptyNode,
   errorMsgNodeValue,
   ifNullReturn,
@@ -73,7 +73,7 @@ export function $put(opitons: {
   binder.create({
     data: data,
     node: node,
-    fields: [{ expression: nodeValue, field: nodeValue }],
+    fields: [{ expression: nodeValue, field: nodeValue, pipes: [] }],
     context: context,
     isReplaceProperty: false,
     onUpdate: () => execute()
@@ -86,7 +86,7 @@ export function $put(opitons: {
     nodeValue = trim(ifNullReturn(node.nodeValue, ''));
     if (nodeValue === '') return;
 
-    const componentElement = createAnyEl(nodeValue)
+    const componentElement = createEl(nodeValue)
       .appendTo(ownerNode)
       .build();
 

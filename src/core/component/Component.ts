@@ -103,7 +103,7 @@ export default class Component<Data extends {} = {}> implements IComponentOption
    */
   export(data: dynamic) {
     if (!isObject(data))
-      return Logger.log('Invalid object for component.export(...), only "Object Literal" is allowed.');
+      return Logger.error('Invalid object for component.export(...), only "Object Literal" is allowed.');
 
     return forEach(Object.keys(data), key => {
       (this.data as any)[key] = (data as any)[key];
