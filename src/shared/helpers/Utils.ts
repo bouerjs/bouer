@@ -605,7 +605,7 @@ export function htmlToJsObj(
         // Getting the value from if exists, otherwise set default value as empty array
         const $oldValue: unknown[] = $$obj[attrName] || [];
         // Seeting the value
-        $$obj[attrName] = $oldValue.concat($oldValue);
+        $$obj[attrName] = $oldValue.concat(attrValue);
       }
 
       onSet($$obj, attrName, attrValue, el);
