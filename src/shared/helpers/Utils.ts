@@ -593,22 +593,22 @@ export function htmlToJsObj(
       if ((el instanceof HTMLInputElement) && (checkables[el.type] === true && el.checked === false))
         return $$obj;
 
-      const attrValue = tryGetValue(el);
+      const $value = tryGetValue(el);
 
       // Retrieving the value if it needs to be build as arry property
       const isArray = findAttribute(el, ['e-array']) != null;
       // if it is not an array built type, just set the value
       if (!isArray) {
         // Setting the value
-        $$obj[attrName] = attrValue;
+        $$obj[attrName] = $value;
       } else {
         // Getting the value from if exists, otherwise set default value as empty array
         const $oldValue: unknown[] = $$obj[attrName] || [];
         // Seeting the value
-        $$obj[attrName] = $oldValue.concat($oldValue);
+        $$obj[attrName] = $oldValue.concat($value);
       }
 
-      onSet($$obj, attrName, attrValue, el);
+      onSet($$obj, attrName, $value, el);
     }
 
     forEach([].slice.call(el.children), child => walker(child, $obj));
