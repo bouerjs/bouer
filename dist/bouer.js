@@ -648,19 +648,23 @@
   }
 
   function fnCallResolver(fn, cb) {
-    if (isNull(fn))
-      return fn;
-    if (!(fn instanceof Promise))
-      return Promise.resolve(fn).then(function(value) {
+    var fnValue = fn;
+    if (isNull(fnValue))
+      return fnValue;
+    cb = cb || fnEmpty;
+    if (typeof fnValue === 'function')
+      fnValue = fn();
+    if (!(fnValue instanceof Promise))
+      return fnValue;
+    if (fnValue instanceof Promise) {
+      fnValue.then(function(value) {
         if (typeof cb === 'function')
           cb(value);
         return value;
       });
-    return fn.then(function(value) {
-      if (typeof cb === 'function')
-        cb(value);
-      return value;
-    });
+    }
+    cb(fnValue);
+    return fnValue;
   }
 
   function findAttribute(element, attrs, removeIfFound) {
@@ -826,20 +830,20 @@
         // If it's is checkable and it's not selected, stop
         if ((el instanceof HTMLInputElement) && (checkables[el.type] === true && el.checked === false))
           return $$obj_1;
-        var attrValue = tryGetValue(el);
+        var $value = tryGetValue(el);
         // Retrieving the value if it needs to be build as arry property
         var isArray = findAttribute(el, ['e-array']) != null;
         // if it is not an array built type, just set the value
         if (!isArray) {
           // Setting the value
-          $$obj_1[attrName] = attrValue;
+          $$obj_1[attrName] = $value;
         } else {
           // Getting the value from if exists, otherwise set default value as empty array
           var $oldValue = $$obj_1[attrName] || [];
           // Seeting the value
-          $$obj_1[attrName] = $oldValue.concat($oldValue);
+          $$obj_1[attrName] = $oldValue.concat($value);
         }
-        onSet($$obj_1, attrName, attrValue, el);
+        onSet($$obj_1, attrName, $value, el);
       }
       forEach([].slice.call(el.children), function(child) {
         return walker(child, $obj);
@@ -3858,7 +3862,7 @@
           element.setAttribute(attrName, delimiterField.field);
           var attr = element.attributes.getNamedItem(attrName);
           attr.isActive = isActive;
-          element.attributes.removeNamedItem(delimiterField.field);
+          element.attributes.removeNamedItem(node.nodeName);
           return _this.binder.create({
             node: attr,
             fields: [delimiterField],
