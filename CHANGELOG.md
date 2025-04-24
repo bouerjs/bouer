@@ -1,11 +1,16 @@
 # v3.2.0
-[2025-03-31]
+[2025-04-24]
 
 ### Features
 
 * feat: reimplemented htmlToJsObject function for performance increase ([`4c0b3a2`](https://github.com/bouerjs/bouer/commit/4c0b3a21d96e6f31494560c35b1544336168614a))
 * feat: pipe fully implemented, now we're able to use pipe {{ price | currency }} to transform the value that need to be presented ([`4dd6774`](https://github.com/bouerjs/bouer/commit/4dd67745638d8944ee48a6d9b3373987314c9810))
 * feat: implemeneted Pipe same of Angular or Vue to add the possibility to transform the bound value ([`4775f42`](https://github.com/bouerjs/bouer/commit/4775f425be844e741bd83a85481e152f8a835fd2))
+
+### Fixes
+
+* fix: fixed jsObject generation from html element ([`8a98b91`](https://github.com/bouerjs/bouer/commit/8a98b9177476eb7910ff5ac0344846f401dcf9e1))
+* fix: fixed jsObject generation from html element ([`7aee3fc`](https://github.com/bouerjs/bouer/commit/7aee3fc71c26dffcb25cc163d69b674ed309adf4))
 
 # v3.1.2
 [2025-03-05]
