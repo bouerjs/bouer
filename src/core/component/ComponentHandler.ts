@@ -1,31 +1,34 @@
+import IAsset from '../../definitions/interfaces/IAsset';
 import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
 import ILifeCycleHooks from '../../definitions/interfaces/ILifeCycleHooks';
+import Constructor from '../../definitions/types/Constructor';
 import dynamic from '../../definitions/types/Dynamic';
 import Bouer from '../../instance/Bouer';
 import Constants from '../../shared/helpers/Constants';
 import Extend from '../../shared/helpers/Extend';
-import Prop from '../../shared/helpers/Prop';
 import IoC from '../../shared/helpers/IoCContainer';
+import Prop from '../../shared/helpers/Prop';
 import Task from '../../shared/helpers/Task';
 import {
-  createEl,
   buildError,
   code,
+  createEl,
   DOM,
+  findDirective,
   fnCallResolver,
   forEach,
-  findDirective,
   ifNullReturn,
   isFunction,
   isNull,
   isObject,
+  isRef,
   pathResolver, toArray,
   toLower,
+  trim,
   urlCombine,
   urlResolver,
   webRequest,
-  where,
-  trim
+  where
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Compiler from '../compiler/Compiler';
@@ -36,8 +39,6 @@ import ReactiveEvent from '../event/ReactiveEvent';
 import Reactive from '../reactive/Reactive';
 import Routing from '../routing/Routing';
 import Component from './Component';
-import IAsset from '../../definitions/interfaces/IAsset';
-import Constructor from '../../definitions/types/Constructor';
 
 type Class = Constructor<any>;
 
@@ -56,14 +57,6 @@ export default class ComponentHandler {
   // Avoids adding multiple styles of the same component if it's already in use
   stylesController: { [key: string]: { styles: Element[], elements: Element[] } } = {};
   activeComponents: Component[] = [];
-
-  private componentDefaultProps = new Set([
-    'name', 'path', 'title', 'route',
-    'template', 'data', 'keepAlive', 'assets',
-    'prefetch', 'children', 'restrictions',
-    'isDefault', 'isNotFound', 'isDestroyed',
-    'clazz', 'el', 'bouer', 'events', '_IRT_'
-  ]);
 
   constructor(
     bouer: Bouer,
@@ -470,14 +463,12 @@ export default class ComponentHandler {
     }
 
     // Transforming all unknown variables to reactive
-    const unknownVars = where(Object.keys(component), key => !this.componentDefaultProps.has(key));
-    if (unknownVars.length > 0) {
-      Reactive.transform({
-        context: component,
-        data: component,
-        keys: unknownVars
-      });
-    }
+
+    forEach(Object.keys(component), propName => {
+      const prop = (component as any)[propName];
+      if (isNull(prop) || isRef(prop))
+        prop.__!(propName, component);
+    });
 
     // Adding the listeners
     const createdEvent = this.addEvent('created', rootElement, component);
