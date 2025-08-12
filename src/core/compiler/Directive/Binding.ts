@@ -18,6 +18,8 @@ import DelimiterHandler from '../../DelimiterHandler';
 import Evaluator from '../../Evaluator';
 import Routing from '../../routing/Routing';
 
+const constsValues = Object.values(Constants);
+
 export function $bind(opitons: {
   node: Node,
   binder: Binder,
@@ -84,11 +86,15 @@ export function $property(opitons: {
     data
   } = opitons;
   const ownerNode = toOwnerNode(node) as Element;
+  const nodeName = node.nodeName;
   const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
   let execute = (obj: object) => { };
 
   const errorInvalidValue = (node: Node) => ('Invalid value, expected an Object/Object Literal in “'
-    + node.nodeName + '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
+    + nodeName + '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
+
+  if (constsValues.includes(node.nodeName))
+    return;
 
   if (nodeValue === '')
     return Logger.error(errorInvalidValue(node));
