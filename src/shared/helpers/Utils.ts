@@ -3,6 +3,7 @@
 
 import ReactiveEvent from '../../core/event/ReactiveEvent';
 import Reactive from '../../core/reactive/Reactive';
+import Ref from '../../core/reactive/Ref';
 import dynamic from '../../definitions/types/Dynamic';
 import RenderContext from '../../definitions/types/RenderContext';
 import Logger from '../logger/Logger';
@@ -150,6 +151,10 @@ export function isEmptyObject(input: any) {
 
 export function isFunction(input: any) {
   return typeof input === 'function';
+}
+
+export function isRef(input: any) {
+  return input instanceof Ref && typeof input.__ === 'function';
 }
 
 export function ifNullReturn<T>(v: any, _return: T) {
