@@ -43,6 +43,8 @@ import {
 } from '../shared/helpers/Utils';
 import Logger from '../shared/logger/Logger';
 
+import version from './version';
+
 export default class Bouer<
   Data extends {} = {},
   Global extends {} = {},
@@ -52,7 +54,7 @@ export default class Bouer<
   // Ignore Reactive Transformation
   readonly _IRT_ = true;
   readonly name = 'Bouer';
-  readonly version = '3.2.0';
+  readonly version = version;
   readonly config: IBouerConfig;
   readonly data: DataType<Data, this> & dynamic;
   readonly globalData: DataType<Global, this> & dynamic;
