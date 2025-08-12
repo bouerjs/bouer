@@ -17,6 +17,7 @@ import {
   ifNullReturn,
   isNull,
   isObject,
+  isRef,
   toArray,
   toStr,
   trim,
@@ -129,18 +130,20 @@ export default class Binder {
           if (delimiter && delimiter.name === 'html') isHtml = true;
 
           // Evaluate the expression from the delimiter
-          let result = this.evaluator.exec({
+          let evaluetedValue = this.evaluator.exec({
             data: data,
             code: field.expression,
             context: context,
           });
 
-          result = isNull(result) ? '' : result;
+          evaluetedValue = isRef(evaluetedValue) ? evaluetedValue.get() : evaluetedValue;
 
-          result = this.applyPipes(result, field);
+          evaluetedValue = isNull(evaluetedValue) ? '' : evaluetedValue;
+
+          evaluetedValue = this.applyPipes(evaluetedValue, field);
 
           // Replacing each field with the specific value
-          valueToSet = valueToSet.replace(field.field, toStr(result));
+          valueToSet = valueToSet.replace(field.field, toStr(evaluetedValue));
 
           if (delimiter && typeof delimiter.onUpdate === 'function')
             valueToSet = delimiter.onUpdate(valueToSet, node, data);
@@ -215,6 +218,8 @@ export default class Binder {
 
       const bindingDirection: { [key: string]: (v: any) => void } = {
         fromDataToInput: (value: any) => {
+          value = isRef(value) ? value.get() : value;
+
           // Normal Property Set
           if (!Array.isArray(boundPropertyValue)) {
             // In case of radio button we need to check if the value is the same to check it
@@ -269,6 +274,11 @@ export default class Binder {
         fromInputToData: (value: any) => {
           // Normal Property Set
           if (!Array.isArray(boundPropertyValue)) {
+            // Check Ref<?>
+            if (isRef(boundPropertyValue)) {
+              return boundPropertyValue.set(value);
+            }
+
             // Default Binding
             return this.evaluator.exec({
               isReturn: false,
