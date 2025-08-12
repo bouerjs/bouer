@@ -35,14 +35,23 @@ export default (function Prop() {
     transfer<Source extends dynamic, Destination extends dynamic>(
       destination: Destination,
       source: Source,
-      propName: keyof Source
+      propName: keyof Source | string[]
     ) {
-      const descriptor = this.descriptor(source, propName) as Reactive<any, Source>;
-      const mDst = (destination as any);
-      if (!(propName in destination))
-        mDst[propName] = undefined;
+      const setter = (prop: string) => {
+        const descriptor = this.descriptor(source, prop) as Reactive<any, Source>;
+        const mDst = (destination as any);
+        if (!(propName as any in destination))
+          mDst[propName] = undefined;
 
-      this.set(destination, propName as any, descriptor);
+        this.set(destination, propName as any, descriptor);
+      };
+
+      if (Array.isArray(propName)) {
+        propName.forEach(prop => setter(prop));
+        return;
+      }
+
+      setter(propName as string);
     }
   };
 })();
