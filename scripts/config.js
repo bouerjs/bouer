@@ -92,5 +92,6 @@ Object.keys(builds).filter(key => {
 });
 
 module.exports = {
-  builds
+  builds,
+  version
 };

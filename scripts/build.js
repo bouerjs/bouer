@@ -3,13 +3,21 @@ const zlib = require('zlib');
 const path = require('path');
 const rollup = require('rollup');
 const { minify } = require('terser');
-const builds = require('./config').builds;
+const { builds, version } = require('./config');
 const indent = require('js-beautify');
 
 let clearConsole = false;
 let numberOfGenerations = 0;
 const buildKeys = Object.keys(builds);
 
+// Updating bouer version
+fs.writeFileSync(
+  path.resolve(__dirname, '../src/instance/version.ts'),
+  `export default '${version}';`,
+  { encoding: 'utf8' }
+);
+
+// Building...
 buildKeys.filter(key => {
   const config = builds[key];
   const output = config.output;
