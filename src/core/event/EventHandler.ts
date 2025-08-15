@@ -97,10 +97,10 @@ export default class EventHandler {
 
     if (!('on' + eventName in this.input))
       this.on({
-        eventName,
-        callback,
+        context: context,
+        eventName: eventName,
+        callback: callback,
         modifiers: modifiersObject,
-        context,
         attachedNode: ownerNode
       });
     else
@@ -178,6 +178,7 @@ export default class EventHandler {
     const emitter = (node: Node, callback: any) => {
       node.addEventListener(eventName, callback, { once: true });
       node.dispatchEvent(new CustomEvent(eventName, init));
+      node.removeEventListener(eventName, callback);
     };
 
     this.$events[eventName] = where(events, evt => {
