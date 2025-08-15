@@ -103,34 +103,30 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
     ReactiveEvent.emit('BeforeSet', this);
 
     if (isObject(value) || Array.isArray(value)) {
+      // Checking the type
       if ((typeof this.propValue) !== (typeof value))
         return Logger.error(('Cannot set “' + (typeof value) + '” in “' +
           this.propName + '” property.'));
 
-      if (Array.isArray(value)) {
+      // Checking if the value is null
+      if (isNull(this.propValue))
+        return;
+
+      // Transform if it is not an html element
+      if (this.propValue instanceof Node)
+        this.propValue = value;
+      else
         Reactive.transform({
           data: value,
           descriptor: this,
           context: this.context
         });
 
-        const propValue = this.propValue as any[];
-        propValue.splice(0, propValue.length);
-        propValue.push.apply(propValue, (value as any));
-      } else if (isObject(value)) {
-        if ((value instanceof Node)) // If some html element
-          this.propValue = value;
-        else {
-          Reactive.transform({
-            data: value as dynamic,
-            context: this.context
-          });
-          if (!isNull(this.propValue))
-            mapper(value as dynamic, this.propValue as dynamic);
-          else
-            this.propValue = value;
-        }
-      }
+
+      if (Array.isArray(value))
+        this.propValue = value;
+
+      mapper(value as dynamic, this.propValue as dynamic);
     } else {
       this.propValue = value;
     }
