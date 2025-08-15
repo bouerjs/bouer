@@ -112,7 +112,11 @@ export default class Compiler {
 
         // <component></component>
         if (this.component.check(node.localName))
-          return this.component.order(node, data);
+          return this.component.order({
+            context: context,
+            componentElement: node,
+            data: data,
+          });
 
         // e-if="..." directive
         if (Constants.if in node.attributes)

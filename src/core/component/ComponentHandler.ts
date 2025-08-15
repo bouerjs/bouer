@@ -3,6 +3,7 @@ import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
 import ILifeCycleHooks from '../../definitions/interfaces/ILifeCycleHooks';
 import Constructor from '../../definitions/types/Constructor';
 import dynamic from '../../definitions/types/Dynamic';
+import RenderContext from '../../definitions/types/RenderContext';
 import Bouer from '../../instance/Bouer';
 import Constants from '../../shared/helpers/Constants';
 import Extend from '../../shared/helpers/Extend';
@@ -193,29 +194,38 @@ export default class ComponentHandler {
     });
   }
 
-  order(componentElement: Element, data: object, onComponent?: (component: Component) => void) {
+  order(options: {
+    componentElement: Element,
+    data: object,
+    context: RenderContext,
+    onComponent?: (component: Component) => void
+  }) {
+    const { componentElement, data, context, onComponent } = options;
     const $name = toLower(componentElement.nodeName);
     const component = this.components[$name];
 
     if (!component) return Logger.error('No component with name “' + $name + '” registered.');
 
     const mainExecutionWrapper = () => {
+
       const resolveComponentInstance = (c: Component | IComponentOptions) => {
-        let mCom: Component;
+        let mComponent: any;
 
         if ((c instanceof Component) && (c as Component).clazz)
-          mCom = IoC.app(this.bouer).resolve(c.clazz!) || IoC.new(c.clazz!)!;
+          mComponent = IoC.app(this.bouer).resolve(c.clazz!) || IoC.new(c.clazz!)!;
         else if (c instanceof Component)
-          mCom = structuredClone(c);
+          mComponent = structuredClone(c);
         else
-          mCom = new Component(c);
+          mComponent = new Component(c);
 
-        if (mCom.keepAlive === true)
-          this.components[$name] = mCom;
+        if (mComponent.keepAlive === true)
+          this.components[$name] = mComponent;
 
-        (mCom as any).template = c.template;
-        mCom.bouer = this.bouer;
-        return mCom;
+        mComponent.template = c.template;
+        mComponent.bouer = this.bouer;
+        mComponent.parent = context;
+
+        return mComponent as Component;
       };
 
       const isGroupableComponent = !component.template && !component.path;
@@ -331,8 +341,7 @@ export default class ComponentHandler {
 
       this.eventHandler.emit({
         eventName: 'component:' + eventName,
-        init: { detail: { component: component } },
-        once: true
+        init: { detail: { component: component } }
       });
     };
 
@@ -348,6 +357,7 @@ export default class ComponentHandler {
     const $name = toLower(componentElement.nodeName);
     const container = componentElement.parentElement;
     const compiler = IoC.app(this.bouer).resolve(Compiler)!;
+    const context = component.parent;
 
     if (!container)
       return;
@@ -466,7 +476,7 @@ export default class ComponentHandler {
 
     forEach(Object.keys(component), propName => {
       const prop = (component as any)[propName];
-      if (isNull(prop) || isRef(prop))
+      if (!isNull(prop) && isRef(prop))
         prop.__!(propName, component);
     });
 
@@ -487,6 +497,7 @@ export default class ComponentHandler {
 
     const processDataAttr = (attr: Attr) => {
       let inputData: dynamic = {};
+
       const mData = Extend.obj(data, { $data: data });
 
       // Listening to all the reactive properties
@@ -505,7 +516,7 @@ export default class ComponentHandler {
           .exec({
             data: mData,
             code: attr.value,
-            context: this.bouer
+            context: context ?? this.bouer
           });
 
         if (!isObject(mInputData))
@@ -533,10 +544,6 @@ export default class ComponentHandler {
 
     const compile = (scriptContent?: string) => {
       try {
-        // Injecting data
-        // If the component has does not have the data directive assigned, create it implicitly
-        if (!(findDirective(componentElement, Constants.data)))
-          componentElement.setAttribute('data', '$data');
 
         let dataAttr = null;
         // If the attr is `data`, prepare and inject the value into component `data`

@@ -47,6 +47,10 @@ export default class Component<Data extends {} = {}> implements IComponentOption
   /** Bouer instance of the component */
   bouer?: Bouer;
 
+  /** The parent component */
+  parent?: Component;
+
+  /** The children of the component */
   readonly children?: (Component | IComponentOptions | Constructor<Component>)[] = [];
 
   /** All the assets attached to the component */

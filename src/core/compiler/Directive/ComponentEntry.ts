@@ -91,6 +91,10 @@ export function $put(opitons: {
       .build();
 
     IoC.app(bouer).resolve(ComponentHandler)!
-      .order(componentElement, data);
+      .order({
+        componentElement: componentElement,
+        context: context,
+        data: data
+      });
   })();
 }

@@ -119,8 +119,13 @@ export default class Routing {
 
     const routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route!);
     IoC.app(this.bouer).resolve(ComponentHandler)!
-      .order(componentElement, this.bouer.data, () => {
-        this.markActiveAnchorsWithRoute(routeToSet);
+      .order({
+        componentElement: componentElement,
+        context: this.bouer,
+        data: this.bouer.data,
+        onComponent: () => {
+          this.markActiveAnchorsWithRoute(routeToSet);
+        }
       });
   }
 
