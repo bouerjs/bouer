@@ -35,7 +35,7 @@ export function $bind(opitons: {
     data
   } = opitons;
   const ownerNode = toOwnerNode(node);
-  const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  const nodeValue = ifNullReturn(node.nodeValue, '');
 
   if (nodeValue === '')
     return Logger.error(errorMsgEmptyNode(node));
@@ -60,7 +60,7 @@ export function $text(opitons: {
     node,
   } = opitons;
   const ownerNode = toOwnerNode(node);
-  const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  const nodeValue = ifNullReturn(node.nodeValue, '');
 
   if (nodeValue === '')
     return Logger.error(errorMsgEmptyNode(node));
@@ -87,7 +87,7 @@ export function $property(opitons: {
   } = opitons;
   const ownerNode = toOwnerNode(node) as Element;
   const nodeName = node.nodeName;
-  const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  const nodeValue = ifNullReturn(node.nodeValue, '');
   let execute = (obj: object) => { };
 
   const errorInvalidValue = (node: Node) => ('Invalid value, expected an Object/Object Literal in “'

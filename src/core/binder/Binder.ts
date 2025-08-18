@@ -52,7 +52,7 @@ export default class Binder {
 
   create(options: IBinderOptions) {
     const { node, data, fields, isReplaceProperty, context } = options;
-    const originalValue = trim(ifNullReturn(node.nodeValue, ''));
+    const originalValue = ifNullReturn(node.nodeValue, '');
     const originalName = node.nodeName;
     const ownerNode = (node as any).ownerElement || node.parentNode;
     const middleware = IoC.app(this.bouer).resolve(Middleware)!;
