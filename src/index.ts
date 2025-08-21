@@ -1,13 +1,17 @@
 export { default as default } from './instance/Bouer';
 
 export { default as Component } from './core/component/Component';
+
 export { default as Reactive } from './core/reactive/Reactive';
+export { default as Ref } from './core/reactive/Ref';
+export { default as Computed } from './core/reactive/Computed';
+
 export { default as Compiler } from './core/compiler/Compiler';
 export { default as Routing } from './core/routing/Routing';
 export { default as Watch } from './core/binder/Watch';
+export { default as ViewChild } from './core/ViewChild';
 export { default as Extend } from './shared/helpers/Extend';
 export { default as Prop } from './shared/helpers/Prop';
-export { default as ViewChild } from './core/ViewChild';
 export { default as IoC } from './shared/helpers/IoCContainer';
 
 export { default as IBouerOptions } from './definitions/interfaces/IBouerOptions';
