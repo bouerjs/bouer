@@ -19,6 +19,7 @@ import {
   fnCallResolver,
   forEach,
   ifNullReturn,
+  isComputed,
   isFunction,
   isNull,
   isObject,
@@ -38,6 +39,7 @@ import Evaluator from '../Evaluator';
 import EventHandler from '../event/EventHandler';
 import ReactiveEvent from '../event/ReactiveEvent';
 import Reactive from '../reactive/Reactive';
+import Ref from '../reactive/Ref';
 import Routing from '../routing/Routing';
 import Component from './Component';
 
@@ -475,7 +477,12 @@ export default class ComponentHandler {
     // Transforming all unknown variables to reactive
 
     forEach(Object.keys(component), propName => {
-      const prop = (component as any)[propName];
+      let prop = (component as any)[propName];
+
+      // If it's a computed property, wrap it in a ref
+      if (!isNull(prop) && isComputed(prop))
+        prop = (component as any)[propName] = new Ref(prop);
+
       if (!isNull(prop) && isRef(prop))
         prop.__!(propName, component);
     });
