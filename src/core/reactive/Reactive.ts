@@ -60,7 +60,7 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
     if (isComputed) {
       this.computed = isObject(propValue)
           // If the value is an object, we assume it's a computed object
-          ? propValue as Computed<Value, typeof this.context>
+          ? propValue as Computed<Value, RenderContext>
           // If the value is a function, we assume it's a computed function
           : new Computed(propValue);
 
