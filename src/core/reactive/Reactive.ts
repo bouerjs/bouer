@@ -5,7 +5,6 @@ import Prop from '../../shared/helpers/Prop';
 import {
   fnCallResolver,
   forEach,
-  isFunction,
   isNull,
   isObject,
   mapper,
@@ -14,6 +13,7 @@ import {
 import Logger from '../../shared/logger/Logger';
 import Watch from '../binder/Watch';
 import ReactiveEvent from '../event/ReactiveEvent';
+import Computed from './Computed';
 
 export default class Reactive<Value, Obj> implements PropertyDescriptor {
   readonly _IRT_ = true;
@@ -23,26 +23,8 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
   propSource: Obj;
   baseDescriptor: PropertyDescriptor | undefined;
   watches: Watch<Value, Obj>[] = [];
-  isComputed: boolean;
   context: RenderContext;
-  fnComputed: Function | null = null;
-
-  computed() {
-    if (!this.isComputed)
-      return { get: () => { }, set: (v: any) => { } };
-
-    const computedResult = this.fnComputed!.call(this.context);
-
-    if (isNull(computedResult))
-      throw new Error('Invalid value used as return in “function $computed(){...}”.');
-
-    const isNotInferred = isObject(computedResult) || isFunction(computedResult);
-
-    return {
-      get: (isNotInferred && 'get' in computedResult) ? computedResult.get : (() => computedResult),
-      set: (isNotInferred && 'set' in computedResult) ? computedResult.set : undefined
-    };
-  }
+  computed?: Computed<Value, typeof this.context>;
 
   /**
    * Default constructor
@@ -65,41 +47,57 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
     this.baseDescriptor = Prop.descriptor(this.propSource as dynamic, this.propName);
 
     this.propValue = this.baseDescriptor!.value as Value;
-    this.isComputed = typeof this.propValue === 'function' && this.propValue.name === '$computed';
 
-    if (this.isComputed) {
-      this.fnComputed = this.propValue as any;
-      (this.propValue as any) = undefined;
+    const propValue = this.propValue as any;
+    const isFn = typeof propValue === 'function';
+
+    // If the value is a function, we bind it to the context
+    if (isFn) this.propValue = propValue.bind(this.context);
+
+    const isComputed = isFn && propValue.name === '$computed' ||
+      propValue instanceof Computed;
+
+    if (isComputed) {
+      this.computed = isObject(propValue)
+          // If the value is an object, we assume it's a computed object
+          ? propValue as Computed<Value, typeof this.context>
+          // If the value is a function, we assume it's a computed function
+          : new Computed(propValue);
+
+      // Adding the context
+      this.computed.__({
+        context: this.context,
+        propName: this.propName,
+        propSource: this.propSource as dynamic
+      });
+
+      this.propValueOld = this.propValue;
+      this.propValue = undefined as any;
+
+      // PropValue interceptor
+      Prop.set(this as any, 'propValue', {
+        get: () => {
+          return fnCallResolver(this.computed!.get());
+        },
+        set: (v) => {
+          if (isNull(this.computed!.set)) return;
+          fnCallResolver(this.computed!.set(v));
+        },
+      });
     }
-
-    if (typeof this.propValue === 'function' && !this.isComputed)
-      this.propValue = this.propValue.bind(this.context);
   }
 
-  get = () => {
-    const computedGet = this.computed().get;
-
+  get = (function get (this: Reactive<Value, Obj>) {
     ReactiveEvent.emit('BeforeGet', this);
-    this.propValue = this.isComputed ?
-      fnCallResolver(computedGet.call(this.context)) : this.propValue;
     const value = this.propValue;
     ReactiveEvent.emit('AfterGet', this);
     return value;
-  };
+  }).bind(this);
 
-  set = (value: Value) => {
-    if (this.propValue === value || (Number.isNaN(this.propValue) && Number.isNaN(value)))
-      return;
-
-    const computedSet = this.computed().set;
-
-    if (this.isComputed && computedSet)
-      fnCallResolver(computedSet.call(this.context, value));
-    else if (this.isComputed && isNull(computedSet))
-      return;
+  set = (function set (this: Reactive<Value, Obj>, value: Value) {
+    if (this.propValue === value || (Number.isNaN(this.propValue) && Number.isNaN(value))) return;
 
     this.propValueOld = this.propValue;
-
     ReactiveEvent.emit('BeforeSet', this);
 
     if (isObject(value) || Array.isArray(value)) {
@@ -122,7 +120,6 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
           context: this.context
         });
 
-
       if (Array.isArray(value))
         this.propValue = value;
 
@@ -133,7 +130,7 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
 
     ReactiveEvent.emit('AfterSet', this);
     this.notify();
-  };
+  }).bind(this);
 
   /**
    * Force onChange callback calling
@@ -187,21 +184,24 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
     keys?: string[]
   }) => {
     const context = options.context;
+    let tranformedData = new WeakSet();
+
     const executer = (
       data: InputObject | InputObject[],
-      visiting: any[], visited: any[],
       descriptor?: Reactive<any, any>,
       keys?: string[],
     ) => {
+
       if (Array.isArray(data)) {
         if (descriptor == null) {
           Logger.warn('Cannot transform this array to a reactive one because no reactive object was provided');
           return data;
         }
 
-        if (visiting.indexOf(data) !== -1)
+        // Checking if the array has already been transformed
+        if (tranformedData.has(data as any))
           return data;
-        visiting.push(data);
+        tranformedData.add(data as any);
 
         const REACTIVE_ARRAY_METHODS = ['push', 'pop', 'unshift', 'shift', 'splice'];
         const inputArray = data as any;
@@ -210,6 +210,7 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
         const prototype = Object.getPrototypeOf(inputArray);
 
         forEach(REACTIVE_ARRAY_METHODS, method => {
+
           // cache original method
           reference[method] = inputArray[method].bind(inputArray);
           // changing to the reactive one
@@ -220,7 +221,7 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
               case 'push': case 'unshift':
                 forEach(toArray(args), (arg: any) => {
                   if (!isObject(arg) && !Array.isArray(arg)) return;
-                  executer(arg, [], []);
+                  executer(arg);
                 });
             }
 
@@ -232,6 +233,7 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
             }));
             return result;
           };
+
         });
 
         return inputArray;
@@ -240,9 +242,11 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
       if (!isObject(data))
         return data;
 
-      if (visiting!.indexOf(data) !== -1)
+      // Checking if the array has already been transformed
+      if (tranformedData.has(data as any))
         return data;
-      visiting.push(data);
+      tranformedData.add(data as any);
+
 
       forEach(keys || Object.keys(data as dynamic), key => {
         const mInputObject = data as dynamic;
@@ -263,19 +267,23 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
         });
 
         Prop.set(data as dynamic, key, descriptor);
-        if (Array.isArray(propValue)) {
-          executer(propValue as any, visiting, visited, descriptor); // Transform the array to a reactive one
-          forEach(propValue, (item: object) => executer(item as any, visiting, visited));
-        } else if (isObject(propValue))
-          executer(propValue, visiting, visited);
-      });
 
-      visiting.splice(visiting.indexOf(data), 1);
-      visited.push(data);
+        // If the value is a computed object, do nothing
+        if (isObject(propValue) && propValue instanceof Computed)
+          return;
+
+        if (Array.isArray(propValue)) {
+          executer(propValue as any, descriptor); // Transform the array to a reactive one
+          forEach(propValue, (item: object) => executer(item as any));
+        } else if (isObject(propValue))
+          executer(propValue);
+      });
 
       return data;
     };
 
-    return executer(options.data, [], [], options.descriptor, options.keys);
+    const data = executer(options.data, options.descriptor, options.keys);
+    tranformedData = new WeakSet();
+    return data;
   };
 }
