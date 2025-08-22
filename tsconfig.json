@@ -3,9 +3,10 @@
     "noEmit": true,
     "strict": true,
     "allowJs": true,
-    "target": "ES5",
+    "target": "ES2022",
+    "module": "ESNext",
     "moduleResolution": "Node",
-    "lib": ["ES5", "ES6", "DOM"],
+    "lib": ["ES2022", "DOM"],
     "isolatedModules": false,
     "esModuleInterop": false,
 		"emitDeclarationOnly": false,
@@ -19,3 +20,4 @@
 	],
   "include": ["./src/**/*"]
 }
+
