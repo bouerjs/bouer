@@ -15,6 +15,7 @@ import {
   fnEmpty,
   forEach,
   ifNullReturn,
+  isComputed,
   isNull,
   isObject,
   isRef,
@@ -136,7 +137,7 @@ export default class Binder {
             context: context,
           });
 
-          evaluetedValue = isRef(evaluetedValue) ? evaluetedValue.get() : evaluetedValue;
+          evaluetedValue = isRef(evaluetedValue) || isComputed(evaluetedValue) ? evaluetedValue.get() : evaluetedValue;
 
           evaluetedValue = isNull(evaluetedValue) ? '' : evaluetedValue;
 
@@ -218,7 +219,7 @@ export default class Binder {
 
       const bindingDirection: { [key: string]: (v: any) => void } = {
         fromDataToInput: (value: any) => {
-          value = isRef(value) ? value.get() : value;
+          value = isRef(value) || isComputed(value) ? value.get() : value;
 
           // Normal Property Set
           if (!Array.isArray(boundPropertyValue)) {
@@ -275,7 +276,7 @@ export default class Binder {
           // Normal Property Set
           if (!Array.isArray(boundPropertyValue)) {
             // Check Ref<?>
-            if (isRef(boundPropertyValue)) {
+            if (isRef(boundPropertyValue) || isComputed(boundPropertyValue)) {
               return boundPropertyValue.set(value);
             }
 
