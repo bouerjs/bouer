@@ -2,6 +2,7 @@
 // Quotes “'+  +'”
 
 import ReactiveEvent from '../../core/event/ReactiveEvent';
+import Computed, { EntryType } from '../../core/reactive/Computed';
 import Reactive from '../../core/reactive/Reactive';
 import Ref from '../../core/reactive/Ref';
 import dynamic from '../../definitions/types/Dynamic';
@@ -157,6 +158,10 @@ export function isRef(input: any) {
   return input instanceof Ref && typeof input.__ === 'function';
 }
 
+export function isComputed(input: any) {
+  return input instanceof Computed && typeof input.__ === 'function';
+}
+
 export function ifNullReturn<T>(v: any, _return: T) {
   return isNull(v) ? _return : v;
 }
@@ -257,17 +262,31 @@ export function removeEl(el: Element) {
 }
 
 export function mapper(source: dynamic, destination: dynamic) {
-  forEach(Object.keys(source), key => {
-    const sourceValue = source[key];
+  let map = new WeakSet();
 
-    if (key in destination) {
-      if (isObject(sourceValue))
-        return mapper(sourceValue as any, destination[key]);
-      return destination[key] = sourceValue;
-    }
+  function walker(source: any, destination: any) {
+    if (map.has(source)) return;
 
-    Prop.transfer(destination, source, key);
-  });
+    map.add(source);
+    forEach(Object.keys(source), key => {
+      const sourceValue = source[key];
+
+      // If the key already in the destination, set
+      if ((key in destination)) {
+        // If the source value is an object
+        if (isObject(sourceValue)) {
+          return walker(sourceValue as any, destination[key]);
+        }
+        // Set the value directly to allow reactive
+        return destination[key] = sourceValue;
+      }
+
+      Prop.transfer(destination, source, key);
+    });
+  }
+
+  walker(source, destination);
+  map = new WeakSet();
 }
 
 export function urlResolver(url: string) {
@@ -483,6 +502,12 @@ export function setData<
   return (targetObject! as any) as OutData;
 }
 
+export function $computed<Type, Context = any>(
+  entryValue: EntryType<Type, Context>
+) {
+  return new Computed<Type, Context>(entryValue);
+}
+
 export function htmlToJsObj(
   input: string | HTMLElement,
   options?: {
@@ -522,7 +547,7 @@ export function htmlToJsObj(
 
   // If the element is not
   if (isNull(element))
-    throw Logger.error('Invalid element provided at app.toJsObj(“'+ input +'”).');
+    throw Logger.error('Invalid element provided at app.toJsObj(“' + input + '”).');
 
   options = options || {};
 
@@ -544,7 +569,7 @@ export function htmlToJsObj(
   // Elements that skipped on serialization process
   const escapes: dynamic = { BUTTON: true };
   const checkables: dynamic = { checkbox: true, radio: true };
-  onSet = (typeof onSet === 'function') ? onSet : (...args: any[]) => {};
+  onSet = (typeof onSet === 'function') ? onSet : (...args: any[]) => { };
 
   type ObjectType = {} & dynamic;
   type ReturnType = ObjectType | ObjectType[];
