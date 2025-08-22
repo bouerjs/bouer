@@ -21,7 +21,7 @@ interface IComponentOptions<Data extends {} = {}> extends ILifeCycleHooks {
   readonly template?: string;
 
   /** The default data that should be injected in the component */
-  data?: DataType<Data, Component<Data>>;
+  readonly data?: DataType<Data, Component<Data>>;
 
   /** Allow the component the keep the last state */
   readonly keepAlive?: boolean;

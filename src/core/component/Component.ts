@@ -111,7 +111,7 @@ export default class Component<Data extends {} = {}> implements IComponentOption
       return Logger.error('Invalid object for component.export(...), only "Object Literal" is allowed.');
 
     const isDataAComponent = (data instanceof Component);
-    let nonExportableFields = null;
+    let nonExportableFields: Set<string> | null = null;
 
     if (isDataAComponent)
       nonExportableFields = new Set([
