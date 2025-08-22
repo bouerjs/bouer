@@ -61,6 +61,7 @@
       "always"
     ],
     "no-undef": "off",
-    "eol-last": 0
+    "eol-last": 0,
+    "no-invalid-this": "off"
   }
 }
