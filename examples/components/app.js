@@ -5,6 +5,10 @@ var app = new Bouer('#app', {
       path: '/components/app-header.html'
     },
     {
+      name: 'app-main',
+      path: '/components/app-main.html'
+    },
+    {
       name: 'app-footer',
       path: '/components/app-footer.html'
     }
