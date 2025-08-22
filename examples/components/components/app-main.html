@@ -6,10 +6,14 @@
     <div e-for="movie of movies"
         style="border: 1.8px solid #e5e5e5; border-radius: 4px; margin: 6px 0; padding: 3px 6px; cursor: pointer;"
         e-class="{ active: movie.name == selectedMovie.name }"
-        on:click="chooseMovie(movie)"
-        on:add="onList(movie)">
-      <div> 🎞️ <b>{{ movie.name }}</b> - {{ movie.year }} </div>
+        on:click="chooseMovie(movie)">
+      <div> 🎞️ {{ movie.name }} - <b>{{ movie.year }}</b> </div>
 
+    </div>
+
+    <div style="border: 1.8px solid #e49797; border-radius: 4px; margin: 6px 0; padding: 3px 6px; cursor: pointer; text-align: center;"
+        on:click="clearSelection()">
+      <div> Clear Selection </div>
     </div>
   </div>
 </div>
@@ -54,8 +58,11 @@
     chooseMovie: function (movie) {
       this.data.selectedMovie = movie;
     },
-    onList: function (movie) {
-      console.log(movie);
+    clearSelection: function (movie) {
+      this.data.selectedMovie = {
+        name: '',
+        year: ''
+      };
     }
   })
 </script>
