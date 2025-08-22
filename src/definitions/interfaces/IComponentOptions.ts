@@ -6,7 +6,7 @@ import ILifeCycleHooks from './ILifeCycleHooks';
 
 interface IComponentOptions<Data extends {} = {}> extends ILifeCycleHooks {
   /** The name of the component */
-  readonly name?: string
+  readonly name?: string;
 
   /** The path of the component (not required on e-entry directive) */
   readonly path?: string;
@@ -21,7 +21,7 @@ interface IComponentOptions<Data extends {} = {}> extends ILifeCycleHooks {
   readonly template?: string;
 
   /** The default data that should be injected in the component */
-  readonly data?: DataType<Data, Component<Data>>;
+  data?: DataType<Data, Component<Data>>;
 
   /** Allow the component the keep the last state */
   readonly keepAlive?: boolean;
