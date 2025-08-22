@@ -20,12 +20,11 @@ import EventHandler from '../event/EventHandler';
 import Reactive from '../reactive/Reactive';
 import ComponentHandler from './ComponentHandler';
 
-export default class Component<Data extends {} = {}> implements IComponentOptions {
+export default class Component<Data extends {} = {}> implements IComponentOptions<Data> {
   readonly _IRT_ = true;
 
   readonly name: string;
   readonly path: string;
-  readonly data: DataType<Data, this> & dynamic;
   readonly template?: string;
   readonly keepAlive?: boolean;
   readonly prefetch?: boolean;
@@ -34,6 +33,8 @@ export default class Component<Data extends {} = {}> implements IComponentOption
 
   readonly isDefault?: boolean;
   readonly isNotFound?: boolean;
+
+  data: DataType<Data, this> & dynamic;
 
   /** Indicates if the component is destroyed or not */
   isDestroyed: boolean = false;
@@ -67,15 +68,15 @@ export default class Component<Data extends {} = {}> implements IComponentOption
    * Default constructor
    * @param {string|object} optionsOrPath the path of the component or the compponent options
    */
-  constructor(optionsOrPath?: string | IComponentOptions, assets?: (IAsset | string)[]) {
+  constructor(optionsOrPath?: string | IComponentOptions<Data>, assets?: (IAsset | string)[]) {
     let _name: string | undefined = undefined;
     let _path: string | undefined = undefined;
     let _data: DataType<{}, Component> | undefined = undefined;
 
     if (isObject(optionsOrPath)) {
-      _name = (optionsOrPath as Component).name;
-      _path = (optionsOrPath as Component).path;
-      _data = (optionsOrPath as Component).data;
+      _name = (optionsOrPath as Component<Data>).name;
+      _path = (optionsOrPath as Component<Data>).path;
+      _data = (optionsOrPath as Component<Data>).data;
       Object.assign(this, optionsOrPath);
     } else {
       _path = optionsOrPath as string;
@@ -105,11 +106,44 @@ export default class Component<Data extends {} = {}> implements IComponentOption
    * The data that should be exported from the `<script>` tag to the root element
    * @param {object} data the data to export
    */
-  export(data: dynamic) {
+  export(data: dynamic, props?: string[]) {
     if (!isObject(data))
       return Logger.error('Invalid object for component.export(...), only "Object Literal" is allowed.');
 
-    return forEach(Object.keys(data), key => {
+    const isDataAComponent = (data instanceof Component);
+    let nonExportableFields = null;
+
+    if (isDataAComponent)
+      nonExportableFields = new Set([
+        'name',
+        'path',
+        'title',
+        'route',
+        'template',
+        'data',
+        'keepAlive',
+        'prefetch',
+        'children',
+        'restrictions',
+        'isDefault',
+        'isNotFound',
+        'requested',
+        'created',
+        'beforeMount',
+        'mounted',
+        'beforeLoad',
+        'loaded',
+        'beforeDestroy',
+        'destroyed',
+        'blocked',
+        'failed'
+      ]);
+
+    return forEach(props || Object.keys(data), key => {
+
+      if (nonExportableFields && nonExportableFields.has(key))
+        return;
+
       (this.data as any)[key] = (data as any)[key];
       Prop.transfer(this.data, data, key as any);
     });
