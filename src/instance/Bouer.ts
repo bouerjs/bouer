@@ -18,7 +18,7 @@ import IComponentOptions from '../definitions/interfaces/IComponentOptions';
 import IDelimiter from '../definitions/interfaces/IDelimiter';
 import IEventSubscription from '../definitions/interfaces/IEventSubscription';
 import Constructor from '../definitions/types/Constructor';
-import Props from '../definitions/types/Data';
+import Props from '../definitions/types/Properties';
 import DataType from '../definitions/types/DataType';
 import dynamic from '../definitions/types/Dynamic';
 import Pipe from '../definitions/types/Pipe';
