@@ -36,19 +36,22 @@ export default class Computed<Type, Context = RenderContext | any> {
         set: this.$set
       };
 
-    const isFunctionEntry = typeof this.entryValue === 'function';
+    const entryValue = this.entryValue;
+    const isFunctionEntry = typeof entryValue === 'function';
 
     const value: any = isFunctionEntry
-      ? (this.entryValue as EntryFnType<Type, Context>).call(this.context as any)
-      : this.entryValue;
+      ? (entryValue as EntryFnType<Type, Context>).call(this.context as any)
+      : entryValue;
 
     if (isNull(value))
       throw new Error('Invalid value used as return in “function $computed(){...}” | “new Computed(...)”.');
 
     const isExplicit = isObject(value) && (('get' in value) || ('set' in value));
 
-    this.$get = ((isExplicit && 'get' in value) ? value.get : (() => value)).bind(this.context);
-    this.$set = ((isExplicit && 'set' in value) ? value.set : ((v: any) => {})).bind(this.context);
+    this.$get = ((isExplicit && 'get' in value) ? value.get : (function(this: any) {
+      return isFunctionEntry ? entryValue.call(this) : value;
+    })).bind(this.context);
+    this.$set = ((isExplicit && 'set' in value) ? value.set : (function(v: any) {})).bind(this.context);
 
     return {
       get: this.$get,
