@@ -3,15 +3,16 @@
     "noEmit": true,
     "strict": true,
     "allowJs": true,
-    "target": "ES5",
+    "target": "es2017",
     "moduleResolution": "Node",
-    "lib": ["ES5", "ES6", "DOM"],
+    "lib": ["ES2016", "ES2017", "DOM"],
     "isolatedModules": false,
     "esModuleInterop": false,
 		"emitDeclarationOnly": false,
     "outDir": "types",
 		"declaration": false,
-    "strictNullChecks": true
+    "strictNullChecks": true,
+    "ignoreDeprecations": "6.0"
   },
   "exclude": [
 		"node_modules",

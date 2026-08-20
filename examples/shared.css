@@ -49,3 +49,14 @@ button {
   height: 28px;
   cursor: pointer;
 }
+
+.red {
+  color: rgb(240, 82, 82);
+}
+
+.card {
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  padding: 1px 8px;
+  margin-bottom: 6px;
+}
