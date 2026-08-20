@@ -25,7 +25,7 @@ describe('When element is compiled with "e-if" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).not.toContain('Visible');
       }
     });
@@ -44,7 +44,7 @@ describe('When element is compiled with "e-if" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).toContain('Visible');
       }
     });
@@ -71,7 +71,7 @@ describe('When element is compiled with "e-if" and "e-else" directives', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).toContain('If-Block');
         expect(el.innerHTML).not.toContain('Else-Block');
       }
@@ -91,7 +91,7 @@ describe('When element is compiled with "e-if" and "e-else" directives', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).toContain('Else-Block');
         expect(el.innerHTML).not.toContain('If-Block');
       }
@@ -120,7 +120,7 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).toContain('Single-If-Block');
         expect(el.innerHTML).not.toContain('Else-If-Block');
         expect(el.innerHTML).not.toContain('Else-Block');
@@ -141,7 +141,7 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).not.toContain('Single-If-Block');
         expect(el.innerHTML).toContain('Else-If-Block');
         expect(el.innerHTML).not.toContain('Else-Block');
@@ -162,7 +162,7 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).not.toContain('Single-If-Block');
         expect(el.innerHTML).not.toContain('Else-If-Block');
         expect(el.innerHTML).toContain('Else-Block');

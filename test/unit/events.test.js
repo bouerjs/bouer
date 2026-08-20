@@ -23,7 +23,7 @@ describe('Standard events', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: el => {
+        onComponentLoad: el => {
           expect('on:click' in el.attributes).toBe(false);
         }
       });
@@ -62,7 +62,7 @@ describe('Standard events', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: el => {
+        onComponentLoad: el => {
           el.click();
           el.click();
           expect(click).toHaveBeenCalledTimes(1);
@@ -85,7 +85,7 @@ describe('Standard events', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: el => {
+        onComponentLoad: el => {
           expect('on:mycustom' in el.attributes).toBe(false);
         }
       });
@@ -105,7 +105,7 @@ describe('Standard events', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: el => {
+        onComponentLoad: el => {
           context.emit('mycustom');
           context.emit('mycustom');
           expect(callback).toHaveBeenCalledTimes(2);
@@ -127,7 +127,7 @@ describe('Standard events', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: el => {
+        onComponentLoad: el => {
           context.emit('mycustom');
           context.emit('mycustom');
           expect(callback).toHaveBeenCalledTimes(1);

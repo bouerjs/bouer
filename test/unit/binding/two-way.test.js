@@ -21,7 +21,7 @@ describe('When using a "e-bind" for two way data binding ', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: compiledEl => {
+        onComponentLoad: compiledEl => {
           expect(compiledEl.value).toBe(context.data.value);
 
           context.data.value = 'bound-value-changed';
@@ -47,7 +47,7 @@ describe('When using a "e-bind" for two way data binding ', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: () => {
+        onComponentLoad: () => {
           expect(element.checked).toBe(true);
 
           context.data.value = false;
@@ -79,7 +79,7 @@ describe('When using a "e-bind" for two way data binding ', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: () => {
+        onComponentLoad: () => {
           const maleInput = element.children[0];
           const femaleInput = element.children[1];
 

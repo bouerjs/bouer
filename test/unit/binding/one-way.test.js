@@ -21,7 +21,7 @@ describe('When using a delimiter "{{ ... }}" for one way data binding', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.textContent).toContain('Printed');
       }
     });

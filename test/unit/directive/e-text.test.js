@@ -20,7 +20,7 @@ describe('When element is compiled with "e-text" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.textContent).toContain('Hello');
       }
     });
@@ -33,7 +33,7 @@ describe('When element is compiled with "e-text" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.hasAttribute('e-text')).toBe(false);
       }
     });

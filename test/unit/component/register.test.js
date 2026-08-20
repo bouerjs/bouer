@@ -20,7 +20,7 @@ describe('When using "e-entry" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: () => {
+      onComponentLoad: () => {
         expect(context.$components.get('copied-el')).toBeDefined();
       }
     });
