@@ -12,6 +12,8 @@ export { default as Watch } from './core/binder/Watch';
 export { default as ViewChild } from './core/ViewChild';
 
 export { default as FormHandler } from './core/form/FormHandler';
+export { default as FormSchema } from './core/form/FormSchema';
+export { default as FieldSchema } from './core/form/FieldSchema';
 
 export { default as Extend } from './shared/helpers/Extend';
 export { default as Prop } from './shared/helpers/Prop';
