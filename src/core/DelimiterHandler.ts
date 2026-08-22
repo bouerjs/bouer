@@ -31,7 +31,7 @@ export default class DelimiterHandler {
       for (let i = 0; i < this.delimiters.length; i++) {
         const item = this.delimiters[i];
         const result = text.match(
-          RegExp(item.delimiter.open + center + item.delimiter.close, flag || '')
+          new RegExp(item.delimiter.open + center + item.delimiter.close, flag || '')
         );
 
         if (result) {
