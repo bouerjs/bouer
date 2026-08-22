@@ -11,7 +11,7 @@ export default class Watch<Value, Obj> {
   /** the callback that needs to be performed when there is a change */
   readonly callback: WatchCallback<Value>;
   /** an action that needs to be performed when this watch instance is destroyed */
-  readonly onDestroy?: () => void | undefined;
+  onDestroy?: () => void | undefined;
 
   /**
    * Default constructor
