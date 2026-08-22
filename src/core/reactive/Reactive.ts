@@ -102,7 +102,7 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
 
     if (isObject(value) || Array.isArray(value)) {
       // Checking the type
-      if ((typeof this.propValue) !== (typeof value))
+      if (this.propValue != null && (typeof this.propValue) !== (typeof value))
         return Logger.error(('Cannot set “' + (typeof value) + '” in “' +
           this.propName + '” property.'));
 
@@ -282,8 +282,8 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
       return data;
     };
 
-    const data = executer(options.data, options.descriptor, options.keys);
+    executer(options.data, options.descriptor, options.keys);
     tranformedData = new WeakSet();
-    return data;
+    return options.data as any;
   };
 }
