@@ -32,12 +32,11 @@ export function custom(opitons: {
     data: data,
     node: node,
     fields: delimiters,
-    isReplaceProperty: false,
+    replaceable: false,
     context: context,
-    onUpdate: () => {
-      if (typeof $CustomDirective.onUpdate === 'function')
-        $CustomDirective.onUpdate(node, bindConfig);
-    }
+    onBind: $CustomDirective.onBind,
+    onUpdate: $CustomDirective.onUpdate,
+    onUnbind: $CustomDirective.onUnbind
   });
 
   if (ifNullReturn($CustomDirective.removable, true))
