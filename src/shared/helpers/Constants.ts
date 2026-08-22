@@ -11,6 +11,13 @@ const Constants = {
   req: 'e-req',
   for: 'e-for',
 
+  form: {
+    property: 'e-form',
+    schema: 'e-schema',
+    build: 'e-build',
+    abuild: 'e-build:array',
+    array: 'e-array',
+  },
   data: 'data',
   def: 'e-def',
   wait: 'wait-data',
@@ -43,7 +50,7 @@ const Constants = {
   },
 
   check(node: Node, cmd: string) {
-    if (node.nodeName in { 'e-build': 1, 'e-build:array': 1, 'e-array': 1 })
+    if (node.nodeName in { [this.form.schema]: 1, 'e-build': 1, 'e-build:array': 1, 'e-array': 1 })
       return false;
     return startWith(node.nodeName, cmd);
   }
