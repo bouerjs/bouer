@@ -21,7 +21,7 @@ export default class Middleware {
   }
 
   run = (directive: string, runnable: {
-    type: 'onBind' | 'onUpdate',
+    type: 'onBind' | 'onUpdate' | 'onUnbind',
     action: (middleware: (context: IMiddleware, callbacks: {
       success: (response: any) => void,
       fail: (error: any) => void,
@@ -68,7 +68,8 @@ export default class Middleware {
   subscribe = (directive: string, actions: (
     this: Bouer,
     onBind: MiddlewareConfigType,
-    onUpdate: MiddlewareConfigType
+    onUpdate: MiddlewareConfigType,
+    onUnbind: MiddlewareConfigType
   ) => void) => {
     if (!this.middlewareConfigContainer[directive])
       this.middlewareConfigContainer[directive] = [];
@@ -77,7 +78,8 @@ export default class Middleware {
 
     actions.call(this.bouer,
       onBind => middleware.onBind = onBind,
-      onUpdate => middleware.onUpdate = onUpdate
+      onUpdate => middleware.onUpdate = onUpdate,
+      onUnbind => middleware.onUnbind = onUnbind,
     );
 
     this.middlewareConfigContainer[directive].push(middleware);
