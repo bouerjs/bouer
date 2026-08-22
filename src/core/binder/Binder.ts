@@ -12,7 +12,7 @@ import Task from '../../shared/helpers/Task';
 import {
   createEl,
   findAttribute,
-  fnEmpty,
+  $default,
   forEach,
   ifNullReturn,
   isComputed,
@@ -52,13 +52,21 @@ export default class Binder {
   }
 
   create(options: IBinderOptions) {
-    const { node, data, fields, isReplaceProperty, context } = options;
+    const { node, data, fields, replaceable: isReplaceProperty, context } = options;
     const originalValue = ifNullReturn(node.nodeValue, '');
     const originalName = node.nodeName;
     const ownerNode = (node as any).ownerElement || node.parentNode;
     const middleware = IoC.app(this.bouer).resolve(Middleware)!;
-    const onUpdate = options.onUpdate || ((v: any, n: Node) => { });
+
+    const onBind = options.onBind || $default;
+    const onUpdate = options.onUpdate || $default;
+    const onUnbind = options.onUnbind || $default;
+
     const isActive: () => boolean = ownerNode.isActive;
+
+    const bindingHooks = {
+      onBind, onUnbind, onUpdate
+    };
 
     // Clousure cache property settings
     const propertyBindConfig: IBinderConfig = {
@@ -72,27 +80,22 @@ export default class Binder {
     };
 
     // Middleware that runs before the bind or update is made
-    const $RunDirectiveMiddlewares = (type: 'onBind' | 'onUpdate') => {
+    const $RunDirectiveMiddlewares = (type: 'onBind' | 'onUpdate' | 'onUnbind') => {
+      // Running the hooks
+      bindingHooks[type](node, propertyBindConfig);
+
       middleware.run(originalName, {
         type: type,
-        action: (middleware) => {
+        action: middleware => {
           middleware(
-            {
-              binder: propertyBindConfig,
-              detail: {},
-            },
-            {
-              success() { },
-              fail() { },
-              done() { },
-            }
+            { binder: propertyBindConfig, detail: {} },
+            { success() {}, fail() {}, done() {} }
           );
         },
       });
     };
 
     const $BindOneWay = () => {
-
       // One-Way Data Binding
       let nodeToBind = node;
 
@@ -171,21 +174,27 @@ export default class Binder {
 
       ReactiveEvent.once('AfterGet', (event) => {
         event.onemit = (descriptor) => {
+
+          const watch = descriptor.onChange(() => {
+            setter();
+            $RunDirectiveMiddlewares('onUpdate');
+          }, node);
+
+          watch.onDestroy = () => {
+            $RunDirectiveMiddlewares('onUnbind');
+          };
+
           this.binds.push({
             isConnected: isActive,
-            watch: descriptor.onChange(() => {
-              $RunDirectiveMiddlewares('onUpdate');
-              setter();
-              onUpdate(descriptor.propValue, node);
-            }, node),
+            watch: watch,
           });
         };
 
         setter();
       });
 
-      $RunDirectiveMiddlewares('onBind');
       propertyBindConfig.node = nodeToBind;
+      $RunDirectiveMiddlewares('onBind');
       return propertyBindConfig;
     };
 
@@ -282,7 +291,7 @@ export default class Binder {
 
             // Default Binding
             return this.evaluator.exec({
-              isReturn: false,
+              returnable: false,
               context: context,
               data: Extend.obj(data, { $vl: value }),
               code: dataBindProperty + '=$vl',
@@ -364,10 +373,9 @@ export default class Binder {
           this.binds.push({
             isConnected: isActive,
             watch: descriptor.onChange(() => {
-              $RunDirectiveMiddlewares('onUpdate');
               const value = getValue();
               setter('fromDataToInput', value);
-              onUpdate(value, node);
+              $RunDirectiveMiddlewares('onUpdate');
             }, node),
           });
         };
@@ -438,7 +446,7 @@ export default class Binder {
     ReactiveEvent.once('AfterGet', (event) => {
       event.onemit = (descriptor) =>
         (mWatch = descriptor.onChange(callback as WatchCallback) as any);
-      fnEmpty((targetObject as any)[propertyName]);
+      $default((targetObject as any)[propertyName]);
     });
 
     return mWatch;
@@ -492,7 +500,7 @@ export default class Binder {
         return this.evaluator.exec({
           code: a as any,
           context: this.bouer,
-          isReturn: true,
+          returnable: true,
           data: this.bouer.data
         });
       });
