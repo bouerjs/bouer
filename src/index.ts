@@ -10,9 +10,13 @@ export { default as Compiler } from './core/compiler/Compiler';
 export { default as Routing } from './core/routing/Routing';
 export { default as Watch } from './core/binder/Watch';
 export { default as ViewChild } from './core/ViewChild';
+
+export { default as FormHandler } from './core/form/FormHandler';
+
 export { default as Extend } from './shared/helpers/Extend';
 export { default as Prop } from './shared/helpers/Prop';
 export { default as IoC } from './shared/helpers/IoCContainer';
+
 
 export { default as IBouerOptions } from './definitions/interfaces/IBouerOptions';
 export { default as IBouerConfig } from './definitions/interfaces/IBouerConfig';
@@ -26,6 +30,7 @@ export { default as IEventSubscription } from './definitions/interfaces/IEventSu
 export { default as IEventEmitterOptions } from './definitions/interfaces/IEventEmitterOptions';
 export { default as IAsset } from './definitions/interfaces/IAsset';
 export { default as IMiddlewareResult } from './core/middleware/IMiddlewareResult';
+export * from './definitions/interfaces/IFieldSchema';
 
 export { default as dynamic } from './definitions/types/Dynamic';
 export { default as CustomDirective } from './definitions/types/CustomDirective';
