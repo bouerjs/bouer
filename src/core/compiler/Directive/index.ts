@@ -6,7 +6,7 @@ import Binder from '../../binder/Binder';
 import DelimiterHandler from '../../DelimiterHandler';
 import Evaluator from '../../Evaluator';
 import EventHandler from '../../event/EventHandler';
-import Compiler from '../Compiler';
+import Compiler, { CompilationHooks } from '../Compiler';
 import { $href, $text, $bind, $property } from './Binding';
 import { $entry, $put } from './ComponentEntry';
 import { $if, $show } from './Conditions';
@@ -16,6 +16,7 @@ import { $req } from './DataRequest';
 import { $for } from './Loops';
 import { $skeleton } from './Skeleton';
 import { $skip } from './Skip';
+import { $form } from './Form';
 
 export default class Directive {
   readonly _IRT_ = true;
@@ -51,7 +52,7 @@ export default class Directive {
     });
   }
 
-  if(node: Node, data: object) {
+  if(node: Node, data: object, compilationHooks: CompilationHooks) {
     return $if({
       binder: this.binder,
       compiler: this.compiler,
@@ -59,7 +60,8 @@ export default class Directive {
       delimiter: this.delimiter,
       evaluator: this.evaluator,
       data: data,
-      node: node
+      node: node,
+      compilationHooks: compilationHooks
     });
   }
 
@@ -74,7 +76,8 @@ export default class Directive {
     });
   }
 
-  for(node: Node, data: object) {
+
+  for(node: Node, data: object, compilationHooks: CompilationHooks) {
     return $for({
       binder: this.binder,
       compiler: this.compiler,
@@ -83,7 +86,8 @@ export default class Directive {
       evaluator: this.evaluator,
       eventHandler: this.eventHandler,
       data: data,
-      node: node
+      node: node,
+      compilationHooks: compilationHooks
     });
   }
 
@@ -125,7 +129,7 @@ export default class Directive {
     });
   }
 
-  data(node: Node, data: object) {
+  data(node: Node, data: object, compilationHooks: CompilationHooks) {
     return $data({
       bouer: this.bouer,
       compiler: this.compiler,
@@ -133,7 +137,8 @@ export default class Directive {
       evaluator: this.evaluator,
       context: this.context,
       node: node,
-      data: data
+      data: data,
+      compilationHooks: compilationHooks
     });
   }
 
@@ -157,18 +162,19 @@ export default class Directive {
     });
   }
 
-  put(node: Node, data: object) {
+  put(node: Node, data: object, compilationHooks: CompilationHooks) {
     return $put({
       bouer: this.bouer,
       binder: this.binder,
       delimiter: this.delimiter,
       context: this.context,
       node: node,
-      data: data
+      data: data,
+      compilationHooks: compilationHooks
     });
   }
 
-  req(node: Node, data: object) {
+  req(node: Node, data: object, compilationHooks: CompilationHooks) {
     return $req({
       bouer: this.bouer,
       compiler: this.compiler,
@@ -177,17 +183,19 @@ export default class Directive {
       eventHandler: this.eventHandler,
       binder: this.binder,
       node: node,
-      data: data
+      data: data,
+      compilationHooks: compilationHooks
     });
   }
 
-  wait(node: Node) {
+  wait(node: Node, compilationHooks: CompilationHooks) {
     return $wait({
       bouer: this.bouer,
       compiler: this.compiler,
       delimiter: this.delimiter,
       context: this.context,
       node: node,
+      compilationHooks: compilationHooks
     });
   }
 
@@ -200,6 +208,16 @@ export default class Directive {
       customDirectives: this.customDirectives,
       node: node,
       data: data,
+    });
+  }
+
+  form(node: Node, data: object) {
+    return $form({
+      evaluator: this.evaluator,
+      context: this.context,
+      compiler: this.compiler,
+      node: node,
+      data: data
     });
   }
 
