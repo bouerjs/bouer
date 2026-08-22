@@ -5,6 +5,7 @@ import IMiddleware from './IMiddleware';
 interface IMiddlewareObject {
   onBind?: (this: Bouer, context: IMiddleware, next: () => void) => IMiddlewareResult | Promise<IMiddlewareResult>,
   onUpdate?: (this: Bouer, context: IMiddleware, next: () => void) => IMiddlewareResult | Promise<IMiddlewareResult>
+  onUnbind?: (this: Bouer, context: IMiddleware, next: () => void) => IMiddlewareResult | Promise<IMiddlewareResult>
 }
 
 export default IMiddlewareObject;
