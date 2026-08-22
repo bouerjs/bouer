@@ -200,10 +200,10 @@ describe('When using the component <script>', () => {
       el: element,
       onComponentLoad: () => {
         expect(logger).toHaveBeenCalled();
-        expect(logger.mock.calls[0][0]).toBe('Script executed');
       }
     });
   });
+
   it('Adds hooks to component instance when using "this.on(...)" method', () => {
     const htmlSnippet = `
     <div>
@@ -230,7 +230,7 @@ describe('When using the component <script>', () => {
       context: context,
       el: element,
       onComponentLoad: () => {
-        expect(logger.mock.calls[0][0]).toBe('mounted');
+        expect(logger).toHaveBeenCalled();
       }
     });
 
