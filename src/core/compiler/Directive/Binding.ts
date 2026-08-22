@@ -114,7 +114,7 @@ export function $property(opitons: {
     data: data,
     node: node,
     context: context,
-    isReplaceProperty: false,
+    replaceable: false,
     fields: [{ expression: nodeValue, field: nodeValue, pipes: [] }],
     onUpdate: () => execute(evaluator.exec({
       data: data,
