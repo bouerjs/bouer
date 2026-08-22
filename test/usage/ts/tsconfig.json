@@ -1,9 +1,7 @@
 {
   "compilerOptions": {
     "strict": true,
-    "target": "es5",
-    "module": "ES2015",
-    "moduleResolution": "Node",
+    "target": "es2017"
   },
   "exclude": ["node_modules", "dist"],
   "include": ["typings/**/*.d.ts", "src/**/*"],
