@@ -24,7 +24,7 @@ import Evaluator from '../../Evaluator';
 import EventHandler from '../../event/EventHandler';
 import ReactiveEvent from '../../event/ReactiveEvent';
 import Reactive from '../../reactive/Reactive';
-import Compiler from '../Compiler';
+import Compiler, { CompilationHooks } from '../Compiler';
 
 export function $for(opitons: {
   node: Node,
@@ -34,7 +34,8 @@ export function $for(opitons: {
   eventHandler: EventHandler,
   delimiter: DelimiterHandler,
   context: RenderContext,
-  data: object
+  data: object,
+  compilationHooks: CompilationHooks
 }) {
   const {
     node,
@@ -94,18 +95,18 @@ export function $for(opitons: {
       node: node,
       data: data,
       fields: delimiters,
-      isReplaceProperty: true,
+      replaceable: true,
       context: context,
       onUpdate: () => execute()
     });
 
   ownerNode.removeAttribute(nodeName);
 
-  // Cloning the element
-  const forItem = ownerNode.cloneNode(true);
-
   // Replacing the comment reference
   container.replaceChild(comment, ownerNode);
+
+  // Cloning the element
+  const forItem = ownerNode;
 
   // Filters the list of items
   const $Where = (list: any[], filterConfigParts: string[]) => {
@@ -114,7 +115,7 @@ export function $for(opitons: {
     let wValue = filterConfigParts[1];
 
     if (isNull(wValue) || wValue === '') {
-      Logger.error('Invalid where-value in “' + nodeName + '” with “' + nodeValue + '” expression.');
+      Logger.error('Invalid where-value in “' + nodeName + '” with “' + node.nodeValue + '” expression.');
       return list;
     }
 
@@ -126,7 +127,7 @@ export function $for(opitons: {
     } else {
       // where:search:name?
       if ((isNull(wKeys) || wKeys === '') && isObject(list[0] || '')) {
-        Logger.error(('Invalid where-keys in “' + nodeName + '” with “' + nodeValue + '” expression, ' +
+        Logger.error(('Invalid where-keys in “' + nodeName + '” with “' + node.nodeValue + '” expression, ' +
           'at least one where-key to be provided when using list of object.'));
         return list;
       }
@@ -170,7 +171,7 @@ export function $for(opitons: {
         switch (toLower(type)) {
           case 'asc': return asc ? 1 : -1;
           case 'desc': return desc ? -1 : 1;
-          default: Logger.error('The “' + type + '” order type is invalid: “' + nodeValue +
+          default: Logger.error('The “' + type + '” order type is invalid: “' + node.nodeValue +
             '”. Available types are: “asc”  for order ascendent and “desc” for order descendent.');
             return 0;
         }
@@ -225,11 +226,13 @@ export function $for(opitons: {
       el: forClonedItem,
       data: forData,
       context: context,
-      onDone: el => eventHandler.emit({
+      beforeCompile: opitons.compilationHooks.beforeCompile,
+      afterCompile: opitons.compilationHooks.afterCompile,
+      onComponentLoad: el => eventHandler.emit({
         eventName: Constants.builtInEvents.add,
         attachedNode: el,
         once: true
-      })
+      }),
     });
 
     // Updating the handler
@@ -243,7 +246,7 @@ export function $for(opitons: {
   // Builds the expression to an object
   const $ExpressionBuilder = (expression: string): ExpressionType => {
     const filters = expression.split('|').map(item => trim(item));
-    const forExpression = filters[0].replace(/\(|\)/g, '');
+    const forExpression = filters[0];
     filters.shift();
 
     // for types:
@@ -256,7 +259,7 @@ export function $for(opitons: {
     if (!(forParts.length > 1))
       forParts = forExpression.split(forSeparator = ' in ');
 
-    const leftHand = forParts[0];
+    const leftHand = forParts[0].replace(/\(|\)/g, '');
     const rightHand = forParts[1];
     const leftHandParts = leftHand.split(',').map(x => trim(x));
 
@@ -381,7 +384,7 @@ export function $for(opitons: {
     const parts = config.split(':').map(item => trim(item));
 
     if (parts.length == 1) {
-      Logger.error(('Invalid “' + nodeName + '” where expression “' + nodeValue +
+      Logger.error(('Invalid “' + nodeName + '” where expression “' + node.nodeValue +
         '”, at least a where-value and where-keys, or a filter-function must be provided'));
     } else {
       return $Where(listCopy, parts);
@@ -396,7 +399,7 @@ export function $for(opitons: {
           $OnArrayChanges(detail), node)
       });
     });
-  let expObj: ExpressionType | null = $ExpressionBuilder(nodeValue);
+  let expObj: ExpressionType | null = $ExpressionBuilder(node.nodeValue!);
 
   const filters = expObj!.filters;
   const findFilter = (fName: string) => filters.filter(item => item.substring(0, fName.length) === fName);
@@ -422,7 +425,7 @@ export function $for(opitons: {
 
     evaluator.exec({
       data: data,
-      isReturn: false,
+      returnable: false,
       context: context,
       code: 'var __e = __each, __fl = __filters, __f = __for; ' +
         '__f(__fl(' + iterable + '), function($$itm, $$idx) { __e($$itm, $$idx); })',
@@ -438,7 +441,7 @@ export function $for(opitons: {
           const applyOrder = (config: string) => {
             const parts = config.split(':').map(item => trim(item));
             if (parts.length == 1) {
-              Logger.error(('Invalid “' + nodeName + '” order  expression “' + nodeValue +
+              Logger.error(('Invalid “' + nodeName + '” order  expression “' + node.nodeValue +
                 '”, at least the order type must be provided'));
             } else {
               listCopy = $Order(listCopy, parts[1], parts[2]);
