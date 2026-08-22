@@ -17,7 +17,7 @@ import DelimiterHandler from '../../DelimiterHandler';
 import Evaluator from '../../Evaluator';
 import ReactiveEvent from '../../event/ReactiveEvent';
 import Reactive from '../../reactive/Reactive';
-import Compiler from '../Compiler';
+import Compiler, { CompilationHooks } from '../Compiler';
 
 export function $if(opitons: {
   node: Node,
@@ -26,7 +26,8 @@ export function $if(opitons: {
   compiler: Compiler,
   delimiter: DelimiterHandler,
   context: RenderContext,
-  data: object
+  data: object,
+  compilationHooks: CompilationHooks
 }) {
   const {
     node,
@@ -128,7 +129,7 @@ export function $if(opitons: {
 
     evaluator.exec({
       data: data,
-      isReturn: false,
+      returnable: false,
       code: conditionalExpression,
       context: context,
       aditional: {
@@ -140,7 +141,9 @@ export function $if(opitons: {
           compiler.compile({
             el: element,
             data: data,
-            context: context
+            context: context,
+            beforeCompile: opitons.compilationHooks.beforeCompile,
+            afterCompile: opitons.compilationHooks.afterCompile,
           });
         }
       }
