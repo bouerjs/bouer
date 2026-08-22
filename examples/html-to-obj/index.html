@@ -12,45 +12,83 @@
 
 <body>
   <div id="app">
-    <form class="center" on:submit.prevent="submit">
-
-      <input-field silent data="{ label: 'First Name', name: 'firstName', value: '' }">
-        <input e-bind="value" type="text" e-name="{{ name }}" />
+    <form class="center" on:submit.prevent="submit" e-form="personForm">
+      <input-field --s data="{
+        label: 'First Name',
+        name: 'firstName',
+        $form: $form
+      }">
+        <input type="text" e-name="{{ name }}" on:keyup="$form.get(name).validate()" />
       </input-field>
 
-      <input-field silent data="{ label: 'Last Name', name: 'lastName', value: '' }">
-        <input e-bind="value" type="text" e-name="{{ name }}" />
+      <input-field --s data="{
+        label: 'Last Name',
+        name: 'lastName',
+        $form: $form
+      }">
+        <input type="text" e-name="{{ name }}" on:keyup="$form.get(name).validate()" />
       </input-field>
 
-      <input-field silent data="{ label: 'Birthday', name: 'birthday', value: '' }">
-        <input e-bind="value" type="date" e-name="{{ name }}" />
+      <input-field --s data="{
+        label: 'Birthdate',
+        name: 'birthdate',
+        $form: $form
+      }">
+        <input type="text" e-name="{{ name }}" on:keyup="$form.get(name).validate()" />
       </input-field>
 
-      <!-- Build an phones property as an array -->
-      <div e-build="phones" e-array>
+      <input-field --s data="{
+        label: 'E-mail Address',
+        name: 'email',
+        $form: $form
+      }">
+        <input type="text" e-name="{{ name }}" on:keyup="$form.get(name).validate()" />
+      </input-field>
 
-        <input-field silent data="{ label: 'Country Code', name: 'code', value: '' }">
-          <input e-bind="value" type="text" e-name="{{ name }}" />
+
+      <div e-build:array="phones" class="card">
+        <div>Phones </div>
+        <input-field --s data="{
+          label: 'Country Code',
+          name: 'code',
+          $form: $form
+        }">
+          <input type="text" e-name="{{ name }}" on:keyup="$form.get(name).validate()" />
         </input-field>
 
-        <input-field silent data="{ label: 'Number', name: 'number', value: 0 }">
-          <input e-bind="value" type="number" e-name="{{ name }}" />
+        <input-field --s data="{
+          label: 'Phone Number',
+          name: 'phoneNumber',
+          $form: $form,
+        }">
+          <input type="text" e-name="{{ name }}" on:keyup="$form.get(name).validate()" />
         </input-field>
-
       </div>
 
+      <!-- Build an phones property as an array -->
       <!-- Build an identification property as an object -->
-      <div e-build="identification">
-        <input-field silent data="{ label: 'Type', name: 'type', value: '' }">
-          <select e-name="{{ name }}" e-bind="value">
-            <option> Id Card </option>
-            <option> Passport </option>
+      <div e-build="identification" class="card">
+        <div>Identification</div>
+        <input-field --s data="{
+          label: 'Type',
+          name: 'type',
+          $form: $form
+        }">
+          <select e-name="{{ name }}" on:change="$form.get(name).validate()">
+            <option selected> Choose one options </option>
+            <option value="ID"> Id Card </option>
+            <option value="PP"> Passport </option>
+            <option value="DL"> Driver's License </option>
           </select>
         </input-field>
 
 
-        <input-field silent data="{ label: 'Code', name: 'code', value: '' }">
-          <input e-bind="value" type="text" e-name="{{ name }}" />
+        <input-field --s data="{
+          label: 'Code',
+          name: 'code',
+          $form: $form
+        }">
+          <input type="text" e-name="{{ name }}" on:keyup="$form.get(name).validate()" />
         </input-field>
       </div>
 
