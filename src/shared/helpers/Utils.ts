@@ -183,6 +183,9 @@ export function startWith(value: string, pattern: string) {
 export function toLower(str: string) {
   return str.toLowerCase();
 }
+export function toPascalCase(value: string) {
+  return value[0].toUpperCase() + value.substring(1);
+}
 
 export function toStr(input: any) {
   if (isPrimitive(input)) {
@@ -218,6 +221,19 @@ export function where<T, C = {}>(
     }
   }
   return out;
+}
+
+export function findOneBy<T, C = {}>(
+  iterable: T[],
+  callback: (this: typeof context, item: T, index: number) => any,
+  context?: C
+) {
+  for (let i = 0; i < iterable.length; i++) {
+    if (callback.call(context, iterable[i], i)) {
+      return iterable[i];
+    }
+  }
+  return null;
 }
 
 export function toArray(array: any) {
@@ -341,7 +357,7 @@ export function urlCombine(base: string, ...parts: string[]) {
  * @param { string } path the actual path
  * @returns { string } path with ./resolved-path
  */
-export function pathResolver(relative: string, path: string) {
+export function pathResolver(relative: string, path: string): string {
   const isCurrentDir = (v: string) => v.substring(0, 2) === './';
   const isParentDir = (v: string) => v.substring(0, 3) === '../';
 
@@ -380,7 +396,7 @@ export function buildError(error: any) {
   return error;
 }
 
-export function fnEmpty(input?: any) {
+export function $default(input?: any, ...remains: any): any {
   return input;
 }
 
@@ -390,7 +406,7 @@ export function fnCallResolver(fn?: any, cb?: (v: any) => any) {
   if (isNull(fnValue))
     return fnValue;
 
-  cb = cb || fnEmpty;
+  cb = cb || $default;
 
   if (typeof fnValue === 'function')
     fnValue = fn();
@@ -506,147 +522,6 @@ export function $computed<Type, Context = any>(
   entryValue: EntryType<Type, Context>
 ) {
   return new Computed<Type, Context>(entryValue);
-}
-
-export function htmlToJsObj(
-  input: string | HTMLElement,
-  options?: {
-    /**
-    * attributes that tells the compiler to lookup to the element, e.g: [name],[data-name].
-    * * Note: The definition order matters.
-    */
-    names?: string,
-    /**
-    * attributes that tells the compiler where it going to get the value, e.g: [value],[data-value].
-    * * Note: The definition order matters.
-    */
-    values?: string
-  },
-  onSet?: (
-    builtObject: object, propName: string, value: any, element: Element
-  ) => void
-) {
-
-  let element: Element | null | undefined = undefined;
-  // If it's not a HTML Element, just return
-  if ((input instanceof HTMLElement))
-    element = input;
-  // If it's a string try to get the element
-  else if (typeof input === 'string') {
-    try {
-      if (!(element = DOM.querySelector(input))) {
-        Logger.error('Element with "' + input + '" selector Not Found.');
-        return null;
-      }
-    } catch (error) {
-      // Unknown error
-      Logger.error(buildError(error));
-      return null;
-    }
-  }
-
-  // If the element is not
-  if (isNull(element))
-    throw Logger.error('Invalid element provided at app.toJsObj(“' + input + '”).');
-
-  options = options || {};
-
-  // Remove `[ ]` and `,` and return an array of the names provided
-  const mNames = (options.names || '[name]').replace(/\[|\]/g, '').split(',');
-  const mValues = (options.values || '[value]').replace(/\[|\]/g, '').split(',');
-
-  const getValue = (el: Element, fieldName: string) => {
-    if (fieldName in el) return (el as any)[fieldName];
-    return el.getAttribute(fieldName) || (el as any).innerText;
-  };
-
-  const tryGetValue = (el: Element) => {
-    let val: string | number | boolean | undefined | null = undefined;
-    mValues.find((field: string) => (val = getValue(el, field)) ? true : false);
-    return val;
-  };
-
-  // Elements that skipped on serialization process
-  const escapes: dynamic = { BUTTON: true };
-  const checkables: dynamic = { checkbox: true, radio: true };
-  onSet = (typeof onSet === 'function') ? onSet : (...args: any[]) => { };
-
-  type ObjectType = {} & dynamic;
-  type ReturnType = ObjectType | ObjectType[];
-
-  const $object: ReturnType = (function walker(el: Element | HTMLCollection, $obj: ReturnType): ReturnType {
-    if (el instanceof HTMLCollection) {
-      forEach([].slice.call(el), child => walker(child, $obj));
-      return $obj;
-    }
-
-    const $$obj = $obj as ObjectType;
-
-    // Handling builds => e-build
-    // Checking for e-build property
-    const attrBuild = findAttribute(el, ['e-build', 'e-build:array']);
-    if (attrBuild) {
-      const attrValue = attrBuild.value;
-      const attrName = attrBuild.name;
-      // Building the object
-      const $value = walker(el.children, {});
-
-      // Retrieving the value if it needs to be build as arry property
-      const isArray = attrName === 'e-build:array' || findAttribute(el, ['e-array']) != null;
-
-      // if it is not an array built type, just set the value
-      if (!isArray) {
-        $$obj[attrValue] = $value;
-      } else {
-        // Getting the value from if exists, otherwise set default value as empty array
-        const $oldValue: ObjectType[] = $$obj[attrValue] || [];
-
-        // Seeting the value
-        $$obj[attrValue] = $oldValue.concat($value);
-      }
-
-      onSet($$obj, attrValue, $value, el);
-      return $$obj;
-    }
-
-    // Handling the inputs in/out e-build
-    const attr = findAttribute(el, mNames);
-    // Checking if the element has the names on it
-    if (attr) {
-      const $$obj = $obj as ObjectType;
-      const attrName = attr.value;
-
-      // If is escapable, stop
-      if (escapes[el.tagName] === true) return $$obj;
-
-      // If it's is checkable and it's not selected, stop
-      if ((el instanceof HTMLInputElement) && (checkables[el.type] === true && el.checked === false))
-        return $$obj;
-
-      const $value = tryGetValue(el);
-
-      // Retrieving the value if it needs to be build as arry property
-      const isArray = findAttribute(el, ['e-array']) != null;
-      // if it is not an array built type, just set the value
-      if (!isArray) {
-        // Setting the value
-        $$obj[attrName] = $value;
-      } else {
-        // Getting the value from if exists, otherwise set default value as empty array
-        const $oldValue: unknown[] = $$obj[attrName] || [];
-        // Seeting the value
-        $$obj[attrName] = $oldValue.concat($value);
-      }
-
-      onSet($$obj, attrName, $value, el);
-    }
-
-    forEach([].slice.call(el.children), child => walker(child, $obj));
-
-    return $obj;
-  })(element!, {});
-
-  return $object;
 }
 
 export function toOwnerNode(node: Node) {

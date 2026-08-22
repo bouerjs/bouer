@@ -622,7 +622,7 @@ export default class ComponentHandler {
 
         // Executing the mixed scripts
         IoC.app(this.bouer).resolve(Evaluator)!
-          .execRaw((scriptContent || ''), component);
+          .eval((scriptContent || ''), component);
 
         createdEvent.emit();
 

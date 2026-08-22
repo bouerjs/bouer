@@ -12,7 +12,7 @@ export default class Evaluator {
     this.bouer = bouer;
   }
 
-  execRaw(code: string, context?: RenderContext) {
+  eval(code: string, context?: RenderContext) {
     // Executing the expression
     try {
       Function(code).call(context || this.bouer);

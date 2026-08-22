@@ -13,6 +13,9 @@ export default (function Prop() {
     set<T extends dynamic>(
       obj: T, propName: keyof T | string, descriptor: PropertyDescriptor
     ) {
+      const _obj = (obj as any);
+      // If the property is not defined
+      if (!(propName in _obj)) _obj[propName] = undefined;
       return Object.defineProperty(obj, propName, descriptor);
     },
 
@@ -39,10 +42,6 @@ export default (function Prop() {
     ) {
       const setter = (prop: string) => {
         const descriptor = this.descriptor(source, prop) as Reactive<any, Source>;
-        const mDst = (destination as any);
-        if (!(propName as any in destination))
-          mDst[propName] = undefined;
-
         this.set(destination, propName as any, descriptor);
       };
 

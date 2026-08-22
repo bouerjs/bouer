@@ -102,7 +102,7 @@ export default (function IoC() {
     return Evaluator.run({
       code: 'new __ctor0(' + paramsToProvide.join(',') + ')',
       data: data,
-      isReturn: true
+      returnable: true
     }) as S;
   };
 

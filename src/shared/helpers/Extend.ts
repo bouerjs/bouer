@@ -1,6 +1,6 @@
 import dynamic from '../../definitions/types/Dynamic';
 import Prop from './Prop';
-import { fnEmpty, forEach, isNull } from './Utils';
+import { $default, forEach, isNull } from './Utils';
 
 export default (function Extend() {
 
@@ -29,7 +29,7 @@ export default (function Extend() {
 
       if (hasOwnProp) {
         const mOut = out as any;
-        mOut[key] = fnEmpty(mOut[key]);
+        mOut[key] = $default(mOut[key]);
       }
     });
 
@@ -69,7 +69,7 @@ export default (function Extend() {
         const hasOwnProp = key in src;
         Prop.transfer(dst, src, key);
         if (hasOwnProp) {
-          src[key] = fnEmpty(src[key]);
+          src[key] = $default(src[key]);
         }
       });
     };
