@@ -18,6 +18,7 @@ import Evaluator from '../../Evaluator';
 import ReactiveEvent from '../../event/ReactiveEvent';
 import Reactive from '../../reactive/Reactive';
 import DataStore from '../../store/DataStore';
+import { CompilationHooks } from '../Compiler';
 
 export function $data(opitons: {
   node: Node,
@@ -26,7 +27,8 @@ export function $data(opitons: {
   delimiter: DelimiterHandler,
   evaluator: Evaluator,
   context: RenderContext,
-  data: object
+  data: object,
+  compilationHooks: CompilationHooks
 }) {
   const {
     node,
@@ -46,7 +48,7 @@ export function $data(opitons: {
   ownerNode.removeAttribute(node.nodeName);
 
   let inputData: dynamic = {};
-  const mData = Extend.obj(data, { $data: data });
+  const mData = Extend.obj(data, { $data: data, $scope: data });
   const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
     if (!(descriptor.propName in inputData))
       inputData[descriptor.propName] = undefined;
@@ -55,7 +57,7 @@ export function $data(opitons: {
 
   // If data value is empty gets the main scope value
   if (nodeValue === '')
-    inputData = Extend.obj(bouer.data);
+    inputData = Extend.obj(data);
   else {
     // Other wise, compiles the object provided
     const mInputData = evaluator.exec({
@@ -88,10 +90,15 @@ export function $data(opitons: {
     data: inputData
   });
 
+  // Signinng the element with it's data
+  IoC.app(bouer).resolve(DataStore)!.addNodeData(ownerNode, inputData);
+
   return compiler.compile({
     data: inputData,
     el: ownerNode,
     context: context,
+    afterCompile: opitons.compilationHooks.afterCompile,
+    beforeCompile: opitons.compilationHooks.beforeCompile
   });
 }
 
@@ -154,7 +161,8 @@ export function $wait(options: {
   bouer: Bouer,
   compiler: Compiler,
   delimiter: DelimiterHandler,
-  context: RenderContext
+  context: RenderContext,
+  compilationHooks: CompilationHooks
 }) {
   const { node, bouer, delimiter, compiler, context } = options;
   const ownerNode = toOwnerNode(node);
@@ -183,6 +191,8 @@ export function $wait(options: {
           context: mWait.context,
           data: mWait.data!
         }),
+        beforeCompile: options.compilationHooks.beforeCompile,
+        afterCompile: options.compilationHooks.afterCompile,
       });
     });
 
