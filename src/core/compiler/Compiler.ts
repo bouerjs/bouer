@@ -150,7 +150,10 @@ export default class Compiler {
 
         // wait-data="..." directive
         if (Constants.wait in attributes)
-          return directive.wait(findDirective(currentNode, Constants.wait)!);
+          return directive.wait(findDirective(currentNode, Constants.wait)!, {
+            beforeCompile: beforeCompile as any,
+            afterCompile: afterCompile as any
+          });
 
         // e-form directive
         if (Constants.form.property in attributes)
@@ -208,7 +211,10 @@ export default class Compiler {
         // e-req="..." | e-req:[id]="..."  directive
         let reqNode: Attr | null = null;
         if ((reqNode = findDirective(currentNode, Constants.req)))
-          return directive.req(reqNode, scopeData);
+          return directive.req(reqNode, scopeData, {
+            beforeCompile: beforeCompile as any,
+            afterCompile: afterCompile as any
+          });
 
         // data="..." | data:[id]="..." directive
         let dataNode: Attr | null = null;
