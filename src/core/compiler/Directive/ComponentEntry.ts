@@ -10,6 +10,7 @@ import Logger from '../../../shared/logger/Logger';
 import Binder from '../../binder/Binder';
 import ComponentHandler from '../../component/ComponentHandler';
 import DelimiterHandler from '../../DelimiterHandler';
+import { CompilationHooks } from '../Compiler';
 
 export function $entry(opitons: {
   node: Node,
@@ -49,7 +50,8 @@ export function $put(opitons: {
   binder: Binder,
   delimiter: DelimiterHandler,
   context: RenderContext,
-  data: object
+  data: object,
+  compilationHooks: CompilationHooks
 }) {
   const {
     node,
@@ -75,7 +77,7 @@ export function $put(opitons: {
     node: node,
     fields: [{ expression: nodeValue, field: nodeValue, pipes: [] }],
     context: context,
-    isReplaceProperty: false,
+    replaceable: false,
     onUpdate: () => execute()
   });
 
@@ -94,7 +96,10 @@ export function $put(opitons: {
       .order({
         componentElement: componentElement,
         context: context,
-        data: data
+        data: data,
+        onComponentLoad: () => {},
+        onComponentFail: () => {},
+        compilationHooks: opitons.compilationHooks
       });
   })();
 }
