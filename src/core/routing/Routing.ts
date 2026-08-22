@@ -106,8 +106,7 @@ export default class Routing {
     if (!page && route.endsWith('.html')) return;
 
     const componentElement = createEl(page.name!, el => {
-      // Inherit the data scope by default
-      el.setAttribute('data', isObject(options!.data) ? JSON.stringify(options!.data) : '$data');
+      el.setAttribute('data', isObject(options!.data) ? '$navigate' : '$data');
     }).appendTo(this.routeView!)
       .build();
 
@@ -122,10 +121,11 @@ export default class Routing {
       .order({
         componentElement: componentElement,
         context: this.bouer,
-        data: this.bouer.data,
-        onComponent: () => {
+        data: options!.data!,
+        onComponentLoad: () => {
           this.markActiveAnchorsWithRoute(routeToSet);
-        }
+        },
+        onComponentFail: () => {}
       });
   }
 
