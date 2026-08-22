@@ -33,7 +33,6 @@ import Task from '../shared/helpers/Task';
 import {
   createEl, DOM,
   forEach,
-  htmlToJsObj,
   ifNullReturn,
   ifNullStop,
   isNull,
@@ -44,6 +43,8 @@ import {
 import Logger from '../shared/logger/Logger';
 
 import version from './version';
+import SchemaBuilder from '../core/form/SchemaBuilder';
+import FormHandler from '../core/form/FormHandler';
 
 export default class Bouer<
   Data extends {} = {},
@@ -461,32 +462,6 @@ export default class Bouer<
   }
 
   /**
-   * Compiles a `HTML snippet` to an `Object Literal`
-   * @param {string} input the input element
-   * @param {object?} options the options of the compilation
-   * @param {Function?} onSet a function that should be fired when a value is setted
-   * @returns the Object Compiled from the HTML
-   */
-  static toJsObj(
-    input: string | HTMLElement,
-    options?: {
-      /**
-       * attributes that tells the compiler to lookup to the element, e.g: [name],[data-name].
-       * * Note: The definition order matters.
-       */
-      names?: string,
-      /**
-       * attributes that tells the compiler where it going to get the value, e.g: [value],[data-value].
-       * * Note: The definition order matters.
-       */
-      values?: string
-    },
-    onSet?: (builtObjectLayer: object, propName: string, value: any, element: Element) => void
-  ) {
-    return htmlToJsObj(input, options, onSet);
-  }
-
-  /**
    * Initialize create application
    * @param {string} selector the selector of the element to be controlled by the instance
    */
@@ -507,6 +482,8 @@ export default class Bouer<
     const routing = IoC.app(this).resolve(Routing)!;
     const skeleton = IoC.app(this).resolve(Skeleton)!;
     const compiler = IoC.app(this).resolve(Compiler)!;
+    const dataStore = IoC.app(this).resolve(DataStore)!;
+
 
     forEach([options.beforeLoad, options.loaded, options.beforeDestroy, options.destroyed], hook => {
       if (typeof hook !== 'function') return;
@@ -537,7 +514,7 @@ export default class Bouer<
       el: this.el,
       data: this.data,
       context: this,
-      onDone: () => eventHandler.emit({
+      onComponentLoad: () => eventHandler.emit({
         eventName: 'loaded',
         attachedNode: el
       })
@@ -553,6 +530,8 @@ export default class Bouer<
     Task.run(stopTask => {
       if (this.isDestroyed) return stopTask();
       if (el.isConnected) return;
+
+      dataStore.unlinkNodeData()
 
       eventHandler.emit({ eventName: 'beforeDestroy', attachedNode: el });
       this.destroy();
@@ -587,11 +566,10 @@ export default class Bouer<
    * Compiles a `HTML snippet` to an `Object Literal`
    * @param {string} input the input element
    * @param {object?} options the options of the compilation
-   * @param {Function?} onSet a function that should be fired when a value is setted
    * @returns the Object Compiled from the HTML
    */
   toJsObj(
-    input: string | HTMLElement,
+    input: string | Element,
     options?: {
       /**
        * attributes that tells the compiler to lookup to the element, e.g: [name],[data-name].
@@ -602,11 +580,18 @@ export default class Bouer<
        * attributes that tells the compiler where it going to get the value, e.g: [value],[data-value].
        * * Note: The definition order matters.
        */
-      values?: string
-    },
-    onSet?: (builtObjectLayer: object, propName: string, value: any, element: Element) => void
+      values?: string,
+    }
   ) {
-    return htmlToJsObj(input, options, onSet);
+
+    const formHandler = new FormHandler({}, Extend.obj({}, { type: 'STATIC' }, options as any)).init({
+      bouer: this,
+      context: this,
+      data: this.data,
+      element: input,
+    });
+
+    return formHandler.toObject();
   }
 
   /**
@@ -773,7 +758,7 @@ export default class Bouer<
         el: options.el,
         data: options.data,
         context: options.context || this,
-        onDone: options.onDone
+        onComponentLoad: options.onDone
       });
   }
 
