@@ -16,7 +16,7 @@ import Middleware from '../../middleware/Middleware';
 import Reactive from '../../reactive/Reactive';
 import Skeleton from '../../Skeleton';
 import DataStore from '../../store/DataStore';
-import Compiler from '../Compiler';
+import Compiler, { CompilationHooks } from '../Compiler';
 
 export function $req(opitons: {
   node: Node,
@@ -25,8 +25,9 @@ export function $req(opitons: {
   delimiter: DelimiterHandler,
   context: RenderContext,
   eventHandler: EventHandler,
+  compilationHooks: CompilationHooks,
   binder: Binder,
-  data: object
+  data: object,
 }) {
   const {
     node,
@@ -83,7 +84,7 @@ export function $req(opitons: {
       node: node,
       fields: delimiters,
       context: context,
-      isReplaceProperty: false,
+      replaceable: false,
       onUpdate: () => onUpdate()
     });
 
@@ -215,7 +216,9 @@ export function $req(opitons: {
         return compiler.compile({
           el: ownerNode,
           data: Reactive.transform({ context: context, data: data }),
-          context: context
+          context: context,
+          beforeCompile: opitons.compilationHooks.beforeCompile,
+          afterCompile: opitons.compilationHooks.afterCompile
         });
       }
 
@@ -234,7 +237,9 @@ export function $req(opitons: {
         return compiler.compile({
           el: ownerNode,
           data: mData,
-          context: context
+          context: context,
+          beforeCompile: opitons.compilationHooks.beforeCompile,
+          afterCompile: opitons.compilationHooks.afterCompile
         });
       }
     };
