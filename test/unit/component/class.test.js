@@ -43,13 +43,11 @@ describe('Customize Component (extends)', () => {
       el: element,
     });
 
-    const fn = console.log;
-    console.log = jest.fn();
+    const logger = jest.spyOn(console, 'log');
     const btn = element.children[0];
     btn.click();
 
-    expect(console.log.mock.calls[0][0]).toBe('Clicked');
-    console.log = fn;
+    expect(logger.mock.calls[0][0]).toBe('Clicked');
   });
 
   it('Component properties are reactive if used the Ref class', () => {

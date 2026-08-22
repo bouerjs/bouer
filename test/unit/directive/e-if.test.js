@@ -1,7 +1,6 @@
 import {
   Bouer,
   Compiler,
-  sleep,
   toHtml,
   IoC
 } from '../../index';
@@ -170,7 +169,7 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
     });
   });
 
-  it('Re-render the "if-chaining" elements when the value changes', async () => {
+  it('Re-render the "if-chaining" elements when the value changes', () => {
     const context = Bouer.create({
       data: {
         value: 0
@@ -184,8 +183,6 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
       context: context,
       el: element
     });
-
-    await sleep(1);
 
     const blocks = [
       {
@@ -203,9 +200,8 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
     ];
     for (let i = 0; i < blocks.length; i++) {
       context.data.value = i;
-      await sleep(1);
-
       const blockValue = blocks[i].content;
+
       expect(element.innerHTML).toContain(blockValue);
       expect(blocks[i].directive in element.attributes).toBe(false);
     }

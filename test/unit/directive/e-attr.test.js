@@ -1,7 +1,6 @@
 import {
   Bouer,
   Compiler,
-  sleep,
   toHtml,
   IoC
 } from '../../index';
@@ -36,7 +35,7 @@ describe('When element is compiled with "e-[attr]" directive', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: el => {
+        onComponentLoad: el => {
           expect(el.getAttribute('title')).toBe('value-rendered');
         }
       });
@@ -49,7 +48,7 @@ describe('When element is compiled with "e-[attr]" directive', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: el => {
+        onComponentLoad: el => {
           expect(el.hasAttribute('e-title')).toBe(false);
         }
       });
@@ -58,7 +57,7 @@ describe('When element is compiled with "e-[attr]" directive', () => {
 
   // Object literal rendering
   describe('On e-class render with Object Literal', () => {
-    it('Creates `class` attribute, add the className and removes if the value change', async () => {
+    it('Creates `class` attribute, add the className and removes if the value change', () => {
       const htmlSnippet = '<h4 e-class="{ \'visible\': isVisible  }">Value</h4>';
       const element = toHtml(htmlSnippet);
 
@@ -66,19 +65,16 @@ describe('When element is compiled with "e-[attr]" directive', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: el => {
+        onComponentLoad: el => {
           expect(el.getAttribute('class')).toBe('visible');
         }
       });
 
-      await sleep(1);
       context.data.isVisible = false;
-
-      await sleep(1);
       expect('class' in element.attributes).toBe(false);
     });
 
-    it('Adds to `classList` and removes if the value change', async () => {
+    it('Adds to `classList` and removes if the value change', () => {
       const htmlSnippet = '<h4 class="green" e-class="{ \'visible\': isVisible  }">Value</h4>';
       const element = toHtml(htmlSnippet);
 
@@ -86,16 +82,14 @@ describe('When element is compiled with "e-[attr]" directive', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: el => {
+        onComponentLoad: el => {
           expect(el.classList.contains('green')).toBe(true);
           expect(el.classList.contains('visible')).toBe(true);
         }
       });
 
-      await sleep(1);
       context.data.isVisible = false;
 
-      await sleep(1);
       expect(element.classList.contains('green')).toBe(true);
       expect(element.classList.contains('visible')).toBe(false);
     });
@@ -108,7 +102,7 @@ describe('When element is compiled with "e-[attr]" directive', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: el => {
+        onComponentLoad: el => {
           expect(el.hasAttribute('e-class')).toBe(false);
         }
       });
@@ -119,14 +113,14 @@ describe('When element is compiled with "e-[attr]" directive', () => {
   describe('On e-class render with reactive object', () => {
     const htmlSnippet = '<h4 e-class="classList">Value</h4>';
 
-    it('Creates "class" attribute, add the classNames and remove each class on change', async () => {
+    it('Creates "class" attribute, add the classNames and remove each class on change', () => {
       const element = toHtml(htmlSnippet);
 
       compiler.compile({
         data: context.data,
         context: context,
         el: element,
-        onDone: el => {
+        onComponentLoad: el => {
           expect(el.hasAttribute('class')).toBe(true);
         }
       });
@@ -141,7 +135,6 @@ describe('When element is compiled with "e-[attr]" directive', () => {
       // Removes classes one by one and check if it was really removed
       for (const cls of classes) {
         context.data.classList[cls] = false;
-        await sleep(1);
         expect(element.classList.contains(cls)).toBe(false);
       }
 
@@ -156,7 +149,7 @@ describe('When element is compiled with "e-[attr]" directive', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: el => {
+        onComponentLoad: el => {
           expect(el.hasAttribute('e-class')).toBe(false);
         }
       });

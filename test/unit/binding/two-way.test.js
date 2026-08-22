@@ -33,7 +33,7 @@ describe('When using a "e-bind" for two way data binding ', () => {
       });
     });
 
-    it('Binds "checked" property when using <input type="checkbox"> element', async () => {
+    it('Binds "checked" property when using <input type="checkbox"> element', () => {
       const htmlSnippet = '<input type="checkbox" e-bind="value"/>';
       const element = toHtml(htmlSnippet);
       const context = Bouer.create({

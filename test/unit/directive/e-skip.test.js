@@ -1,7 +1,6 @@
 import {
   Bouer,
   Compiler,
-  sleep,
   toHtml,
   IoC
 } from '../../index';
@@ -21,19 +20,17 @@ describe('When element is compiled with "e-skip" directive', () => {
 
   const htmlSnippet = '<h4 e-skip>{{ value }}</h4>';
 
-  it('Ignore the element compilation', async () => {
+  it('Ignore the element compilation', () => {
     const element = toHtml(htmlSnippet);
 
     compiler.compile({
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.textContent).toContain('{{ value }}');
+        expect(element.textContent).toContain('{{ value }}');
       }
     });
-
-    await sleep(1);
-    expect(element.textContent).toContain('{{ value }}');
   });
 });

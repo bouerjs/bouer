@@ -40,7 +40,7 @@ describe('Standard events', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: el => {
+        onComponentLoad: el => {
           el.click();
           el.click();
           expect(click).toHaveBeenCalledTimes(2);

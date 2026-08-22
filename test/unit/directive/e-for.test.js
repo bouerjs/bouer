@@ -1,7 +1,6 @@
 import {
   Bouer,
   Compiler,
-  sleep,
   toHtml,
   IoC
 } from '../../index';
@@ -31,7 +30,7 @@ describe('When element is compiled with "e-for" directive', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: el => {
+        onComponentLoad: el => {
           for (let i = 0; i < el.children.length; i++) {
             const child = el.children[i];
             const todo = context.data.todos[i];
@@ -43,7 +42,7 @@ describe('When element is compiled with "e-for" directive', () => {
   });
 
   describe('When compiled with "where" filters', () => {
-    it('Renders all the items according to "where:property"', async () => {
+    it('Renders all the items according to "where:property"', () => {
       const htmlSnippet = `
       <ul class="container">
         <li e-for="todo of todos | where:search">{{ todo }}</li>
@@ -72,14 +71,11 @@ describe('When element is compiled with "e-for" directive', () => {
       }
 
       test();
-
       data.search = 'ea';
-      await sleep(1);
-
       test();
     });
 
-    it('Renders all the items according to "where:function"', async () => {
+    it('Renders all the items according to "where:function"', () => {
       const htmlSnippet = `
       <ul class="container">
         <li e-for="todo of todos | where:fnSearch">{{ todo }}</li>
@@ -111,14 +107,11 @@ describe('When element is compiled with "e-for" directive', () => {
       }
 
       test();
-
       data.search = 'ea';
-
-      await sleep(1);
       test();
     });
 
-    it('Renders all the items according to "where:property:name"', async () => {
+    it('Renders all the items according to "where:property:name"', () => {
       const htmlSnippet = `
       <ul class="container">
         <li e-for="todo of todosObj | where:search:name">{{ todo.name }}</li>
@@ -170,8 +163,6 @@ describe('When element is compiled with "e-for" directive', () => {
       test();
 
       data.search = 'ea';
-      await sleep(1);
-
       test();
     });
   });
@@ -186,7 +177,7 @@ describe('When element is compiled with "e-for" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.children[0].hasAttribute('e-for')).toBe(false);
       }
     });

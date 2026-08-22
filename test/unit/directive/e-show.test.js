@@ -1,7 +1,6 @@
 import {
   Bouer,
   Compiler,
-  sleep,
   toHtml,
   IoC
 } from '../../index';
@@ -31,7 +30,7 @@ describe('When element is compiled with "e-show" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         const child = el.children[0];
         expect(child.classList.contains('style'));
         expect(child.getAttribute('style')).toBe('display: none;');
@@ -39,20 +38,19 @@ describe('When element is compiled with "e-show" directive', () => {
     });
   });
 
-  it('Removes "display:none" from style attribute value', async () => {
+  it('Removes "display:none" from style attribute value', () => {
     const element = toHtml(htmlSnippet);
 
     compiler.compile({
       data: context.data,
       context: context,
-      el: element
+      el: element,
+      onComponentLoad: el => {
+        context.data.see = true;
+        const child = element.children[0];
+        expect(child.getAttribute('style')).not.toBe('display: none;');
+      }
     });
-
-    await sleep(1);
-    context.data.see = true;
-
-    const child = element.children[0];
-    expect(child.getAttribute('style')).not.toBe('display: none;');
   });
 
   it('Removes the directive after compilation', () => {
@@ -62,7 +60,7 @@ describe('When element is compiled with "e-show" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         const child = el.children[0];
         expect(child.hasAttribute('e-show')).toBe(false);
       }

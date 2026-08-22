@@ -3,7 +3,6 @@ import {
   Compiler,
   IoC,
   toHtml,
-  sleep
 } from '../../index';
 
 import {
@@ -29,7 +28,7 @@ class Person extends Component {
 }
 
 describe('When "set" method from Component is called with no target object', () => {
-  it('Adds all the properties the instance data', async () => {
+  it('Adds all the properties the instance data', () => {
     const context = Bouer.create({
       components: [Person]
     });
@@ -46,22 +45,21 @@ describe('When "set" method from Component is called with no target object', () 
       data: {},
       context: context,
       el: element,
+      onComponentLoad: () => {
+        const person = context.$components.viewById('person');
+
+        person.set({
+          age: 12
+        });
+
+        expect('age' in person.data).toBe(true);
+      }
     });
-
-    await sleep(1);
-
-    const person = context.$components.viewById('person');
-
-    person.set({
-      age: 12
-    });
-
-    expect('age' in person.data).toBe(true);
   });
 });
 
 describe('When "set" method from Component is called with target object', () => {
-  it('Adds all the properties the instance data', async () => {
+  it('Adds all the properties the instance data', () => {
     const context = Bouer.create({
       components: [Person]
     });
@@ -78,17 +76,16 @@ describe('When "set" method from Component is called with target object', () => 
       data: {},
       context: context,
       el: element,
+      onComponentLoad: () => {
+        const person = context.$components.viewById('person');
+
+        person.set({
+          code: 'AO'
+        }, person.data.address);
+
+        expect('code' in person.data).toBe(false);
+        expect('code' in person.data.address).toBe(true);
+      }
     });
-
-    await sleep(1);
-
-    const person = context.$components.viewById('person');
-
-    person.set({
-      code: 'AO'
-    }, person.data.address);
-
-    expect('code' in person.data).toBe(false);
-    expect('code' in person.data.address).toBe(true);
   });
 });

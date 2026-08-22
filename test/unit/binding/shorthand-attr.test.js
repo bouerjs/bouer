@@ -27,7 +27,7 @@ describe('When element is compiled with "{attr}" directive (ShortHand Directive)
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.getAttribute('title')).toBe('value-rendered');
       }
     });
@@ -40,7 +40,7 @@ describe('When element is compiled with "{attr}" directive (ShortHand Directive)
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.hasAttribute('{title}')).toBe(false);
       }
     });

@@ -1,7 +1,6 @@
 import {
   Bouer,
   Compiler,
-  sleep,
   toHtml,
   IoC
 } from '../../index';
@@ -11,7 +10,7 @@ describe('When element is compiled with "wait-data" directive', () => {
     const context = Bouer.create();
     const compiler = IoC.app(context).resolve(Compiler);
 
-    it('Keeps the origin state of the element unitil a data is provided', async () => {
+    it('Keeps the origin state of the element unitil a data is provided', () => {
       const element = toHtml(`
       <div wait-data="wait-key">
         <h4> {{ value }} </h4>
@@ -20,17 +19,17 @@ describe('When element is compiled with "wait-data" directive', () => {
       compiler.compile({
         data: context.data,
         context: context,
-        el: element
-      });
+        el: element,
+        onComponentLoad: el => {
+          expect(element.innerHTML).toContain('{{ value }}');
 
-      await sleep(1);
-      expect(element.innerHTML).toContain('{{ value }}');
+          context.$wait.set('wait-key', {
+            value: 'waited value'
+          });
 
-      await sleep(1);
-      context.$wait.set('wait-key', {
-        value: 'waited value'
+          expect(element.innerHTML).toContain('waited value');
+        }
       });
-      expect(element.innerHTML).toContain('waited value');
     });
   });
 
@@ -38,7 +37,7 @@ describe('When element is compiled with "wait-data" directive', () => {
     const context = Bouer.create();
     const compiler = IoC.app(context).resolve(Compiler);
 
-    it('Compiles the elements right away', async () => {
+    it('Compiles the elements right away', () => {
       const element = toHtml(`
       <div wait-data="wait-key">
         <h4> {{ value }} </h4>
@@ -51,12 +50,12 @@ describe('When element is compiled with "wait-data" directive', () => {
       compiler.compile({
         data: context.data,
         context: context,
-        el: element
+        el: element,
+        onComponentLoad: el => {
+          expect(element.innerHTML).not.toContain('{{ value }}');
+          expect(element.innerHTML).toContain('waited value');
+        }
       });
-
-      await sleep(1);
-      expect(element.innerHTML).not.toContain('{{ value }}');
-      expect(element.innerHTML).toContain('waited value');
     });
   });
 });

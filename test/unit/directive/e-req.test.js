@@ -50,12 +50,14 @@ describe('When element is compiled with "e-req" directive', () => {
       compiler.compile({
         data: context.data,
         context: context,
-        el: element
+        el: element,
+        onComponentLoad: el => {
+          expect(requested).toHaveBeenCalled();
+        }
       });
 
       await sleep(1);
 
-      expect(requested).toHaveBeenCalled();
       expect(responded).toHaveBeenCalled();
       expect(done).toHaveBeenCalled();
 
@@ -93,12 +95,14 @@ describe('When element is compiled with "e-req" directive', () => {
       compiler.compile({
         data: context.data,
         context: context,
-        el: element
+        el: element,
+        onComponentLoad: el => {
+          expect(requested).toHaveBeenCalled();
+        }
       });
 
       await sleep(1);
 
-      expect(requested).toHaveBeenCalled();
       expect(responded).toHaveBeenCalled();
       expect(done).toHaveBeenCalled();
 
@@ -134,12 +138,14 @@ describe('When element is compiled with "e-req" directive', () => {
       compiler.compile({
         data: context.data,
         context: context,
-        el: element
+        el: element,
+        onComponentLoad: el => {
+          expect(requested).toHaveBeenCalled();
+        }
       });
 
       await sleep(1);
 
-      expect(requested).toHaveBeenCalled();
       expect(responded).not.toHaveBeenCalled();
       expect(failed).toHaveBeenCalled();
       expect(done).toHaveBeenCalled();
@@ -193,12 +199,14 @@ describe('When element is compiled with "e-req" directive', () => {
       compiler.compile({
         data: context.data,
         context: context,
-        el: element
+        el: element,
+        onComponentLoad: el => {
+          expect(requested).toHaveBeenCalled();
+        }
       });
 
       await sleep(1);
 
-      expect(requested).toHaveBeenCalled();
       expect(responded).toHaveBeenCalled();
       expect(done).toHaveBeenCalled();
 
@@ -237,12 +245,14 @@ describe('When element is compiled with "e-req" directive', () => {
       compiler.compile({
         data: context.data,
         context: context,
-        el: element
+        el: element,
+        onComponentLoad: el => {
+          expect(requested).toHaveBeenCalled();
+        }
       });
 
       await sleep(1);
 
-      expect(requested).toHaveBeenCalled();
       expect(responded).toHaveBeenCalled();
       expect(done).toHaveBeenCalled();
 
@@ -279,12 +289,14 @@ describe('When element is compiled with "e-req" directive', () => {
       compiler.compile({
         data: context.data,
         context: context,
-        el: element
+        el: element,
+        onComponentLoad: el => {
+          expect(requested).toHaveBeenCalled();
+        }
       });
 
       await sleep(1);
 
-      expect(requested).toHaveBeenCalled();
       expect(responded).not.toHaveBeenCalled();
       expect(failed).toHaveBeenCalled();
       expect(done).toHaveBeenCalled();

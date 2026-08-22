@@ -54,7 +54,7 @@ describe('When using a computed property', () => {
           data: context.data,
           context: context,
           el: element,
-          onDone: el => {
+          onComponentLoad: el => {
             expect(el.innerHTML).toContain('Printed');
           }
         });
@@ -68,7 +68,7 @@ describe('When using a computed property', () => {
           data: context.data,
           context: context,
           el: element,
-          onDone: compiledEl => {
+          onComponentLoad: compiledEl => {
             context.data._valueGet = 'new-value-printed';
             expect(compiledEl.innerHTML).toContain('Printed');
           }
@@ -85,7 +85,7 @@ describe('When using a computed property', () => {
           data: context.data,
           context: context,
           el: element,
-          onDone: compiledEl => {
+          onComponentLoad: compiledEl => {
             expect(compiledEl.innerHTML).toContain('Printed');
           }
         });
@@ -99,7 +99,7 @@ describe('When using a computed property', () => {
           data: context.data,
           context: context,
           el: element,
-          onDone: compiledEl => {
+          onComponentLoad: compiledEl => {
             context.data._valuePartialGet = 'new-value-printed';
             expect(compiledEl.innerHTML).toContain('Printed');
           }
@@ -116,7 +116,7 @@ describe('When using a computed property', () => {
           data: context.data,
           context: context,
           el: element,
-          onDone: compiledEl => {
+          onComponentLoad: compiledEl => {
             context.data._valuePartialSet = 'new-value-printed';
             expect(compiledEl.innerHTML).toContain('new-value-printed');
           }
@@ -133,7 +133,7 @@ describe('When using a computed property', () => {
           data: context.data,
           context: context,
           el: element,
-          onDone: compiledEl => {
+          onComponentLoad: compiledEl => {
             expect(compiledEl.innerHTML).toContain('Printed');
           }
         });
@@ -147,13 +147,41 @@ describe('When using a computed property', () => {
           data: context.data,
           context: context,
           el: element,
-          onDone: compiledEl => {
+          onComponentLoad: compiledEl => {
             context.data._valueFull = 'new-value-printed';
             expect(compiledEl.innerHTML).toContain('new-value-printed');
           }
         });
       });
     });
+
+    describe('When using a invalid definition', () => {
+      it('Stops the the rendering and throwing an error', () => {
+
+        const htmlSnippet = '<h1>{{ _valueWithNull }}</h1>';
+        const element = toHtml(htmlSnippet);
+
+        const logger = jest.spyOn(console, 'error');
+
+        const context = Bouer.create({
+          data: {
+            value: 'Printed',
+            _valueWithNull: function $computed() {
+              return null;
+            }
+          }
+        });
+
+        compiler.compile({
+          data: context.data,
+          context: context,
+          el: element,
+          onComponentLoad: () => {
+            expect(logger.mock.calls[0][1].message).toBe('Invalid value used as return in property _valueWithNull: “function $computed(){...}” | “new Computed(...)”.');
+          }
+        });
+      })
+    })
   });
 
   describe('When using class approach', () => {
@@ -203,7 +231,7 @@ describe('When using a computed property', () => {
           data: context.data,
           context: context,
           el: element,
-          onDone: el => {
+          onComponentLoad: el => {
             expect(el.innerHTML).toContain('Printed');
           }
         });
@@ -217,7 +245,7 @@ describe('When using a computed property', () => {
           data: context.data,
           context: context,
           el: element,
-          onDone: compiledEl => {
+          onComponentLoad: compiledEl => {
             context.data._valueFn = 'new-value-printed';
             expect(compiledEl.innerHTML).toContain('Printed');
           }
@@ -234,7 +262,7 @@ describe('When using a computed property', () => {
           data: context.data,
           context: context,
           el: element,
-          onDone: compiledEl => {
+          onComponentLoad: compiledEl => {
             expect(compiledEl.innerHTML).toContain('Printed');
           }
         });
@@ -248,7 +276,7 @@ describe('When using a computed property', () => {
           data: context.data,
           context: context,
           el: element,
-          onDone: compiledEl => {
+          onComponentLoad: compiledEl => {
             context.data._valueObj = 'new-value-printed';
             expect(compiledEl.innerHTML).toContain('new-value-printed');
           }
@@ -265,7 +293,7 @@ describe('When using a computed property', () => {
           data: context.data,
           context: context,
           el: element,
-          onDone: compiledEl => {
+          onComponentLoad: compiledEl => {
             expect(compiledEl.innerHTML).toContain('Printed');
           }
         });
@@ -279,7 +307,7 @@ describe('When using a computed property', () => {
           data: context.data,
           context: context,
           el: element,
-          onDone: compiledEl => {
+          onComponentLoad: compiledEl => {
             context.data._valueFnGetSet = 'new-value-printed';
             expect(compiledEl.innerHTML).toContain('new-value-printed');
           }

@@ -23,7 +23,7 @@ describe('When element is compiled with "e-def" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect('prop' in context.data).toBe(true);
       }
     });
@@ -36,7 +36,7 @@ describe('When element is compiled with "e-def" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: _ => {
+      onComponentLoad: _ => {
         expect(context.data.prop).toEqual('new');
       }
     });
@@ -49,7 +49,7 @@ describe('When element is compiled with "e-def" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.hasAttribute('e-def')).toBe(false);
       }
     });
