@@ -44,7 +44,7 @@ export default class Computed<Type, Context = RenderContext | any> {
       : entryValue;
 
     if (isNull(value))
-      throw new Error('Invalid value used as return in “function $computed(){...}” | “new Computed(...)”.');
+      throw new Error('Invalid value used as return in property '+ this.propName +': “function $computed(){...}” | “new Computed(...)”.');
 
     const isExplicit = isObject(value) && (('get' in value) || ('set' in value));
 
