@@ -17,6 +17,7 @@ import {
   DOM,
   findDirective,
   fnCallResolver,
+  $default,
   forEach,
   ifNullReturn,
   isComputed,
@@ -33,7 +34,7 @@ import {
   where
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
-import Compiler from '../compiler/Compiler';
+import Compiler, { CompilationHooks } from '../compiler/Compiler';
 import DelimiterHandler from '../DelimiterHandler';
 import Evaluator from '../Evaluator';
 import EventHandler from '../event/EventHandler';
@@ -41,6 +42,7 @@ import ReactiveEvent from '../event/ReactiveEvent';
 import Reactive from '../reactive/Reactive';
 import Ref from '../reactive/Ref';
 import Routing from '../routing/Routing';
+import DataStore from '../store/DataStore';
 import Component from './Component';
 
 type Class = Constructor<any>;
@@ -200,13 +202,21 @@ export default class ComponentHandler {
     componentElement: Element,
     data: object,
     context: RenderContext,
-    onComponent?: (component: Component) => void
+    directivesToIgnore?: string[],
+    beforeComponentLoad?: (element: Element) => void
+    onComponentLoad: (component: Component) => void,
+    onComponentFail: (element: Element) => void,
+    compilationHooks?: CompilationHooks
   }) {
-    const { componentElement, data, context, onComponent } = options;
+    const { componentElement, data, context, onComponentLoad } = options;
     const $name = toLower(componentElement.nodeName);
     const component = this.components[$name];
+    const onComponentFail = options.onComponentFail || $default;
 
-    if (!component) return Logger.error('No component with name “' + $name + '” registered.');
+    if (!component) {
+      onComponentFail(componentElement);
+      return Logger.error('No component with name “' + $name + '” registered.');
+    }
 
     const mainExecutionWrapper = () => {
 
@@ -233,11 +243,20 @@ export default class ComponentHandler {
       const isGroupableComponent = !component.template && !component.path;
 
       if (component.template || isGroupableComponent)
-        return this.insert(componentElement, resolveComponentInstance(component)!, data, onComponent);
+        return this.insert({
+          componentElement: componentElement,
+          component: resolveComponentInstance(component)!,
+          directiveToIgnore: options.directivesToIgnore,
+          data: data,
+          onComponentLoad: onComponentLoad,
+          onComponentFail: onComponentFail,
+          compilationHooks: options.compilationHooks
+        });
 
-      if (!component.path)
-        return Logger.error('Expected a valid value in `path` or `template` got invalid value at “' +
-          $name + '” component.');
+      if (!component.path) {
+        onComponentFail(componentElement);
+        return Logger.error('Expected a valid value in `path` or `template` got invalid value at “' + $name + '” component.');
+      }
 
       this.addEvent('requested', componentElement, component, this.bouer)
         .emit();
@@ -246,7 +265,15 @@ export default class ComponentHandler {
       this.request(component.path, {
         success: content => {
           (component as any).template = content;
-          this.insert(componentElement, resolveComponentInstance(component)!, data, onComponent);
+          this.insert({
+            componentElement: componentElement,
+            component: resolveComponentInstance(component)!,
+            data: data,
+            onComponentLoad: onComponentLoad,
+            onComponentFail: onComponentFail,
+            directiveToIgnore: options.directivesToIgnore,
+            compilationHooks: options.compilationHooks
+          });
         },
         fail: (error) => {
           Logger.error('Failed to request <' + $name + '/> component with path “' +
@@ -254,6 +281,7 @@ export default class ComponentHandler {
           Logger.error(buildError(error));
 
           this.addEvent('failed', componentElement, component, this.bouer).emit();
+          onComponentFail(componentElement);
         }
       });
     };
@@ -279,7 +307,7 @@ export default class ComponentHandler {
       });
 
       const blockedEvent = this.addEvent('blocked', componentElement, component, this.bouer);
-      const emitter = () => blockedEvent.emit({
+      const emitFailEvent = () => blockedEvent.emit({
         detail: {
           component: component.name,
           message: 'Component “' + component.name + '” blocked by restriction(s)',
@@ -291,10 +319,12 @@ export default class ComponentHandler {
         .then(restrictionValues => {
           if (restrictionValues.every(value => value == true))
             mainExecutionWrapper();
-          else
-            emitter();
+          else {
+            onComponentFail(componentElement);
+            emitFailEvent();
+          }
         })
-        .catch(() => emitter());
+        .catch(() => emitFailEvent());
     }
 
     return mainExecutionWrapper();
@@ -350,28 +380,45 @@ export default class ComponentHandler {
     return { emit: (init?: CustomEventInit) => emitter(init) };
   }
 
-  insert(
+  insert(options: {
     componentElement: Element,
     component: Component,
     data: object,
-    onComponent?: (component: Component) => void
-  ) {
+    onComponentLoad: (component: Component) => void,
+    onComponentFail: (element: Element) => void
+    directiveToIgnore?: string[],
+    compilationHooks?: CompilationHooks
+  }) {
+    const componentElement = options.componentElement;
+    const component = options.component;
+    const data = options.data;
+    const onComponentLoad = options.onComponentLoad || $default;
+    const onComponentFail = options.onComponentFail || $default;
+    const directivesToIgnore = options.directiveToIgnore;
+
+    const beforeCompile = options.compilationHooks?.beforeCompile || $default;
+    const afterCompile = options.compilationHooks?.afterCompile || $default;
+
     const $name = toLower(componentElement.nodeName);
     const container = componentElement.parentElement;
     const compiler = IoC.app(this.bouer).resolve(Compiler)!;
     const context = component.parent;
 
-    if (!container)
-      return;
+    if (!container) {
+      return onComponentFail(componentElement);
+    }
 
-    if (isNull(component.template))
+    if (isNull(component.template)) {
+      onComponentFail(componentElement);
       return Logger.error('The <' + $name + '/> component is not ready yet to be inserted.');
+    }
 
-    if (!compiler.analize(component.template!))
-      return;
+    if (!compiler.analize(component.template!)) {
+      return onComponentFail(componentElement);
+    }
 
     // Adding the component to the active component list if it is not added
-    if (!this.activeComponents.includes(component))
+    if (this.activeComponents.indexOf(component) < 0)
       this.activeComponents.push(component);
 
     const slotContainer = createEl('SlotContainer', el => {
@@ -407,9 +454,9 @@ export default class ComponentHandler {
       });
     }
 
-    const rootElement = component.el!;
+    const mainComponentElement = component.el!;
 
-    if (isNull(rootElement)) return;
+    if (isNull(mainComponentElement)) return onComponentFail(componentElement);
 
     // Handling Slots
     if (slotContainer.childNodes.length > 0) {
@@ -423,7 +470,7 @@ export default class ComponentHandler {
 
       // # slot[default]
       const slotContainerChildren = toArray(slotContainer.children);
-      const slotDefaults = toArray(rootElement.querySelectorAll('slot[default]'));
+      const slotDefaults = toArray(mainComponentElement.querySelectorAll('slot[default]'));
       // Looping all the slots defaults target
       forEach(slotDefaults, (slotTarget: Node) => {
         if (hasSkippedParent(slotTarget as Element)) return;
@@ -439,7 +486,7 @@ export default class ComponentHandler {
       });
 
       // # div[slot='name'] || slot[slot=name]
-      const slotNamed = toArray(rootElement.querySelectorAll('slot[name]'));
+      const slotNamed = toArray(mainComponentElement.querySelectorAll('slot[name]'));
       // Looping all the slots defaults target
       forEach(slotNamed, (slotTarget: Element) => {
         if (hasSkippedParent(slotTarget as Element)) return;
@@ -488,13 +535,13 @@ export default class ComponentHandler {
     });
 
     // Adding the listeners
-    const createdEvent = this.addEvent('created', rootElement, component);
-    const beforeMountEvent = this.addEvent('beforeMount', rootElement, component);
-    const mountedEvent = this.addEvent('mounted', rootElement, component);
-    const beforeLoadEvent = this.addEvent('beforeLoad', rootElement, component);
-    const loadedEvent = this.addEvent('loaded', rootElement, component);
-    this.addEvent('beforeDestroy', rootElement, component);
-    this.addEvent('destroyed', rootElement, component);
+    const createdEvent = this.addEvent('created', mainComponentElement, component);
+    const beforeMountEvent = this.addEvent('beforeMount', mainComponentElement, component);
+    const mountedEvent = this.addEvent('mounted', mainComponentElement, component);
+    const beforeLoadEvent = this.addEvent('beforeLoad', mainComponentElement, component);
+    const loadedEvent = this.addEvent('loaded', mainComponentElement, component);
+    this.addEvent('beforeDestroy', mainComponentElement, component);
+    this.addEvent('destroyed', mainComponentElement, component);
 
     const scriptsAssets = where(component.assets, asset => asset.nodeName === 'SCRIPT');
     const initializer = component.init;
@@ -503,66 +550,74 @@ export default class ComponentHandler {
       fnCallResolver(initializer!.call(component));
 
     const processDataAttr = (attr: Attr) => {
-      let inputData: dynamic = {};
-
-      const mData = Extend.obj(data, { $data: data });
-
       // Listening to all the reactive properties
       const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
         if (!(descriptor.propName in inputData))
           inputData[descriptor.propName] = undefined;
+
         Prop.set(inputData, descriptor.propName, descriptor);
       });
 
-      // If data value is empty gets the main scope value
-      if (attr.value === '')
-        inputData = Extend.obj(this.bouer.data);
-      else {
-        // Otherwise, compiles the object provided
-        const mInputData = IoC.app(this.bouer).resolve(Evaluator)!
-          .exec({
-            data: mData,
-            code: attr.value,
-            context: context ?? this.bouer
-          });
 
-        if (!isObject(mInputData))
-          Logger.error('Expected a valid Object Literal expression in “' + attr.nodeName +
-            '” and got “' + attr.value + '”.');
-        else {
-          // Adding all non-existing properties
-          forEach(Object.keys(mInputData), key => {
-            if (!(key in inputData))
-              inputData[key] = mInputData[key];
-          });
-        }
+      let inputData: dynamic = {};
+
+      if (attr.value.trim() === '') {
+        reactiveEvent.off();
+        // Data to apply: {...Bouer.data, ...component.data}
+        return Extend.obj(data, component.data);
+      }
+
+      // Otherwise, compiles the object provided
+      const dataAttrValue = IoC.app(this.bouer).resolve(Evaluator)!
+        .exec({
+          data: Extend.obj(data, {
+            $data: data,
+            $scope: data,
+            $navigate: data
+          }),
+          code: attr.value,
+          context: context ?? this.bouer
+        });
+
+      if (!isObject(dataAttrValue))
+        Logger.error('Expected a valid Object Literal expression in “' + attr.nodeName +
+          '” and got “' + attr.value + '”.');
+      else {
+        // Adding all non-existing properties
+        forEach(Object.keys(dataAttrValue), key => {
+          if (!(key in inputData))
+            inputData[key] = dataAttrValue[key];
+        });
       }
 
       reactiveEvent.off();
-      inputData = Reactive.transform({
-        context: component,
-        data: inputData
-      });
-
-      forEach(Object.keys(inputData), key => {
-        Prop.transfer(component.data, inputData, key);
-      });
+      return Extend.obj(
+        Reactive.transform({ context: component, data: inputData }),
+        component.data
+      );
     };
 
     const compile = (scriptContent?: string) => {
       try {
 
+        let dataToUse: any = {};
         let dataAttr = null;
+
         // If the attr is `data`, prepare and inject the value into component `data`
         if (dataAttr = findDirective(componentElement, Constants.data)) {
           const attr = dataAttr as Attr;
           if (this.delimiter.run(attr.value).length !== 0) {
-            Logger.error(('The “data” attribute cannot contain delimiter, source element: ' +
-              '<' + $name + '/>.'));
+            Logger.error(('The “data” attribute cannot contain delimiter, source element: ' + '<' + $name + '/>.'));
           } else {
-            processDataAttr(attr);
+            dataToUse = processDataAttr(attr);
+
+            // Signinng the element with it's data
+            IoC.app(this.bouer).resolve(DataStore)!.addNodeData(mainComponentElement, dataToUse);
           }
+
           componentElement.removeAttribute(attr.name);
+        } else {
+          dataToUse = component.data;
         }
 
         // Executing the mixed scripts
@@ -576,28 +631,28 @@ export default class ComponentHandler {
           // if the attr is the class, transfer the items to the root element
           if (attr.nodeName === 'class')
             return componentElement.classList.forEach(cls => {
-              rootElement.classList.add(cls);
+              mainComponentElement.classList.add(cls);
             });
 
           if (Constants.silent == attr.name) return;
           // sets the attr to the root element
-          rootElement.setAttribute(attr.name, attr.value);
+          mainComponentElement.setAttribute(attr.name, attr.value);
         });
 
         beforeMountEvent.emit();
 
         // Attaching the root element to the component element
         if (!('root' in componentElement))
-          Prop.set(componentElement, 'root', { value: rootElement });
+          Prop.set(componentElement, 'root', { value: mainComponentElement });
 
         // Mouting the element
-        container.replaceChild(rootElement, componentElement);
+        container.replaceChild(mainComponentElement, componentElement);
         mountedEvent.emit();
 
         const rootClassList: any = {};
 
         // Retrieving all the classes of the root element
-        rootElement.classList.forEach(key => rootClassList[key] = true);
+        mainComponentElement.classList.forEach(key => rootClassList[key] = true);
 
         // Changing each selector to avoid conflits
         const changeSelector = (style: HTMLStyleElement | HTMLLinkElement, styleId: string) => {
@@ -661,16 +716,16 @@ export default class ComponentHandler {
           if (this.stylesController[$name]) {
             const controller = this.stylesController[$name];
 
-            if (controller.elements.indexOf(rootElement) > -1)
+            if (controller.elements.indexOf(mainComponentElement) > -1)
               return;
 
-            controller.elements.push(rootElement);
+            controller.elements.push(mainComponentElement);
             return forEach(controller.styles, $style => {
-              rootElement.classList.add($style.getAttribute(styleAttrName) as string);
+              mainComponentElement.classList.add($style.getAttribute(styleAttrName) as string);
             });
           }
 
-          const styleId = code(5, 'e-');
+          const styleId = code(8, 'e-');
           mStyle.setAttribute(styleAttrName, styleId);
 
           if ((mStyle instanceof HTMLLinkElement) && mStyle.hasAttribute('scoped'))
@@ -678,12 +733,12 @@ export default class ComponentHandler {
 
           this.stylesController[$name] = {
             styles: [DOM.head.appendChild(mStyle)],
-            elements: [rootElement]
+            elements: [mainComponentElement]
           };
 
           if (!mStyle.hasAttribute('scoped')) return;
 
-          rootElement.classList.add(styleId);
+          mainComponentElement.classList.add(styleId);
           if (mStyle instanceof HTMLStyleElement)
             return changeSelector(mStyle, styleId);
         });
@@ -691,17 +746,21 @@ export default class ComponentHandler {
         beforeLoadEvent.emit();
         // Compiling the rootElement
         compiler.compile({
-          el: rootElement,
+          el: mainComponentElement,
           context: component,
-          data: Reactive.transform({ context: component, data: component.data }),
-          onDone: () => {
-            if (isFunction(onComponent))
-              onComponent!(component);
+          data: Reactive.transform({ context: component, data: dataToUse }),
+          directivesToIgnore: directivesToIgnore,
+
+          beforeCompile: beforeCompile,
+          afterCompile: afterCompile,
+
+          onComponentLoad: () => {
+            onComponentLoad(component);
             loadedEvent.emit();
 
             if (!this.rounting.routeView) {
-              const routeView = rootElement.hasAttribute('route-vew') ?
-                rootElement : rootElement.querySelector('[route-view]');
+              const routeView = mainComponentElement.hasAttribute('route-vew') ?
+                mainComponentElement : mainComponentElement.querySelector('[route-view]');
 
               if (routeView) this.rounting.setRouteView(routeView!);
             }
@@ -743,6 +802,7 @@ export default class ComponentHandler {
       } catch (error) {
         Logger.error('Error in <' + $name + '/> component.');
         Logger.error(buildError(error));
+        onComponentFail(componentElement);
       }
     };
 
@@ -791,6 +851,7 @@ export default class ComponentHandler {
         Logger.error(('Error loading the <script src=\'' + url + '\'></script> in ' +
           '<' + $name + '/> component, remove it in order to be compiled.'));
         Logger.error(error);
+        onComponentFail(componentElement);
       });
     });
   }
