@@ -2,7 +2,10 @@ import IBinderConfig from '../interfaces/IBinderConfig';
 
 type CustomDirective = {
   [key: string]: {
-    /** Allow to remove the directive after the bind */
+    /**
+     * Allow to remove the directive after the bind
+     * default value: true
+     */
     removable?: boolean,
     /**
      * An action that will be performed on bind
