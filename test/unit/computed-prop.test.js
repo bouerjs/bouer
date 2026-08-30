@@ -161,7 +161,7 @@ describe('When using a computed property', () => {
         const htmlSnippet = '<h1>{{ _valueWithNull }}</h1>';
         const element = toHtml(htmlSnippet);
 
-        const logger = jest.spyOn(console, 'error');
+        const logger = jest.spyOn(console, 'error').mockImplementation();
 
         const context = Bouer.create({
           data: {
@@ -177,14 +177,15 @@ describe('When using a computed property', () => {
           context: context,
           el: element,
           onComponentLoad: () => {
-            expect(logger.mock.calls[0][1].message).toBe('Invalid value used as return in property _valueWithNull: “function $computed(){...}” | “new Computed(...)”.');
+            expect(logger.mock.calls[0][1].message).toBe('Invalid value used as return in property _valueWithNull: “function $computed(){...}” | “$computed({...})”.');
+            logger.mockRestore();
           }
         });
       })
     })
   });
 
-  describe('When using class approach', () => {
+  describe('When using calling the $computed function', () => {
     let context;
     let compiler;
 
@@ -316,115 +317,55 @@ describe('When using a computed property', () => {
     });
   });
 
-  describe('When using in a Component', () => {
-    describe('When using in data property', () => {
-      it('Component properties are reactive when using Computed property', () => {
-        class InputComponent extends Component {
-          name = 'InputComponent';
-          mText = '<empty>';
+  describe('When using computed property in a Component', () => {
+    it('Component properties are reactive when using Computed property', async () => {
+      class InputComponent extends Component {
+        mText = '<empty>';
 
-          data = {
-            text: $computed({
-              get: () => this.mText,
-              set: (v) => this.mText = v
-            })
-          };
-
-          constructor() {
-            super({
-              template: '<input e-bind="text"/>'
-            });
-          }
-        }
-
-        const htmlSnippet = `
-          <div>
-            <InputComponent></InputComponent>
-          </div>`;
-        const element = toHtml(htmlSnippet);
-        const context = Bouer.create({
-          components: [
-            InputComponent
-          ],
+        text = $computed({
+          get: () => this.mText,
+          set: (v) => this.mText = v
         });
 
-        const compiler = IoC.app(context).resolve(Compiler);
-
-        compiler.compile({
-          data: context.data,
-          context: context,
-          el: element,
-        });
-
-        const inputComponentInstance = ViewChild.byName(context, InputComponent.name)[0];
-
-        // Checking the values in
-        expect(inputComponentInstance.data.text).toBe('<empty>');
-
-        const input = element.children[0];
-
-        // Updating the inputs
-        input.value = 'Input Value Changed';
-        input.dispatchEvent(new Event('input'));
-
-        // Checking the values
-        expect(input.value).toBe(inputComponentInstance.mText);
-        expect(input.value).toBe(inputComponentInstance.data.text);
-      });
-    });
-
-    describe('When using in instance property', () => {
-      it('Component properties are reactive when using Computed property', () => {
-        class InputComponent extends Component {
-          name = 'InputComponent';
-          mText = '<empty>';
-
-          text = $computed({
-            get: () => this.mText,
-            set: (v) => this.mText = v
+        constructor() {
+          super({
+            template: '<input e-bind="text"/>'
           });
-
-          constructor() {
-            super({
-              template: '<input e-bind="this.text"/>'
-            });
-          }
         }
+      }
 
-        const htmlSnippet = `
-          <div>
-            <InputComponent></InputComponent>
-          </div>`;
-        const element = toHtml(htmlSnippet);
-        const context = Bouer.create({
-          components: [
-            InputComponent
-          ],
-        });
+      const htmlSnippet = `
+        <div>
+          <InputComponent></InputComponent>
+        </div>`;
+      const element = toHtml(htmlSnippet);
+      const context = Bouer.create({
+        components: [InputComponent],
+      });
 
-        const compiler = IoC.app(context).resolve(Compiler);
+      const compiler = IoC.app(context).resolve(Compiler);
 
+      await compiler.compile({
+        data: context.data,
+        context: context,
+        el: element,
+        onComponentLoad: () => {
 
-        compiler.compile({
-          data: context.data,
-          context: context,
-          el: element,
-        });
+          const inputComponentInstance = ViewChild.byName(context, InputComponent.name)[0];
 
-        const inputComponentInstance = ViewChild.byName(context, InputComponent.name)[0];
+          // Checking the values in
+          expect(inputComponentInstance.text).toBe('<empty>');
 
-        // Checking the values in
-        expect(inputComponentInstance.text.get()).toBe('<empty>');
+          const input = element.children[0];
 
-        const input = element.children[0];
+          // Updating the inputs
+          input.value = 'Input Value Changed';
+          input.dispatchEvent(new Event('input'));
 
-        // Updating the inputs
-        input.value = 'Input Value Changed';
-        input.dispatchEvent(new Event('input'));
-
-        // Checking the values
-        expect(input.value).toBe(inputComponentInstance.mText);
-        expect(input.value).toBe(inputComponentInstance.text.get());
+          // Checking the values
+          expect(input.value).toBe(inputComponentInstance.mText);
+          expect(input.value).toBe(inputComponentInstance.text);
+        }
       });
     });
   });

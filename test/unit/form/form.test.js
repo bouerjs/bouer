@@ -2,7 +2,11 @@ import {
   Bouer,
   toHtml,
   Compiler,
-  IoC
+  Component,
+  IoC,
+  $form,
+  $field,
+  $inert
 } from '../../index';
 
 describe('When "toJsObj" method is called (On instance)', () => {
@@ -26,7 +30,7 @@ describe('When "toJsObj" method is called (On instance)', () => {
 });
 
 describe('When "e-form" directive is used', () => {
-  it('Throws an error if the form entry (e-form) has invalid value in html', () => {
+  it('Throws an error if the form entry (e-form) has invalid value in html', async () => {
     let htmlSnippet = toHtml(`<form class="center" e-form></form>`);
 
     const context = Bouer.create({
@@ -36,19 +40,20 @@ describe('When "e-form" directive is used', () => {
     });
 
     const compiler = IoC.app(context).resolve(Compiler);
-    const logger = jest.spyOn(console, 'error');
+    const logger = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: htmlSnippet,
       onComponentLoad: el => {
         expect(logger).toHaveBeenCalled();
+        logger.mockRestore();
       }
     });
   });
 
-  it('Throws an error if the form entry (e-form) has invalid value in code', () => {
+  it('Throws an error if the form entry (e-form) has invalid value in code', async () => {
     let htmlSnippet = toHtml(`<form class="center" e-form="personForm"></form>`);
 
     const context = Bouer.create({
@@ -58,19 +63,20 @@ describe('When "e-form" directive is used', () => {
     });
 
     const compiler = IoC.app(context).resolve(Compiler);
-    const logger = jest.spyOn(console, 'error');
+    const logger = jest.spyOn(console, 'error').mockImplementation();
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: htmlSnippet,
       onComponentLoad: el => {
         expect(logger).toHaveBeenCalled();
+        logger.mockRestore();
       }
     });
   });
 
-  it('Compile the form accoring to the schema provided by the code directive', () => {
+  it('Compile the form accoring to the schema provided by the code directive', async () => {
     let htmlSnippet = toHtml(`
     <form class="center" e-form="personForm">
       <div class="input-field">
@@ -163,7 +169,7 @@ describe('When "e-form" directive is used', () => {
 
     const compiler = IoC.app(context).resolve(Compiler);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: htmlSnippet,
@@ -183,7 +189,7 @@ describe('When "e-form" directive is used', () => {
     });
   });
 
-  it('Compile the form accoring to the schema provided by the directive (e-schema)', () => {
+  it('Compile the form accoring to the schema provided by the directive (e-schema)', async () => {
     let htmlSnippet = toHtml(`
     <form class="center" e-form="personForm">
       <div class="input-field">
@@ -243,7 +249,7 @@ describe('When "e-form" directive is used', () => {
 
     const compiler = IoC.app(context).resolve(Compiler);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: htmlSnippet,
@@ -263,7 +269,7 @@ describe('When "e-form" directive is used', () => {
     });
   });
 
-  it('Compile the form if the schema is provided by both the directive (e-schema) and the code schema, and also warn the developer', () => {
+  it('Compile the form if the schema is provided by both the directive (e-schema) and the code schema, and also warn the user', async () => {
     let htmlSnippet = toHtml(`
     <form class="center" e-form="personForm">
       <div class="input-field">
@@ -280,7 +286,7 @@ describe('When "e-form" directive is used', () => {
       <p id="output"></p>
     </form>`);
 
-    const logger = jest.spyOn(console, 'warn');
+    const logger = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     const context = Bouer.create({
       data: {
@@ -297,12 +303,105 @@ describe('When "e-form" directive is used', () => {
 
     const compiler = IoC.app(context).resolve(Compiler);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: htmlSnippet,
       onComponentLoad: el => {
         expect(logger).toHaveBeenCalled();
+        logger.mockRestore();
+      }
+    });
+  });
+});
+
+describe('When using module + component', () => {
+  it('Compile the component form according to the structure provided using $form and $field', async () => {
+
+    let htmlSnippet = toHtml(`<div id="app">
+      <RegisterUser></RegisterUser>
+    </div>`);
+
+
+    class RegisterUser extends Component {
+      webClient = $inert();
+
+      form = $form({
+        firstName: $field({
+          required: true,
+          length: { min: 3, max: 10 },
+        }),
+        lastName: $field({
+          required: true,
+          length: { min: 3, max: 10 }
+        }),
+        birthdate: $field({
+          required: true,
+          pattern: 'date'
+        }),
+        email: $field({
+          required: true,
+          pattern: 'email'
+        }),
+        password: $field({
+          required: true,
+          length: { min: 6, max: 10 }
+        })
+      });
+
+      constructor() {
+        super({
+          template: `
+          <form id="form" e-form="form" on:submit.prevent="submit">
+            <label for="fn">First Name</label>
+            <input id="fn" type="text" name="firstName"/>
+            <small e-for="error of $form.get('firstName').errors"> {{ error.message }} </small>
+
+            <label for="ln">Last Name</label>
+            <input id="ln" type="text" name="lastName"/>
+            <small e-for="error of $form.get('lastName').errors"> {{ error.message }} </small>
+
+            <label for="el">Email</label>
+            <input id="el" type="text" name="email"/>
+            <small e-for="error of $form.get('email').errors"> {{ error.message }} </small>
+
+            <label for="pwd">Password</label>
+            <input id="pwd" type="password" name="password"/>
+            <small e-for="error of $form.get('password').errors"> {{ error.message }} </small>
+          </form>`
+        });
+      }
+
+      submit() {
+        if (!this.form.validate()) return;
+
+        const user =  this.form.toObject();
+        this.webClient.post('user/register', {
+          body: JSON.stringify(user)
+        });
+      }
+    }
+
+    const context = Bouer.create({
+      components: [RegisterUser]
+    });
+
+    const compiler = IoC.app(context).resolve(Compiler);
+
+    await compiler.compile({
+      data: context.data,
+      context: context,
+      el: htmlSnippet,
+      onComponentLoad: el => {
+        const registerUser = context.$components.viewByName(RegisterUser.name)[0];
+        const form = registerUser.form;
+
+        expect(form.validate()).toBe(false);
+
+        expect(form.get('firstName').errors.length).toBeGreaterThan(0);
+        expect(form.get('lastName').errors.length).toBeGreaterThan(0);
+        expect(form.get('email').errors.length).toBeGreaterThan(0);
+        expect(form.get('password').errors.length).toBeGreaterThan(0);
       }
     });
   });

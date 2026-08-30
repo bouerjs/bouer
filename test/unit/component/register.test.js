@@ -24,7 +24,7 @@ describe('When using "e-entry" directive', () => {
       }
     });
   });
-  it('Paste/Insert the element (component) at the requested position', () => {
+  it('Paste/Insert the element (component) at the requested position', async () => {
     const htmlSnippet = `
     <div>
       <label e-entry="copied-el">Element</label>
@@ -34,7 +34,7 @@ describe('When using "e-entry" directive', () => {
     const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
@@ -60,7 +60,7 @@ describe('When added to the instance component options', () => {
 
     expect(context.$components.get('my-component')).toBeDefined();
   });
-  it('Insert the element (component) at the requested position', () => {
+  it('Insert the element (component) at the requested position', async () => {
     const htmlSnippet = `
     <div>
       <my-component></my-component>
@@ -74,7 +74,7 @@ describe('When added to the instance component options', () => {
     const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
@@ -91,7 +91,7 @@ describe('When added to the instance component options', () => {
 });
 
 describe('When using the component options', () => {
-  it('Inject "data" if provided in the options', () => {
+  it('Inject "data" if provided in the options', async () => {
     const htmlSnippet = `
     <div>
       <my-component></my-component>
@@ -108,7 +108,7 @@ describe('When using the component options', () => {
     const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
@@ -118,7 +118,7 @@ describe('When using the component options', () => {
       }
     });
   });
-  it('Fires the hooks if provided in the options', () => {
+  it('Fires the hooks if provided in the options', async () => {
     const htmlSnippet = `
     <div>
       <my-component></my-component>
@@ -152,7 +152,7 @@ describe('When using the component options', () => {
     const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
@@ -174,7 +174,7 @@ describe('When using the component options', () => {
 });
 
 describe('When using the component <script>', () => {
-  it('Executes script tags if exists', () => {
+  it('Executes script tags if exists', async () => {
     const htmlSnippet = `
     <div>
       <my-component></my-component>
@@ -194,7 +194,7 @@ describe('When using the component <script>', () => {
 
     const logger = jest.spyOn(console, 'log');
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
@@ -204,7 +204,7 @@ describe('When using the component <script>', () => {
     });
   });
 
-  it('Adds hooks to component instance when using "this.on(...)" method', () => {
+  it('Adds hooks to component instance when using "this.on(...)" method', async () => {
     const htmlSnippet = `
     <div>
       <my-component></my-component>
@@ -225,7 +225,7 @@ describe('When using the component <script>', () => {
 
     const logger = jest.spyOn(console, 'log');
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
@@ -235,7 +235,7 @@ describe('When using the component <script>', () => {
     });
 
   });
-  it('Exports "data" the component element when using "this.export(...)" method', () => {
+  it('Exports "data" the component element when using "this.export(...)" method', async () => {
     const htmlSnippet = `
     <div>
       <my-component></my-component>
@@ -256,7 +256,7 @@ describe('When using the component <script>', () => {
     const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
@@ -268,7 +268,7 @@ describe('When using the component <script>', () => {
 });
 
 describe('When using component slots', () => {
-  it('Injects the component "body" when using <slot default>', () => {
+  it('Injects the component "body" when using <slot default>', async () => {
     const htmlSnippet = `
     <div>
       <my-component>
@@ -287,7 +287,7 @@ describe('When using component slots', () => {
     const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
@@ -297,7 +297,7 @@ describe('When using component slots', () => {
     });
 
   });
-  it('Injects the element <el slot="..."> body in component body to target <slot name="...">', () => {
+  it('Injects the element <el slot="..."> body in component body to target <slot name="...">', async () => {
     const htmlSnippet = `
     <div>
       <my-component>
@@ -322,7 +322,7 @@ describe('When using component slots', () => {
     const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
@@ -347,51 +347,50 @@ describe('When using component slots', () => {
     });
 
   });
-  it('Injects and replace the element <slot slot="..."> body in component body to target <slot name="...">',
-    () => {
-      const htmlSnippet = `
-    <div>
-      <my-component>
-        <slot slot="target-1">
-          <label>Injected-target-1</label>
-        </slot>
-        <slot slot="target-2">
-          <label>Injected-target-2</label>
-        </slot>
-      </my-component>
-    </div>`;
-      const context = Bouer.create({
-        components: [{
-          name: 'my-component',
-          template: `
-        <div>
-          <slot name="target-1"></slot>
-          <slot name="target-2"></slot>
-        </div>`,
-        }]
-      });
-      const compiler = IoC.app(context).resolve(Compiler);
-      const element = toHtml(htmlSnippet);
-
-      compiler.compile({
-        data: context.data,
-        context: context,
-        el: element,
-        onComponentLoad: () => {
-          const child = element.children[0];
-
-          expect(child.tagName).toBe('DIV');
-          expect(child.tagName).not.toBe('MY-COMPONENT');
-
-          const label1 = child.children[0];
-          const label2 = child.children[1];
-
-          expect(label1.tagName).toBe('LABEL');
-          expect(label2.tagName).toBe('LABEL');
-          expect(label1.textContent).toContain('Injected-target-1');
-          expect(label2.textContent).toContain('Injected-target-2');
-        }
-      });
-
+  it('Injects and replace the element <slot slot="..."> body in component body to target <slot name="...">', async () => {
+    const htmlSnippet = `
+  <div>
+    <my-component>
+      <slot slot="target-1">
+        <label>Injected-target-1</label>
+      </slot>
+      <slot slot="target-2">
+        <label>Injected-target-2</label>
+      </slot>
+    </my-component>
+  </div>`;
+    const context = Bouer.create({
+      components: [{
+        name: 'my-component',
+        template: `
+      <div>
+        <slot name="target-1"></slot>
+        <slot name="target-2"></slot>
+      </div>`,
+      }]
     });
+    const compiler = IoC.app(context).resolve(Compiler);
+    const element = toHtml(htmlSnippet);
+
+    await compiler.compile({
+      data: context.data,
+      context: context,
+      el: element,
+      onComponentLoad: () => {
+        const child = element.children[0];
+
+        expect(child.tagName).toBe('DIV');
+        expect(child.tagName).not.toBe('MY-COMPONENT');
+
+        const label1 = child.children[0];
+        const label2 = child.children[1];
+
+        expect(label1.tagName).toBe('LABEL');
+        expect(label2.tagName).toBe('LABEL');
+        expect(label1.textContent).toContain('Injected-target-1');
+        expect(label2.textContent).toContain('Injected-target-2');
+      }
+    });
+
+  });
 });

@@ -32,25 +32,26 @@ describe('When element is compiled with "e-put" directive', () => {
 
   const htmlSnippet = '<div e-put="tabValue"></div>';
 
-  it('Throws an error if the form entry (e-put) has invalid value in html', () => {
+  it('Throws an error if the form entry (e-put) has invalid value in html', async () => {
     let htmlSnippet = toHtml(`<div e-put></div>`);
 
-    const logger = jest.spyOn(console, 'error');
+    const logger = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: htmlSnippet,
       onComponentLoad: el => {
         expect(logger).toHaveBeenCalled();
+        logger.mockRestore();
       }
     });
   });
 
   it('Throws an error if the form entry (e-put) has invalid value', () => {
-    let htmlSnippet = toHtml(`<div e-put="{{ tabValue }}"></div>`);
+    const htmlSnippet = toHtml(`<div e-put="{{ tabValue }}"></div>`);
 
-    const logger = jest.spyOn(console, 'error');
+    const logger = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     compiler.compile({
       data: context.data,
@@ -58,66 +59,35 @@ describe('When element is compiled with "e-put" directive', () => {
       el: htmlSnippet,
       onComponentLoad: el => {
         expect(logger).toHaveBeenCalled();
+        logger.mockRestore();
       }
     });
   });
 
   it('Starts with the default component "component-a" injected in the element', async () => {
     const element = toHtml(htmlSnippet);
-
     context.data.tabValue = 'component-a';
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
       onComponentLoad: el => {
+
         expect(element.innerHTML).toContain('Component A');
+        context.data.tabValue = 'component-b';
+        expect(element.innerHTML).toContain('Component B');
+        context.data.tabValue = '';
+        expect(element.innerHTML).toBe('');
       }
     });
 
-    await sleep(1);
-    context.data.tabValue = 'component-b';
-
-    await sleep(1);
-    expect(element.innerHTML).toContain('Component B');
-
-    context.data.tabValue = '';
-    await sleep(1);
-
-    expect(element.innerHTML).toBe('');
-  });
-
-  it('Starts with the default component "component-a" injected in the element', async () => {
-    const element = toHtml(htmlSnippet);
-
-    context.data.tabValue = 'component-a';
-
-    compiler.compile({
-      data: context.data,
-      context: context,
-      el: element,
-      onComponentLoad: el => {
-        expect(element.innerHTML).toContain('Component A');
-      }
-    });
-
-    await sleep(1);
-    context.data.tabValue = 'component-b';
-
-    await sleep(1);
-    expect(element.innerHTML).toContain('Component B');
-
-    context.data.tabValue = '';
-    await sleep(1);
-
-    expect(element.innerHTML).toBe('');
   });
 
   it('Starts with the empty element if the value is empty', async () => {
     const element = toHtml(htmlSnippet);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
