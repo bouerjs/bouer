@@ -5,7 +5,7 @@ import Constants from '../../../shared/helpers/Constants';
 import {
   errorMsgEmptyNode,
   errorMsgNodeValue,
-  forEach,
+  filter,
   ifNullReturn,
   isObject,
   toOwnerNode,
@@ -133,7 +133,7 @@ export function $property(opitons: {
       attr = (ownerNode.attributes as any)[attrNameToSet] as Attr;
     }
 
-    forEach(Object.keys(obj), key => {
+    filter(Object.keys(obj), key => {
       /* if has a falsy value remove the key */
       if (!obj[key]) return attr.value = trim(attr.value.replace(key, ''));
       attr.value = (attr.value.includes(key) ? attr.value : trim(attr.value + ' ' + key));

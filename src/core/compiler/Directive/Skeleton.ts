@@ -1,5 +1,5 @@
 import Bouer from '../../../instance/Bouer';
-import { forEach, ifNullReturn, toOwnerNode, trim } from '../../../shared/helpers/Utils';
+import { filter, ifNullReturn, toOwnerNode, trim } from '../../../shared/helpers/Utils';
 
 export function $skeleton(opitons: {
   node: Node,
@@ -18,7 +18,7 @@ export function $skeleton(opitons: {
   if (!uid) return;
 
   ownerNode.removeAttribute('skeleton-clone-code');
-  forEach([].slice.call(bouer.el?.querySelectorAll('[="' + uid + '"]')), (el: Node) => {
+  filter([].slice.call(bouer.el?.querySelectorAll('[="' + uid + '"]')), (el: Node) => {
     (el.parentElement || el.parentNode)!.removeChild(el);
   });
 }

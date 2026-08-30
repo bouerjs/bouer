@@ -1,6 +1,7 @@
 import IMiddleware from '../../definitions/interfaces/IMiddleware';
 import IMiddlewareObject from '../../definitions/interfaces/IMiddlewareObject';
 import Bouer from '../../instance/Bouer';
+import { $internal } from '../../shared/helpers/Utils';
 import IMiddlewareResult from './IMiddlewareResult';
 
 type MiddlewareConfigType = (
@@ -12,11 +13,11 @@ type MiddlewareConfigType = (
 ) => void;
 
 export default class Middleware {
-  readonly _IRT_ = true;
   private middlewareConfigContainer: { [key: string]: IMiddlewareObject[] } = {};
   bouer: Bouer;
 
   constructor(bouer: Bouer) {
+    $internal(this);
     this.bouer = bouer;
   }
 

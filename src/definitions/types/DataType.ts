@@ -7,8 +7,8 @@ type DataType<Type extends Record<string, any> = dynamic, Context = RenderContex
     // In case of a function, bind it to the context
     Type[K] extends (...args: infer A) => infer R
       ? (this: Context, ...args: A) => R
-      // In case of a computed, return the EntryType | the Computed<EntryType>
-      : Type[K] extends Computed<infer EntryType, any> ? EntryType | Computed<EntryType, Context>
+      // In case of a computed, return the EntryType | any
+      : Type[K] extends Computed<infer EntryType, any> ? EntryType
         // If it is an object, recurse
         : Type[K] extends object
           ? DataType<Type[K], Context>

@@ -13,22 +13,20 @@ import {
   createEl,
   findAttribute,
   $default,
-  forEach,
   ifNullReturn,
-  isComputed,
   isNull,
   isObject,
-  isRef,
   toArray,
   toStr,
   trim,
-  where,
+  filter,
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Compiler from '../compiler/Compiler';
 import Evaluator from '../Evaluator';
-import ReactiveEvent from '../event/ReactiveEvent';
+import ReactiveEvent from '../reactive/ReactiveEvent';
 import Middleware from '../middleware/Middleware';
+import { isComputed } from '../reactive/Computed';
 import Watch from './Watch';
 
 export default class Binder {
@@ -47,7 +45,6 @@ export default class Binder {
   constructor(bouer: Bouer, evaluator: Evaluator) {
     this.bouer = bouer;
     this.evaluator = evaluator;
-
     this.cleanup();
   }
 
@@ -115,7 +112,6 @@ export default class Binder {
         ownerNode.setAttribute(propertyBindConfig.nodeName, originalValue);
         // Retrieve the new attr set
         nodeToBind = ownerNode.attributes[propertyBindConfig.nodeName];
-
         // Removing the e-[?] attr
         ownerNode.removeAttribute(node.nodeName);
       }
@@ -126,7 +122,7 @@ export default class Binder {
         let isHtml = false;
 
         // Looping all the fields to be setted
-        forEach(fields, (field) => {
+        filter(fields, (field) => {
           // Retrieving the delimiter used in this field
           const delimiter = field.delimiter;
 
@@ -140,10 +136,8 @@ export default class Binder {
             context: context,
           });
 
-          evaluetedValue = isRef(evaluetedValue) || isComputed(evaluetedValue) ? evaluetedValue.get() : evaluetedValue;
-
+          evaluetedValue = isComputed(evaluetedValue) ? evaluetedValue.get() : evaluetedValue;
           evaluetedValue = isNull(evaluetedValue) ? '' : evaluetedValue;
-
           evaluetedValue = this.applyPipes(evaluetedValue, field);
 
           // Replacing each field with the specific value
@@ -161,7 +155,7 @@ export default class Binder {
           .children();
 
         ownerNode.innerHTML = '';
-        forEach(htmlSnippets, (snippetNode: INode) => {
+        filter(htmlSnippets, (snippetNode: INode) => {
           ownerNode.appendChild(snippetNode);
           snippetNode.isActive = isActive;
           IoC.app(this.bouer).resolve(Compiler)!.compile({
@@ -228,7 +222,7 @@ export default class Binder {
 
       const bindingDirection: { [key: string]: (v: any) => void } = {
         fromDataToInput: (value: any) => {
-          value = isRef(value) || isComputed(value) ? value.get() : value;
+          value = isComputed(value) ? value.get() : value;
 
           // Normal Property Set
           if (!Array.isArray(boundPropertyValue)) {
@@ -257,7 +251,7 @@ export default class Binder {
 
           // select-multiple handling
           if (isSelectMultiple) {
-            return forEach(
+            return filter(
               toArray(ownerNode.options),
               (option: HTMLOptionElement) => {
                 option.selected =
@@ -284,8 +278,7 @@ export default class Binder {
         fromInputToData: (value: any) => {
           // Normal Property Set
           if (!Array.isArray(boundPropertyValue)) {
-            // Check Ref<?>
-            if (isRef(boundPropertyValue) || isComputed(boundPropertyValue)) {
+            if (isComputed(boundPropertyValue)) {
               return boundPropertyValue.set(value);
             }
 
@@ -310,7 +303,7 @@ export default class Binder {
           // select-multiple handling
           if (isSelectMultiple) {
             const optionCollection: string[] = [];
-            forEach(
+            filter(
               toArray(ownerNode.options),
               (option: HTMLOptionElement) => {
                 if (option.selected === true)
@@ -395,7 +388,7 @@ export default class Binder {
         listeners.push(ownerNode.localName);
 
       // Applying the events
-      forEach(listeners, (listener) => {
+      filter(listeners, (listener) => {
         if (listener === 'change' && ownerNode.localName !== 'select') return;
 
         // Adding the event to listen to the element change event
@@ -418,7 +411,7 @@ export default class Binder {
   }
 
   remove(boundNode: Node, boundAttrName?: string, boundPropName?: string) {
-    this.binds = where(this.binds, (bind) => {
+    this.binds = filter(this.binds, (bind) => {
       const node = bind.watch.node!;
 
       if (((node as any).ownerElement || node.parentElement) !== boundNode)
@@ -463,8 +456,8 @@ export default class Binder {
         if (
           watches.find(
             (w) =>
-              w.property === descriptor.propName &&
-              w.descriptor.propSource === descriptor.propSource
+              w.property === descriptor.$name &&
+              w.descriptor.source === descriptor.source
           )
         )
           return;
@@ -485,7 +478,7 @@ export default class Binder {
 
     return {
       watches: watches,
-      destroy: () => forEach(watches, w => w.destroy())
+      destroy: () => filter(watches, w => w.destroy())
     };
   }
 
@@ -495,7 +488,7 @@ export default class Binder {
     if (isNull($value) || trim($value + '') === '')
       return $value;
 
-    forEach(field.pipes || [], pipe => {
+    filter(field.pipes || [], pipe => {
       const args = pipe.args.slice().map(a => {
         return this.evaluator.exec({
           code: a as any,
@@ -528,7 +521,7 @@ export default class Binder {
     const autoUnbind = ifNullReturn(this.bouer.config.autoUnbind, true);
     if (autoUnbind == false) return;
     Task.run(() => {
-      this.binds = where(this.binds, (bind) => {
+      this.binds = filter(this.binds, (bind) => {
         if (bind.isConnected()) return true;
         bind.watch.destroy();
       });

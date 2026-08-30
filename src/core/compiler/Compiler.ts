@@ -9,10 +9,10 @@ import Extend from '../../shared/helpers/Extend';
 import IoC from '../../shared/helpers/IoCContainer';
 import {
   $default,
+  $internal,
   findDirective,
-  findOneBy,
   fnCallResolver,
-  forEach,
+  filter,
   isString, toArray, toLower
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
@@ -32,7 +32,6 @@ export type CompilationHooks = {
 };
 
 export default class Compiler {
-  readonly _IRT_ = true;
   bouer: Bouer;
   binder: Binder;
   delimiter: DelimiterHandler;
@@ -54,6 +53,8 @@ export default class Compiler {
     componentHandler: ComponentHandler,
     directives?: CustomDirective
   ) {
+    $internal(this);
+
     this.bouer = bouer;
     this.directives = directives ?? {};
     this.binder = binder;
@@ -104,14 +105,17 @@ export default class Compiler {
       return this.dataStore.getNodeData(node, defaultData)!;
     }
 
-    if (!rootElement)
-      return Logger.error('Invalid element provided to the compiler.');
+    if (!rootElement) {
+      Logger.error('Invalid element provided to the compiler.');
+      return fnCallResolver(onComponentLoad!.call(context, rootElement, data as any));
+    }
 
     const iNode = rootElement as INode;
     const isActive = iNode.isActive = iNode.isActive ?? (() => rootElement.isConnected);
 
-    if (!this.analize(rootElement.outerHTML))
-      return rootElement;
+    if (!this.analize(rootElement.outerHTML)) {
+      return fnCallResolver(onComponentLoad!.call(context, rootElement, data as any));
+    }
 
     const directive = new Directive(this, this.directives || {}, context);
     const loadingComponents: Promise<any>[] = [];
@@ -137,7 +141,7 @@ export default class Compiler {
           return directive.skip(currentNode);
 
         // Intercept Directive in the Element
-        if (findOneBy(directivesToIgnore, (dir) => dir in attributes))
+        if (directivesToIgnore.find(dir => dir in attributes))
           return;
 
         // e-def="{...}" directive
@@ -236,7 +240,7 @@ export default class Compiler {
           return;
 
         // Looping the attributes
-        forEach(toArray(attributes), (attr: Attr) => walker(attr, scopeData));
+        filter(toArray(attributes), (attr: Attr) => walker(attr, scopeData));
       }
 
       // :href="..." or !href="..." directive
@@ -303,7 +307,7 @@ export default class Compiler {
       }
 
       const dataToUse = getElementData(currentNode, scopeData);
-      forEach(toArray(currentNode.childNodes), (childNode: INode) => {
+      filter(toArray(currentNode.childNodes), (childNode: INode) => {
         childNode.isActive = isActive;
 
         fnCallResolver(// Before Compile the element...
@@ -341,13 +345,10 @@ export default class Compiler {
     };
 
     if (loadingComponents.length == 0)
-      onCompilationFinished();
-    else
-      Promise.all(loadingComponents)
-        .then(() => onCompilationFinished())
-        .catch(() => onCompilationFinished());
+      return fnCallResolver(onComponentLoad!.call(context, rootElement, data as any));
 
-    return rootElement;
+    return Promise.all(loadingComponents)
+        .then(() => { onCompilationFinished() });
   }
 
   analize(htmlSnippet: string) {

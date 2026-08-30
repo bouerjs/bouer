@@ -3,21 +3,18 @@ import Constructor from '../../definitions/types/Constructor';
 import Params from '../../definitions/types/Parameters';
 import Bouer from '../../instance/Bouer';
 import Logger from '../logger/Logger';
-import { forEach, ifNullReturn, isNull } from './Utils';
+import Prop from './Prop';
+import { $default, filter, ifNullReturn, isNull } from './Utils';
 
-type Service<S> = {
-  ctor: Constructor<S>,
-  instance?: S,
-  isSingleton: boolean,
-  args?: unknown[]
-};
 
 /**
  * It's a **Service Provider** container with all the services that will be used in the application.
- */
-export default (function IoC() {
+*/
+const IoC = (function () {
+  type Service<S> = { ctor: Constructor<S>, instance?: S, isSingleton: boolean, args?: unknown[] };
+
   let bouerId: number = 1;
-  const globalApp: any = { isDestroyed: false };
+  const global: Bouer = $default<Bouer>({ isDestroyed: false } as any);
   const serviceCollection: WeakMap<Bouer, WeakMap<Constructor<unknown>, Service<unknown>>> = new WeakMap();
 
   const add = <S>(app: Bouer, ctor: any, params?: any[], isSingleton?: boolean) => {
@@ -35,16 +32,16 @@ export default (function IoC() {
     });
   };
 
-  const resolve = <S>(app: Bouer, clazz: Constructor<S>) => {
+  const resolve = <S>(app: Bouer, ctor: Constructor<S>) => {
     if (app.isDestroyed) throw new Error('Application already disposed.');
 
     const collection = serviceCollection.get(app);
-    if (!collection) return null;
+    if (!collection) return undefined;
 
-    const service = collection.get(clazz);
+    const service = collection.get(ctor);
 
     if (service == null)
-      return null;
+      return undefined;
 
     if (service.isSingleton) {
 
@@ -52,47 +49,49 @@ export default (function IoC() {
         return service.instance as S;
 
       // Otherwise, creates the singleton instance
-      return service.instance = newInstance(clazz, service.args, app) as S;
+      return service.instance = newInstance(ctor, service.args, app) as S;
     }
 
-    return newInstance(clazz, service.args, app);
+    return newInstance(ctor, service.args, app);
   };
 
   /**
    * Creates a new instance of a class provided
-   * @param clazz the class that the new instance should be created
+   * @param ctor the class that the new instance should be created
    * @param params the parameter list that will be injected in the constructor
    * @returns new intance of the class provided
    */
-  const newInstance = <S>(clazz: Constructor<S>, params?: any[], app?: Bouer) => {
+  const newInstance = <S>(ctor: Constructor<S>, params?: any[], app?: Bouer) => {
     const paramsToProvide: string[] = [];
-    const mParams: unknown[] = params || [];
-    const data: { __ctor0: Constructor<S>, [key: string]: unknown } = { __ctor0: clazz };
+    const $params: unknown[] = params || [];
+    const data: { __ctor0: Constructor<S>, [key: string]: unknown } = { __ctor0: ctor };
 
     // Looping all the provided params of the class constructor
-    forEach(mParams, (paramValue, index) => {
+    filter($params, (param: any, index) => {
       // Creating a unique name for the argument
       const paramName = '__arg' + index;
-      const paramValueAsAny = paramValue as any;
 
       // If the param is a class
       // eslint-disable-next-line no-prototype-builtins
-      if (paramValue && paramValueAsAny.hasOwnProperty('prototype')) {
+      if (param && param.hasOwnProperty('prototype')) {
         if (app) {
-          const paramInstance = resolve(app!, paramValueAsAny);
-          if (!isNull(paramValueAsAny)) {
-            paramValue = paramInstance;
+
+          const localInstance = resolve(app!, param);
+          const globalInstance = (!localInstance && app != global) ? resolve(global, param) : localInstance;
+
+          if (!isNull(param)) {
+            param = localInstance || globalInstance;
           } else {
-            Logger.warn('Could not create an instance of ' + paramValueAsAny.name || paramValueAsAny
-              + '. Make sure it is added as a service in IoC[.app].add(Service).');
+            Logger.warn('Could not create an instance of ' + param.name || param
+              + '. Make sure it is added as a service in IoC[.app(Bouer)].add(Service).');
           }
         } else {
-          paramValue = null;
+          param = null;
         }
       }
 
       // Setting the param name and value
-      data[paramName] = paramValue;
+      data[paramName] = param;
 
       // Adding the unique name
       paramsToProvide.push(paramName);
@@ -103,14 +102,14 @@ export default (function IoC() {
       code: 'new __ctor0(' + paramsToProvide.join(',') + ')',
       data: data,
       returnable: true
-    }) as S;
+    }) as S || undefined;
   };
 
   const clear = (app: Bouer) => {
     return serviceCollection.delete(app);
   };
 
-  return {
+  const methods = {
     /**
      * Adds a service to generic app
      * @param ctor the service that should be resolved future on
@@ -122,7 +121,7 @@ export default (function IoC() {
       params?: Params<S>,
       isSingleton?: boolean
     ): void {
-      return add(globalApp, ctor, (params || []) as any, isSingleton);
+      return add(global, ctor, (params || []) as any, isSingleton);
     },
     /**
      * Resolves the Service with all it's dependencies
@@ -131,8 +130,8 @@ export default (function IoC() {
      */
     resolve<S>(
       ctor: Constructor<S>
-    ): S | null {
-      return resolve(globalApp, ctor);
+    ): S | undefined {
+      return resolve(global, ctor);
     },
     /**
      * Defines the bouer app containing all the services that needs to be provided in this app
@@ -155,7 +154,7 @@ export default (function IoC() {
          * @param ctor the class the needs to be resolved
          * @returns the instance of the class resolved
          */
-        resolve<S >(ctor: Constructor<S>): S | null {
+        resolve<S >(ctor: Constructor<S>): S | undefined {
           return resolve(app, ctor);
         },
         /**
@@ -178,11 +177,11 @@ export default (function IoC() {
       ctor: Constructor<S>,
       params?: Params<S>,
       app?: Bouer
-    ): S | null {
+    ): S | undefined {
 
       if (ctor instanceof Bouer) {
         Logger.error('Cannot create an instance of Bouer using IoC');
-        return null;
+        return undefined;
       }
       return newInstance(ctor, (params || []) as any, app);
     },
@@ -192,6 +191,10 @@ export default (function IoC() {
      */
     newId(): number {
       return bouerId++;
-    }
+    },
+    global
   };
+  return methods
 })();
+
+export default IoC;

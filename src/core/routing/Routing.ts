@@ -1,29 +1,27 @@
-import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
 import Bouer from '../../instance/Bouer';
 import IoC from '../../shared/helpers/IoCContainer';
 import {
   DOM,
-  forEach,
+  filter,
   WIN,
   ifNullReturn,
   isNull,
-  isObject,
   toArray,
   trim,
   urlCombine,
   urlResolver,
   ifNullStop,
   createEl,
+  $internal,
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
-import Component from '../component/Component';
+import ComponentPrototype from '../component/Component';
 import ComponentHandler from '../component/ComponentHandler';
 
 export default class Routing {
-  readonly _IRT_ = true;
   bouer: Bouer;
-  defaultPage?: Component | IComponentOptions;
-  notFoundPage?: Component | IComponentOptions;
+  defaultPage?: ComponentPrototype;
+  notFoundPage?: ComponentPrototype;
   routeView: Element | null = null;
   activeAnchors: HTMLAnchorElement[] = [];
 
@@ -31,6 +29,7 @@ export default class Routing {
   base: string | null = null;
 
   constructor(bouer: Bouer) {
+    $internal(this);
     this.bouer = bouer;
   }
 
@@ -106,7 +105,7 @@ export default class Routing {
     if (!page && route.endsWith('.html')) return;
 
     const componentElement = createEl(page.name!, el => {
-      el.setAttribute('data', isObject(options!.data) ? '$navigate' : '$data');
+      el.setAttribute('data', !isNull(options!.data) ? '$navigate' : '$data');
     }).appendTo(this.routeView!)
       .build();
 
@@ -169,18 +168,18 @@ export default class Routing {
     if (isNull(route)) return;
 
     // Removing the active mark
-    forEach(this.activeAnchors, anchor =>
+    filter(this.activeAnchors, anchor =>
       anchor.classList.remove(className));
 
     // Removing the active mark
-    forEach([].slice.call(appEl.querySelectorAll('a.' + className)),
+    filter([].slice.call(appEl.querySelectorAll('a.' + className)),
       (anchor: HTMLAnchorElement) =>
         anchor.classList.remove(className));
 
     this.activeAnchors = [];
 
     // Adding the className and storing all the active anchors
-    forEach(toArray(anchors), (anchor: HTMLAnchorElement) => {
+    filter(toArray(anchors), (anchor: HTMLAnchorElement) => {
       if (anchor.href.split('?')[0] !== route.split('?')[0])
         return;
 
@@ -193,8 +192,8 @@ export default class Routing {
     const className = this.bouer.config.activeClassName || 'active-link';
     if (isNull(anchor)) return;
 
-    forEach(this.activeAnchors, anchor => anchor.classList.remove(className));
-    forEach([].slice.call(ifNullStop(this.bouer.el)!.querySelectorAll('a.' + className)),
+    filter(this.activeAnchors, anchor => anchor.classList.remove(className));
+    filter([].slice.call(ifNullStop(this.bouer.el)!.querySelectorAll('a.' + className)),
       (anchor: HTMLAnchorElement) => anchor.classList.remove(className));
 
     anchor.classList.add(className);
@@ -207,13 +206,13 @@ export default class Routing {
 
   /**
    * Allow to configure the `Default Page` and `NotFound Page`
-   * @param {Component|IComponentOptions} component the component to be checked
+   * @param {ComponentPrototype|IComponentOptions} component the component to be checked
    */
-  configure(component: Component | IComponentOptions) {
-    if (component.isDefault === true && !isNull(this.defaultPage))
+  configure(component: ComponentPrototype) {
+    if (component.isDefault === true && this.defaultPage)
       return Logger.warn('There are multiple “Default Page” provided, check the “' + component.route + '” route.');
 
-    if (component.isNotFound === true && !isNull(this.notFoundPage))
+    if (component.isNotFound === true && this.notFoundPage)
       return Logger.warn('There are multiple “NotFound Page” provided, check the “' + component.route + '” route.');
 
     if (component.isDefault === true)

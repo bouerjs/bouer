@@ -1,4 +1,6 @@
 import { FieldErrorMessage, FieldFnValidation, IFieldInfo, IFieldInfoSnapshot, IFieldInit } from '../../definitions/interfaces/IFieldSchema';
+import dynamic from '../../definitions/types/Dynamic';
+import { isNull } from '../../shared/helpers/Utils';
 import FormSchema from './FormSchema';
 import Validator from './Validator';
 
@@ -10,11 +12,6 @@ export default class FieldSchema implements IFieldInfo {
     this.value = undefined;
 
     Object.assign(this, options || {});
-  }
-
-  init(options: IFieldInit) {
-    Object.assign(this, options);
-    return this;
   }
 
   field: Element;
@@ -32,6 +29,22 @@ export default class FieldSchema implements IFieldInfo {
 
   form?: FormSchema;
 
+  init(options: IFieldInit) {
+    Object.assign(this, options);
+    return this;
+  }
+
+  merge(schema: dynamic) {
+    const _this: any = this;
+    Object.keys(schema).forEach((key: string) => {
+
+      if (key in _this && isNull(_this[key]))
+        _this[key] = schema[key];
+    });
+
+    return this;
+  }
+
   isValid(): boolean {
     const errors = Validator.validate(this);
     return (this.errors = errors).length === 0;
@@ -40,4 +53,8 @@ export default class FieldSchema implements IFieldInfo {
   validate() {
     return this.isValid();
   }
+}
+
+export function $field(schema: IFieldInfoSnapshot) {
+  return new FieldSchema(schema);
 }

@@ -6,7 +6,7 @@ import {
   errorMsgEmptyNode,
   errorMsgNodeValue,
   findAttribute,
-  forEach, getRootElement,
+  filter, getRootElement,
   ifNullReturn,
   toOwnerNode,
   trim
@@ -15,8 +15,8 @@ import Logger from '../../../shared/logger/Logger';
 import Binder from '../../binder/Binder';
 import DelimiterHandler from '../../DelimiterHandler';
 import Evaluator from '../../Evaluator';
-import ReactiveEvent from '../../event/ReactiveEvent';
-import Reactive from '../../reactive/Reactive';
+import ReactiveEvent from '../../reactive/ReactiveEvent';
+import ReactivePropertyDescriptor from '../../reactive/Reactive';
 import Compiler, { CompilationHooks } from '../Compiler';
 
 export function $if(opitons: {
@@ -54,7 +54,7 @@ export function $if(opitons: {
   if (nodeName === Constants.elseif || nodeName === Constants.else) return;
 
   let currentEl: Element | null = ownerNode;
-  const reactives: { attr: Attr, descriptor: Reactive<any, any> }[] = [];
+  const reactives: { attr: Attr, descriptor: ReactivePropertyDescriptor<any, any> }[] = [];
 
   // Inserting the comment ref
   container.insertBefore(comment, currentEl);
@@ -88,7 +88,7 @@ export function $if(opitons: {
     ReactiveEvent.once('AfterGet', event => {
       event.onemit = descriptor => {
         // Avoiding multiple binding in the same property
-        if (reactives.findIndex(item => item.descriptor.propName == descriptor.propName) !== -1)
+        if (reactives.findIndex(item => item.descriptor.$name == descriptor.$name) !== -1)
           return;
         reactives.push({ attr: attr, descriptor: descriptor });
       };
@@ -103,7 +103,7 @@ export function $if(opitons: {
     currentEl.removeAttribute(attr.nodeName);
   } while (currentEl = currentEl.nextElementSibling);
 
-  forEach(reactives, item => {
+  filter(reactives, item => {
     binder.binds.push({
       // Binder is connected if at least one of the chain and the comment is still connected
       isConnected: isActive,
@@ -112,7 +112,7 @@ export function $if(opitons: {
   });
 
   (execute = () => {
-    forEach(conditions, chainItem => {
+    filter(conditions, chainItem => {
       const element = getRootElement(chainItem.node);
       if (!element.parentElement) return;
       container.removeChild(element);

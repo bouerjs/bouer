@@ -1,11 +1,11 @@
 import INode from '../../definitions/interfaces/INode';
 import dynamic from '../../definitions/types/Dynamic';
 import RenderContext from '../../definitions/types/RenderContext';
-import { forEach } from '../../shared/helpers/Utils';
+import { $internal, filter } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 
 export default class DataStore {
-  readonly _IRT_ = true;
+  constructor() { $internal(this); }
 
   wait: {
     [key: string]: {
@@ -42,17 +42,17 @@ export default class DataStore {
   getNodeData(element: Element | Node, defaultData?: dynamic) {
     if (!this.element.data.has(element as Element))
       return defaultData;
-
     return this.element.data.get(element as Element) ?? defaultData;
   }
 
   addNodeData(element: Element, data: dynamic) {
+    if (this.element.keys.indexOf(element))
+      this.element.keys.push(element);
     this.element.data.set(element, data);
-    this.element.keys.push(element);
   }
 
   unlinkNodeData() {
-    forEach(this.element.keys, (el:INode) => {
+    filter(this.element.keys, (el:INode) => {
       const isUnlinked = !el.isConnected || (el.isActive || (() => { return false; }))();
 
       if (!isUnlinked)

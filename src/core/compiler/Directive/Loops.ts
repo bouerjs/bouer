@@ -6,7 +6,7 @@ import Extend from '../../../shared/helpers/Extend';
 import {
   createComment,
   errorMsgEmptyNode,
-  forEach,
+  filter,
   getRootElement,
   ifNullReturn,
   isNull,
@@ -22,8 +22,8 @@ import Binder from '../../binder/Binder';
 import DelimiterHandler from '../../DelimiterHandler';
 import Evaluator from '../../Evaluator';
 import EventHandler from '../../event/EventHandler';
-import ReactiveEvent from '../../event/ReactiveEvent';
-import Reactive from '../../reactive/Reactive';
+import ReactiveEvent from '../../reactive/ReactiveEvent';
+import { $reactive } from '../../reactive/Reactive';
 import Compiler, { CompilationHooks } from '../Compiler';
 
 export function $for(opitons: {
@@ -133,7 +133,7 @@ export function $for(opitons: {
       }
 
       const newListCopy: any[] = [];
-      forEach(list, item => {
+      filter(list, item => {
         let isValid = false;
         if (isNull(wKeys)) {
           isValid = toStr(item).toLowerCase().includes(wValue.toLowerCase());
@@ -199,7 +199,7 @@ export function $for(opitons: {
     forData[indexOrValue] = isForOf ? index : sourceValue[item];
     forData[mIndex] = index;
 
-    return Reactive.transform({
+    return $reactive({
       data: forData,
       context: context
     });
@@ -304,7 +304,7 @@ export function $for(opitons: {
         if (indexOrValue === '_index_or_value')
           return;
 
-        forEach(array, (item, index) => {
+        filter(array, (item, index) => {
           item.data[indexOrValue] = index;
         });
       }).then(mCaller => mCaller(listedItemsHandler));
@@ -324,7 +324,7 @@ export function $for(opitons: {
         const deleteCount = args[1] as number;
 
         const removedItems = mListedItems.splice(index, deleteCount);
-        forEach(removedItems, (item: any) => removeEl(getRootElement(item.el)));
+        filter(removedItems, (item: any) => removeEl(getRootElement(item.el)));
 
         expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
 
@@ -333,7 +333,7 @@ export function $for(opitons: {
         const insertArgs = [].slice.call(args, 2);
 
         // Adding the items to the dom
-        forEach(insertArgs, item => {
+        filter(insertArgs, item => {
           index++;
           $InsertForItem({
             // Getting the next reference
@@ -363,7 +363,7 @@ export function $for(opitons: {
         let reference = isUnshift ? getRootElement(element) : comment;
 
         // Adding the items to the dom
-        forEach([].slice.call(args), item => {
+        filter([].slice.call(args), item => {
           const ref = $InsertForItem({
             index: indexRef++,
             reference,
@@ -402,11 +402,11 @@ export function $for(opitons: {
   let expObj: ExpressionType | null = $ExpressionBuilder(node.nodeValue!);
 
   const filters = expObj!.filters;
-  const findFilter = (fName: string) => filters.filter(item => item.substring(0, fName.length) === fName);
+  const findFilter = (fName: string) => filters.filter(f => f.substring(0, fName.length) === fName);
   const whereFilterConfigs = findFilter('where');
 
   // Applying the filter before rendering the items
-  forEach(whereFilterConfigs, config => applyWhere(expObj!.sourceValue, config));
+  filter(whereFilterConfigs, config => applyWhere(expObj!.sourceValue, config));
 
   reactivePropertyEvent.off();
 
@@ -416,7 +416,7 @@ export function $for(opitons: {
     const orderFilterConfigs = findFilter('order');
 
     // Cleaning the existing items
-    forEach(listedItemsHandler, item => {
+    filter(listedItemsHandler, item => {
       const element = getRootElement(item.el);
       if (!element.parentElement) return;
       container.removeChild(element);
@@ -430,12 +430,12 @@ export function $for(opitons: {
       code: 'var __e = __each, __fl = __filters, __f = __for; ' +
         '__f(__fl(' + iterable + '), function($$itm, $$idx) { __e($$itm, $$idx); })',
       aditional: {
-        __for: forEach,
+        __for: filter,
         __each: (item: any, index: number) => $InsertForItem({ index, item }),
         __filters: (list: any[]) => {
           let listCopy = Extend.array(list);
           // applying where:
-          forEach(whereFilterConfigs, config => listCopy = applyWhere(listCopy, config)!);
+          filter(whereFilterConfigs, config => listCopy = applyWhere(listCopy, config)!);
 
           // applying order:
           const applyOrder = (config: string) => {
@@ -448,7 +448,7 @@ export function $for(opitons: {
             }
           };
 
-          forEach(orderFilterConfigs, config => applyOrder(config));
+          filter(orderFilterConfigs, config => applyOrder(config));
 
           return listCopy;
         }

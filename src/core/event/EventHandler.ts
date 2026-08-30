@@ -9,26 +9,27 @@ import Task from '../../shared/helpers/Task';
 import {
   buildError,
   createEl,
-  forEach,
+  filter,
   isFunction,
   isNull,
   trim,
-  where,
   ifNullReturn,
-  fnCallResolver
+  fnCallResolver,
+  $internal
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Evaluator from '../Evaluator';
 import INode from '../../definitions/interfaces/INode';
 
 export default class EventHandler {
-  readonly _IRT_ = true;
   bouer: Bouer;
   evaluator: Evaluator;
   $events: { [key: string]: IEventSubscription[] } = {};
   input = createEl('input').build();
 
   constructor(bouer: Bouer, evaluator: Evaluator) {
+    $internal(this);
+
     this.bouer = bouer;
     this.evaluator = evaluator;
 
@@ -62,13 +63,13 @@ export default class EventHandler {
         'stop': 'stopPropagation'
       };
 
-      forEach(allModifiers, modifier => {
+      filter(allModifiers, modifier => {
         const modifierFunctionName = availableModifiersFunction[modifier];
         if ((evt as any)[modifierFunctionName]) (evt as any)[modifierFunctionName]();
       });
 
       const mArguments = [evt];
-      const isResultFunction = this.evaluator.exec({
+      const response = this.evaluator.exec({
         data: data,
         code: nodeValue,
         args: mArguments,
@@ -76,9 +77,13 @@ export default class EventHandler {
         context: context
       });
 
-      if (isFunction(isResultFunction)) {
+      if (isFunction(response)) {
         try {
-          fnCallResolver((isResultFunction as Function).apply(context, mArguments));
+          if (('nobind' in response)) {
+            fnCallResolver(response);
+          } else {
+            fnCallResolver((response as Function).apply(context, mArguments));
+          }
         } catch (error) {
           Logger.error(buildError(error));
         }
@@ -88,7 +93,7 @@ export default class EventHandler {
     const modifiersObject: dynamic = {};
     const addEventListenerOptions = ['capture', 'once', 'passive'];
 
-    forEach(allModifiers, md => {
+    filter(allModifiers, md => {
       md = md.toLocaleLowerCase();
       if (addEventListenerOptions.indexOf(md) !== -1) {
         modifiersObject[md] = true;
@@ -152,7 +157,7 @@ export default class EventHandler {
     if (!this.$events[eventName])
       return;
 
-    this.$events[eventName] = where(this.$events[eventName], evt => {
+    this.$events[eventName] = filter(this.$events[eventName], evt => {
       const isEqual = (evt.eventName === eventName && callback == evt.callback);
 
       if (attachedNode && (evt.attachedNode === attachedNode) && isEqual)
@@ -160,8 +165,7 @@ export default class EventHandler {
 
       // In this case remove all
       const isRemoveAll = (evt.eventName === eventName &&
-        evt.attachedNode === attachedNode &&
-        isNull(callback));
+        evt.attachedNode === attachedNode && !callback);
       if (isRemoveAll) return;
 
       return !isEqual;
@@ -181,7 +185,7 @@ export default class EventHandler {
       node.removeEventListener(eventName, callback);
     };
 
-    this.$events[eventName] = where(events, evt => {
+    this.$events[eventName] = filter(events, evt => {
       const node = evt.attachedNode;
       const isOnceEvent = ifNullReturn((evt.modifiers || {}).once, false) || ifNullReturn(once, false);
 
@@ -208,8 +212,8 @@ export default class EventHandler {
     const autoOffEvent = ifNullReturn(this.bouer.config.autoOffEvent, true);
     if (autoOffEvent == false) return;
     Task.run(() => {
-      forEach(Object.keys(this.$events), key => {
-        this.$events[key] = where(this.$events[key], event => {
+      filter(Object.keys(this.$events), key => {
+        this.$events[key] = filter(this.$events[key], event => {
           if ((event.modifiers || {}).autodestroy === false) return true;
 
           if (!event.attachedNode) return true;

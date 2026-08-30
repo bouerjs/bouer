@@ -1,16 +1,15 @@
-import { Compiler, Extend, IFieldInfoSnapshot, IFieldSchema, Prop, Reactive, RenderContext } from "../..";
+import { Compiler, Extend, IFieldInfoSnapshot, IFieldSchema, Prop, RenderContext } from "../..";
 import dynamic from "../../definitions/types/Dynamic";
 import Constants from "../../shared/helpers/Constants";
-import { code, findAttribute, forEach, isEmptyObject, isNull, toArray, toLower } from "../../shared/helpers/Utils";
+import { $internal, code, findAttribute, filter, isEmptyObject, isNull, toArray, toLower } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
 import Evaluator from "../Evaluator";
+import { $reactive } from "../reactive/Reactive";
 import FieldSchema from "./FieldSchema";
 import { BuildOptions } from "./FormHandler";
 import FormSchema from "./FormSchema";
 
 export default class SchemaBuilder {
-  readonly _IRT_ = true;
-
   private context: RenderContext;
   private compiler: Compiler;
   private evaluator: Evaluator;
@@ -23,6 +22,7 @@ export default class SchemaBuilder {
     compiler: Compiler,
     evaluator: Evaluator
   ) {
+    $internal(this);
     this.context = context;
     this.compiler = compiler;
     this.evaluator = evaluator;
@@ -43,8 +43,7 @@ export default class SchemaBuilder {
     const rootElement = entry.element;
 
     const options = entry.options || {};
-    const buildType = options.type || 'REACTIVE';
-    const isReactive = buildType === 'REACTIVE';
+    const isReactive = (options.type || 'REACTIVE') === 'REACTIVE';
 
     // Remove `[ ]` and `,` and return an array of the names provided
     const mNames = (options.names || '[name]').replace(/\[|\]/g, '').split(',');
@@ -62,25 +61,25 @@ export default class SchemaBuilder {
         return;
 
       formSchema.schema = $schema;
-    };
+    }
 
     const getValue = (el: Element, fieldName: string) => {
       if (fieldName in el) return (el as any)[fieldName];
       return el.getAttribute(fieldName) || (el as any).innerText;
-    };
+    }
 
     const getFieldValue = (el: Element) => {
       let val: string | number | boolean | undefined | null = undefined;
       mValues.find((field: string) => (val = getValue(el, field)) ? true : false);
       return val;
-    };
+    }
 
     const getFieldStructure = (
       schema: IFieldSchema,
       fieldName: string,
       el: Element,
       scopeData: dynamic
-    ) => {
+    ) : FieldSchema | IFieldInfoSnapshot  => {
       const field = findAttribute(el, [Constants.form.schema], true);
       const codeFieldInfo = schema[fieldName] || {};
 
@@ -100,8 +99,12 @@ export default class SchemaBuilder {
         );
       }
 
-      return Extend.obj(htmlFieldInfo, codeFieldInfo) as dynamic;
-    };
+      if (codeFieldInfo instanceof FieldSchema) {
+        return codeFieldInfo.merge(htmlFieldInfo);
+      }
+
+      return Extend.obj(htmlFieldInfo, codeFieldInfo) as IFieldInfoSnapshot;
+    }
 
     // Use the up array to map the layers and check what layer the compiler is
     const findParentBuildElement = function (el: Element): Element | null | undefined {
@@ -134,7 +137,7 @@ export default class SchemaBuilder {
 
       const attrName = attr.value;
       const type = findAttribute(input, ['type']);
-      const typeName = (!type || toLower(type.value) == 'text') ? 'string' : toLower(type.value);
+      const typeName = type ? toLower(type.value) : 'text';
 
       // If is escapable, stop
       if (escapes[input.tagName] === true) return;
@@ -145,13 +148,17 @@ export default class SchemaBuilder {
 
       // Retrieving the value if it needs to be build as arry property
       const isArray = findAttribute(input, ['e-array']) != null;
+
       // if it is not an array built type, just set the value
+      const fieldStructure = getFieldStructure(schema, attrName, input, scopeData);
 
       // Form Field
-      const $fieldSchema = new FieldSchema(
-        getFieldStructure(schema, attrName, input, scopeData)
-      ).init({
-        field: input, name: attrName, type: isArray ? 'array' : typeName
+      const $fieldSchema = fieldStructure instanceof FieldSchema
+        ? fieldStructure
+        : new FieldSchema(fieldStructure);
+
+      $fieldSchema.init({
+        field: input, name: attrName, type: isArray ? typeName+'[]' : typeName
       });
 
       $fieldSchema.form = scopeData.$form;
@@ -161,7 +168,7 @@ export default class SchemaBuilder {
         $fieldSchema.value = getFieldValue(input);
 
       // Transforming the value and errors to reactive
-      Reactive.transform({
+      $reactive({
         context: this.context!,
         data: $fieldSchema,
         keys: ['value', 'errors']
@@ -182,8 +189,6 @@ export default class SchemaBuilder {
       // Setting the element prop in the schema
        // if it is not an array built type, just set the value
       if (!isArray) {
-        // Field Info Set
-
         if (attrName in schema)
           delete schema[attrName];
 
@@ -195,7 +200,7 @@ export default class SchemaBuilder {
       }
 
       if (isReactive) {
-        Reactive.transform({
+        $reactive({
           context: this.context!,
           data: schema,
           keys: [attrName]
@@ -268,7 +273,7 @@ export default class SchemaBuilder {
       }
 
       if (isReactive) {
-        Reactive.transform({
+        $reactive({
           context: this.context!,
           data: currentSchema,
           keys: [attrValue]
@@ -285,18 +290,15 @@ export default class SchemaBuilder {
     // Initializing the Schema Layer
     formLayerSchema.set(rootElement!, $schema);
 
-
     if (isReactive) {
       const arrayElements = Extend.array(
         toArray(rootElement!.querySelectorAll('[e-build\\:array]')),
         toArray(rootElement!.querySelectorAll('[e-array]'))
       );
-      forEach(arrayElements, (el: Element) => {
+      filter(arrayElements, (el: Element) => {
         const attr = findAttribute(el, ['e-build:array', 'e-build']);
         if (!attr) return;
-
-        const varName = code(3, '_');
-        el.setAttribute('e-for', `${varName} of $form.parent.get('${attr.value}')`);
+        el.setAttribute('e-for', `${code(3, '_')} of $form.parent.get('${attr.value}')`);
       });
     }
 

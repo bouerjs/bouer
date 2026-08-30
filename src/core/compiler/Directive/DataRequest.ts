@@ -1,10 +1,10 @@
-import { IoC } from '../../..';
 import IBinderConfig from '../../../definitions/interfaces/IBinderConfig';
 import dynamic from '../../../definitions/types/Dynamic';
 import RenderContext from '../../../definitions/types/RenderContext';
 import Bouer from '../../../instance/Bouer';
 import Constants from '../../../shared/helpers/Constants';
 import Extend from '../../../shared/helpers/Extend';
+import IoC from '../../../shared/helpers/IoCContainer';
 import Prop from '../../../shared/helpers/Prop';
 import { code, createComment, ifNullReturn, toOwnerNode, trim } from '../../../shared/helpers/Utils';
 import Logger from '../../../shared/logger/Logger';
@@ -13,7 +13,7 @@ import DelimiterHandler from '../../DelimiterHandler';
 import EventHandler from '../../event/EventHandler';
 import IMiddlewareResult from '../../middleware/IMiddlewareResult';
 import Middleware from '../../middleware/Middleware';
-import Reactive from '../../reactive/Reactive';
+import { $reactive } from '../../reactive/Reactive';
 import Skeleton from '../../Skeleton';
 import DataStore from '../../store/DataStore';
 import Compiler, { CompilationHooks } from '../Compiler';
@@ -183,7 +183,7 @@ export function $req(opitons: {
       if (!isValidResponse(response, expObject.type))
         return;
 
-      Reactive.transform({
+      $reactive({
         context: context,
         data: response
       });
@@ -215,7 +215,7 @@ export function $req(opitons: {
         (data as any)[variable] = response.data;
         return compiler.compile({
           el: ownerNode,
-          data: Reactive.transform({ context: context, data: data }),
+          data: $reactive({ context: context, data: data }),
           context: context,
           beforeCompile: opitons.compilationHooks.beforeCompile,
           afterCompile: opitons.compilationHooks.afterCompile

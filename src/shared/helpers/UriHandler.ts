@@ -1,11 +1,11 @@
 import dynamic from '../../definitions/types/Dynamic';
-import { DOM, forEach, isString } from './Utils';
+import { $internal, DOM, filter, isString } from './Utils';
 
 export default class UriHandler {
-  readonly _IRT_ = true;
   url: string;
 
   constructor(url?: string) {
+    $internal(this);
     this.url = url || DOM.location.href;
   }
 
@@ -20,7 +20,7 @@ export default class UriHandler {
 
       const urlPatternReversed = urlPattern.split('/').reverse();
 
-      forEach(urlPatternReversed, (value, index) => {
+      filter(urlPatternReversed, (value, index) => {
         const valueExec = RegExp('{([\\S\\s]*?)}', 'ig').exec(value);
 
         if (Array.isArray(valueExec))
@@ -32,7 +32,7 @@ export default class UriHandler {
     const queryStr = this.url.split('?')[1];
     if (!queryStr) return mParams;
     const keys = queryStr.split('&');
-    forEach(keys, key => {
+    filter(keys, key => {
       const pair = key.split('=');
       mParams[pair[0]] = (pair[1] || '').split('#')[0];
     });
@@ -42,7 +42,7 @@ export default class UriHandler {
 
   add(params: dynamic) {
     const mParams: string[] = [];
-    forEach(Object.keys(params), key => {
+    filter(Object.keys(params), key => {
       mParams.push(key + '=' + params[key]);
     });
 

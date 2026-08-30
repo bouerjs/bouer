@@ -50,8 +50,12 @@ const Constants = {
   },
 
   check(node: Node, cmd: string) {
-    if (node.nodeName in { [this.form.schema]: 1, 'e-build': 1, 'e-build:array': 1, 'e-array': 1 })
-      return false;
+    if (node.nodeName in {
+      [this.form.schema]: 1,
+      'e-build': 1,
+      'e-build:array': 1,
+      'e-array': 1
+    }) return false;
     return startWith(node.nodeName, cmd);
   }
 };

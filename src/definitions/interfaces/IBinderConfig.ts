@@ -1,5 +1,5 @@
 import IDelimiterResponse from './IDelimiterResponse';
-import dynamic from '../types/Dynamic';
+import dynamic from './../types/Dynamic';
 
 interface IBinderConfig {
   /** the bound node */

@@ -1,10 +1,8 @@
 
 // Quotes “'+  +'”
 
-import ReactiveEvent from '../../core/event/ReactiveEvent';
-import Computed, { EntryType } from '../../core/reactive/Computed';
-import Reactive from '../../core/reactive/Reactive';
-import Ref from '../../core/reactive/Ref';
+import ReactivePropertyDescriptor, { $reactive } from '../../core/reactive/Reactive';
+import ReactiveEvent from '../../core/reactive/ReactiveEvent';
 import dynamic from '../../definitions/types/Dynamic';
 import RenderContext from '../../definitions/types/RenderContext';
 import Logger from '../logger/Logger';
@@ -65,7 +63,7 @@ export function webRequest(url: string, options?: {
 
     xhr.open(method, url, true);
 
-    forEach(Object.keys(headers), key => {
+    filter(Object.keys(headers), key => {
       xhr.setRequestHeader(key, headers[key]);
     });
 
@@ -116,22 +114,6 @@ export function isObject(input: any) {
   return (typeof input === 'object') && (String(input) === '[object Object]');
 }
 
-export function isFilledObj(input: any) {
-  if (isEmptyObject(input)) return false;
-
-  let oneFilledField = false;
-  const arrayObject = Object.keys(input);
-
-  for (let index = 0; index < arrayObject.length; index++) {
-    if (!isNull(arrayObject[index])) {
-      oneFilledField = true;
-      break;
-    }
-  }
-
-  return oneFilledField;
-}
-
 export function isPrimitive(input: any): boolean {
   return (
     typeof input === 'string' ||
@@ -142,7 +124,7 @@ export function isPrimitive(input: any): boolean {
 }
 
 export function isString(input: any) {
-  return (typeof input !== 'undefined') && (typeof input === 'string');
+  return typeof input === 'string';
 }
 
 export function isEmptyObject(input: any) {
@@ -154,21 +136,12 @@ export function isFunction(input: any) {
   return typeof input === 'function';
 }
 
-export function isRef(input: any) {
-  return input instanceof Ref && typeof input.__ === 'function';
-}
-
-export function isComputed(input: any) {
-  return input instanceof Computed && typeof input.__ === 'function';
-}
-
 export function ifNullReturn<T>(v: any, _return: T) {
   return isNull(v) ? _return : v;
 }
 
 export function ifNullStop(el: Element | undefined | null) {
-  if (isNull(el))
-    throw new Error('Application is not initialized');
+  if (!el) throw new Error('Application is not initialized');
   return el!;
 }
 
@@ -183,9 +156,6 @@ export function startWith(value: string, pattern: string) {
 export function toLower(str: string) {
   return str.toLowerCase();
 }
-export function toPascalCase(value: string) {
-  return value[0].toUpperCase() + value.substring(1);
-}
 
 export function toStr(input: any) {
   if (isPrimitive(input)) {
@@ -199,41 +169,19 @@ export function toStr(input: any) {
   }
 }
 
-export function forEach<T, C = {}>(
-  iterable: T[],
-  callback: (this: typeof context, item: T, index: number) => void,
-  context?: C
-) {
-  for (let i = 0; i < iterable.length; i++) {
-    callback.call(context, iterable[i], i);
-  }
-}
 
-export function where<T, C = {}>(
+export function filter<T, C = {}>(
   iterable: T[],
   callback: (this: typeof context, item: T, index: number) => any,
   context?: C
 ) {
   const out: T[] = [];
   for (let i = 0; i < iterable.length; i++) {
-    if (callback.call(context, iterable[i], i)) {
+    if (callback.call(context, iterable[i], i))
       out.push(iterable[i]);
-    }
   }
-  return out;
-}
 
-export function findOneBy<T, C = {}>(
-  iterable: T[],
-  callback: (this: typeof context, item: T, index: number) => any,
-  context?: C
-) {
-  for (let i = 0; i < iterable.length; i++) {
-    if (callback.call(context, iterable[i], i)) {
-      return iterable[i];
-    }
-  }
-  return null;
+  return out;
 }
 
 export function toArray(array: any) {
@@ -273,7 +221,7 @@ export function createEl<Key extends string>(
 }
 
 export function removeEl(el: Element) {
-  const parent = el.parentNode;
+  const parent = el.parentElement || el.parentNode;
   if (parent) parent.removeChild(el);
 }
 
@@ -284,7 +232,7 @@ export function mapper(source: dynamic, destination: dynamic) {
     if (map.has(source)) return;
 
     map.add(source);
-    forEach(Object.keys(source), key => {
+    filter(Object.keys(source), key => {
       const sourceValue = source[key];
 
       // If the key already in the destination, set
@@ -344,8 +292,8 @@ export function urlCombine(base: string, ...parts: string[]) {
   const uriRemainParts = uriRemain.split(/\//);
   const partsToJoin: string[] = [];
 
-  forEach(uriRemainParts, p => trim(p) ? partsToJoin.push(p) : null);
-  forEach(parts, part => forEach(part.split(/\//),
+  filter(uriRemainParts, p => trim(p) ? partsToJoin.push(p) : null);
+  filter(parts, part => filter(part.split(/\//),
     p => trim(p) ? partsToJoin.push(p) : null));
 
   return protocol + partsToJoin.join('/');
@@ -396,8 +344,8 @@ export function buildError(error: any) {
   return error;
 }
 
-export function $default(input?: any, ...remains: any): any {
-  return input;
+export function $default<T = any>(entry?: T, ...remains: any): T {
+  return entry!;
 }
 
 export function fnCallResolver(fn?: any, cb?: (v: any) => any) {
@@ -415,9 +363,11 @@ export function fnCallResolver(fn?: any, cb?: (v: any) => any) {
     return fnValue;
 
   if (fnValue instanceof Promise) {
-    fnValue.then(value => {
+    fnValue = fnValue.then(value => {
       if (typeof cb === 'function') cb(value);
       return value;
+    }).catch(error => {
+      throw Error(buildError(error));
     });
   }
 
@@ -428,7 +378,7 @@ export function fnCallResolver(fn?: any, cb?: (v: any) => any) {
 export function findAttribute(
   element: Element,
   attrs: string[],
-  removeIfFound: boolean = false
+  removeIfFound?: boolean
 ): Attr | null {
   let res: Attr | null = null;
 
@@ -438,7 +388,7 @@ export function findAttribute(
     if (res = element.attributes[attrs[i] as any])
       break;
 
-  if (!isNull(res) && removeIfFound)
+  if (!isNull(res) && removeIfFound === true)
     element.removeAttribute(res!.name);
 
   return res;
@@ -481,15 +431,15 @@ export function setData<
   }
 
   // Transforming the input
-  Reactive.transform({
+  $reactive({
     data: inputData,
     context: context
   });
 
   // Transfering the properties
-  forEach(Object.keys(inputData), key => {
-    let source: Reactive<any, any> | undefined;
-    let destination: Reactive<any, any> | undefined;
+  filter(Object.keys(inputData), key => {
+    let source: ReactivePropertyDescriptor<any, any> | undefined;
+    let destination: ReactivePropertyDescriptor<any, any> | undefined;
 
     ReactiveEvent.once('AfterGet', evt => {
       evt.onemit = descriptor => source = descriptor;
@@ -506,7 +456,7 @@ export function setData<
 
     if (!destination || !source) return;
     // Adding the previous watches to the property that is being set
-    forEach(destination.watches, watch => {
+    filter(destination.watches, watch => {
       if (source!.watches.indexOf(watch) === -1)
         source!.watches.push(watch);
     });
@@ -516,12 +466,6 @@ export function setData<
   });
 
   return (targetObject! as any) as OutData;
-}
-
-export function $computed<Type, Context = any>(
-  entryValue: EntryType<Type, Context>
-) {
-  return new Computed<Type, Context>(entryValue);
 }
 
 export function toOwnerNode(node: Node) {
@@ -536,6 +480,13 @@ export function errorMsgEmptyNode(node: Node) {
 export function errorMsgNodeValue(node: Node) {
   return ('Expected an expression in “' + node.nodeName +
     '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
+}
+
+export function $internal($this: any) {
+  Object.defineProperty($this, 'ͼ', {
+    enumerable: false,configurable: false, writable: false, value: undefined,
+  });
+  return $this;
 }
 
 export const WIN = window;

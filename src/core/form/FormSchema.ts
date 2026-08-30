@@ -2,7 +2,7 @@ import { IFieldSchema } from "../../definitions/interfaces/IFieldSchema";
 import dynamic from "../../definitions/types/Dynamic";
 import Constants from "../../shared/helpers/Constants";
 import Extend from "../../shared/helpers/Extend";
-import { $default, findAttribute, toArray, where } from "../../shared/helpers/Utils";
+import { $default, findAttribute, toArray, filter } from "../../shared/helpers/Utils";
 import FieldSchema from "./FieldSchema";
 
 export default class FormSchema {

@@ -1,4 +1,3 @@
-import Bouer, { Compiler, IoC } from '../../..';
 import dynamic from '../../../definitions/types/Dynamic';
 import RenderContext from '../../../definitions/types/RenderContext';
 import Extend from '../../../shared/helpers/Extend';
@@ -6,7 +5,7 @@ import Prop from '../../../shared/helpers/Prop';
 import {
   errorMsgEmptyNode,
   errorMsgNodeValue,
-  forEach,
+  filter,
   ifNullReturn,
   isObject,
   toOwnerNode,
@@ -15,10 +14,12 @@ import {
 import Logger from '../../../shared/logger/Logger';
 import DelimiterHandler from '../../DelimiterHandler';
 import Evaluator from '../../Evaluator';
-import ReactiveEvent from '../../event/ReactiveEvent';
-import Reactive from '../../reactive/Reactive';
+import ReactiveEvent from '../../reactive/ReactiveEvent';
+import { $reactive } from '../../reactive/Reactive';
 import DataStore from '../../store/DataStore';
-import { CompilationHooks } from '../Compiler';
+import Compiler, { CompilationHooks } from '../Compiler';
+import Bouer from '../../../instance/Bouer';
+import IoC from '../../../shared/helpers/IoCContainer';
 
 export function $data(opitons: {
   node: Node,
@@ -50,9 +51,9 @@ export function $data(opitons: {
   let inputData: dynamic = {};
   const mData = Extend.obj(data, { $data: data, $scope: data });
   const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
-    if (!(descriptor.propName in inputData))
-      inputData[descriptor.propName] = undefined;
-    Prop.set(inputData, descriptor.propName, descriptor);
+    if (!(descriptor.$name in inputData))
+      inputData[descriptor.$name] = undefined;
+    Prop.set(inputData, descriptor.$name, descriptor);
   });
 
   // If data value is empty gets the main scope value
@@ -71,7 +72,7 @@ export function $data(opitons: {
         '” and got “' + nodeValue + '”.');
 
     // Adding all non-existing properties
-    forEach(Object.keys(mInputData), key => {
+    filter(Object.keys(mInputData), key => {
       if (!(key in inputData))
         inputData[key] = mInputData[key];
     });
@@ -85,7 +86,7 @@ export function $data(opitons: {
     IoC.app(bouer).resolve(DataStore)!.set('data', dataKey, inputData);
   }
 
-  Reactive.transform({
+  $reactive({
     context: context,
     data: inputData
   });
@@ -129,9 +130,9 @@ export function $def(opitons: {
 
   const inputData: dynamic = {};
   const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
-    if (!(descriptor.propName in inputData))
-      inputData[descriptor.propName] = undefined;
-    Prop.set(inputData, descriptor.propName, descriptor);
+    if (!(descriptor.$name in inputData))
+      inputData[descriptor.$name] = undefined;
+    Prop.set(inputData, descriptor.$name, descriptor);
   });
 
   const mInputData = evaluator.exec({
@@ -145,7 +146,7 @@ export function $def(opitons: {
       '” and got “' + nodeValue + '”.');
 
   // Adding all non-existing properties
-  forEach(Object.keys(mInputData), key => {
+  filter(Object.keys(mInputData), key => {
     if (!(key in inputData))
       inputData[key] = mInputData[key];
   });
@@ -183,11 +184,11 @@ export function $wait(options: {
     // No data exposed yet
     if (!mWait.data) return;
     // Compile all the waiting nodes
-    forEach(mWait.nodes, (nodeWaiting) => {
+    filter(mWait.nodes, (nodeWaiting) => {
       compiler.compile({
         el: nodeWaiting as Element,
         context: mWait.context,
-        data: Reactive.transform({
+        data: $reactive({
           context: mWait.context,
           data: mWait.data!
         }),

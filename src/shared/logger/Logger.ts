@@ -9,9 +9,6 @@ export default (function Logger() {
     },
     warn(w: any) {
       console.warn(prefix, w);
-    },
-    info(i: any) {
-      console.info(prefix, i);
     }
   };
 })();

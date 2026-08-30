@@ -1,9 +1,9 @@
-import { buildError, forEach, isNull } from '../../shared/helpers/Utils';
+import { buildError, filter, isNull } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
-import Reactive from '../reactive/Reactive';
+import ReactivePropertyDescriptor from './Reactive';
 
 type CallbackReactiveProperty = <TProperty, TObject>(
-  descriptor: Reactive<TProperty, TObject>
+  descriptor: ReactivePropertyDescriptor<TProperty, TObject>
 ) => void;
 
 
@@ -67,10 +67,10 @@ export default class ReactiveEvent {
 
   static emit<TKey extends keyof ReactiveKeyEvents, TProperty, TObject>(
     eventName: TKey,
-    descriptor: Reactive<TProperty, TObject>
+    descriptor: ReactivePropertyDescriptor<TProperty, TObject>
   ): void {
     try {
-      forEach((this.events[eventName] || []), evt => evt(descriptor));
+      filter((this.events[eventName] || []), evt => evt(descriptor));
     } catch (error) {
       Logger.error(buildError(error));
     }

@@ -16,10 +16,10 @@ import { $req } from './DataRequest';
 import { $for } from './Loops';
 import { $skeleton } from './Skeleton';
 import { $skip } from './Skip';
-import { $form } from './Form';
+import { $formHandling } from './FormHandling';
+import { $internal } from '../../../shared/helpers/Utils';
 
 export default class Directive {
-  readonly _IRT_ = true;
   bouer: Bouer;
   binder: Binder;
   evaluator: Evaluator;
@@ -34,6 +34,8 @@ export default class Directive {
     customDirective: CustomDirective,
     compilerContext: RenderContext
   ) {
+    $internal(this);
+
     this.compiler = compiler;
     this.context = compilerContext;
     this.bouer = compiler.bouer;
@@ -212,7 +214,7 @@ export default class Directive {
   }
 
   form(node: Node, data: object) {
-    return $form({
+    return $formHandling({
       evaluator: this.evaluator,
       context: this.context,
       compiler: this.compiler,

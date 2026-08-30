@@ -1,22 +1,19 @@
 import RenderContext from '../../../definitions/types/RenderContext';
-import Extend from '../../../shared/helpers/Extend';
 import { $default, ifNullReturn, isObject, toOwnerNode } from '../../../shared/helpers/Utils';
 import Logger from '../../../shared/logger/Logger';
 import Evaluator from '../../Evaluator';
-import ReactiveEvent from '../../event/ReactiveEvent';
+import ReactiveEvent from '../../reactive/ReactiveEvent';
 import FormHandler from '../../form/FormHandler';
-import FormSchema from '../../form/FormSchema';
-import Reactive from '../../reactive/Reactive';
 import Compiler from '../Compiler';
+import ReactivePropertyDescriptor from '../../reactive/Reactive';
 
-export function $form(opitons: {
+export function $formHandling(opitons: {
   node: Node,
   evaluator: Evaluator,
   context: RenderContext,
   compiler: Compiler,
   data: object
 }) {
-
   const {
     node,
     context,
@@ -36,8 +33,8 @@ export function $form(opitons: {
 
   let formEntryDataSource = $default();
 
-  const reactiveEvent = ReactiveEvent.on('AfterGet', (descriptor: Reactive<any, any>) => {
-    formEntryDataSource = descriptor.propSource;
+  const reactiveEvent = ReactiveEvent.on('AfterGet', (descriptor: ReactivePropertyDescriptor<any, any>) => {
+    formEntryDataSource = descriptor.source;
   });
 
   const entryForm = evaluator.exec({
@@ -55,7 +52,7 @@ export function $form(opitons: {
     // Return the FormHandler
     ? entryForm
     // Create a new annonymous FormHandler
-    : new FormHandler(entryForm.schema);
+    : new FormHandler(entryForm.schema, entryForm.builderOptions);
 
   // Removing the form directive
   ownerNode.removeAttribute(node.nodeName);

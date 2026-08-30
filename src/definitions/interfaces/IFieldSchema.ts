@@ -1,5 +1,6 @@
+import FieldSchema from "../../core/form/FieldSchema";
 
-export type FieldFnValidation = (fieldInfo: IFieldInfo) => boolean | {
+export type FieldFnValidation = (fieldSchema: FieldSchema) => boolean | {
   valid: boolean,
   message: string,
   override: boolean

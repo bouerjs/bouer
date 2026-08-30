@@ -1,9 +1,14 @@
-import Bouer, { $default, buildError, DOM, Extend, IFieldInfoSnapshot, IFieldSchema, IoC, isNull, Prop } from '../..';
+import { IFieldSchema } from '../../definitions/interfaces/IFieldSchema';
 import dynamic from '../../definitions/types/Dynamic';
 import RenderContext from '../../definitions/types/RenderContext';
+import Bouer from '../../instance/Bouer';
+import Extend from '../../shared/helpers/Extend';
+import IoC from '../../shared/helpers/IoCContainer';
+import { $default, $internal, buildError, DOM, isNull } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Compiler from '../compiler/Compiler';
 import Evaluator from '../Evaluator';
+import DataStore from '../store/DataStore';
 import FieldSchema from './FieldSchema';
 import FormSchema from './FormSchema';
 import SchemaBuilder from './SchemaBuilder';
@@ -32,12 +37,11 @@ export type BuildOptions = {
 }
 
 export default class FormHandler {
-  readonly _IRT_ = true;
-
   constructor(
     schema: IFieldSchema,
     builderOptions?: BuildOptions
   ) {
+    $internal(this);
     // Assigning an empty object if formObject is not provided
     this.schema = schema || {};
     this.builderOptions = builderOptions || {};
@@ -77,7 +81,7 @@ export default class FormHandler {
     }
 
     // If the element is not
-    if (isNull(element))
+    if (!element)
       throw Logger.error('Invalid element provided at “' + element + '”.');
 
     return element;
@@ -104,17 +108,21 @@ export default class FormHandler {
       evaluator
     );
 
+    const dataToUse = Extend.obj(data, {
+      $form: new FormSchema({
+        currentNode: this.formElement,
+        scopeData: data
+      })
+    });
+
+    IoC.app(bouer).resolve(DataStore)!
+      .addNodeData(this.formElement, dataToUse);
 
     $builder.build({
       element: this.formElement,
       schema: this.schema,
       options: this.builderOptions,
-      data: Extend.obj(data, {
-        $form: new FormSchema({
-          currentNode: this.formElement,
-          scopeData: data
-        })
-      }),
+      data: dataToUse
     });
 
     this.schemas = $builder.schemas;
@@ -163,4 +171,27 @@ export default class FormHandler {
     }
     return this.$builder.toObject();
   }
+
+  public clear() {
+    for (const field of this.schemas) {
+      switch (field.type) {
+        case 'text': case 'string':
+        case 'checkbox': case 'password':
+          return field.value = '';
+        case 'number': case 'range':
+          return field.value = 0;
+        case 'radio': case 'boolean':
+          return field.value = undefined;
+        default:
+          return field.value = undefined;
+      }
+    }
+  }
+}
+
+export function $form(
+  schema: IFieldSchema,
+  builderOptions?: BuildOptions
+) {
+  return new FormHandler(schema, builderOptions);
 }

@@ -1,31 +1,21 @@
 import { FieldErrorMessage } from '../../definitions/interfaces/IFieldSchema';
 import dynamic from '../../definitions/types/Dynamic';
 import FieldSchema from './FieldSchema';
-import FormSchema from './FormSchema';
 
 const Validator = (function () {
-  const invalidInputClass = 'is-invalid';
-
   function innerValidateRequired(
     fieldInfo: FieldSchema
   ) {
-    const errorList: FieldErrorMessage[] = [];
-    const { field, name, value, type } = fieldInfo;
+    const errors: FieldErrorMessage[] = [];
+    const { field, name, value } = fieldInfo;
     const required = fieldInfo.required ?? false;
 
     const isValidValue = () => {
       return required == true ? (value != null && (value + '').trim() != '') : true;
     };
 
-    const addError = (error: FieldErrorMessage, clear?: boolean) => {
-      if (clear === true) errorList.splice(0, errorList.length);
-
-      errorList.push(error);
-      field.classList.add(invalidInputClass);
-    };
-
     if (!isValidValue()) {
-      addError({
+      errors.push({
         rule: 'required',
         message: `The field ${name} is required.`,
         field: field,
@@ -34,39 +24,46 @@ const Validator = (function () {
     }
 
     return {
-      errors: errorList,
+      errors,
       isValidValue,
-      addError
     };
   }
 
   function innerValidateCheck(
-    fieldInfo: FieldSchema,
-    isValidValue: () => boolean,
-    addError: (error: FieldErrorMessage) => void
+    fieldSchema: FieldSchema
   ) {
-    const { field, name, value, check } = fieldInfo;
+    const errors: FieldErrorMessage[] = [];
+
+    const { field, name, value, check } = fieldSchema;
 
     // Check validation
     if (check != null && check.indexOf(value) < 0) {
-      addError({
+      errors.push({
         rule: 'check',
         message: `The field ${name} with value ${value} does not match the required options.`,
         field: field,
         value: value
       });
-      field.classList.add(invalidInputClass);
     }
+
+    return {
+      errors
+    };
   }
 
   function innerValidateFunction(
-    fieldInfo: FieldSchema,
-    addError: (error: FieldErrorMessage, clear?: boolean) => void
+    fieldSchema: FieldSchema
   ) {
-    if (!fieldInfo.fn) return;
+    const errors: FieldErrorMessage[] = [];
 
-    const { name, field, value, fn } = fieldInfo;
-    const result = fn!(fieldInfo);
+    if (!fieldSchema.fn)
+      return {
+        errors,
+        clearPreviousError: false
+      };
+
+    const { name, field, value, fn } = fieldSchema;
+    const result = fn!(fieldSchema);
 
     const {
       valid,
@@ -81,28 +78,34 @@ const Validator = (function () {
     const clearPreviousError = valid == false && override == true;
 
     if (!valid) {
-      field.classList.add(invalidInputClass);
-      addError({
+      errors.push({
         rule: 'function',
         message: message,
         field: field,
         value: value
-      }, clearPreviousError);
-      field.classList.add(invalidInputClass);
+      });
     }
+
+    return {
+      errors,
+      clearPreviousError
+    };
   }
 
   function validateString(
-    fieldInfo: FieldSchema
+    fieldSchema: FieldSchema
   ) {
-    const { field, pattern, name, value, length } = fieldInfo;
+    const { field, pattern, name, value, length } = fieldSchema;
     const { min, max } = typeof length == 'object' ? length : { min: 0, max: length };
 
-    const { errors, isValidValue, addError } = innerValidateRequired(fieldInfo);
+    const { errors, isValidValue } = innerValidateRequired(fieldSchema);
+
+    if (errors.length > 0)
+      return errors;
 
     // Minimum length validation
     if (min != null && isValidValue() && value.length < min) {
-      addError({
+      errors.push({
         rule: 'length:min',
         message: `The field ${name} should have at least ${min} characters. Current length: ${value.length}.`,
         field: field,
@@ -112,7 +115,7 @@ const Validator = (function () {
 
     // Maximum length validation
     if (max != null && isValidValue() && value.length > max) {
-      addError({
+      errors.push({
         rule: 'length:max',
         message: `The field ${name} should have at most ${max} characters. Current length: ${value.length}.`,
         field: field,
@@ -147,7 +150,7 @@ const Validator = (function () {
       // Validates the pattern as named pattern, otherwise, validate the the pattern as regex
       const isValidPattern = (validator[pattern] || validator['regex'])();
       if (!isValidPattern) {
-        addError({
+        errors.push({
           rule: 'regex',
           message: `The field ${name} does not match the ${(pattern in validator) ? pattern : 'regex'} pattern.`,
           field: field,
@@ -157,30 +160,38 @@ const Validator = (function () {
     }
 
     // Check validation
-    innerValidateCheck(fieldInfo, isValidValue, addError);
+    errors.push(...innerValidateCheck(fieldSchema).errors);
 
     // Function validation
-    innerValidateFunction(fieldInfo, addError);
+    const fnValidation = innerValidateFunction(fieldSchema);
+
+    if (fnValidation.clearPreviousError) {
+      errors.splice(0, errors.length);
+      errors.push(...fnValidation.errors);
+    }
 
     return errors;
   }
 
   function validateNumber(
-    fieldInfo: FieldSchema
+    fieldSchema: FieldSchema
   ) {
     let {
       name,
       value,
       length,
       field
-    } = fieldInfo;
+    } = fieldSchema;
 
     const { min, max } = typeof length == 'object' ? length : { min: 0, max: length };
-    const { errors, isValidValue, addError } = innerValidateRequired(fieldInfo);
+    const { errors, isValidValue } = innerValidateRequired(fieldSchema);
+
+    if (errors.length > 0)
+      return errors;
 
     // is value a valid number
     if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.exec(value)) {
-      addError({
+      errors.push({
         rule: 'number',
         message: `The field ${name} should have a number value.`,
         field: field,
@@ -192,7 +203,7 @@ const Validator = (function () {
 
     // Minimum validation
     if (min != null && value < min) {
-      addError({
+      errors.push({
         rule: 'length:min',
         message: `The field ${name} should be greater than or equal to ${min}.`,
         field: field,
@@ -202,7 +213,7 @@ const Validator = (function () {
 
     // Maximum validation
     if (max != null && value > max) {
-      addError({
+      errors.push({
         rule: 'length:max',
         message: `The field ${name} should be less than or equal to ${max}.`,
         field: field,
@@ -211,27 +222,35 @@ const Validator = (function () {
     }
 
     // Check validation
-    innerValidateCheck(fieldInfo, isValidValue, addError);
+    errors.push(...innerValidateCheck(fieldSchema).errors);
 
     // Function validation
-    innerValidateFunction(fieldInfo, addError);
+    const fnValidation = innerValidateFunction(fieldSchema);
+
+    if (fnValidation.clearPreviousError) {
+      errors.splice(0, errors.length);
+      errors.push(...fnValidation.errors);
+    }
 
     return errors;
   }
 
   function validateBoolean(
-    fieldInfo: FieldSchema
+    fieldSchema: FieldSchema
   ) {
     let {
       name,
       value,
       field
-    } = fieldInfo;
-    const { errors, isValidValue, addError } = innerValidateRequired(fieldInfo);
+    } = fieldSchema;
+    const { errors, isValidValue } = innerValidateRequired(fieldSchema);
+
+    if (errors.length > 0)
+      return errors;
 
     // is value a valid number
     if (!isValidValue() && !/^(TRUE|True|true|1|FALSE|False|false|0)?$/.exec(value)) {
-      addError({
+      errors.push({
         rule: 'boolean',
         message: `The field ${name} should be a boolean. Current value: ${value}`,
         field: field,
@@ -242,35 +261,45 @@ const Validator = (function () {
     }
 
     // Function validation
-    innerValidateFunction(fieldInfo, addError);
+    const fnValidation = innerValidateFunction(fieldSchema);
+
+    if (fnValidation.clearPreviousError) {
+      errors.splice(0, errors.length);
+      errors.push(...fnValidation.errors);
+    }
 
     return errors;
   }
 
   function validate(
-    fieldInfo: FieldSchema
+    fieldSchema: FieldSchema
   ) {
-    const type = fieldInfo.type = fieldInfo.type || 'string';
+    const type = fieldSchema.type = fieldSchema.type || 'string';
+
+    HTMLInputElement
 
     switch (type) {
+      case 'text':
       case 'string':
-        return validateString(fieldInfo);
+      case 'checkbox':
+      case 'password':
+        return validateString(fieldSchema);
       case 'number':
-        return validateNumber(fieldInfo);
+      case 'range':
+        return validateNumber(fieldSchema);
+      case 'radio':
       case 'boolean':
-        return validateBoolean(fieldInfo);
+        return validateBoolean(fieldSchema);
       default:
-        return [] as FieldErrorMessage[];
+        return validateString(fieldSchema);
     }
   }
 
-  return class FormValidator {
-    static validate(
-      fieldInfo: FieldSchema
-    ) {
-      return validate(fieldInfo);
+  return {
+    validate(fieldSchema: FieldSchema) {
+      return validate(fieldSchema);
     }
-  };
+  }
 })();
 
 export default Validator;

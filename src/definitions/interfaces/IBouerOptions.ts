@@ -1,4 +1,4 @@
-import Component from '../../core/component/Component';
+import ComponentPrototype, { Component } from '../../core/component/Component';
 import { MiddlewareConfigType } from '../../core/middleware/Middleware';
 import Bouer from '../../instance/Bouer';
 import Constructor from '../types/Constructor';
@@ -25,12 +25,11 @@ interface IBouerOptions<
   readonly config?: IBouerConfig
 
   /** The components of the instance */
-  readonly components?: (Component | IComponentOptions | Constructor<Component>)[];
+  readonly components?: (Constructor<Component> | IComponentOptions)[];
 
   /** The custom directives for this instance */
   readonly directives?: CustomDirective,
 
-  /** The dependencies of the instance */
   readonly deps?: DataType<Deps, Bouer<Data, Global, Deps>>;
 
   /** Appends delimiters to the instance */
@@ -59,6 +58,12 @@ interface IBouerOptions<
       ) => void) => void,
     app: Bouer<Data, Global, Deps>
   ): void,
+
+  /**
+   * The hook that should be called before the component is loaded
+   * @param event the called event object
+   */
+  mounted?(this: Bouer<Data, Global, Deps>, event: CustomEvent): void;
 
   /**
    * The hook that should be called before the component is loaded
