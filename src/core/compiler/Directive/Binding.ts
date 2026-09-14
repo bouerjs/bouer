@@ -191,3 +191,17 @@ export function $href(opitons: {
         .navigate(href.value);
     }, false);
 }
+
+export function $ref(options: {
+  node: Node,
+  bouer: Bouer
+}) {
+  const { node, bouer } = options;
+  const ownerNode = toOwnerNode(node);
+  const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+
+  if (nodeValue === '')
+    return Logger.error(errorMsgEmptyNode(node));
+
+  bouer.refs[nodeValue] = ownerNode;
+}

@@ -48,7 +48,6 @@ export default class Routing {
         setURL: false
       });
     });
-
   }
 
   /** Initialize the routing the instance */
@@ -206,7 +205,7 @@ export default class Routing {
 
   /**
    * Allow to configure the `Default Page` and `NotFound Page`
-   * @param {ComponentPrototype|IComponentOptions} component the component to be checked
+   * @param {ComponentPrototype} component the component to be checked
    */
   configure(component: ComponentPrototype) {
     if (component.isDefault === true && this.defaultPage)

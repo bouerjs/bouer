@@ -144,6 +144,10 @@ export default class Compiler {
         if (directivesToIgnore.find(dir => dir in attributes))
           return;
 
+        // ref directive
+        if (Constants.ref in attributes)
+          directive.ref(findDirective(currentNode, Constants.ref)!);
+
         // e-def="{...}" directive
         if (Constants.def in attributes)
           directive.def(findDirective(currentNode, Constants.def)!, scopeData);
@@ -345,7 +349,7 @@ export default class Compiler {
     };
 
     if (loadingComponents.length == 0)
-      return fnCallResolver(onComponentLoad!.call(context, rootElement, data as any));
+      return onCompilationFinished();
 
     return Promise.all(loadingComponents)
         .then(() => { onCompilationFinished() });

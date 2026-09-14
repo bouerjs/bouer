@@ -2,22 +2,22 @@ import CustomDirective from '../../../definitions/types/CustomDirective';
 import RenderContext from '../../../definitions/types/RenderContext';
 import Bouer from '../../../instance/Bouer';
 import IoC from '../../../shared/helpers/IoCContainer';
+import { $internal } from '../../../shared/helpers/Utils';
 import Binder from '../../binder/Binder';
 import DelimiterHandler from '../../DelimiterHandler';
 import Evaluator from '../../Evaluator';
 import EventHandler from '../../event/EventHandler';
 import Compiler, { CompilationHooks } from '../Compiler';
-import { $href, $text, $bind, $property } from './Binding';
+import { $bind, $href, $property, $ref, $text } from './Binding';
 import { $entry, $put } from './ComponentEntry';
 import { $if, $show } from './Conditions';
 import { custom } from './Customs';
 import { $data, $def, $wait } from './DataInject';
 import { $req } from './DataRequest';
+import { $formHandling } from './FormHandling';
 import { $for } from './Loops';
 import { $skeleton } from './Skeleton';
 import { $skip } from './Skip';
-import { $formHandling } from './FormHandling';
-import { $internal } from '../../../shared/helpers/Utils';
 
 export default class Directive {
   bouer: Bouer;
@@ -225,6 +225,13 @@ export default class Directive {
 
   skeleton(node: Node) {
     return $skeleton({
+      node: node,
+      bouer: this.bouer
+    });
+  }
+
+  ref(node: Node) {
+    return $ref({
       node: node,
       bouer: this.bouer
     });
