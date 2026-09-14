@@ -393,7 +393,6 @@ export class Component<Data extends object = {}> {
     });
 
     const component = this.__$proto__;
-
     if (component.name == '') {
       // Setting the name of the component, according to the caller (Component) name if not configured
       Property.set(component, 'name', { value: this.constructor.name });
