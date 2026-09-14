@@ -1,3 +1,40 @@
+## [3.3.0](https://github.com/bouerjs/bouer/compare/v3.2.0...v3.3.0) (2026-09-14)
+
+### Features
+
+* added $scope when using data directive, and keep the current scope if the nothing is set as value ([3948e56](https://github.com/bouerjs/bouer/commit/3948e566e63cbc961314e6632941fab4551e35ed))
+* Added InertProp class and $inert function the allows to make a property inert (non-reactive) ([9b5bc74](https://github.com/bouerjs/bouer/commit/9b5bc74bd0a9993e8d7f8a664a39464f0d08e52a))
+* added memory data store for compiled elements, meaning that everytime the element is compiled it shall have the same data ([90ed992](https://github.com/bouerjs/bouer/commit/90ed99216d37db40f238e819bcfb8d668f7e2cc0))
+* added new dirs in the constants ([392e1d5](https://github.com/bouerjs/bouer/commit/392e1d5b2f60150208f9c2a93ca27a7859bc5bb7))
+* added parent property in component to allow to easily navigate between component and fixed the global component event issue ([b437b1a](https://github.com/bouerjs/bouer/commit/b437b1a43338f1b2c0cd6b16d03c168430e40e3a))
+* added props in export method to allow to directly exporty the component props to the data ([9d7e864](https://github.com/bouerjs/bouer/commit/9d7e8640cf95e642ef4665929bdd9aee13b694a5))
+* Implemented DataProp that allows to extract properties from the data directive/data property in the component, and define it as property in the CustomComponent ([1e45a9a](https://github.com/bouerjs/bouer/commit/1e45a9a9e17fcc2483fae8ec7edd42b8e925eff2))
+* introduced ComponentPrototype and Component. The ComponentProto is the instance having all the component information, and the component class is the class that allows creating custom component without all the component proto information, making the component cleanner and more fun to use ([7ce2fb1](https://github.com/bouerjs/bouer/commit/7ce2fb14f0282b9ae1bfb1647d0a3009285ded47))
+* introduced the $createApp that allows creating a app without using the new keyword to instantiate the Bouer class ([9c3ed68](https://github.com/bouerjs/bouer/commit/9c3ed68fb6c38c6e37aad7100c1ba9ebe7eef01b))
+* introduction of FormHandling with validation, among with e-form and e-schema directive ([980a6e1](https://github.com/bouerjs/bouer/commit/980a6e156829e11e7734656b0f8e36ee6e1231ac))
+* introduction of FormHandling with validation, among with e-form and e-schema directive ([48441bd](https://github.com/bouerjs/bouer/commit/48441bd31aa62ac867cc1b497c46cc5eda9b2b90))
+* removed static toJsObj, given that the new form handling uses the compilation process, the static cannot be used ([a73d8c7](https://github.com/bouerjs/bouer/commit/a73d8c77cf412fa206c779ad0f6c9931e88c6dd5))
+
+### Bug Fixes
+
+* added $navigate var to avoid turning it to JSON, and passed the compilation hooks ([48a3705](https://github.com/bouerjs/bouer/commit/48a370561697cc5fb2a743b4c35923da6107eaee))
+* added all the hooks when called Bimder.create(...) ([f753540](https://github.com/bouerjs/bouer/commit/f753540a6c8deca091049202943c2071c51f4180))
+* added all the missing hooks in custom directives ([985d231](https://github.com/bouerjs/bouer/commit/985d231d25070a1c79ceb4a6d540db57083f7416))
+* added missing hook 'onUnbind' ([7227879](https://github.com/bouerjs/bouer/commit/7227879a826b160f7aee7308493462eea9869090))
+* added missing hooks ([89223a2](https://github.com/bouerjs/bouer/commit/89223a2698dc4ba9332cc96f720e7109b17792ca))
+* added new keyword while creating a new instance ([4c8dbaa](https://github.com/bouerjs/bouer/commit/4c8dbaabc8dd95553945859b3184ebc110cc6c8d))
+* added new keyword while creating a new instance and changed the property isReturn to returnable ([fff8f3b](https://github.com/bouerjs/bouer/commit/fff8f3b2895b1f536501eb73ab620278ee1fe632))
+* added the property name on computed prop configuration fail ([c68fde2](https://github.com/bouerjs/bouer/commit/c68fde2539b22a0d6c0f2ac534751ea520e054ee))
+* fixed computed issue on inner property update ([903223e](https://github.com/bouerjs/bouer/commit/903223ec0fa237a75ef9b5a56d554389c0236f2e))
+* fixed double compilation on array value set. Ex. this.data.list = [{...}] ([a336320](https://github.com/bouerjs/bouer/commit/a3363208ce5102d716609cb2527abbbb41565b76))
+* fixed onComponentLoad (onDone) call, now it is called after all the inner components are fully loaded, added beforeCompile and afterCompile, that is called when the on each node compilation, and added formhandling ([6f17964](https://github.com/bouerjs/bouer/commit/6f17964307ca605546f201a0cbbc4222f634796b))
+* fixed onComponentLoad (onDone) call, now it is called after all the inner components are fully loaded, added beforeCompile and afterCompile, that is called when the on each node compilation, and added formhandling ([8aeaeca](https://github.com/bouerjs/bouer/commit/8aeaeca59e5fb89ca02a664ee3f287927a23d407))
+* fixed onComponentLoad (onDone) call, now it is called after all the inner components are fully loaded, added beforeCompile and afterCompile, that is called when the on each node compilation, and added formhandling ([80f77fb](https://github.com/bouerjs/bouer/commit/80f77fbaaf325156e17c98ff707a9423db159d07))
+* fixed the error show in the console when using e-skeleton or another e-[custom] directive ([65a8109](https://github.com/bouerjs/bouer/commit/65a8109484c479240d972e9be398e6938cd8c008))
+* fixed the mapping function issue on self-reference object ([092581d](https://github.com/bouerjs/bouer/commit/092581de3eb85b59b38944ff6948d65b3efb9739))
+* removed data JSON stringification on routing navigation ([399eb4c](https://github.com/bouerjs/bouer/commit/399eb4c40322a6a13846996d77bb56df3d92c3c4))
+* updated the exported types ([6711c34](https://github.com/bouerjs/bouer/commit/6711c3441a6c203cfa92584dba110b9a0fa1e8d7))
+
 # v3.2.0
 [2025-04-24]
 
