@@ -49,8 +49,7 @@ export { prop } from './core/compiler/Directive/DataInject';
  * @returns Bouer instance
  */
 export function $createApp<Data extends {} = {}, Global extends {} = {}, Deps extends {} = {}>(
-  selector?: string,
-  options?: IBouerOptions<Data, Global, Deps>
+  selector?: string, options?: IBouerOptions<Data, Global, Deps>
 ) {
   return new Bouer<Data, Global, Deps>(selector, options);
 }
