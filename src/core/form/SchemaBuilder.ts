@@ -1,8 +1,12 @@
-import { Compiler, Extend, IFieldInfoSnapshot, IFieldSchema, Prop, RenderContext } from "../..";
+import { IFieldInfoSnapshot, IFieldSchema } from "../../definitions/interfaces/IFieldSchema";
 import dynamic from "../../definitions/types/Dynamic";
+import RenderContext from "../../definitions/types/RenderContext";
 import Constants from "../../shared/helpers/Constants";
+import Extend from "../../shared/helpers/Extend";
+import Property from "../../shared/helpers/Property";
 import { $internal, code, findAttribute, filter, isEmptyObject, isNull, toArray, toLower } from "../../shared/helpers/Utils";
 import Logger from "../../shared/logger/Logger";
+import Compiler from "../compiler/Compiler";
 import Evaluator from "../Evaluator";
 import { $reactive } from "../reactive/Reactive";
 import FieldSchema from "./FieldSchema";
@@ -45,6 +49,8 @@ export default class SchemaBuilder {
     const options = entry.options || {};
     const isReactive = (options.type || 'REACTIVE') === 'REACTIVE';
 
+    const cform = Constants.form;
+
     // Remove `[ ]` and `,` and return an array of the names provided
     const mNames = (options.names || '[name]').replace(/\[|\]/g, '').split(',');
     const mValues = (options.values || '[value]').replace(/\[|\]/g, '').split(',');
@@ -80,7 +86,7 @@ export default class SchemaBuilder {
       el: Element,
       scopeData: dynamic
     ) : FieldSchema | IFieldInfoSnapshot  => {
-      const field = findAttribute(el, [Constants.form.schema], true);
+      const field = findAttribute(el, [cform.schema], true);
       const codeFieldInfo = schema[fieldName] || {};
 
       if (field == null) return codeFieldInfo;
@@ -113,8 +119,8 @@ export default class SchemaBuilder {
       if (parentElement == rootElement || parentElement == null)
         return rootElement;
 
-      const isBuild = parentElement.hasAttribute(Constants.form.build) ||
-        parentElement.hasAttribute(Constants.form.abuild);
+      const isBuild = parentElement.hasAttribute(cform.build) ||
+        parentElement.hasAttribute(cform.buildarray);
 
       if (isBuild)
         return parentElement;
@@ -147,7 +153,7 @@ export default class SchemaBuilder {
         return;
 
       // Retrieving the value if it needs to be build as arry property
-      const isArray = findAttribute(input, ['e-array']) != null;
+      const isArray = findAttribute(input, [cform.array]) != null;
 
       // if it is not an array built type, just set the value
       const fieldStructure = getFieldStructure(schema, attrName, input, scopeData);
@@ -232,8 +238,8 @@ export default class SchemaBuilder {
 
       // Finding e-build property
       const attrBuild = findAttribute(currentElement, [
-        Constants.form.build,
-        Constants.form.abuild,
+        cform.build,
+        cform.buildarray,
       ]);
 
       if (!attrBuild)
@@ -243,7 +249,7 @@ export default class SchemaBuilder {
       const attrName = attrBuild.name;
 
       // Retrieving the value if it needs to be build as arry property
-      const isArray = attrName === 'e-build:array' || findAttribute(currentElement, ['e-array']) != null;
+      const isArray = attrName === cform.buildarray || findAttribute(currentElement, [cform.array]) != null;
       let $$schema: dynamic = {};
 
       let currentSchemaValue = currentSchema[attrValue];
@@ -293,10 +299,10 @@ export default class SchemaBuilder {
     if (isReactive) {
       const arrayElements = Extend.array(
         toArray(rootElement!.querySelectorAll('[e-build\\:array]')),
-        toArray(rootElement!.querySelectorAll('[e-array]'))
+        toArray(rootElement!.querySelectorAll(`[${cform.array}]`))
       );
       filter(arrayElements, (el: Element) => {
-        const attr = findAttribute(el, ['e-build:array', 'e-build']);
+        const attr = findAttribute(el, [cform.buildarray, cform.build]);
         if (!attr) return;
         el.setAttribute('e-for', `${code(3, '_')} of $form.parent.get('${attr.value}')`);
       });
@@ -334,7 +340,7 @@ export default class SchemaBuilder {
         const property = schema[key];
 
         if (property instanceof FieldSchema) {
-          Prop.set($obj, key, {
+          Property.set($obj, key, {
             enumerable: true,
             get(){ return property.value; },
             set(v: any) { property.value = v; }

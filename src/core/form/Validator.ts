@@ -257,7 +257,8 @@ const Validator = (function () {
         value: value
       });
     } else {
-      value = ['true', '1'].indexOf(value.toLowerCase()) > -1 ? true : false; // Convert to the presented boolean value
+      // Convert to the presented boolean value
+      value = ['true', '1'].indexOf(value.toString().toLowerCase()) > -1 ? true : false;
     }
 
     // Function validation

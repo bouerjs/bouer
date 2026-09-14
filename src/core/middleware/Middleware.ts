@@ -88,8 +88,7 @@ export default class Middleware {
 
   has = (directive: string) => {
     const middlewares = this.middlewareConfigContainer[directive];
-    if (!middlewares) return false;
-    return middlewares.length > 0;
+    return middlewares && middlewares.length > 0;
   };
 }
 
