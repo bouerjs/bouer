@@ -1,7 +1,7 @@
 import IBouerOptions from './definitions/interfaces/IBouerOptions';
 import Bouer from './instance/Bouer';
 
-export { default as Components, Component } from './core/component/Component';
+export { default as ComponentPrototype, Component } from './core/component/Component';
 
 export { default as ReactivePropertyDescriptor, $reactive, $inert } from './core/reactive/Reactive';
 export { default as Computed, $computed } from './core/reactive/Computed';
@@ -16,7 +16,7 @@ export { default as FormSchema } from './core/form/FormSchema';
 export { default as FieldSchema, $field } from './core/form/FieldSchema';
 
 export { default as Extend } from './shared/helpers/Extend';
-export { default as Prop } from './shared/helpers/Prop';
+export { default as Property } from './shared/helpers/Property';
 export { default as IoC } from './shared/helpers/IoCContainer';
 
 export { default as IBouerConfig } from './definitions/interfaces/IBouerConfig';
@@ -39,7 +39,8 @@ export { default as WatchCallback } from './definitions/types/WatchCallback';
 export { default as DataType } from './definitions/types/DataType';
 
 export * from './definitions/interfaces/IFieldSchema';
-export * from './shared/helpers/Utils';
+export { code, webRequest, setData } from './shared/helpers/Utils';
+export { prop } from './core/compiler/Directive/DataInject';
 
 /**
  * Creates a new bouer app
@@ -47,11 +48,12 @@ export * from './shared/helpers/Utils';
  * @param {object?} options the options to the instance
  * @returns Bouer instance
  */
-function $createApp<Data extends {} = {}, Global extends {} = {}, Deps extends {} = {}>(
+export function $createApp<Data extends {} = {}, Global extends {} = {}, Deps extends {} = {}>(
   selector?: string,
   options?: IBouerOptions<Data, Global, Deps>
 ) {
   return new Bouer<Data, Global, Deps>(selector, options);
 }
 
-export { Bouer as default, IBouerOptions, $createApp };
+export default Bouer;
+export { IBouerOptions };
