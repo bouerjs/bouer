@@ -1,8 +1,9 @@
 import dynamic from '../../../definitions/types/Dynamic';
 import RenderContext from '../../../definitions/types/RenderContext';
 import Extend from '../../../shared/helpers/Extend';
-import Prop from '../../../shared/helpers/Prop';
+import Property from '../../../shared/helpers/Property';
 import {
+  $internal,
   errorMsgEmptyNode,
   errorMsgNodeValue,
   filter,
@@ -53,7 +54,7 @@ export function $data(opitons: {
   const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
     if (!(descriptor.$name in inputData))
       inputData[descriptor.$name] = undefined;
-    Prop.set(inputData, descriptor.$name, descriptor);
+    Property.set(inputData, descriptor.$name, descriptor);
   });
 
   // If data value is empty gets the main scope value
@@ -132,7 +133,7 @@ export function $def(opitons: {
   const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
     if (!(descriptor.$name in inputData))
       inputData[descriptor.$name] = undefined;
-    Prop.set(inputData, descriptor.$name, descriptor);
+    Property.set(inputData, descriptor.$name, descriptor);
   });
 
   const mInputData = evaluator.exec({
@@ -185,13 +186,12 @@ export function $wait(options: {
     if (!mWait.data) return;
     // Compile all the waiting nodes
     filter(mWait.nodes, (nodeWaiting) => {
+      const $data = $reactive({ context: mWait.context, data: mWait.data! });
+      dataStore.addNodeData(nodeWaiting, $data);
       compiler.compile({
-        el: nodeWaiting as Element,
+        el: nodeWaiting,
         context: mWait.context,
-        data: $reactive({
-          context: mWait.context,
-          data: mWait.data!
-        }),
+        data: $data,
         beforeCompile: options.compilationHooks.beforeCompile,
         afterCompile: options.compilationHooks.afterCompile,
       });
@@ -203,3 +203,39 @@ export function $wait(options: {
 
   return dataStore.wait[nodeValue] = { nodes: [ownerNode], context: context };
 }
+
+export class DataProp<T, Constraint = 'required' | 'optional'> {
+  public value?: T;
+  public constraint: Constraint;
+  constructor(
+    value: T | undefined,
+    type: Constraint
+  ) {
+    $internal(this);
+    this.value = value;
+    this.constraint = type;
+  }
+
+  static required<T>() {
+    return new DataProp<T>(undefined as any, 'required') as T
+  }
+
+  static optional<T>(value?: T) {
+    return new DataProp<T>(value, 'optional') as T | undefined
+  }
+}
+
+const prop = Object.assign(
+  /** Default function represent optional Property */
+  function optional<T>(value?: T) {
+    return DataProp.optional<T>(value);
+  },
+  {
+    /** Optional Property, not expected in data directive */
+    optional: DataProp.optional,
+    /** Required Property, expected in data directive */
+    required: DataProp.required
+  }
+);
+
+export { prop };

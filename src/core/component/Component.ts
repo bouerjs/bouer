@@ -5,10 +5,11 @@ import ILifeCycleHooks from '../../definitions/interfaces/ILifeCycleHooks';
 import Constructor from '../../definitions/types/Constructor';
 import DataType from '../../definitions/types/DataType';
 import dynamic from '../../definitions/types/Dynamic';
+import WatchCallback from '../../definitions/types/WatchCallback';
 import Bouer from '../../instance/Bouer';
 import Extend from '../../shared/helpers/Extend';
 import IoC from '../../shared/helpers/IoCContainer';
-import Prop from '../../shared/helpers/Prop';
+import Property from '../../shared/helpers/Property';
 import UriHandler from '../../shared/helpers/UriHandler';
 import {
     $default,
@@ -19,13 +20,15 @@ import {
     isFunction,
     isNull,
     isObject,
+    pathResolver,
     setData,
     toLower,
     trim
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
+import { DataProp } from '../compiler/Directive/DataInject';
 import EventHandler from '../event/EventHandler';
-import { $reactive, InertVariable } from '../reactive/Reactive';
+import { $reactive, InertProp } from '../reactive/Reactive';
 import ComponentHandler from './ComponentHandler';
 
 export default class ComponentPrototype<Data extends {} = {}> implements IComponentOptions<Data> {
@@ -106,7 +109,7 @@ export default class ComponentPrototype<Data extends {} = {}> implements ICompon
       value: (optionsOrPath || {} as any).template || ''
     };
 
-    Prop.set(this, 'template', {
+    Property.set(this, 'template', {
       get: () => template.value,
       set: (v) => template.value = v
     });
@@ -114,9 +117,7 @@ export default class ComponentPrototype<Data extends {} = {}> implements ICompon
     this.setAssets(assets || []);
   }
 
-  setAssets(
-    assets: (string | IAsset)[]
-  ) {
+  setAssets(assets: (string | IAsset)[]) {
     const component = this;
 
     const $Assets: any[] = [];
@@ -165,14 +166,13 @@ export default class ComponentPrototype<Data extends {} = {}> implements ICompon
       const isRelativePathImport = src[0] === '.';
 
       if (isRelativePathImport && (!component.path || isNull(component.path))) {
-        Logger.warn('Component with no `path` cannot use imported assets, check component: ' + component.path);
+        Logger.warn('Component with no `path` cannot use imported assets, check component: ' + component.name);
         return;
       }
 
       if (isRelativePathImport) {
-        const pathSections = component.path.split('/').slice(0, -1);
-        if (pathSections[0] === '') pathSections.shift();
-        src = pathSections.join('/') + src.substring(1, src.length);
+        src = pathResolver(component.path, src);
+        src = src[0] === '/' ? src.substring(1) : src;
       }
 
       const $Asset = createEl(type, el => {
@@ -207,7 +207,7 @@ export default class ComponentPrototype<Data extends {} = {}> implements ICompon
 
     return filter(props || Object.keys(data), key => {
       (this.data as any)[key] = (data as any)[key];
-      Prop.transfer(this.data, data, key as any);
+      Property.transfer(this.data, data, key as any);
     });
   }
 
@@ -306,8 +306,12 @@ export default class ComponentPrototype<Data extends {} = {}> implements ICompon
     targetObject?: TargetObject
   ): InputData & TargetObject {
     const result = setData(this, inputData, targetObject);
-    filter(Object.keys(inputData), key => Prop.transfer(this, inputData, key as keyof InputData));
+    filter(Object.keys(inputData), key => Property.transfer(this, inputData, key as keyof InputData));
     return result;
+  }
+
+  watch(propertyName: string, callback: WatchCallback<any>) {
+    return this.bouer!.watch(propertyName, callback, this.data);
   }
 
   prepareClass(
@@ -318,7 +322,9 @@ export default class ComponentPrototype<Data extends {} = {}> implements ICompon
       'requested', 'created', 'beforeMount', 'mounted', 'beforeLoad',
       'loaded', 'beforeDestroy', 'destroyed', 'blocked', 'failed'
     ];
-    const ignorables: string[] = ['__$proto__', 'init', 'constructor'].concat(hooks);
+    const ignorables: string[] = [
+      'el', 'bouer',  '__$proto__', 'init', 'constructor', 'export', 'watch'
+    ].concat(hooks);
 
     const cachedInert: dynamic = {};
     const properties = Object.getOwnPropertyNames(component);
@@ -329,17 +335,18 @@ export default class ComponentPrototype<Data extends {} = {}> implements ICompon
     // Transfering the properties from the component to the data
     filter(fields as any, (field: never) => {
       const fieldValue: any = component[field];
+      if (fieldValue instanceof DataProp) return;
 
       // If the value is a function, bind it to the component ifself
       if (typeof fieldValue === 'function') {
-        Prop.set(fieldValue, 'nobind', { value: true });
+        Property.set(fieldValue, 'nobind', { value: true });
         return proto.data[field] = fieldValue.bind(component);
       }
 
-      //In case of InertVariable, cache the object and return the value
-      if (fieldValue instanceof InertVariable) {
+      //In case of InertProp, cache the object and return the value
+      if (fieldValue instanceof InertProp) {
         cachedInert[field] = fieldValue;
-        return Prop.set(proto.data, field, {
+        Property.set(proto.data, field, {
           get: function reactive() {
             return cachedInert[field].get();
           },
@@ -347,26 +354,23 @@ export default class ComponentPrototype<Data extends {} = {}> implements ICompon
             cachedInert[field].set(value);
           }
         });
+      } else {
+        proto.data[field] = fieldValue;
       }
 
-      proto.data[field] = fieldValue;
-    });
-
-    // Transforming the data to reactive
-    $reactive({ context: proto, data: proto.data });
-
-    // Pointing the properties of the component to the actual data props
-    filter(fields as any, (field: never) => {
-      Prop.set(component, field, {
+      Property.set(component, field, {
         get: function reactive() { return proto.data[field]; },
         set: function reactive(value) { proto.data[field] = value; }
       });
     });
 
+    // Transforming the data to reactive
+    $reactive({ context: proto, data: proto.data });
+
     // Setting all the methods
     filter(hooks as any, (hook: never) => {
-      if (isFunction(proto[hook])) {
-        proto[hook] = component[hook];
+      if (isFunction(component[hook])) {
+        proto[hook] = (component[hook] as Function).bind(component) as never;
       }
     });
   }
@@ -374,6 +378,8 @@ export default class ComponentPrototype<Data extends {} = {}> implements ICompon
 
 export class Component<Data extends object = {}> {
   readonly __$proto__: ComponentPrototype<Data>;
+  public get el() { return this.__$proto__.el!; }
+  public get bouer() { return this.__$proto__.bouer!; }
 
   constructor(
     init?: string | IComponentOptions<Data>,
@@ -381,7 +387,7 @@ export class Component<Data extends object = {}> {
   ) {
     this.__$proto__ = $default();
 
-    Prop.set(this, '__$proto__', {
+    Property.set(this, '__$proto__', {
       enumerable: false,  configurable: false,
       value: new ComponentPrototype<Data>(init, assets)
     });
@@ -390,7 +396,7 @@ export class Component<Data extends object = {}> {
 
     if (component.name == '') {
       // Setting the name of the component, according to the caller (Component) name if not configured
-      Prop.set(component, 'name', { value: this.constructor.name });
+      Property.set(component, 'name', { value: this.constructor.name });
     }
   }
 
@@ -400,6 +406,14 @@ export class Component<Data extends object = {}> {
 
   params() {
     return this.__$proto__.params();
+  }
+
+  set(data: dynamic) {
+    return this.__$proto__.set(data);
+  }
+
+  watch(propertyName: string, callback: WatchCallback<any>) {
+    return this.__$proto__.watch(propertyName, callback);
   }
 
   init?(): void;

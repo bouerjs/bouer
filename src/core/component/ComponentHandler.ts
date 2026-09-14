@@ -7,7 +7,7 @@ import Bouer from '../../instance/Bouer';
 import Constants from '../../shared/helpers/Constants';
 import Extend from '../../shared/helpers/Extend';
 import IoC from '../../shared/helpers/IoCContainer';
-import Prop from '../../shared/helpers/Prop';
+import Property from '../../shared/helpers/Property';
 import Task from '../../shared/helpers/Task';
 import {
     $default,
@@ -24,6 +24,7 @@ import {
     isNull,
     isObject,
     pathResolver, toArray,
+    toComponentOrOptions,
     toLower,
     urlCombine,
     urlResolver,
@@ -31,6 +32,7 @@ import {
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Compiler, { CompilationHooks } from '../compiler/Compiler';
+import { DataProp } from '../compiler/Directive/DataInject';
 import DelimiterHandler from '../DelimiterHandler';
 import Evaluator from '../Evaluator';
 import EventHandler from '../event/EventHandler';
@@ -127,8 +129,10 @@ export default class ComponentHandler {
       if (isComponentClass) {
         // Resolve the instance of the class
         $classComponent = IoC.app(this.bouer).resolve(entry as Class) || IoC.resolve(entry as Class) || IoC.new(entry as Class);
+        if (!$protoComponent) return Logger.error('Could not create the “'+ entry.name +'” component');
+
         $protoComponent = $classComponent!.__$proto__;
-        Prop.set($protoComponent, 'ctor', {
+        Property.set($protoComponent, 'ctor', {
           configurable: false, enumerable: false, writable: false, value: entry as Class
         });
       }
@@ -211,16 +215,7 @@ export default class ComponentHandler {
     const $name = toLower(componentElement.nodeName);
     const $component = this.components[$name];
 
-    const getComponentOrOptions = (
-      entry: Component | ComponentPrototype | IComponentOptions
-    ): ComponentPrototype | IComponentOptions => {
-      return entry instanceof Component
-        ? entry.__$proto__
-        : entry instanceof ComponentPrototype
-          ? entry : entry;
-    };
-
-    const protoComponent = getComponentOrOptions($component);
+    const protoComponent = toComponentOrOptions($component);
     const onComponentFail = options.onComponentFail || $default;
 
     if (!protoComponent) {
@@ -230,16 +225,17 @@ export default class ComponentHandler {
 
     const mainExecutionWrapper = () => {
       const newComponent = (entry: Component | ComponentPrototype | IComponentOptions): Component | ComponentPrototype => {
+        const protoComponent = toComponentOrOptions(entry);
+
         const configure = (proto: ComponentPrototype) => {
           proto.bouer = this.bouer;
-          Prop.set(proto, 'parent', {
+          Property.set(proto, 'template', { get: () => protoComponent.template });
+          Property.set(proto, 'parent', {
             // only assing the parent if is a component prototype
             value: context instanceof ComponentPrototype ? context : null
           });
           return proto;
         }
-
-        const protoComponent = getComponentOrOptions(entry);
 
         // If the component is set has keep-alive, just return it
         if (protoComponent.keepAlive == true) {
@@ -252,7 +248,8 @@ export default class ComponentHandler {
 
         if (entry instanceof Component) {
           const ctor = entry.__$proto__.ctor
-          const $newClassComponent: Component<any> = IoC.app(this.bouer).resolve(ctor) || IoC.resolve(ctor) || IoC.new(ctor)!;
+          const $newClassComponent: Component<any> = IoC.app(this.bouer).resolve(ctor) ||
+            IoC.resolve(ctor) || IoC.new(ctor)!;
 
           $classComponent = $newClassComponent;
           $protoComponent = $newClassComponent.__$proto__;
@@ -366,10 +363,7 @@ export default class ComponentHandler {
     const keys = Object.keys(this.components);
     for (let i = 0; i < keys.length; i++) {
       const $component = this.components[keys[i]];
-      const component = $component instanceof Component
-        ? $component.__$proto__
-        : $component instanceof ComponentPrototype ? $component :
-          $component;
+      const component = toComponentOrOptions($component);
       if (predicate(component)) return component;
     }
     return null;
@@ -428,11 +422,9 @@ export default class ComponentHandler {
     const componentElement = options.componentElement;
 
     const $classComponent = options.component;
-    const $protoComponent = $classComponent instanceof Component
-      ? $classComponent.__$proto__
-      : $classComponent;
+    const $protoComponent = toComponentOrOptions($classComponent) as ComponentPrototype;
 
-    const data = options.data || this.bouer.data;
+    const data = options.data || Extend.obj(this.bouer.data);
     const onComponentLoad = options.onComponentLoad || $default;
     const onComponentFail = options.onComponentFail || $default;
     const directivesToIgnore = options.directiveToIgnore;
@@ -576,7 +568,7 @@ export default class ComponentHandler {
         if (!(descriptor.$name in inputData))
           inputData[descriptor.$name] = undefined;
 
-        Prop.set(inputData, descriptor.$name, descriptor);
+        Property.set(inputData, descriptor.$name, descriptor);
       });
 
       let inputData: dynamic = {};
@@ -645,6 +637,36 @@ export default class ComponentHandler {
           data: $protoComponent.data
         });
 
+        if ($classComponent != $protoComponent) {
+          filter(Object.getOwnPropertyNames($classComponent) as any, (key: never) => {
+            const prop: any = $classComponent[key];
+
+            // If it is not InputData, skip it
+            if (!(prop instanceof DataProp)) return;
+
+            const dataPropValue = $protoComponent.data[key];
+
+            // If the property is null and it is required type
+            if (isNull(dataPropValue) && prop.constraint == 'required') {
+              Logger.error('The property “'+ key +'” is required, please inject it via data directive.');
+              return Property.set($classComponent, key, { value: undefined });
+            }
+
+            // If the property is null and it it optional
+            if (isNull(dataPropValue) && prop.constraint == 'optional') {
+              $protoComponent.data[key] = prop.value;
+            }
+
+            $reactive({
+              context: $protoComponent,
+              data: $protoComponent.data,
+              keys: [key]
+            });
+
+            Property.transfer($classComponent, $protoComponent.data, key);
+          });
+        }
+
         // Signing the element with it's data
         IoC.app(this.bouer).resolve(DataStore)!.addNodeData(
           mainComponentElement,
@@ -670,7 +692,7 @@ export default class ComponentHandler {
 
         // Attaching the root element to the component element
         if (!('root' in componentElement))
-          Prop.set(componentElement, 'root', { value: mainComponentElement });
+          Property.set(componentElement, 'root', { value: mainComponentElement });
 
         // Mouting the element
         container.replaceChild(mainComponentElement, componentElement);
@@ -695,13 +717,11 @@ export default class ComponentHandler {
           const cssRules = style.sheet.cssRules;
 
           for (let i = 0; i < cssRules.length; i++) {
-            const rule = cssRules.item(i);
-
+            const rule = cssRules.item(i) as dynamic;
             if (!rule) continue;
 
-            const mRule = rule as dynamic;
             // .item .title, .item .desc
-            const ruleText = mRule.selectorText;
+            const ruleText = rule.selectorText;
 
             if (ruleText) {
               const classStyleId = '.' + styleId;
@@ -716,7 +736,7 @@ export default class ComponentHandler {
                *  .e-A1bcD .item .desc
                * ]
                */
-              mRule.selectorText = ruleText.split(',')
+              rule.selectorText = ruleText.split(',')
                 .flatMap(($selector: string) => {
                   const $selectors = $selector.split(' ');
                   $selectors[0] = $selectors[0] + classStyleId;
@@ -726,7 +746,7 @@ export default class ComponentHandler {
             }
 
             // Adds the cssText only if the element is <style>
-            if (isStyle) rules.push(mRule.cssText);
+            if (isStyle) rules.push(rule.cssText);
           }
           if (isStyle) style.innerText = rules.join(' ');
         };
