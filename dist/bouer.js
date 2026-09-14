@@ -545,15 +545,15 @@
     return options.data;
   };
   class InertProp {
-    constructor(value) {
+    constructor(v) {
       $internal(this);
-      this.value = value;
+      this.value = v;
     }
     get() {
       return this.value;
     }
-    set(value) {
-      this.value = value;
+    set(v) {
+      this.value = v;
     }
   }
 
@@ -2719,10 +2719,6 @@
     const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
     if (nodeValue === '')
       return Logger.error(errorMsgEmptyNode(node));
-    if (nodeValue in bouer.refs) {
-      Logger.warn('The key ref “' + nodeValue + '” for “' + ownerNode.nodeName + '” is taken, choose another key.');
-      return;
-    }
     bouer.refs[nodeValue] = ownerNode;
   }
 
