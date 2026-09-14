@@ -1,11 +1,22 @@
-const rollupConfigs = require('path');
-const version = require('../package.json').version;
-const typescript = require('@rollup/plugin-typescript');
-const buble = require('@rollup/plugin-buble');
-const cleanup = require('rollup-plugin-cleanup');
-const babel = require('@rollup/plugin-babel').babel;
+// scripts/config.js
 
-const resolve = (p1, p2) => rollupConfigs.resolve(p1, p2);
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+
+import typescript from '@rollup/plugin-typescript';
+import { babel } from '@rollup/plugin-babel';
+
+// Create require helper to read JSON safely in ESM
+const require = createRequire(import.meta.url);
+const { version } = require('../package.json');
+
+// Derive __dirname equivalent in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const resolve = (p1, p2) => path.resolve(p1, p2);
 const outputName = name => resolve('dist', name);
 
 const banner =
@@ -23,14 +34,12 @@ const banner =
 
 const builds = {
   'umd-browser': {
-    extra: {
-      transpile: false
-    },
     input: resolve('src', 'instance/Bouer.ts'),
     output: {
-      file: outputName('bouer.js'),
+      file: outputName('bouer.js')
     }
   },
+
   'cjs-common-js': {
     input: resolve('src', 'index.ts'),
     output: {
@@ -38,13 +47,14 @@ const builds = {
       exports: 'named'
     }
   },
+
   'es-browser-esm': {
     input: resolve('src', 'index.ts'),
     output: {
       file: outputName('bouer.esm.js'),
       exports: 'named'
     }
-  },
+  }
 };
 
 const rollupConfigBuilder = (key, config) => {
@@ -56,24 +66,22 @@ const rollupConfigBuilder = (key, config) => {
   config.output.banner = banner;
   config.output.indent = false;
 
-  const extra = config.extra;
   delete config.extra;
 
   const rollupConfig = {
     input: config.input,
     output: config.output,
+
     plugins: [
-      cleanup({
-        comments: false,
-      }),
       babel({
         exclude: ['node_modules/**'],
-        babelHelpers: 'bundled',
+        babelHelpers: 'bundled'
       }),
       typescript({
         tsconfig: 'tsconfig.json'
       })
     ],
+
     onwarn: (message, logger) => {
       if (!/Circular/.test(message)) {
         logger(message);
@@ -81,17 +89,14 @@ const rollupConfigBuilder = (key, config) => {
     }
   };
 
-  if (extra && extra.transpile !== false)
-    rollupConfig.plugins.push(buble());
-
   return rollupConfig;
 };
 
-Object.keys(builds).filter(key => {
+Object.keys(builds).forEach(key => {
   builds[key] = rollupConfigBuilder(key, builds[key]);
 });
 
-module.exports = {
+export {
   builds,
   version
 };

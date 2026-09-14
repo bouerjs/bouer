@@ -6,27 +6,20 @@
   "bin": "dist/bouer.common.min.js",
   "module": "dist/bouer.esm.min.js",
   "typings": "types/index.d.ts",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "test": "jest --detectOpenHandles",
-    "dev": "rollup --config rollup.config.js --configPlugin typescript --w",
+    "dev": "rollup --config rollup.config.js --w",
     "dev:r": "node scripts/build.js --dev",
-    "build": "rollup --config rollup.config.js --configPlugin typescript",
+    "build": "rollup --config rollup.config.js",
     "build:main:": "node scripts/build.js",
     "build+min": "node scripts/build.js --prod",
-    "pack": "node scripts/build.js --prod && npm pack && node scripts/test-pkg-json-updater.js",
-    "prepare": "husky install",
-    "changelog": "auto-changelog -p -u"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "npm test"
-    }
-  },
-  "auto-changelog": {
-    "output": "CHANGELOG.md",
-    "template": "./template/changelog-template.hbs",
-    "unreleased": true,
-    "commitLimit": false
+    "pack": "node scripts/build.js --prod && npm pack",
+    "prepare": "husky",
+    "changelog": "conventional-changelog -p conventionalcommits -i CHANGELOG.md -s"
   },
   "files": [
     "src",
@@ -53,32 +46,27 @@
   },
   "license": "MIT License",
   "devDependencies": {
-    "@babel/cli": "^7.2.3",
-    "@babel/core": "^7.3.4",
-    "@babel/preset-env": "^7.15.8",
-    "@babel/preset-typescript": "^7.3.3",
-    "@rollup/plugin-babel": "^5.3.0",
-    "@rollup/plugin-buble": "^0.21.3",
-    "@rollup/plugin-commonjs": "^21.0.0",
-    "@rollup/plugin-typescript": "^8.2.5",
-    "@types/jest": "^27.4.1",
-    "@types/node": "^16.11.13",
-    "@typescript-eslint/eslint-plugin": "^5.14.0",
-    "@typescript-eslint/parser": "^5.14.0",
-    "auto-changelog": "^2.4.0",
-    "eslint": "^8.10.0",
-    "eslint-config-google": "^0.14.0",
-    "husky": "^7.0.0",
-    "indent.js": "^0.3.5",
-    "jest": "^27.5.1",
-    "js-beautify": "^1.14.7",
-    "jsdom": "^21.1.1",
-    "jsdom-global": "^3.0.2",
-    "regenerator-runtime": "^0.13.11",
-    "rollup": "^2.58.0",
-    "rollup-plugin-cleanup": "^3.2.1",
-    "terser": "^5.9.0",
-    "tslib": "^2.3.1",
-    "typescript": "^4.9.5"
+    "@babel/cli": "^7.28.3",
+    "@babel/core": "^7.28.4",
+    "@babel/preset-env": "^7.28.3",
+    "@babel/preset-typescript": "^7.27.1",
+    "@rollup/plugin-babel": "^7.1.0",
+    "@rollup/plugin-commonjs": "^29.0.3",
+    "@rollup/plugin-strip": "^3.0.4",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.13.0",
+    "@typescript-eslint/eslint-plugin": "^8.20.0",
+    "@typescript-eslint/parser": "^8.20.0",
+    "conventional-changelog-cli": "^5.0.0",
+    "eslint": "^9.18.0",
+    "husky": "^9.1.7",
+    "jest": "^30.5.1",
+    "jest-environment-jsdom": "^30.5.1",
+    "js-beautify": "^2.0.3",
+    "rollup": "^4.30.0",
+    "terser": "^5.37.0",
+    "tslib": "^2.8.1",
+    "typescript": "^5.7.3"
   }
 }
