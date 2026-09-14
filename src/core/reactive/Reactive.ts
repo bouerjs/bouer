@@ -2,7 +2,7 @@ import dynamic from '../../definitions/types/Dynamic';
 import RenderContext from '../../definitions/types/RenderContext';
 import WatchCallback from '../../definitions/types/WatchCallback';
 import IoC from '../../shared/helpers/IoCContainer';
-import Prop from '../../shared/helpers/Prop';
+import Property from '../../shared/helpers/Property';
 import {
     $default,
     $internal,
@@ -46,7 +46,7 @@ export default class ReactivePropertyDescriptor<Value, Obj> implements PropertyD
     this.context = options.context;
     // Setting the value of the property
 
-    this.base = Prop.descriptor(this.source as dynamic, this.$name);
+    this.base = Property.descriptor(this.source as dynamic, this.$name);
     this.$value = this.base!.value as Value;
 
     const propValue = this.$value as any;
@@ -78,7 +78,7 @@ export default class ReactivePropertyDescriptor<Value, Obj> implements PropertyD
       this.$value = undefined as any;
 
       // Intercepting $value
-      Prop.set(this as any, '$value', {
+      Property.set(this as any, '$value', {
         get: () => {
           return fnCallResolver(this.computed!.get());
         },
@@ -254,7 +254,7 @@ export default class ReactivePropertyDescriptor<Value, Obj> implements PropertyD
         const mInputObject = data as dynamic;
 
         // Already a reactive property, do nothing
-        if (!('value' in Prop.descriptor(data as dynamic, key)!))
+        if (!('value' in Property.descriptor(data as dynamic, key)!))
           return;
 
         const propValue = mInputObject[key];
@@ -272,7 +272,7 @@ export default class ReactivePropertyDescriptor<Value, Obj> implements PropertyD
           context: context
         });
 
-        Prop.set(data as dynamic, key, descriptor);
+        Property.set(data as dynamic, key, descriptor);
 
         // If the value is a computed object, do nothing
         if (isObject(propValue) && propValue instanceof Computed)
@@ -294,7 +294,7 @@ export default class ReactivePropertyDescriptor<Value, Obj> implements PropertyD
   };
 }
 
-export class InertVariable<T> {
+export class InertProp<T> {
   private value?: T
   constructor(value?: T) {
     $internal(this);
@@ -314,7 +314,6 @@ export function $reactive<Data extends dynamic>(options: {
     /** All the keys that needs to be transformed */
     keys?: string[]
   }) {
-
   // If no context is provided, create one
   if (options.context == null)
     options.context = IoC.global;
@@ -329,5 +328,5 @@ export function $reactive<Data extends dynamic>(options: {
 
 export function $inert<T>(entry?: T | undefined): T {
   // Tricking the typescript compiler
-  return new InertVariable<T>(entry) as T;
+  return new InertProp<T>(entry) as T;
 }

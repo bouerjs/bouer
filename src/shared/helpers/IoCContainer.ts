@@ -3,7 +3,7 @@ import Constructor from '../../definitions/types/Constructor';
 import Params from '../../definitions/types/Parameters';
 import Bouer from '../../instance/Bouer';
 import Logger from '../logger/Logger';
-import Prop from './Prop';
+import Property from './Property';
 import { $default, filter, ifNullReturn, isNull } from './Utils';
 
 
@@ -39,20 +39,17 @@ const IoC = (function () {
     if (!collection) return undefined;
 
     const service = collection.get(ctor);
-
     if (service == null)
       return undefined;
 
-    if (service.isSingleton) {
+    if (!service.isSingleton)
+      return newInstance(ctor, service.args, app);
 
-      if (service.instance)
-        return service.instance as S;
+    if (service.instance)
+      return service.instance as S;
 
-      // Otherwise, creates the singleton instance
-      return service.instance = newInstance(ctor, service.args, app) as S;
-    }
-
-    return newInstance(ctor, service.args, app);
+    // Otherwise, creates the singleton instance
+    return (service.instance ?? (service.instance = newInstance(ctor, service.args, app))) as S;
   };
 
   /**
@@ -75,7 +72,6 @@ const IoC = (function () {
       // eslint-disable-next-line no-prototype-builtins
       if (param && param.hasOwnProperty('prototype')) {
         if (app) {
-
           const localInstance = resolve(app!, param);
           const globalInstance = (!localInstance && app != global) ? resolve(global, param) : localInstance;
 

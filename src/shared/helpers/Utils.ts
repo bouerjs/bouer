@@ -1,12 +1,14 @@
 
 // Quotes “'+  +'”
 
+import ComponentPrototype, { Component } from '../../core/component/Component';
 import ReactivePropertyDescriptor, { $reactive } from '../../core/reactive/Reactive';
 import ReactiveEvent from '../../core/reactive/ReactiveEvent';
+import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
 import dynamic from '../../definitions/types/Dynamic';
 import RenderContext from '../../definitions/types/RenderContext';
 import Logger from '../logger/Logger';
-import Prop from './Prop';
+import Property from './Property';
 
 export function webRequest(url: string, options?: {
   body?: any;
@@ -169,7 +171,6 @@ export function toStr(input: any) {
   }
 }
 
-
 export function filter<T, C = {}>(
   iterable: T[],
   callback: (this: typeof context, item: T, index: number) => any,
@@ -245,7 +246,7 @@ export function mapper(source: dynamic, destination: dynamic) {
         return destination[key] = sourceValue;
       }
 
-      Prop.transfer(destination, source, key);
+      Property.transfer(destination, source, key);
     });
   }
 
@@ -401,7 +402,7 @@ export function findDirective(
   const attributes = (node as any).attributes || [];
   return attributes.getNamedItem(name) ||
     toArray(attributes).find((attr: Attr) =>
-      (attr.name === name || startWith(attr.name, name + ':')));
+    (attr.name === name || startWith(attr.name, name + ':')));
 }
 
 export function getRootElement(el: Element): Element {
@@ -443,16 +444,16 @@ export function setData<
 
     ReactiveEvent.once('AfterGet', evt => {
       evt.onemit = descriptor => source = descriptor;
-      Prop.descriptor(inputData, key as keyof InData)!.get!();
+      Property.descriptor(inputData, key as keyof InData)!.get!();
     });
 
     ReactiveEvent.once('AfterGet', evt => {
       evt.onemit = descriptor => destination = descriptor;
-      const desc = Prop.descriptor(targetObject as {}, key as never);
+      const desc = Property.descriptor(targetObject as {}, key as never);
       if (desc && isFunction(desc.get)) desc.get!();
     });
 
-    Prop.transfer(targetObject as {}, inputData, key as never);
+    Property.transfer(targetObject as {}, inputData, key as never);
 
     if (!destination || !source) return;
     // Adding the previous watches to the property that is being set
@@ -484,11 +485,21 @@ export function errorMsgNodeValue(node: Node) {
 
 export function $internal($this: any) {
   Object.defineProperty($this, 'ͼ', {
-    enumerable: false,configurable: false, writable: false, value: undefined,
+    enumerable: false, configurable: false, writable: false, value: undefined
   });
   return $this;
 }
 
+export function toComponentOrOptions(
+  entry: Component | ComponentPrototype | IComponentOptions
+): ComponentPrototype | IComponentOptions {
+  return entry instanceof Component
+    ? entry.__$proto__
+    : entry instanceof ComponentPrototype
+      ? entry : entry;
+};
+
+
 export const WIN = window;
-export const DOM = document;
+export const DOM = WIN.document;
 export const ANCHOR = createEl('a').build();

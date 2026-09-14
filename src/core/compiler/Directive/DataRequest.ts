@@ -5,7 +5,7 @@ import Bouer from '../../../instance/Bouer';
 import Constants from '../../../shared/helpers/Constants';
 import Extend from '../../../shared/helpers/Extend';
 import IoC from '../../../shared/helpers/IoCContainer';
-import Prop from '../../../shared/helpers/Prop';
+import Property from '../../../shared/helpers/Property';
 import { code, createComment, ifNullReturn, toOwnerNode, trim } from '../../../shared/helpers/Utils';
 import Logger from '../../../shared/logger/Logger';
 import Binder from '../../binder/Binder';
@@ -198,7 +198,7 @@ export function $req(opitons: {
       if (!('data' in localDataStore)) {
         // Store the data
         localDataStore.data = undefined;
-        Prop.transfer(localDataStore, response, 'data');
+        Property.transfer(localDataStore, response, 'data');
       } else {
         // Update de local data
         return localDataStore.data = response.data;
@@ -233,7 +233,7 @@ export function $req(opitons: {
           Extend.array([forDirectiveContent], expObject.filters).join(' | ')
         );
 
-        Prop.set(mData, resUniqueName, Prop.descriptor(response, 'data')!);
+        Property.set(mData, resUniqueName, Property.descriptor(response, 'data')!);
         return compiler.compile({
           el: ownerNode,
           data: mData,

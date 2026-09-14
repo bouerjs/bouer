@@ -60,7 +60,7 @@ interface IBouerOptions<
   ): void,
 
   /**
-   * The hook that should be called before the component is loaded
+   * The hook that should be called before the bouer istance is mounted
    * @param event the called event object
    */
   mounted?(this: Bouer<Data, Global, Deps>, event: CustomEvent): void;

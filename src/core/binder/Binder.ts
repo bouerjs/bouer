@@ -437,9 +437,8 @@ export default class Binder {
     let mWatch: Watch<Value, TargetObject> | undefined;
 
     ReactiveEvent.once('AfterGet', (event) => {
-      event.onemit = (descriptor) =>
-        (mWatch = descriptor.onChange(callback as WatchCallback) as any);
-      $default((targetObject as any)[propertyName]);
+      event.onemit = (d) => (mWatch = d.onChange(callback as any) as any);
+      Evaluator.run({ code: propertyName as string, data: targetObject as object });
     });
 
     return mWatch;

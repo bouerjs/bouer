@@ -22,7 +22,7 @@ export default class FormSchema {
   static isBuild(currentNode: any) {
     const cform = Constants.form;
     const attributes = currentNode.attributes;
-    return (cform.build in attributes || cform.abuild in attributes)
+    return (cform.build in attributes || cform.buildarray in attributes)
       && !currentNode.$$buildAddedInScope;
   }
 
@@ -40,13 +40,13 @@ export default class FormSchema {
     node.$$buildAddedInScope = true;
 
     // Get the build value
-    const attrBuild = findAttribute(node, [cform.build, cform.abuild]);
+    const attrBuild = findAttribute(node, [cform.build, cform.buildarray]);
     if (attrBuild == null) return;
 
     let buildValue = attrBuild.nodeValue as string;
 
     // Check if the element is an array type
-    if ((cform.array in attributes || cform.abuild in attributes)) {
+    if ((cform.array in attributes || cform.buildarray in attributes)) {
       //Retrieve the actual index of the current element
       const parentElement = node.parentElement!;
 

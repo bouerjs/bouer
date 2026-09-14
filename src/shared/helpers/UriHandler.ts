@@ -49,8 +49,4 @@ export default class UriHandler {
     const joined = mParams.join('&');
     return (this.url.includes('?')) ? '&' + joined : '?' + joined;
   }
-
-  remove(param: { key: string, type?: string }) {
-    return param;
-  }
 }

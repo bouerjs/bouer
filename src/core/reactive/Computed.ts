@@ -1,6 +1,6 @@
 import dynamic from '../../definitions/types/Dynamic';
 import RenderContext from '../../definitions/types/RenderContext';
-import Prop from '../../shared/helpers/Prop';
+import Property from '../../shared/helpers/Property';
 import { isNull, isObject } from '../../shared/helpers/Utils';
 
 export type EntryObjectType<Type, Context> = {
@@ -32,7 +32,7 @@ export default class Computed<Type, Context = RenderContext | any> {
     this.entry = entryValue;
     this.context = undefined as any; // To avoid errors
 
-    Prop.set(this, '_', {
+    Property.set(this, '_', {
       configurable: false,
       enumerable: false,
       value: (options: {

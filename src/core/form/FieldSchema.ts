@@ -37,11 +37,9 @@ export default class FieldSchema implements IFieldInfo {
   merge(schema: dynamic) {
     const _this: any = this;
     Object.keys(schema).forEach((key: string) => {
-
       if (key in _this && isNull(_this[key]))
         _this[key] = schema[key];
     });
-
     return this;
   }
 

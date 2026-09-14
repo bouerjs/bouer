@@ -1,5 +1,5 @@
 import dynamic from '../../definitions/types/Dynamic';
-import Prop from './Prop';
+import Property from './Property';
 import { $default, filter, isNull } from './Utils';
 
 export default class Extend {
@@ -14,7 +14,7 @@ export default class Extend {
     filter(args, arg => {
       if (isNull(arg)) return;
       filter(Object.keys(arg), key => {
-        Prop.transfer(out, arg, key);
+        Property.transfer(out, arg, key);
       });
     });
 
@@ -35,7 +35,7 @@ export default class Extend {
 
     filter(Object.keys(props), key => {
       const hasOwnProp = key in out;
-      Prop.transfer(out, props, key);
+      Property.transfer(out, props, key);
 
       if (hasOwnProp) {
         const mOut = out as any;
@@ -87,7 +87,7 @@ export default class Extend {
         if (key in dst) return;
 
         const hasOwnProp = key in src;
-        Prop.transfer(dst, src, key);
+        Property.transfer(dst, src, key);
         if (hasOwnProp) {
           src[key] = $default(src[key]);
         }

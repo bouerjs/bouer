@@ -61,30 +61,27 @@ export default class FormHandler {
   private $builder?: SchemaBuilder;
 
   private resolveElement(el: any): Element | undefined {
-    let element = el;
-
     // If it's not a HTML Element, just return
-    if ((element instanceof Element))
-      return element;
-    // If it's a string try to get the element
-    else if (typeof element === 'string') {
-      try {
-        if (!(element = DOM.querySelector(element))) {
-          Logger.error('Element with "' + element + '" selector not found.');
-          return undefined;
-        }
-      } catch (error) {
-        // Unknown error
-        Logger.error(buildError(error));
+    if (el instanceof Element)
+      return el;
+
+    if (!(typeof el === 'string'))
+      return undefined;
+
+    try {
+      // If it's a string try to get the element
+      const element = DOM.querySelector(el);
+
+      if (!element) {
+        Logger.error('Element with "' + element + '" selector not found.');
         return undefined;
       }
+      return element;
+    } catch (error) {
+      // Unknown error
+      Logger.error(buildError(error));
+      return undefined;
     }
-
-    // If the element is not
-    if (!element)
-      throw Logger.error('Invalid element provided at “' + element + '”.');
-
-    return element;
   }
 
   public init(options: {
@@ -135,7 +132,7 @@ export default class FormHandler {
       return undefined;
 
     if (this.evaluator == null) {
-      Logger.error('FormHandler is not initialized');
+      Logger.error('FormHandler is not initialized') ?? undefined;
       return undefined;
     }
 
@@ -148,19 +145,14 @@ export default class FormHandler {
   }
 
   public set(path: string, value: string) {
-    const field =  this.get(path);
-
+    const field = this.get(path);
     if (field == null) return;
-
     field.value = value;
   }
 
   public validate() {
     let isValid = true;
-    for (const field of this.schemas) {
-      if (!field.isValid())
-        isValid = false;
-    }
+    this.schemas.forEach(f => f.isValid() ? 1 : isValid = false);
     return isValid;
   }
 
@@ -173,19 +165,7 @@ export default class FormHandler {
   }
 
   public clear() {
-    for (const field of this.schemas) {
-      switch (field.type) {
-        case 'text': case 'string':
-        case 'checkbox': case 'password':
-          return field.value = '';
-        case 'number': case 'range':
-          return field.value = 0;
-        case 'radio': case 'boolean':
-          return field.value = undefined;
-        default:
-          return field.value = undefined;
-      }
-    }
+    this.schemas.forEach(f => f.value = '');
   }
 }
 

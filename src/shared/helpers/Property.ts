@@ -1,7 +1,7 @@
 import ReactivePropertyDescriptor from '../../core/reactive/Reactive';
 import dynamic from '../../definitions/types/Dynamic';
 
-export default class Prop {
+export default class Property {
   /**
    * Sets a property to an object
    * @param {object} obj the object to set the property
@@ -12,7 +12,7 @@ export default class Prop {
   static set<T extends dynamic>(
     obj: T, propName: keyof T | string, descriptor: PropertyDescriptor
   ) {
-    const destinationDescriptor = Prop.descriptor(obj, propName);
+    const destinationDescriptor = Property.descriptor(obj, propName);
 
     if (
         (descriptor instanceof ReactivePropertyDescriptor || !('value' in descriptor)) &&

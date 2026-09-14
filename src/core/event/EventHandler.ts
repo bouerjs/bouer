@@ -79,11 +79,7 @@ export default class EventHandler {
 
       if (isFunction(response)) {
         try {
-          if (('nobind' in response)) {
-            fnCallResolver(response);
-          } else {
-            fnCallResolver((response as Function).apply(context, mArguments));
-          }
+          fnCallResolver('nobind' in response ? response : response.apply(context, mArguments));
         } catch (error) {
           Logger.error(buildError(error));
         }
@@ -119,7 +115,7 @@ export default class EventHandler {
     context: RenderContext,
     modifiers?: IEventModifiers
   }) {
-    const instance = this;
+    const handler = this;
     const { eventName, callback, context, attachedNode, modifiers } = options;
     const iEventSubCallback = (evt: any) => callback.apply(context || this.bouer, [evt]);
 
@@ -128,7 +124,7 @@ export default class EventHandler {
       attachedNode: attachedNode,
       modifiers: modifiers,
       callback: iEventSubCallback,
-      destroy: () => instance.off({
+      destroy: () => handler.off({
         callback: iEventSubCallback,
         attachedNode,
         eventName,
