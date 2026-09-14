@@ -23,10 +23,8 @@ import Props from '../definitions/types/Properties';
 import RenderContext from '../definitions/types/RenderContext';
 import SkeletonOptions from '../definitions/types/SkeletonOptions';
 import WatchCallback from '../definitions/types/WatchCallback';
-import Constants from '../shared/helpers/Constants';
 import Extend from '../shared/helpers/Extend';
 import IoC from '../shared/helpers/IoCContainer';
-import Prop from '../shared/helpers/Prop';
 import Task from '../shared/helpers/Task';
 import {
     $internal,
@@ -409,30 +407,6 @@ export default class Bouer<
     };
 
     this.$deps = IoC.app(this);
-
-    Prop.set(this, 'refs', {
-      get: () => {
-        const mRefs: dynamic<Element> = {};
-        filter(toArray(ifNullStop(this.el).querySelectorAll('[' + Constants.ref + ']')),
-          (ref: any) => {
-            const mRef = ref.attributes[Constants.ref] as Attr;
-            const value = trim(mRef.value) || ref.name || '';
-
-            if (value === '')
-              return Logger.error('Expected an expression in “' + ref.name +
-                '” or at least “name” attribute to combine with “' + ref.name + '”.');
-
-            if (value in mRefs) {
-              Logger.warn('The key “' + value + '” in “' + ref.name + '” is taken, choose another key.');
-              return Logger.warn(ref);
-            }
-
-            mRefs[value] = ref;
-          });
-
-        return mRefs;
-      }
-    });
 
     if (typeof $options.mounted === 'function')
       eventHandler.on({ // Subscribe to the mounted event
