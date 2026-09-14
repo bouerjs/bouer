@@ -296,12 +296,12 @@ export default class ReactivePropertyDescriptor<Value, Obj> implements PropertyD
 
 export class InertProp<T> {
   private value?: T
-  constructor(value?: T) {
+  constructor(v?: T) {
     $internal(this);
-    this.value = value;
+    this.value = v;
   }
   get() { return this.value; }
-  set(value: T) { this.value = value; }
+  set(v: T) { this.value = v; }
 }
 
 export function $reactive<Data extends dynamic>(options: {
