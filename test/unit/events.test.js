@@ -3,7 +3,7 @@ import {
   Compiler,
   toHtml,
   IoC
-} from '../index';
+} from '../index.js';
 
 describe('Standard events', () => {
   let context;

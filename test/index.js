@@ -1,22 +1,18 @@
-import 'jsdom';
-import 'jsdom-global/register';
-import 'regenerator-runtime/runtime';
-
 import Bouer, {
   IoC,
   Compiler,
   Computed,
-  createEl,
   $computed,
-
   Component,
-  ViewChild
-
+  ViewChild,
+  $form,
+  $inert,
+  $field,
+  prop
 } from '../src/index';
+import { createEl } from '../src/shared/helpers/Utils';
 
-import { promisify } from 'util';
-
-const sleep = promisify(setTimeout);
+import { setTimeout as sleep } from 'node:timers/promises';
 
 function toHtml(strContent) {
   return createEl('body', el => el.innerHTML = strContent)
@@ -39,10 +35,14 @@ export {
   Component,
   ViewChild,
 
+  IoC,
+  prop,
+
   $computed,
   nextTick,
   toHtml,
   sleep,
-
-  IoC,
+  $form,
+  $inert,
+  $field,
 };

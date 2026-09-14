@@ -1,0 +1,74 @@
+
+<div>
+  <!-- Register form -->
+  <h3>Available Movies</h3>
+  <div>
+    <div e-for="movie of movies"
+        style="border: 1.8px solid #e5e5e5; border-radius: 4px; margin: 6px 0; padding: 3px 6px; cursor: pointer;"
+        e-class="{ active: movie.name == selectedMovie.name }"
+        on:click="chooseMovie(movie)">
+      <div> 🎞️ {{ movie.name }} - <b>{{ movie.year }}</b> </div>
+
+    </div>
+
+    <div style="border: 1.8px solid #e49797; border-radius: 4px; margin: 6px 0; padding: 3px 6px; cursor: pointer; text-align: center;"
+        on:click="clearSelection()">
+      <div> Clear Selection </div>
+    </div>
+  </div>
+</div>
+
+<script>
+
+  this.on('loaded', function () {
+    this.data.movies = [
+      {
+        name: 'The Matrix',
+        year: 1999
+      },
+      {
+        name: 'The Matrix Reloaded',
+        year: 2003
+      },
+      {
+        name: 'The Matrix Revolutions',
+        year: 2003
+      },
+      {
+        name: 'The Matrix Resurrections',
+        year: 2021
+      },
+      ,{
+        name: 'Avatar',
+        year: 2009
+      },
+      {
+        name: 'Avatar: The Way of Water',
+        year: 2022
+      }
+    ];
+  })
+
+  this.export({
+    movies: [],
+    selectedMovie: {
+      name: '',
+      year: ''
+    },
+    chooseMovie: function (movie) {
+      this.data.selectedMovie = movie;
+    },
+    clearSelection: function (movie) {
+      this.data.selectedMovie = {
+        name: '',
+        year: ''
+      };
+    }
+  })
+</script>
+
+<style scoped>
+  .active {
+    border-color: #71bf71!important;
+  }
+</style>

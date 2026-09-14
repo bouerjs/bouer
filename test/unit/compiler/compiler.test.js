@@ -4,7 +4,7 @@ import {
   Compiler,
   toHtml,
   IoC
-} from '../../index';
+} from '../../index.js';
 
 describe('When "Compiler.compile" method is called', () => {
   const htmlSnippet = '<h1>{{ value }}</h1>';

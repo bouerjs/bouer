@@ -1,6 +1,6 @@
 import {
   Bouer,
-} from '../../index';
+} from '../../index.js';
 
 describe('When "set" method from Bouer is called with no target object', () => {
   let context;

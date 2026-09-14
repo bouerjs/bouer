@@ -3,11 +3,11 @@ import {
   Compiler,
   toHtml,
   IoC,
-  $inert
-} from '../../index';
+  $inert,
+  prop
+} from '../../index.js';
 
 import {
-  $ref,
   Component,
   ViewChild
 } from '../../../src/index';
@@ -166,6 +166,98 @@ describe('Customize Component (extends)', () => {
         expect(el.querySelector('label').textContent).toBe('Full Name');
         expect(el.querySelector('input').value).toBe('New Value');
         expect(inputComponentInstance.text).toBe(el.querySelector('input').value);
+      }
+    });
+  });
+
+  it('Component `prop` properties are extracted from the data', async () => {
+    class InputComponent extends Component {
+      label = prop.required();
+      text = prop.optional('');
+
+      constructor() {
+        super({
+          template: `
+            <div class="input-field">
+              <label for="name">{{ label }}</label>
+              <input id="name" e-bind="text"/>
+            </div>
+          `
+        });
+      }
+    }
+
+    const htmlSnippet = `
+    <div class="form">
+      <InputComponent data="{ label: 'Full Name' }"></InputComponent>
+    </div>`;
+    const element = toHtml(htmlSnippet);
+    const context = Bouer.create({
+      components: [InputComponent],
+    });
+    const compiler = IoC.app(context).resolve(Compiler);
+
+    await compiler.compile({
+      data: context.data,
+      context: context,
+      el: element,
+      onComponentLoad: (el) => {
+        const inputComponentInstance = ViewChild.byClass(context, InputComponent)[0];
+
+        // Checking the values in
+        expect(inputComponentInstance.label).toBe('Full Name');
+        expect(inputComponentInstance.label).toBe(el.querySelector('label').textContent);
+        expect(inputComponentInstance.text).toBe('');
+
+        inputComponentInstance.label = 'New Label';
+        inputComponentInstance.text = 'New Value';
+
+        // Checking the values
+        expect(el.querySelector('label').textContent).toBe('New Label');
+        expect(el.querySelector('input').value).toBe('New Value');
+        expect(inputComponentInstance.text).toBe(el.querySelector('input').value);
+      }
+    });
+  });
+
+  it('Log error if `prop.required` property is not found in data', async () => {
+    class InputComponent extends Component {
+      label = prop.required();
+      text = prop.optional('');
+
+      constructor() {
+        super({
+          template: `
+            <div class="input-field">
+              <label for="name">{{ label }}</label>
+              <input id="name" e-bind="text"/>
+            </div>
+          `
+        });
+      }
+    }
+
+    const htmlSnippet = `
+    <div class="form">
+      <InputComponent></InputComponent>
+    </div>`;
+    const element = toHtml(htmlSnippet);
+    const context = Bouer.create({
+      components: [InputComponent],
+    });
+    const compiler = IoC.app(context).resolve(Compiler);
+    const logger = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await compiler.compile({
+      data: context.data,
+      context: context,
+      el: element,
+      onComponentLoad: (el) => {
+        const inputComponentInstance = ViewChild.byClass(context, InputComponent)[0];
+
+        expect(inputComponentInstance.label).toBeUndefined();
+        expect(logger.mock.calls[0][1]).toBe('The property “label” is required, please inject it via data directive.');
+        logger.mockRestore();
       }
     });
   });

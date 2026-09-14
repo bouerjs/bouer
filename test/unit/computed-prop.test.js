@@ -7,7 +7,7 @@ import {
   $computed,
   Component,
   ViewChild
-} from '../index';
+} from '../index.js';
 
 
 describe('When using a computed property', () => {
@@ -185,7 +185,7 @@ describe('When using a computed property', () => {
     })
   });
 
-  describe('When using calling the $computed function', () => {
+  describe('When calling the $computed function', () => {
     let context;
     let compiler;
 

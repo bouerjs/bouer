@@ -7,7 +7,7 @@ import {
   $form,
   $field,
   $inert
-} from '../../index';
+} from '../../index.js';
 
 describe('When "toJsObj" method is called (On instance)', () => {
   it('Compile the HTML Snippet to Javascript Object Literal', () => {

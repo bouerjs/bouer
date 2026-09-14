@@ -1,6 +1,6 @@
 import {
   Bouer,
-} from '../../index';
+} from '../../index.js';
 
 describe('When using "watch" method', () => {
   it('Listen to property change', () => {

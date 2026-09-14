@@ -3,7 +3,7 @@ import {
   Compiler,
   toHtml,
   IoC
-} from '../../index';
+} from '../../index.js';
 
 describe('When using a "e-bind" for two way data binding ', () => {
   describe('On short binding', () => {

@@ -3,7 +3,7 @@ import {
   Compiler,
   toHtml,
   IoC
-} from '../../index';
+} from '../../index.js';
 
 describe('When using "e-entry" directive', () => {
   it('Copies/Register the element with the directive', () => {

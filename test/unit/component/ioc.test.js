@@ -5,7 +5,7 @@ import {
   toHtml,
   IoC,
   $inert
-} from '../../index';
+} from '../../index.js';
 
 describe('Dependency Injection - IoC Container', () => {
 

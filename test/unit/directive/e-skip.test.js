@@ -3,7 +3,7 @@ import {
   Compiler,
   toHtml,
   IoC
-} from '../../index';
+} from '../../index.js';
 
 describe('When element is compiled with "e-skip" directive', () => {
   let context;

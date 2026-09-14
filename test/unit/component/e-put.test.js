@@ -4,7 +4,7 @@ import {
   toHtml,
   IoC,
   sleep
-} from '../../index';
+} from '../../index.js';
 
 describe('When element is compiled with "e-put" directive', () => {
   let context;

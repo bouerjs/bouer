@@ -1,0 +1,28 @@
+<div class="page">
+  <h2> Contact Page </h2>
+  <form method="post" on:submit.prevent="null">
+    <div class="wrapper">
+      <label>Email</label>
+      <input type="email" placeholder="Type your email...">
+    </div>
+
+    <div class="wrapper">
+      <label>Message</label>
+      <textarea cols="30" rows="10" placeholder="Type your message..."></textarea>
+    </div>
+
+    <button>Submit</button>
+  </form>
+</div>
+
+<style scoped>
+  form {
+    display: flex;
+    flex-direction: column;
+  }
+
+  form>div {
+    display: flex;
+    flex-direction: column;
+  }
+</style>

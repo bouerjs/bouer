@@ -4,7 +4,7 @@ import {
   toHtml,
   sleep,
   IoC
-} from '../../index';
+} from '../../index.js';
 
 describe('When element is compiled with "e-req" directive', () => {
   describe('When compiled with "of" request type', () => {
@@ -56,7 +56,7 @@ describe('When element is compiled with "e-req" directive', () => {
         }
       });
 
-      await sleep(1);
+      await sleep(0.1);
 
       expect(responded).toHaveBeenCalled();
       expect(done).toHaveBeenCalled();
@@ -101,7 +101,7 @@ describe('When element is compiled with "e-req" directive', () => {
         }
       });
 
-      await sleep(1);
+      await sleep(0.1);
 
       expect(responded).toHaveBeenCalled();
       expect(done).toHaveBeenCalled();
@@ -144,7 +144,7 @@ describe('When element is compiled with "e-req" directive', () => {
         }
       });
 
-      await sleep(1);
+      await sleep(0.1);
 
       expect(responded).not.toHaveBeenCalled();
       expect(failed).toHaveBeenCalled();
@@ -205,7 +205,7 @@ describe('When element is compiled with "e-req" directive', () => {
         }
       });
 
-      await sleep(1);
+      await sleep(0.1);
 
       expect(responded).toHaveBeenCalled();
       expect(done).toHaveBeenCalled();
@@ -251,7 +251,7 @@ describe('When element is compiled with "e-req" directive', () => {
         }
       });
 
-      await sleep(1);
+      await sleep(0.1);
 
       expect(responded).toHaveBeenCalled();
       expect(done).toHaveBeenCalled();
@@ -295,7 +295,7 @@ describe('When element is compiled with "e-req" directive', () => {
         }
       });
 
-      await sleep(1);
+      await sleep(0.1);
 
       expect(responded).not.toHaveBeenCalled();
       expect(failed).toHaveBeenCalled();

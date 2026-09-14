@@ -1,6 +1,6 @@
 import {
   Bouer
-} from '../index';
+} from '../index.js';
 
 describe('Reactivity Transformation', () => {
   it('Transform all the properties of an object to a reactive properties and map object only once', () => {

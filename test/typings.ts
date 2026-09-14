@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 
 // Data Property Typing
-import { $form, $field, Component, FormHandler, $computed, $createApp } from '../src';
+import { $form, $field, Component, FormHandler, $computed, $createApp, prop } from '../src';
 import { $inert } from '../src/core/reactive/Reactive';
 
 const app = $createApp('', {
@@ -81,6 +81,9 @@ class RegisterUser extends Component {
       pattern: 'email'
     })
   });
+
+  types1 = prop.required<string[]>();
+  types2 = prop.optional<string>('');
 
   constructor(webClient: any) {
     super({

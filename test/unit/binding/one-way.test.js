@@ -3,7 +3,7 @@ import {
   Compiler,
   toHtml,
   IoC
-} from '../../index';
+} from '../../index.js';
 
 describe('When using a delimiter "{{ ... }}" for one way data binding', () => {
   it('Render the property in Element <h1> content', () => {
