@@ -1,6 +1,4 @@
 // rollup.config.js
-const config = require('./scripts/config');
+import { builds } from './scripts/config.js';
 
-export default Object.keys(config.builds).map(cfg =>{
-  return config.builds[cfg];
-});
+export default Object.keys(builds).map(cfg => builds[cfg]);

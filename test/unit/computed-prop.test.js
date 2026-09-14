@@ -2,147 +2,369 @@ import {
   Bouer,
   Compiler,
   toHtml,
-  IoC
-} from '../index';
+  Computed,
+  IoC,
+  $computed,
+  Component,
+  ViewChild
+} from '../index.js';
+
 
 describe('When using a computed property', () => {
-  let context;
-  let compiler;
 
-  beforeEach(() => {
-    context = Bouer.create({
-      data: {
-        value: 'Printed',
-        _valueGet: function $computed() {
-          return this.data.value;
-        },
-        _valuePartialGet: function $computed() {
-          return {
-            get: () => this.data.value,
-          };
-        },
-        _valuePartialSet: function $computed() {
-          return {
-            set: (v) => this.data.value = v || ''
-          };
-        },
-        _valueFull: function $computed() {
-          return {
-            get: () => this.data.value,
-            set: (v) => this.data.value = v || ''
-          };
-        },
+  describe('When using function $computed approach', () => {
+    let context;
+    let compiler;
+
+    beforeEach(() => {
+      context = Bouer.create({
+        data: {
+          value: 'Printed',
+          _valueGet: function $computed() {
+            return this.data.value;
+          },
+          _valuePartialGet: function $computed() {
+            return {
+              get: () => this.data.value,
+            };
+          },
+          _valuePartialSet: function $computed() {
+            return {
+              set: (v) => this.data.value = v || ''
+            };
+          },
+          _valueFull: function $computed() {
+            return {
+              get: () => this.data.value,
+              set: (v) => this.data.value = v || ''
+            };
+          },
+        }
+      });
+
+      compiler = IoC.app(context).resolve(Compiler);
+    });
+
+    describe('When using inferred get', () => {
+      it('Renders the value when used in a delimiter', () => {
+        const htmlSnippet = '<h1>{{ _valueGet }}</h1>';
+        const element = toHtml(htmlSnippet);
+
+        compiler.compile({
+          data: context.data,
+          context: context,
+          el: element,
+          onComponentLoad: el => {
+            expect(el.innerHTML).toContain('Printed');
+          }
+        });
+      });
+
+      it('Keeps UI old state if I try to set it value', () => {
+        const htmlSnippet = '<h1>{{ _valueGet }}</h1>';
+        const element = toHtml(htmlSnippet);
+
+        compiler.compile({
+          data: context.data,
+          context: context,
+          el: element,
+          onComponentLoad: compiledEl => {
+            context.data._valueGet = 'new-value-printed';
+            expect(compiledEl.innerHTML).toContain('Printed');
+          }
+        });
+      });
+    });
+
+    describe('When using with partial "get" only', () => {
+      it('Renders the value when used in a delimiter', () => {
+        const htmlSnippet = '<h1>{{ _valuePartialGet }}</h1>';
+        const element = toHtml(htmlSnippet);
+
+        compiler.compile({
+          data: context.data,
+          context: context,
+          el: element,
+          onComponentLoad: compiledEl => {
+            expect(compiledEl.innerHTML).toContain('Printed');
+          }
+        });
+      });
+
+      it('Keeps UI old state if I try to set it value', () => {
+        const htmlSnippet = '<h1>{{ _valuePartialGet }}</h1>';
+        const element = toHtml(htmlSnippet);
+
+        compiler.compile({
+          data: context.data,
+          context: context,
+          el: element,
+          onComponentLoad: compiledEl => {
+            context.data._valuePartialGet = 'new-value-printed';
+            expect(compiledEl.innerHTML).toContain('Printed');
+          }
+        });
+      });
+    });
+
+    describe('When using with partial `set` only', () => {
+      it('Changes the source property value and UI if I try to set it value', () => {
+        const htmlSnippet = '<h1>{{ value }}</h1>';
+        const element = toHtml(htmlSnippet);
+
+        compiler.compile({
+          data: context.data,
+          context: context,
+          el: element,
+          onComponentLoad: compiledEl => {
+            context.data._valuePartialSet = 'new-value-printed';
+            expect(compiledEl.innerHTML).toContain('new-value-printed');
+          }
+        });
+      });
+    });
+
+    describe('When using full definition `get` and `set`', () => {
+      it('Renders the value when used in a delimiter', () => {
+        const htmlSnippet = '<h1>{{ _valueFull }}</h1>';
+        const element = toHtml(htmlSnippet);
+
+        compiler.compile({
+          data: context.data,
+          context: context,
+          el: element,
+          onComponentLoad: compiledEl => {
+            expect(compiledEl.innerHTML).toContain('Printed');
+          }
+        });
+      });
+
+      it('Changes UI state if I set it value', () => {
+        const htmlSnippet = '<h1>{{ _valueFull }}</h1>';
+        const element = toHtml(htmlSnippet);
+
+        compiler.compile({
+          data: context.data,
+          context: context,
+          el: element,
+          onComponentLoad: compiledEl => {
+            context.data._valueFull = 'new-value-printed';
+            expect(compiledEl.innerHTML).toContain('new-value-printed');
+          }
+        });
+      });
+    });
+
+    describe('When using a invalid definition', () => {
+      it('Stops the the rendering and throwing an error', () => {
+
+        const htmlSnippet = '<h1>{{ _valueWithNull }}</h1>';
+        const element = toHtml(htmlSnippet);
+
+        const logger = jest.spyOn(console, 'error').mockImplementation();
+
+        const context = Bouer.create({
+          data: {
+            value: 'Printed',
+            _valueWithNull: function $computed() {
+              return null;
+            }
+          }
+        });
+
+        compiler.compile({
+          data: context.data,
+          context: context,
+          el: element,
+          onComponentLoad: () => {
+            expect(logger.mock.calls[0][1].message).toBe('Invalid value used as return in property _valueWithNull: “function $computed(){...}” | “$computed({...})”.');
+            logger.mockRestore();
+          }
+        });
+      })
+    })
+  });
+
+  describe('When calling the $computed function', () => {
+    let context;
+    let compiler;
+
+    beforeEach(() => {
+      context = Bouer.create({
+        data: {
+          value: 'Printed',
+
+          _valueFn: new Computed(function () {
+            return this.data.value;
+          }),
+
+          _valueObj: new Computed({
+            get: function () {
+              return this.data.value;
+            },
+            set: function (v) {
+              this.data.value = v || '';
+            }
+          }),
+
+          _valueFnGetSet: new Computed(function () {
+            return {
+              get: function () {
+                return this.data.value;
+              },
+              set: function (v) {
+                this.data.value = v || '';
+              }
+            };
+          })
+        }
+      });
+
+      compiler = IoC.app(context).resolve(Compiler);
+    });
+
+    describe('When using function with inferred get', () => {
+      it('Renders the value when used in a delimiter', () => {
+        const htmlSnippet = '<h1>{{ _valueFn }}</h1>';
+        const element = toHtml(htmlSnippet);
+
+        compiler.compile({
+          data: context.data,
+          context: context,
+          el: element,
+          onComponentLoad: el => {
+            expect(el.innerHTML).toContain('Printed');
+          }
+        });
+      });
+
+      it('Keeps UI old state if I try to set it value', () => {
+        const htmlSnippet = '<h1>{{ _valueFn }}</h1>';
+        const element = toHtml(htmlSnippet);
+
+        compiler.compile({
+          data: context.data,
+          context: context,
+          el: element,
+          onComponentLoad: compiledEl => {
+            context.data._valueFn = 'new-value-printed';
+            expect(compiledEl.innerHTML).toContain('Printed');
+          }
+        });
+      });
+    });
+
+    describe('When using an object definition with `get` and `set`', () => {
+      it('Renders the value when used in a delimiter', () => {
+        const htmlSnippet = '<h1>{{ _valueObj }}</h1>';
+        const element = toHtml(htmlSnippet);
+
+        compiler.compile({
+          data: context.data,
+          context: context,
+          el: element,
+          onComponentLoad: compiledEl => {
+            expect(compiledEl.innerHTML).toContain('Printed');
+          }
+        });
+      });
+
+      it('Changes UI state if I set it value', () => {
+        const htmlSnippet = '<h1>{{ _valueObj }}</h1>';
+        const element = toHtml(htmlSnippet);
+
+        compiler.compile({
+          data: context.data,
+          context: context,
+          el: element,
+          onComponentLoad: compiledEl => {
+            context.data._valueObj = 'new-value-printed';
+            expect(compiledEl.innerHTML).toContain('new-value-printed');
+          }
+        });
+      });
+    });
+
+    describe('When using a function definition returning an object with `get` and `set`', () => {
+      it('Renders the value when used in a delimiter', () => {
+        const htmlSnippet = '<h1>{{ _valueFnGetSet }}</h1>';
+        const element = toHtml(htmlSnippet);
+
+        compiler.compile({
+          data: context.data,
+          context: context,
+          el: element,
+          onComponentLoad: compiledEl => {
+            expect(compiledEl.innerHTML).toContain('Printed');
+          }
+        });
+      });
+
+      it('Changes UI state if I set it value', () => {
+        const htmlSnippet = '<h1>{{ _valueFnGetSet }}</h1>';
+        const element = toHtml(htmlSnippet);
+
+        compiler.compile({
+          data: context.data,
+          context: context,
+          el: element,
+          onComponentLoad: compiledEl => {
+            context.data._valueFnGetSet = 'new-value-printed';
+            expect(compiledEl.innerHTML).toContain('new-value-printed');
+          }
+        });
+      });
+    });
+  });
+
+  describe('When using computed property in a Component', () => {
+    it('Component properties are reactive when using Computed property', async () => {
+      class InputComponent extends Component {
+        mText = '<empty>';
+
+        text = $computed({
+          get: () => this.mText,
+          set: (v) => this.mText = v
+        });
+
+        constructor() {
+          super({
+            template: '<input e-bind="text"/>'
+          });
+        }
       }
-    });
 
-    compiler = IoC.app(context).resolve(Compiler);
-  });
-
-  describe('When using inferred get', () => {
-    it('Renders the value if used in a delimiter', () => {
-      const htmlSnippet = '<h1>{{ _valueGet }}</h1>';
+      const htmlSnippet = `
+        <div>
+          <InputComponent></InputComponent>
+        </div>`;
       const element = toHtml(htmlSnippet);
-
-      compiler.compile({
-        data: context.data,
-        context: context,
-        el: element,
-        onDone: el => {
-          expect(el.innerHTML).toContain('Printed');
-        }
+      const context = Bouer.create({
+        components: [InputComponent],
       });
-    });
 
-    it('Keeps UI old state if I try to set it value', () => {
-      const htmlSnippet = '<h1>{{ _valueGet }}</h1>';
-      const element = toHtml(htmlSnippet);
+      const compiler = IoC.app(context).resolve(Compiler);
 
-      compiler.compile({
+      await compiler.compile({
         data: context.data,
         context: context,
         el: element,
-        onDone: compiledEl => {
-          context.data._valueGet = 'new-value-printed';
-          expect(compiledEl.innerHTML).toContain('Printed');
-        }
-      });
-    });
-  });
+        onComponentLoad: () => {
 
-  describe('When using with partial "get" only', () => {
-    it('Renders the value if used in a delimiter', () => {
-      const htmlSnippet = '<h1>{{ _valuePartialGet }}</h1>';
-      const element = toHtml(htmlSnippet);
+          const inputComponentInstance = ViewChild.byName(context, InputComponent.name)[0];
 
-      compiler.compile({
-        data: context.data,
-        context: context,
-        el: element,
-        onDone: compiledEl => {
-          expect(compiledEl.innerHTML).toContain('Printed');
-        }
-      });
-    });
+          // Checking the values in
+          expect(inputComponentInstance.text).toBe('<empty>');
 
-    it('Keeps UI old state if I try to set it value', () => {
-      const htmlSnippet = '<h1>{{ _valuePartialGet }}</h1>';
-      const element = toHtml(htmlSnippet);
+          const input = element.children[0];
 
-      compiler.compile({
-        data: context.data,
-        context: context,
-        el: element,
-        onDone: compiledEl => {
-          context.data._valuePartialGet = 'new-value-printed';
-          expect(compiledEl.innerHTML).toContain('Printed');
-        }
-      });
-    });
-  });
+          // Updating the inputs
+          input.value = 'Input Value Changed';
+          input.dispatchEvent(new Event('input'));
 
-  describe('When using with partial `set` only', () => {
-    it('Changes the source property value and UI if I try to set it value', () => {
-      const htmlSnippet = '<h1>{{ value }}</h1>';
-      const element = toHtml(htmlSnippet);
-
-      compiler.compile({
-        data: context.data,
-        context: context,
-        el: element,
-        onDone: compiledEl => {
-          context.data._valuePartialSet = 'new-value-printed';
-          expect(compiledEl.innerHTML).toContain('new-value-printed');
-        }
-      });
-    });
-  });
-
-  describe('When using full definition `get` and `set`', () => {
-    it('Renders the value if used in a delimiter', () => {
-      const htmlSnippet = '<h1>{{ _valueFull }}</h1>';
-      const element = toHtml(htmlSnippet);
-
-      compiler.compile({
-        data: context.data,
-        context: context,
-        el: element,
-        onDone: compiledEl => {
-          expect(compiledEl.innerHTML).toContain('Printed');
-        }
-      });
-    });
-
-    it('Changes UI state if I set it value', () => {
-      const htmlSnippet = '<h1>{{ _valueFull }}</h1>';
-      const element = toHtml(htmlSnippet);
-
-      compiler.compile({
-        data: context.data,
-        context: context,
-        el: element,
-        onDone: compiledEl => {
-          context.data._valueFull = 'new-value-printed';
-          expect(compiledEl.innerHTML).toContain('new-value-printed');
+          // Checking the values
+          expect(input.value).toBe(inputComponentInstance.mText);
+          expect(input.value).toBe(inputComponentInstance.text);
         }
       });
     });

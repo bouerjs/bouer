@@ -1,50 +1,65 @@
 import dynamic from '../../definitions/types/Dynamic';
-import Prop from './Prop';
-import { fnEmpty, forEach, isNull } from './Utils';
+import Property from './Property';
+import { $default, filter, isNull } from './Utils';
 
-export default (function Extend() {
-
-  const obj = <T extends dynamic = dynamic>(...args: T[]) => {
+export default class Extend {
+  /**
+   * Combines different object into a new one
+   * @param {object} args Objects to be combined
+   * @returns A new object having the properties of all the objects
+   */
+  static obj<T extends dynamic = dynamic>(...args: T[]) {
     const out: dynamic = {};
 
-    forEach(args, arg => {
+    filter(args, arg => {
       if (isNull(arg)) return;
-      forEach(Object.keys(arg), key => {
-        Prop.transfer(out, arg, key);
+      filter(Object.keys(arg), key => {
+        Property.transfer(out, arg, key);
       });
     });
 
     return out as T;
-  };
+  }
 
-  const mixin = <OutType extends dynamic = dynamic, InType extends dynamic = any>(
+  /**
+   * Adds properties to the first object provided
+   * @param {object} out the object that should be added all the properties from the other one
+   * @param {object} args the objects where the properties should be extracted from
+   * @returns the first object with all the new properties added on
+   */
+  static mixin<OutType extends dynamic = dynamic, InType extends dynamic = any>(
     out: OutType, ...args: InType[]
-  ) => {
+  ) {
     // Props to mix with out object
-    const props = obj.apply({}, args) as any;
+    const props = Extend.obj.apply({}, args) as any;
 
-    forEach(Object.keys(props), key => {
+    filter(Object.keys(props), key => {
       const hasOwnProp = key in out;
-      Prop.transfer(out, props, key);
+      Property.transfer(out, props, key);
 
       if (hasOwnProp) {
         const mOut = out as any;
-        mOut[key] = fnEmpty(mOut[key]);
+        mOut[key] = $default(mOut[key]);
       }
     });
 
     return out as OutType & InType;
-  };
+  }
 
-  const array = <T extends any[] = any[]>(...args: T[]) => {
+  /**
+   * Combines different arrays into a new one
+   * @param {object} args arrays to be combined
+   * @returns a new arrat having the items of all the arrays
+   */
+  static array<T extends any[] = any[]>(...args: T[]) {
     const out: T[] = [];
-    forEach(args, arg => {
+    filter(args, arg => {
       if (isNull(arg)) return;
 
       if (!Array.isArray(arg))
         return out.push(arg);
 
-      forEach(Object.keys(arg), (key: any) => {
+      filter(Object.keys(arg), (key: any) => {
         const value = arg[key];
         if (isNull(value))
           return;
@@ -56,56 +71,30 @@ export default (function Extend() {
       });
     });
     return out as T;
-  };
+  }
 
-  const matcher = <T1 extends dynamic = dynamic, T2 extends dynamic = any>(
+  /**
+   * transfers the props of first object to the second and the seconds to the first
+   * @param {object} t1 the first object
+   * @param {object} t2 the second object
+   */
+  static matcher<T1 extends dynamic = dynamic, T2 extends dynamic = any>(
     t1: T1, t2: T2
-  ) => {
+  ) {
 
     const exec = (src: any, dst: any) => {
-      forEach(Object.keys(src), key => {
+      filter(Object.keys(src), key => {
         if (key in dst) return;
 
         const hasOwnProp = key in src;
-        Prop.transfer(dst, src, key);
+        Property.transfer(dst, src, key);
         if (hasOwnProp) {
-          src[key] = fnEmpty(src[key]);
+          src[key] = $default(src[key]);
         }
       });
     };
 
     exec(t1, t2);
     exec(t2, t1);
-  };
-
-  return {
-    /**
-     * Combines different object into a new one
-     * @param {object} args Objects to be combined
-     * @returns A new object having the properties of all the objects
-     */
-    obj,
-
-    /**
-     * Adds properties to the first object provided
-     * @param {object} out the object that should be added all the properties from the other one
-     * @param {object} args the objects where the properties should be extracted from
-     * @returns the first object with all the new properties added on
-     */
-    mixin,
-
-    /**
-     * Combines different arrays into a new one
-     * @param {object} args arrays to be combined
-     * @returns a new arrat having the items of all the arrays
-     */
-    array,
-
-    /**
-     * transfers the props of first object to the second and the seconds to the first
-     * @param {object} t1 the first object
-     * @param {object} t2 the second object
-     */
-    matcher,
-  };
-})();
+  }
+}

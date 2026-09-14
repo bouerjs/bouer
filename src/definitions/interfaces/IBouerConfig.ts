@@ -4,7 +4,7 @@ interface IBouerConfig {
   /** Allow to use hash (#) on page navigation, by default is `true` */
   usehash?: boolean;
 
-  /** Allow to keep the data modified during the component lifecycle */
+  /** Defines the className of the active anchor */
   activeClassName?: string;
 
   /** Allow to prefetch the component content when the application is ready, by default is `true` */

@@ -1,48 +1,50 @@
 import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
 import ILifeCycleHooks from '../../definitions/interfaces/ILifeCycleHooks';
+import Constructor from '../../definitions/types/Constructor';
 import dynamic from '../../definitions/types/Dynamic';
+import RenderContext from '../../definitions/types/RenderContext';
 import Bouer from '../../instance/Bouer';
 import Constants from '../../shared/helpers/Constants';
 import Extend from '../../shared/helpers/Extend';
-import Prop from '../../shared/helpers/Prop';
 import IoC from '../../shared/helpers/IoCContainer';
+import Property from '../../shared/helpers/Property';
 import Task from '../../shared/helpers/Task';
 import {
-  createEl,
-  buildError,
-  code,
-  DOM,
-  fnCallResolver,
-  forEach,
-  findDirective,
-  ifNullReturn,
-  isFunction,
-  isNull,
-  isObject,
-  pathResolver, toArray,
-  toLower,
-  urlCombine,
-  urlResolver,
-  webRequest,
-  where,
-  trim
+    $default,
+    $internal,
+    buildError,
+    code,
+    createEl,
+    DOM,
+    filter,
+    findDirective,
+    fnCallResolver,
+    ifNullReturn,
+    isFunction,
+    isNull,
+    isObject,
+    pathResolver, toArray,
+    toComponentOrOptions,
+    toLower,
+    urlCombine,
+    urlResolver,
+    webRequest
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
-import Compiler from '../compiler/Compiler';
+import Compiler, { CompilationHooks } from '../compiler/Compiler';
+import { DataProp } from '../compiler/Directive/DataInject';
 import DelimiterHandler from '../DelimiterHandler';
 import Evaluator from '../Evaluator';
 import EventHandler from '../event/EventHandler';
-import ReactiveEvent from '../event/ReactiveEvent';
-import Reactive from '../reactive/Reactive';
+import { $reactive } from '../reactive/Reactive';
+import ReactiveEvent from '../reactive/ReactiveEvent';
 import Routing from '../routing/Routing';
-import Component from './Component';
-import IAsset from '../../definitions/interfaces/IAsset';
-import Constructor from '../../definitions/types/Constructor';
+import DataStore from '../store/DataStore';
+import ComponentPrototype, { Component } from './Component';
 
 type Class = Constructor<any>;
 
 export default class ComponentHandler {
-  readonly _IRT_ = true;
   private bouer: Bouer;
 
   // Handle all the components web requests to avoid multiple requests
@@ -52,18 +54,10 @@ export default class ComponentHandler {
   eventHandler: EventHandler;
   evaluator: Evaluator;
   rounting: Routing;
-  components: { [key: string]: Component | IComponentOptions } = {};
+  components: { [key: string]: Component | ComponentPrototype | IComponentOptions } = {};
   // Avoids adding multiple styles of the same component if it's already in use
   stylesController: { [key: string]: { styles: Element[], elements: Element[] } } = {};
-  activeComponents: Component[] = [];
-
-  private componentDefaultProps = new Set([
-    'name', 'path', 'title', 'route',
-    'template', 'data', 'keepAlive', 'assets',
-    'prefetch', 'children', 'restrictions',
-    'isDefault', 'isNotFound', 'isDestroyed',
-    'clazz', 'el', 'bouer', 'events', '_IRT_'
-  ]);
+  activeComponents: (Component | ComponentPrototype)[] = [];
 
   constructor(
     bouer: Bouer,
@@ -72,6 +66,8 @@ export default class ComponentHandler {
     evaluator: Evaluator,
     routing: Routing
   ) {
+    $internal(this);
+
     this.bouer = bouer;
     this.delimiter = delimiterHandler;
     this.eventHandler = eventHandler;
@@ -104,7 +100,7 @@ export default class ComponentHandler {
         return response.text();
       })
       .then(content => {
-        forEach(this.requests[path], (request: dynamic) => {
+        filter(this.requests[path], (request: dynamic) => {
           request.success(content, path);
         });
         delete this.requests[path];
@@ -113,73 +109,81 @@ export default class ComponentHandler {
         if (!baseElement)
           Logger.warn('It seems like you are not using the “<base href="/base/components/path/" />” ' +
             'element, try to add as the first child into “<head></head>” element.');
-        forEach(this.requests[path], (request: dynamic) => request.fail(error, path));
+        filter(this.requests[path], (request: dynamic) => request.fail(error, path));
         delete this.requests[path];
       });
   }
 
   prepare(
-    components: (Component | IComponentOptions | Class)[],
-    parent?: Component
+    components: (Constructor<Component> | IComponentOptions)[],
+    parent?: ComponentPrototype
   ) {
-    forEach(components, (entry) => {
+    filter(components, (entry) => {
       const isComponentClass = ((entry as Class).prototype instanceof Component);
 
-      let component = entry as Component;
+      // Assuming that is a ComponentPrototype
+      let $protoComponent = entry as IComponentOptions;
+      let $classComponent: Component | undefined;
+
+      // if it is a class
       if (isComponentClass) {
         // Resolve the instance of the class
-        component = IoC.app(this.bouer).resolve(entry as Class) || IoC.new(entry as Class)!;
-        component.clazz = entry as Class;
+        $classComponent = IoC.app(this.bouer).resolve(entry as Class) || IoC.resolve(entry as Class) || IoC.new(entry as Class);
+        if (!$protoComponent) return Logger.error('Could not create the “'+ entry.name +'” component');
+
+        $protoComponent = $classComponent!.__$proto__;
+        Property.set($protoComponent, 'ctor', {
+          configurable: false, enumerable: false, writable: false, value: entry as Class
+        });
       }
 
       // In case of no-named-component, creates a name
-      if (isNull(component.name) || !component.name) {
-        // Generate a random name
-        (component as any).name = toLower(code(8, 'templ' + '-component-'));
-
+      if (isNull($protoComponent.name)) {
         // But, if the component has a path, generate a beautiful name for it
-        if (!isNull(component.path) || !component.path) {
-          const pathSplitted = component.path.toLowerCase().split('/');
+        if (!isNull($protoComponent.path) || !$protoComponent.path) {
+          const pathSplitted = $protoComponent.path!.toLowerCase().split('/');
           let componentName = pathSplitted[pathSplitted.length - 1].replace('.html', '') || Component.name;
 
           // If the component name already exists generate a new one
-          if (this.components[componentName]) {
+          if (this.components[componentName])
             componentName = toLower(code(8, componentName + '-component-'));
-          }
 
-          (component as any).name = componentName;
+          ($protoComponent as any).name = componentName;
+        } else {
+          // Generate a random name
+          ($protoComponent as any).name = toLower(code(8, 'templ' + '-component-'));
         }
       }
 
       // Normalize the name
-      (component as any).name = component.name.toLowerCase();
+      ($protoComponent as any).name = $protoComponent.name!.toLowerCase();
       let parentRoute = '';
 
-      if (this.components[component.name!])
-        return Logger.warn('The component name “' + component.name + '” is already define, ' +
+      if (this.components[$protoComponent.name!])
+        return Logger.warn('The component name “' + $protoComponent.name + '” is already define, ' +
           'try changing the “component.name” property.');
 
-      if (!isNull(parent)) {
-        /** TODO: Inherit the parent info */
+      if (!isNull(parent))
+        // Inherit the parent info
         parentRoute = parent!.route || '';
-      }
 
-      if (!isNull(component.route)) { // Completing the route
-        (component as any).route = '/' + urlCombine(parentRoute, component.route!);
-      }
+      if (!isNull($protoComponent.route)) // Completing the route
+        ($protoComponent as any).route = '/' + urlCombine(parentRoute, $protoComponent.route!);
 
-      if (Array.isArray(component.children))
-        this.prepare(component.children, component);
+      if (Array.isArray($protoComponent.children))
+        this.prepare($protoComponent.children, $protoComponent as any);
+
+      this.components[$protoComponent.name!] = $classComponent || $protoComponent;
 
       IoC.app(this.bouer).resolve(Routing)!
-        .configure(this.components[component.name!] = component);
+        .configure($protoComponent as any);
 
       const getContent = (path?: string) => {
         if (!path) return;
 
-        this.request(component.path!, {
+        this.request($protoComponent.path!, {
           success: content => {
-            (component as any).template = content;
+            ($protoComponent as any).template = content;
           },
           fail: error => {
             Logger.error(buildError(error));
@@ -187,78 +191,133 @@ export default class ComponentHandler {
         });
       };
 
-      if (!isNull(component.prefetch)) {
-        if (component.prefetch === true)
-          return getContent(component.path);
-        return;
-      }
-
-      if (!((component as any).prefetch = ifNullReturn(this.bouer.config.prefetch, true)))
+      if ($protoComponent.prefetch === false)
         return;
 
-      return getContent(component.path);
+      if ((($protoComponent as any).prefetch = ifNullReturn(this.bouer.config.prefetch, true)) == false)
+        return;
+
+      return getContent($protoComponent.path);
     });
   }
 
-  order(componentElement: Element, data: object, onComponent?: (component: Component) => void) {
+  order(options: {
+    componentElement: Element,
+    data: object,
+    context: RenderContext,
+    directivesToIgnore?: string[],
+    beforeComponentLoad?: (element: Element) => void
+    onComponentLoad: (component: ComponentPrototype) => void,
+    onComponentFail: (element: Element) => void,
+    compilationHooks?: CompilationHooks
+  }) {
+    const { componentElement, data, context, onComponentLoad } = options;
     const $name = toLower(componentElement.nodeName);
-    const component = this.components[$name];
+    const $component = this.components[$name];
 
-    if (!component) return Logger.error('No component with name “' + $name + '” registered.');
+    const protoComponent = toComponentOrOptions($component);
+    const onComponentFail = options.onComponentFail || $default;
+
+    if (!protoComponent) {
+      onComponentFail(componentElement);
+      return Logger.error('No component with name “' + $name + '” registered.');
+    }
 
     const mainExecutionWrapper = () => {
-      const resolveComponentInstance = (c: Component | IComponentOptions) => {
-        let mCom: Component;
+      const newComponent = (entry: Component | ComponentPrototype | IComponentOptions): Component | ComponentPrototype => {
+        const protoComponent = toComponentOrOptions(entry);
 
-        if ((c instanceof Component) && (c as Component).clazz)
-          mCom = IoC.app(this.bouer).resolve(c.clazz!) || IoC.new(c.clazz!)!;
-        else if (c instanceof Component)
-          mCom = structuredClone(c);
-        else
-          mCom = new Component(c);
+        const configure = (proto: ComponentPrototype) => {
+          proto.bouer = this.bouer;
+          Property.set(proto, 'template', { get: () => protoComponent.template });
+          Property.set(proto, 'parent', {
+            // only assing the parent if is a component prototype
+            value: context instanceof ComponentPrototype ? context : null
+          });
+          return proto;
+        }
 
-        if (mCom.keepAlive === true)
-          this.components[$name] = mCom;
+        // If the component is set has keep-alive, just return it
+        if (protoComponent.keepAlive == true) {
+          configure(protoComponent as ComponentPrototype);
+          return entry as ComponentPrototype | Component;
+        }
 
-        (mCom as any).template = c.template;
-        mCom.bouer = this.bouer;
-        return mCom;
+        let $protoComponent: ComponentPrototype;
+        let $classComponent: Component | null = null;
+
+        if (entry instanceof Component) {
+          const ctor = entry.__$proto__.ctor
+          const $newClassComponent: Component<any> = IoC.app(this.bouer).resolve(ctor) ||
+            IoC.resolve(ctor) || IoC.new(ctor)!;
+
+          $classComponent = $newClassComponent;
+          $protoComponent = $newClassComponent.__$proto__;
+
+          $protoComponent.prepareClass($newClassComponent);
+        } else {
+          $protoComponent = new ComponentPrototype(entry);
+        }
+
+        if ($protoComponent.keepAlive === true)
+          this.components[$name] = $protoComponent;
+
+        configure($protoComponent as ComponentPrototype);
+        return $classComponent || $protoComponent;
       };
 
-      const isGroupableComponent = !component.template && !component.path;
+      const isGroupableComponent = !protoComponent.template && !protoComponent.path;
 
-      if (component.template || isGroupableComponent)
-        return this.insert(componentElement, resolveComponentInstance(component)!, data, onComponent);
+      if (protoComponent.template || isGroupableComponent)
+        return this.insert({
+          componentElement: componentElement,
+          component: newComponent($component)!,
+          directiveToIgnore: options.directivesToIgnore,
+          data: data,
+          onComponentLoad: onComponentLoad,
+          onComponentFail: onComponentFail,
+          compilationHooks: options.compilationHooks
+        });
 
-      if (!component.path)
-        return Logger.error('Expected a valid value in `path` or `template` got invalid value at “' +
-          $name + '” component.');
+      if (!protoComponent.path) {
+        onComponentFail(componentElement);
+        return Logger.error('Expected a valid value in `path` or `template` got invalid value at “' + $name + '” component.');
+      }
 
-      this.addEvent('requested', componentElement, component, this.bouer)
+      this.addEvent('requested', componentElement, protoComponent, this.bouer)
         .emit();
 
       // Make component request or Add
-      this.request(component.path, {
+      this.request(protoComponent.path, {
         success: content => {
-          (component as any).template = content;
-          this.insert(componentElement, resolveComponentInstance(component)!, data, onComponent);
+          (protoComponent as any).template = content;
+          this.insert({
+            componentElement: componentElement,
+            component: newComponent($component)!,
+            data: data,
+            onComponentLoad: onComponentLoad,
+            onComponentFail: onComponentFail,
+            directiveToIgnore: options.directivesToIgnore,
+            compilationHooks: options.compilationHooks
+          });
         },
         fail: (error) => {
           Logger.error('Failed to request <' + $name + '/> component with path “' +
-            component.path + '”.');
+            protoComponent.path + '”.');
           Logger.error(buildError(error));
 
-          this.addEvent('failed', componentElement, component, this.bouer).emit();
+          this.addEvent('failed', componentElement, protoComponent, this.bouer).emit();
+          onComponentFail(componentElement);
         }
       });
     };
 
     // Checking the restrictions
-    if (component.restrictions && component.restrictions!.length > 0) {
+    if (protoComponent && protoComponent.restrictions && protoComponent.restrictions!.length > 0) {
       const blockedRestrictions: Function[] = [];
-      const restrictions = component.restrictions.map(restriction => {
+      const restrictions = protoComponent.restrictions.map(restriction => {
 
-        const restrictionResult = restriction.call(this.bouer, component);
+        const restrictionResult = restriction.call(this.bouer, protoComponent);
 
         if (restrictionResult === false)
           blockedRestrictions.push(restriction);
@@ -273,32 +332,38 @@ export default class ComponentHandler {
         return restrictionResult;
       });
 
-      const blockedEvent = this.addEvent('blocked', componentElement, component, this.bouer);
-      const emitter = () => blockedEvent.emit({
-        detail: {
-          component: component.name,
-          message: 'Component “' + component.name + '” blocked by restriction(s)',
-          blocks: blockedRestrictions
-        }
-      });
+      const blockedEvent = this.addEvent('blocked', componentElement, protoComponent || $component, this.bouer);
+      const emitFailEvent = () => {
+        onComponentFail(componentElement);
+
+        blockedEvent.emit({
+          detail: {
+            component: protoComponent || $component,
+            message: 'Component “' + (protoComponent || $component).name + '” blocked by restriction(s)',
+            blocks: blockedRestrictions
+          }
+        });
+      }
 
       return Promise.all(restrictions)
         .then(restrictionValues => {
           if (restrictionValues.every(value => value == true))
             mainExecutionWrapper();
-          else
-            emitter();
+          else {
+            emitFailEvent();
+          }
         })
-        .catch(() => emitter());
+        .catch(() => emitFailEvent());
     }
 
     return mainExecutionWrapper();
   }
 
-  find(predicate: (item: (Component | IComponentOptions)) => boolean) {
+  find(predicate: (item: ComponentPrototype | IComponentOptions) => boolean) {
     const keys = Object.keys(this.components);
     for (let i = 0; i < keys.length; i++) {
-      const component = this.components[keys[i]];
+      const $component = this.components[keys[i]];
+      const component = toComponentOrOptions($component);
       if (predicate(component)) return component;
     }
     return null;
@@ -338,55 +403,71 @@ export default class ComponentHandler {
 
       this.eventHandler.emit({
         eventName: 'component:' + eventName,
-        init: { detail: { component: component } },
-        once: true
+        init: { detail: { component: component } }
       });
     };
 
     return { emit: (init?: CustomEventInit) => emitter(init) };
   }
 
-  insert(
+  insert(options: {
     componentElement: Element,
-    component: Component,
+    component: Component | ComponentPrototype,
     data: object,
-    onComponent?: (component: Component) => void
-  ) {
+    onComponentLoad: (component: ComponentPrototype) => void,
+    onComponentFail: (element: Element) => void
+    directiveToIgnore?: string[],
+    compilationHooks?: CompilationHooks
+  }) {
+    const componentElement = options.componentElement;
+
+    const $classComponent = options.component;
+    const $protoComponent = toComponentOrOptions($classComponent) as ComponentPrototype;
+
+    const data = options.data || Extend.obj(this.bouer.data);
+    const onComponentLoad = options.onComponentLoad || $default;
+    const onComponentFail = options.onComponentFail || $default;
+    const directivesToIgnore = options.directiveToIgnore;
+
+    const beforeCompile = options.compilationHooks?.beforeCompile || $default;
+    const afterCompile = options.compilationHooks?.afterCompile || $default;
+
     const $name = toLower(componentElement.nodeName);
     const container = componentElement.parentElement;
     const compiler = IoC.app(this.bouer).resolve(Compiler)!;
+    const context = $protoComponent.parent;
 
-    if (!container)
-      return;
+    if (!container) {
+      return onComponentFail(componentElement);
+    }
 
-    if (isNull(component.template))
+    if (isNull($protoComponent.template)) {
+      onComponentFail(componentElement);
       return Logger.error('The <' + $name + '/> component is not ready yet to be inserted.');
+    }
 
-    if (!compiler.analize(component.template!))
-      return;
-
-    // Adding the component to the active component list if it is not added
-    if (!this.activeComponents.includes(component))
-      this.activeComponents.push(component);
+    if (!compiler.analize($protoComponent.template!)) {
+      return onComponentFail(componentElement);
+    }
 
     const slotContainer = createEl('SlotContainer', el => {
       el.innerHTML = componentElement.innerHTML;
       componentElement.innerHTML = '';
     }).build();
 
-    const isKeepAlive = componentElement.hasAttribute('keep-alive') || ifNullReturn(component.keepAlive, false);
+    const isKeepAlive = componentElement.hasAttribute('keep-alive') || ifNullReturn($protoComponent.keepAlive, false);
     // Component Creation
-    if (isKeepAlive === false || isNull(component.el)) {
-      createEl('body', htmlSnippet => {
+    if (isKeepAlive === false || !$protoComponent.el) {
+      $protoComponent.el = createEl('body', htmlSnippet => {
         // If both .path and .template are invalid, it means that it's a groupable component
-        const template = !component.path && !component.template ? '<div></div>' : component.template!;
+        const template = !$protoComponent.path && !$protoComponent.template ? '<div></div>' : $protoComponent.template!;
         htmlSnippet.innerHTML = template;
 
-        forEach([].slice.call(htmlSnippet.children), (asset: any) => {
+        filter([].slice.call(htmlSnippet.children), (asset: any) => {
           if (['SCRIPT', 'LINK', 'STYLE'].indexOf(asset.nodeName) === -1)
             return;
 
-          component.assets.push(asset);
+          $protoComponent.assets.push(asset);
           htmlSnippet.removeChild(asset);
         });
 
@@ -397,18 +478,15 @@ export default class ComponentHandler {
         if (htmlSnippet.children.length > 1)
           return Logger.error(('The component <' + $name + '/> seems to have multiple ' +
             'root element, it must have only one root.'));
-
-        component.el = htmlSnippet.children[0];
-      });
+      }).child();
     }
 
-    const rootElement = component.el!;
+    const mainComponentElement = $protoComponent.el!;
 
-    if (isNull(rootElement)) return;
+    if (!mainComponentElement) return onComponentFail(componentElement);
 
     // Handling Slots
     if (slotContainer.childNodes.length > 0) {
-
       const hasSkippedParent = (child: Element): boolean => {
         if (child.hasAttribute(Constants.skip)) return true;
         const parent = child.parentElement;
@@ -418,14 +496,14 @@ export default class ComponentHandler {
 
       // # slot[default]
       const slotContainerChildren = toArray(slotContainer.children);
-      const slotDefaults = toArray(rootElement.querySelectorAll('slot[default]'));
+      const slotDefaults = toArray(mainComponentElement.querySelectorAll('slot[default]'));
       // Looping all the slots defaults target
-      forEach(slotDefaults, (slotTarget: Node) => {
+      filter(slotDefaults, (slotTarget: Node) => {
         if (hasSkippedParent(slotTarget as Element)) return;
 
         const slotTargetContainer = slotTarget.parentElement!;
         // Adding the children
-        forEach(slotContainerChildren, (child: Node) => {
+        filter(slotContainerChildren, (child: Node) => {
           slotTargetContainer.insertBefore(child.cloneNode(true), slotTarget);
         });
 
@@ -434,21 +512,21 @@ export default class ComponentHandler {
       });
 
       // # div[slot='name'] || slot[slot=name]
-      const slotNamed = toArray(rootElement.querySelectorAll('slot[name]'));
+      const slotNamed = toArray(mainComponentElement.querySelectorAll('slot[name]'));
       // Looping all the slots defaults target
-      forEach(slotNamed, (slotTarget: Element) => {
+      filter(slotNamed, (slotTarget: Element) => {
         if (hasSkippedParent(slotTarget as Element)) return;
         const slotTargetContainer = slotTarget.parentElement!;
         const slotName = slotTarget.getAttribute('name');
 
         // Adding the children
-        forEach(slotContainerChildren, (child: Element) => {
+        filter(slotContainerChildren, (child: Element) => {
           if ( // slot[slot='name']
             child.nodeName.toLowerCase() == 'slot' &&
             child.getAttribute('slot') == slotName
           ) {
             // Adding the children
-            forEach(toArray(child.childNodes), (child: Node) => {
+            filter(toArray(child.childNodes), (child: Node) => {
               slotTargetContainer.insertBefore(child.cloneNode(true), slotTarget);
             });
           }
@@ -469,130 +547,165 @@ export default class ComponentHandler {
       });
     }
 
-    // Transforming all unknown variables to reactive
-    const unknownVars = where(Object.keys(component), key => !this.componentDefaultProps.has(key));
-    if (unknownVars.length > 0) {
-      Reactive.transform({
-        context: component,
-        data: component,
-        keys: unknownVars
-      });
-    }
-
     // Adding the listeners
-    const createdEvent = this.addEvent('created', rootElement, component);
-    const beforeMountEvent = this.addEvent('beforeMount', rootElement, component);
-    const mountedEvent = this.addEvent('mounted', rootElement, component);
-    const beforeLoadEvent = this.addEvent('beforeLoad', rootElement, component);
-    const loadedEvent = this.addEvent('loaded', rootElement, component);
-    this.addEvent('beforeDestroy', rootElement, component);
-    this.addEvent('destroyed', rootElement, component);
+    const createdEvent = this.addEvent('created', mainComponentElement, $protoComponent);
+    const beforeMountEvent = this.addEvent('beforeMount', mainComponentElement, $protoComponent);
+    const mountedEvent = this.addEvent('mounted', mainComponentElement, $protoComponent);
+    const beforeLoadEvent = this.addEvent('beforeLoad', mainComponentElement, $protoComponent);
+    const loadedEvent = this.addEvent('loaded', mainComponentElement, $protoComponent);
+    this.addEvent('beforeDestroy', mainComponentElement, $protoComponent);
+    this.addEvent('destroyed', mainComponentElement, $protoComponent);
 
-    const scriptsAssets = where(component.assets, asset => asset.nodeName === 'SCRIPT');
-    const initializer = component.init;
+    const scriptsAssets = filter($protoComponent.assets, asset => asset.nodeName === 'SCRIPT');
+    const initializer = $protoComponent.init;
 
     if (isFunction(initializer))
-      fnCallResolver(initializer!.call(component));
+      fnCallResolver(initializer!.call($protoComponent));
 
     const processDataAttr = (attr: Attr) => {
-      let inputData: dynamic = {};
-      const mData = Extend.obj(data, { $data: data });
-
       // Listening to all the reactive properties
       const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
-        if (!(descriptor.propName in inputData))
-          inputData[descriptor.propName] = undefined;
-        Prop.set(inputData, descriptor.propName, descriptor);
+        if (!(descriptor.$name in inputData))
+          inputData[descriptor.$name] = undefined;
+
+        Property.set(inputData, descriptor.$name, descriptor);
       });
 
-      // If data value is empty gets the main scope value
-      if (attr.value === '')
-        inputData = Extend.obj(this.bouer.data);
-      else {
-        // Otherwise, compiles the object provided
-        const mInputData = IoC.app(this.bouer).resolve(Evaluator)!
-          .exec({
-            data: mData,
-            code: attr.value,
-            context: this.bouer
-          });
+      let inputData: dynamic = {};
 
-        if (!isObject(mInputData))
-          Logger.error('Expected a valid Object Literal expression in “' + attr.nodeName +
-            '” and got “' + attr.value + '”.');
-        else {
-          // Adding all non-existing properties
-          forEach(Object.keys(mInputData), key => {
-            if (!(key in inputData))
-              inputData[key] = mInputData[key];
-          });
-        }
+      if (attr.value.trim() === '') {
+        reactiveEvent.off();
+        // Data to apply: {...Bouer.data, ...component.data}
+        return data;
+      }
+
+      // Otherwise, compiles the object provided
+      const dataAttrValue = IoC.app(this.bouer).resolve(Evaluator)!
+        .exec({
+          data: Extend.obj(data, {
+            $data: data,
+            $scope: data,
+            $navigate: data
+          }),
+          code: attr.value,
+          context: context ?? this.bouer
+        });
+
+      if (!isObject(dataAttrValue))
+        Logger.error('Expected a valid Object Literal expression in “' + attr.nodeName +
+          '” and got “' + attr.value + '”.');
+      else {
+        // Adding all non-existing properties
+        filter(Object.keys(dataAttrValue), key => {
+          if (!(key in inputData))
+            inputData[key] = dataAttrValue[key];
+        });
       }
 
       reactiveEvent.off();
-      inputData = Reactive.transform({
-        context: component,
-        data: inputData
-      });
-
-      forEach(Object.keys(inputData), key => {
-        Prop.transfer(component.data, inputData, key);
-      });
+      return inputData;
     };
 
     const compile = (scriptContent?: string) => {
       try {
-        // Injecting data
-        // If the component has does not have the data directive assigned, create it implicitly
-        if (!(findDirective(componentElement, Constants.data)))
-          componentElement.setAttribute('data', '$data');
-
+        let dataToUse: any = {};
         let dataAttr = null;
+
         // If the attr is `data`, prepare and inject the value into component `data`
         if (dataAttr = findDirective(componentElement, Constants.data)) {
           const attr = dataAttr as Attr;
           if (this.delimiter.run(attr.value).length !== 0) {
-            Logger.error(('The “data” attribute cannot contain delimiter, source element: ' +
-              '<' + $name + '/>.'));
+            Logger.error(('The “data” attribute cannot contain delimiter, source element: ' + '<' + $name + '/>.'));
           } else {
-            processDataAttr(attr);
+            dataToUse = processDataAttr(attr);
           }
+
           componentElement.removeAttribute(attr.name);
+        } else {
+          // if there is no data attr, use the component data mixed with the provided data
+          dataToUse = Extend.obj($protoComponent.data, data);
         }
+
+        $protoComponent.data = Extend.obj(dataToUse, $protoComponent.data);
 
         // Executing the mixed scripts
         IoC.app(this.bouer).resolve(Evaluator)!
-          .execRaw((scriptContent || ''), component);
+          .eval((scriptContent || ''), $protoComponent);
+
+        $reactive({
+          context: $protoComponent,
+          data: $protoComponent.data
+        });
+
+        if ($classComponent != $protoComponent) {
+          filter(Object.getOwnPropertyNames($classComponent) as any, (key: never) => {
+            const prop: any = $classComponent[key];
+
+            // If it is not InputData, skip it
+            if (!(prop instanceof DataProp)) return;
+
+            const dataPropValue = $protoComponent.data[key];
+
+            // If the property is null and it is required type
+            if (isNull(dataPropValue) && prop.constraint == 'required') {
+              Logger.error('The property “'+ key +'” is required, please inject it via data directive.');
+              return Property.set($classComponent, key, { value: undefined });
+            }
+
+            // If the property is null and it it optional
+            if (isNull(dataPropValue) && prop.constraint == 'optional') {
+              $protoComponent.data[key] = prop.value;
+            }
+
+            $reactive({
+              context: $protoComponent,
+              data: $protoComponent.data,
+              keys: [key]
+            });
+
+            Property.transfer($classComponent, $protoComponent.data, key);
+          });
+        }
+
+        // Signing the element with it's data
+        IoC.app(this.bouer).resolve(DataStore)!.addNodeData(
+          mainComponentElement,
+          $protoComponent.data
+        );
 
         createdEvent.emit();
 
         // tranfering the attributes
-        forEach(toArray(componentElement.attributes), (attr: Attr) => {
+        filter(toArray(componentElement.attributes), (attr: Attr) => {
           // if the attr is the class, transfer the items to the root element
           if (attr.nodeName === 'class')
             return componentElement.classList.forEach(cls => {
-              rootElement.classList.add(cls);
+              mainComponentElement.classList.add(cls);
             });
 
           if (Constants.silent == attr.name) return;
           // sets the attr to the root element
-          rootElement.setAttribute(attr.name, attr.value);
+          mainComponentElement.setAttribute(attr.name, attr.value);
         });
 
         beforeMountEvent.emit();
 
         // Attaching the root element to the component element
         if (!('root' in componentElement))
-          Prop.set(componentElement, 'root', { value: rootElement });
+          Property.set(componentElement, 'root', { value: mainComponentElement });
 
         // Mouting the element
-        container.replaceChild(rootElement, componentElement);
+        container.replaceChild(mainComponentElement, componentElement);
         mountedEvent.emit();
+
+        // Adding the component to the active component list if it is not added
+        if (this.activeComponents.indexOf($classComponent || $protoComponent) < 0)
+          this.activeComponents.push($classComponent || $protoComponent);
 
         const rootClassList: any = {};
 
         // Retrieving all the classes of the root element
-        rootElement.classList.forEach(key => rootClassList[key] = true);
+        mainComponentElement.classList.forEach(key => rootClassList[key] = true);
 
         // Changing each selector to avoid conflits
         const changeSelector = (style: HTMLStyleElement | HTMLLinkElement, styleId: string) => {
@@ -604,13 +717,11 @@ export default class ComponentHandler {
           const cssRules = style.sheet.cssRules;
 
           for (let i = 0; i < cssRules.length; i++) {
-            const rule = cssRules.item(i);
-
+            const rule = cssRules.item(i) as dynamic;
             if (!rule) continue;
 
-            const mRule = rule as dynamic;
             // .item .title, .item .desc
-            const ruleText = mRule.selectorText;
+            const ruleText = rule.selectorText;
 
             if (ruleText) {
               const classStyleId = '.' + styleId;
@@ -625,7 +736,7 @@ export default class ComponentHandler {
                *  .e-A1bcD .item .desc
                * ]
                */
-              mRule.selectorText = ruleText.split(',')
+              rule.selectorText = ruleText.split(',')
                 .flatMap(($selector: string) => {
                   const $selectors = $selector.split(' ');
                   $selectors[0] = $selectors[0] + classStyleId;
@@ -635,19 +746,19 @@ export default class ComponentHandler {
             }
 
             // Adds the cssText only if the element is <style>
-            if (isStyle) rules.push(mRule.cssText);
+            if (isStyle) rules.push(rule.cssText);
           }
           if (isStyle) style.innerText = rules.join(' ');
         };
-        const stylesAssets = where(component.assets, asset => asset.nodeName !== 'SCRIPT');
+        const stylesAssets = filter($protoComponent.assets, asset => asset.nodeName !== 'SCRIPT');
         const styleAttrName = 'component-style';
 
         // Configuring the styles
-        forEach(stylesAssets, asset => {
+        filter(stylesAssets, asset => {
           const mStyle = asset.cloneNode(true) as Element;
 
           if (mStyle instanceof HTMLLinkElement) {
-            const path = component.path[0] === '/' ? component.path.substring(1) : component.path;
+            const path = $protoComponent.path[0] === '/' ? $protoComponent.path.substring(1) : $protoComponent.path;
             mStyle.href = pathResolver(path, mStyle.getAttribute('href') || '');
             mStyle.rel = 'stylesheet';
           }
@@ -656,16 +767,16 @@ export default class ComponentHandler {
           if (this.stylesController[$name]) {
             const controller = this.stylesController[$name];
 
-            if (controller.elements.indexOf(rootElement) > -1)
+            if (controller.elements.indexOf(mainComponentElement) > -1)
               return;
 
-            controller.elements.push(rootElement);
-            return forEach(controller.styles, $style => {
-              rootElement.classList.add($style.getAttribute(styleAttrName) as string);
+            controller.elements.push(mainComponentElement);
+            return filter(controller.styles, $style => {
+              mainComponentElement.classList.add($style.getAttribute(styleAttrName) as string);
             });
           }
 
-          const styleId = code(5, 'e-');
+          const styleId = code(8, 'e-');
           mStyle.setAttribute(styleAttrName, styleId);
 
           if ((mStyle instanceof HTMLLinkElement) && mStyle.hasAttribute('scoped'))
@@ -673,12 +784,12 @@ export default class ComponentHandler {
 
           this.stylesController[$name] = {
             styles: [DOM.head.appendChild(mStyle)],
-            elements: [rootElement]
+            elements: [mainComponentElement]
           };
 
           if (!mStyle.hasAttribute('scoped')) return;
 
-          rootElement.classList.add(styleId);
+          mainComponentElement.classList.add(styleId);
           if (mStyle instanceof HTMLStyleElement)
             return changeSelector(mStyle, styleId);
         });
@@ -686,17 +797,21 @@ export default class ComponentHandler {
         beforeLoadEvent.emit();
         // Compiling the rootElement
         compiler.compile({
-          el: rootElement,
-          context: component,
-          data: Reactive.transform({ context: component, data: component.data }),
-          onDone: () => {
-            if (isFunction(onComponent))
-              onComponent!(component);
+          el: mainComponentElement,
+          context: $protoComponent,
+          data: $protoComponent.data,
+          directivesToIgnore: directivesToIgnore,
+
+          beforeCompile: beforeCompile as any,
+          afterCompile: afterCompile as any,
+
+          onComponentLoad: () => {
+            onComponentLoad($protoComponent);
             loadedEvent.emit();
 
             if (!this.rounting.routeView) {
-              const routeView = rootElement.hasAttribute('route-vew') ?
-                rootElement : rootElement.querySelector('[route-view]');
+              const routeView = mainComponentElement.hasAttribute('route-vew') ?
+                mainComponentElement : mainComponentElement.querySelector('[route-view]');
 
               if (routeView) this.rounting.setRouteView(routeView!);
             }
@@ -708,36 +823,37 @@ export default class ComponentHandler {
 
         // Listening the component to be destroyed
         Task.run(stopTask => {
-          if (component.el!.isConnected) return;
+          if ($protoComponent.el!.isConnected) return;
 
           if (this.bouer.isDestroyed)
             return stopTask();
 
-          component.destroy();
+          $protoComponent.destroy();
           stopTask();
 
-          const stylesController = this.stylesController[component.name];
+          const stylesController = this.stylesController[$protoComponent.name];
           if (!stylesController)
             return;
 
-          const index = stylesController.elements.indexOf(component.el!);
+          const index = stylesController.elements.indexOf($protoComponent.el!);
           stylesController.elements.splice(index, 1);
 
           if (stylesController.elements.length > 0 || container.isConnected)
             return;
 
           // No elements using the style
-          forEach(stylesController.styles, style =>
-            forEach(toArray(DOM.head.children), item => {
+          filter(stylesController.styles, style =>
+            filter(toArray(DOM.head.children), item => {
               if (item === style)
                 return DOM.head.removeChild(style);
             }));
 
-          delete this.stylesController[component.name];
+          delete this.stylesController[$protoComponent.name];
         });
       } catch (error) {
         Logger.error('Error in <' + $name + '/> component.');
         Logger.error(buildError(error));
+        onComponentFail(componentElement);
       }
     };
 
@@ -750,11 +866,11 @@ export default class ComponentHandler {
     const webRequestChecker: any = {};
 
     // Grouping the online scripts and collecting the online url
-    forEach(scriptsAssets as any, (script: HTMLScriptElement) => {
+    filter(scriptsAssets as any, (script: HTMLScriptElement) => {
       if (script.src == '' || script.innerHTML)
         localScriptsContent.push(script.innerHTML);
       else {
-        const path = component.path[0] === '/' ? component.path.substring(1) : component.path;
+        const path = $protoComponent.path[0] === '/' ? $protoComponent.path.substring(1) : $protoComponent.path;
         script.src = pathResolver(path, script.getAttribute('src') || '');
         onlineScriptsUrls.push(script.src);
       }
@@ -765,7 +881,7 @@ export default class ComponentHandler {
       return compile(localScriptsContent.join('\n\n'));
 
     // Load the online scripts and run it
-    return forEach(onlineScriptsUrls, (url, index) => {
+    return filter(onlineScriptsUrls, (url, index) => {
       webRequestChecker[url] = true;
       // Getting script content from a web request
       webRequest(url, {
@@ -786,97 +902,9 @@ export default class ComponentHandler {
         Logger.error(('Error loading the <script src=\'' + url + '\'></script> in ' +
           '<' + $name + '/> component, remove it in order to be compiled.'));
         Logger.error(error);
+        onComponentFail(componentElement);
       });
     });
-  }
-
-  /**
-   * Adds assets to the component
-   * @param {string|object} assets the list of assets to be included
-   */
-  static prepareAssets(
-    component: Component, assets: (IAsset | string)[]
-  ) {
-    const $Assets: any[] = [];
-    const assetsTypeMapper: dynamic = {
-      js: 'script',
-      css: 'link',
-      scss: 'link',
-      sass: 'link',
-      less: 'link',
-      styl: 'link',
-      style: 'link',
-    };
-
-    const isValidAssetSrc = (src: string, index: number) => {
-      const isValid = (src || trim(src)) ? true : false;
-      if (!isValid) Logger.error('Invalid asset “src”, in assets[' + index + '].src');
-      return isValid;
-    };
-
-    const assetTypeGetter = (src: string, index: number) => {
-      const srcSplitted = src.split('.');
-      const type = assetsTypeMapper[toLower(srcSplitted[srcSplitted.length - 1])];
-
-      if (!type) return Logger.error('Couldn\'t find out what type of asset it is, provide ' +
-        'the “type” explicitly at assets[' + index + '].type');
-
-      return type;
-    };
-
-    forEach(assets, (asset, index) => {
-      let src = '';
-      let type = '';
-      let scoped = true;
-
-      if (typeof asset === 'string') { // String type
-        if (!isValidAssetSrc(asset, index)) return;
-        type = assetTypeGetter(trim(src = asset.replace(/\.less|\.s[ac]ss|\.styl/i, '.css')), index);
-      } else { // Object Type
-        if (!isValidAssetSrc(trim(src = asset.src.replace(/\.less|\.s[ac]ss\.styl/i, '.css')), index)) return;
-
-        if (!asset.type) {
-          if (!(type = assetTypeGetter(src, index))) return;
-        } else {
-          type = assetsTypeMapper[toLower(asset.type)] || asset.type;
-        }
-
-        scoped = ifNullReturn(asset.scoped, true);
-      }
-
-      const isRelativePathImport = src[0] === '.';
-
-      if (isRelativePathImport && (!component.path || isNull(component.path))) {
-        Logger.warn('Component with no `path` cannot use imported assets, check component: ' + component.path);
-        return;
-      }
-
-      if (isRelativePathImport) {
-        const pathSections = component.path.split('/').slice(0, -1);
-        if (pathSections[0] === '') pathSections.shift();
-        src = pathSections.join('/') + src.substring(1, src.length);
-      }
-
-      const $Asset = createEl(type, el => {
-        if (ifNullReturn(scoped, true))
-          el.setAttribute('scoped', 'true');
-
-        switch (toLower(type)) {
-          case 'script': el.setAttribute('src', src); break;
-          case 'link':
-            el.setAttribute('href', src);
-            el.setAttribute('rel', 'stylesheet');
-            el.setAttribute('type', 'text/css');
-            break;
-          default: el.setAttribute('src', src); break;
-        }
-      }).build();
-
-      $Assets.push($Asset);
-    });
-
-    component.assets.splice(0, component.assets.length);
-    component.assets.push.apply(component.assets, $Assets);
   }
 
   /**
@@ -885,7 +913,7 @@ export default class ComponentHandler {
    * @param {object?} init the CustomEventInit object where we can provid the event detail
    */
   emit<TKey extends keyof ILifeCycleHooks>(
-    component: Component,
+    component: ComponentPrototype,
     eventName: TKey,
     init?: CustomEventInit
   ) {

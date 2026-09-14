@@ -1,6 +1,6 @@
 import CustomDirective from '../../../definitions/types/CustomDirective';
 import RenderContext from '../../../definitions/types/RenderContext';
-import { ifNullReturn, toOwnerNode, trim } from '../../../shared/helpers/Utils';
+import { ifNullReturn, toOwnerNode } from '../../../shared/helpers/Utils';
 import Binder from '../../binder/Binder';
 import DelimiterHandler from '../../DelimiterHandler';
 import Evaluator from '../../Evaluator';
@@ -24,7 +24,7 @@ export function custom(opitons: {
   } = opitons;
   const ownerNode = toOwnerNode(node);
   const nodeName = node.nodeName;
-  const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  const nodeValue = ifNullReturn(node.nodeValue, '');
   const delimiters = delimiter.run(nodeValue);
   const $CustomDirective = $custom[nodeName];
 
@@ -32,12 +32,11 @@ export function custom(opitons: {
     data: data,
     node: node,
     fields: delimiters,
-    isReplaceProperty: false,
+    replaceable: false,
     context: context,
-    onUpdate: () => {
-      if (typeof $CustomDirective.onUpdate === 'function')
-        $CustomDirective.onUpdate(node, bindConfig);
-    }
+    onBind: $CustomDirective.onBind,
+    onUpdate: $CustomDirective.onUpdate,
+    onUnbind: $CustomDirective.onUnbind
   });
 
   if (ifNullReturn($CustomDirective.removable, true))

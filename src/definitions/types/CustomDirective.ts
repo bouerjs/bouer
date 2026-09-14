@@ -2,7 +2,10 @@ import IBinderConfig from '../interfaces/IBinderConfig';
 
 type CustomDirective = {
   [key: string]: {
-    /** Allow to remove the directive after the bind */
+    /**
+     * Allow to remove the directive after the bind
+     * default value: true
+     */
     removable?: boolean,
     /**
      * An action that will be performed on bind
@@ -13,7 +16,7 @@ type CustomDirective = {
      *  - if the method returns `false` it will continue the compiler process of the node
      *  - if `null` or `void` it will assume as `false`
      */
-    onBind?: (node: Node, bindConfig: IBinderConfig) => boolean | undefined,
+    onBind?: (node: Node, directive: IBinderConfig) => boolean | undefined,
     /**
      * An action that will be performed on unbind
      * @param {Node} node the node attached to the process

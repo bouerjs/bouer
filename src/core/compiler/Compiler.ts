@@ -1,15 +1,18 @@
 import IDelimiterResponse from '../../definitions/interfaces/IDelimiterResponse';
 import INode from '../../definitions/interfaces/INode';
 import CustomDirective from '../../definitions/types/CustomDirective';
+import dynamic from '../../definitions/types/Dynamic';
 import RenderContext from '../../definitions/types/RenderContext';
 import Bouer from '../../instance/Bouer';
 import Constants from '../../shared/helpers/Constants';
+import Extend from '../../shared/helpers/Extend';
 import IoC from '../../shared/helpers/IoCContainer';
 import {
+  $default,
+  $internal,
   findDirective,
   fnCallResolver,
-  forEach,
-  isFunction,
+  filter,
   isString, toArray, toLower
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
@@ -17,17 +20,25 @@ import Binder from '../binder/Binder';
 import ComponentHandler from '../component/ComponentHandler';
 import DelimiterHandler from '../DelimiterHandler';
 import EventHandler from '../event/EventHandler';
+import FormSchema from '../form/FormSchema';
 import Routing from '../routing/Routing';
+import DataStore from '../store/DataStore';
 import Directive from './Directive';
 
+export type CompilationHooks = {
+  beforeCompile?: (this: RenderContext, element: Node, data?: dynamic) => void | Promise<any>,
+  /** The function that should be fired after the compilation ends */
+  afterCompile?: (this: RenderContext, element: Node, data?: dynamic) => void | Promise<any>
+};
+
 export default class Compiler {
-  readonly _IRT_ = true;
   bouer: Bouer;
   binder: Binder;
   delimiter: DelimiterHandler;
   eventHandler: EventHandler;
   component: ComponentHandler;
   directives: CustomDirective;
+  dataStore: DataStore;
 
   private NODES_TO_IGNORE_IN_COMPILATION = {
     'SCRIPT': 1,
@@ -42,12 +53,15 @@ export default class Compiler {
     componentHandler: ComponentHandler,
     directives?: CustomDirective
   ) {
+    $internal(this);
+
     this.bouer = bouer;
     this.directives = directives ?? {};
     this.binder = binder;
     this.delimiter = delimiterHandler;
     this.eventHandler = eventHandler;
     this.component = componentHandler;
+    this.dataStore = IoC.app(bouer).resolve(DataStore)!;
   }
 
   /**
@@ -62,180 +76,283 @@ export default class Compiler {
     /** The data that should be injected in the compilation */
     data?: Data,
 
+    /** The function that should be fired before the compilation started */
+    beforeCompile?: (this: typeof options.context, element: Node, data?: Data) => void | Promise<any>,
+    /** The function that should be fired after the compilation ends */
+    afterCompile?: (this: typeof options.context, element: Node, data?: Data) => void | Promise<any>,
     /** The function that should be fired when the compilation is done */
-    onDone?: (this: typeof options.context, element: Element, data?: Data) => void | Promise<any>,
+    onComponentLoad?: (this: typeof options.context, element: Element, data?: Data) => void | Promise<any>,
 
     /** The context of this compilation process */
     context: RenderContext,
+
+    directivesToIgnore?: string[]
   }) {
     const rootElement = options.el;
     const context = options.context || this.bouer;
     const data = (options.data || this.bouer.data!);
     const routing = IoC.app(this.bouer).resolve(Routing)!;
 
-    if (!rootElement)
-      return Logger.error('Invalid element provided to the compiler.');
+    const directivesToIgnore = options.directivesToIgnore || [];
+
+    const beforeCompile = options.beforeCompile || $default;
+    const afterCompile = options.afterCompile || $default;
+    const onComponentLoad = options.onComponentLoad || $default;
+
+
+    const getElementData = (node: Element | Node, defaultData: dynamic) => {
+      if (!(node instanceof Element)) return defaultData;
+      return this.dataStore.getNodeData(node, defaultData)!;
+    }
+
+    if (!rootElement) {
+      Logger.error('Invalid element provided to the compiler.');
+      return fnCallResolver(onComponentLoad!.call(context, rootElement, data as any));
+    }
 
     const iNode = rootElement as INode;
     const isActive = iNode.isActive = iNode.isActive ?? (() => rootElement.isConnected);
 
-    if (!this.analize(rootElement.outerHTML))
-      return rootElement;
+    if (!this.analize(rootElement.outerHTML)) {
+      return fnCallResolver(onComponentLoad!.call(context, rootElement, data as any));
+    }
 
     const directive = new Directive(this, this.directives || {}, context);
+    const loadingComponents: Promise<any>[] = [];
 
-    const walker = (node: Node, data: object) => {
-      if (node.nodeName in this.NODES_TO_IGNORE_IN_COMPILATION)
+    fnCallResolver(
+      beforeCompile!.call(context,rootElement, data as any)
+    );
+
+    const walker = (currentNode: Node, scopeData: object): any => {
+      if (currentNode.nodeName in this.NODES_TO_IGNORE_IN_COMPILATION)
+        return;
+
+      // Intercept Directive by node
+      if (directivesToIgnore.indexOf(currentNode.nodeName) >= 0)
         return;
 
       // First Element Attributes compilation
-      if (node instanceof Element) {
+      if (currentNode instanceof Element) {
+        const attributes = currentNode.attributes;
+
         // e-skip directive
-        if (Constants.skip in node.attributes)
-          return directive.skip(node);
+        if (Constants.skip in attributes)
+          return directive.skip(currentNode);
+
+        // Intercept Directive in the Element
+        if (directivesToIgnore.find(dir => dir in attributes))
+          return;
+
+        // ref directive
+        if (Constants.ref in attributes)
+          directive.ref(findDirective(currentNode, Constants.ref)!);
 
         // e-def="{...}" directive
-        if (Constants.def in node.attributes)
-          directive.def(findDirective(node, Constants.def)!, data);
+        if (Constants.def in attributes)
+          directive.def(findDirective(currentNode, Constants.def)!, scopeData);
 
-        // e-entry="..." directive
-        if (Constants.entry in node.attributes)
-          directive.entry(findDirective(node, Constants.entry)!, data);
+        // e-entry="..." directive | <component />
+        if (Constants.entry in attributes)
+          directive.entry(findDirective(currentNode, Constants.entry)!, scopeData);
 
         // wait-data="..." directive
-        if (Constants.wait in node.attributes)
-          return directive.wait(findDirective(node, Constants.wait)!);
+        if (Constants.wait in attributes)
+          return directive.wait(findDirective(currentNode, Constants.wait)!, {
+            beforeCompile: beforeCompile as any,
+            afterCompile: afterCompile as any
+          });
+
+        // e-form directive
+        if (Constants.form.property in attributes)
+          return directive.form(findDirective(currentNode, Constants.form.property)!, scopeData);
+
+        if (FormSchema.isBuild(currentNode)) {
+          return walker(currentNode, Extend.obj(scopeData, {
+            $form: new FormSchema({ currentNode, scopeData })
+          }));
+        }
 
         // e-for="..." directive
-        if (Constants.for in node.attributes)
-          return directive.for(findDirective(node, Constants.for)!, data);
+        if (Constants.for in attributes)
+          return directive.for(findDirective(currentNode, Constants.for)!, scopeData, {
+            beforeCompile: beforeCompile as any,
+            afterCompile: afterCompile as any
+          });
 
-        // <component></component>
-        if (this.component.check(node.localName))
-          return this.component.order(node, data);
+        // <component />
+        if (this.component.check(currentNode.localName)) {
+          return loadingComponents.push(new Promise((resolver, reject) => {
+            this.component.order({
+              directivesToIgnore: directivesToIgnore,
+              context: context,
+              componentElement: currentNode,
+              data: scopeData,
+
+              compilationHooks: {
+                beforeCompile: beforeCompile as any,
+                afterCompile: afterCompile as any,
+              },
+
+              onComponentLoad(component) { resolver(component); },
+              onComponentFail() { reject(currentNode); },
+            })
+          }));
+        }
 
         // e-if="..." directive
-        if (Constants.if in node.attributes)
-          return directive.if(findDirective(node, Constants.if)!, data);
+        if (Constants.if in attributes)
+          return directive.if(findDirective(currentNode, Constants.if)!, scopeData, {
+            beforeCompile: beforeCompile as any,
+            afterCompile: afterCompile as any
+          });
 
         // e-else-if="..." or e-else directive
-        if ((Constants.elseif in node.attributes) || (Constants.else in node.attributes))
+        if ((Constants.elseif in attributes) || (Constants.else in attributes))
           Logger.warn('The “' + Constants.elseif + '” or “' + Constants.else +
             '” requires an element with “' + Constants.if + '” above.');
 
         // e-show="..." directive
-        if (Constants.show in node.attributes)
-          directive.show(findDirective(node, Constants.show)!, data);
+        if (Constants.show in attributes)
+          directive.show(findDirective(currentNode, Constants.show)!, scopeData);
 
         // e-req="..." | e-req:[id]="..."  directive
         let reqNode: Attr | null = null;
-        if ((reqNode = findDirective(node, Constants.req)))
-          return directive.req(reqNode, data);
+        if ((reqNode = findDirective(currentNode, Constants.req)))
+          return directive.req(reqNode, scopeData, {
+            beforeCompile: beforeCompile as any,
+            afterCompile: afterCompile as any
+          });
 
         // data="..." | data:[id]="..." directive
         let dataNode: Attr | null = null;
-        if (dataNode = findDirective(node, Constants.data))
-          return directive.data(dataNode, data);
+        if ((dataNode = findDirective(currentNode, Constants.data)) )
+          return directive.data(dataNode, scopeData, {
+            beforeCompile: beforeCompile as any,
+            afterCompile: afterCompile as any
+          });
 
         // put="..." directive
-        if (Constants.put in node.attributes)
-          return directive.put(findDirective(node, Constants.put) as Attr, data);
+        if (Constants.put in attributes)
+          return directive.put(findDirective(currentNode, Constants.put)!, scopeData, {
+            beforeCompile: beforeCompile as any,
+            afterCompile: afterCompile as any
+          });
 
         // route-view node
-        if (routing.routeView === node)
+        if (routing.routeView === currentNode)
           return;
 
         // Looping the attributes
-        forEach(toArray(node.attributes), (attr: Attr) => {
-          walker(attr, data);
-        });
+        filter(toArray(attributes), (attr: Attr) => walker(attr, scopeData));
       }
 
       // :href="..." or !href="..." directive
-      if (Constants.check(node, Constants.href))
-        return directive.href(node, data);
+      if (Constants.check(currentNode, Constants.href))
+        return directive.href(currentNode, scopeData);
 
       // e-text="..." directive
-      if (Constants.check(node, Constants.text))
-        return directive.text(node);
+      if (Constants.check(currentNode, Constants.text))
+        return directive.text(currentNode);
 
       // e-bind:[?]="..." directive
-      if (Constants.check(node, Constants.bind))
-        return directive.bind(node, data);
+      if (Constants.check(currentNode, Constants.bind))
+        return directive.bind(currentNode, scopeData);
 
       // Custom directive
-      if (Object.keys(directive.customDirectives).find(name => Constants.check(node, name)))
-        if (directive.custom(node, data))
+      let isCustomDirective = false;
+      if (isCustomDirective = Object.keys(directive.customDirectives).find(name => Constants.check(currentNode, name)) != null)
+        if (directive.custom(currentNode, scopeData))
           return;
 
       // e-[?]="..." directive
-      if (Constants.check(node, Constants.property))
-        directive.property(node, data);
+      if (Constants.check(currentNode, Constants.property) && !isCustomDirective)
+        directive.property(currentNode, scopeData);
 
       // e-skeleton directive
-      if (Constants.check(node, Constants.skeleton))
-        directive.skeleton(node);
+      if (Constants.check(currentNode, Constants.skeleton))
+        directive.skeleton(currentNode);
 
       // Event handler
       // on:[?]="..." directive
-      if (Constants.check(node, Constants.on))
-        return this.eventHandler.compile(node, data, context as RenderContext);
+      if (Constants.check(currentNode, Constants.on))
+        return this.eventHandler.compile(currentNode, scopeData, context as RenderContext);
 
       // ShortHand directive: {title}
       let delimiterField: IDelimiterResponse | null;
-      if ((delimiterField = this.delimiter.shorthand(node.nodeName))) {
-        const element = ((node as any).ownerElement || node.parentNode) as Element;
+      if (delimiterField = this.delimiter.shorthand(currentNode.nodeName)) {
+        const element = ((currentNode as any).ownerElement || currentNode.parentNode) as Element;
 
         const attrName = 'e-' + delimiterField.expression;
         element.setAttribute(attrName, delimiterField.field);
 
         const attr = element.attributes.getNamedItem(attrName)! as INode;
         attr.isActive = isActive;
-        element.attributes.removeNamedItem(node.nodeName);
+        element.attributes.removeNamedItem(currentNode.nodeName);
 
         return this.binder.create({
           node: attr,
           fields: [delimiterField],
           context: context as RenderContext,
-          data: data
+          data: scopeData
         });
       }
 
       // Property binding
       let delimitersFields: IDelimiterResponse[];
-      if (isString(node.nodeValue) && (delimitersFields = this.delimiter.run(node.nodeValue!))
+      if (isString(currentNode.nodeValue) && (delimitersFields = this.delimiter.run(currentNode.nodeValue!))
         && delimitersFields.length !== 0) {
         this.binder.create({
-          node: node,
+          node: currentNode,
           fields: delimitersFields,
           context: context as RenderContext,
-          data: data
+          data: scopeData
         });
       }
 
-      forEach(toArray(node.childNodes), (childNode: INode) => {
+      const dataToUse = getElementData(currentNode, scopeData);
+      filter(toArray(currentNode.childNodes), (childNode: INode) => {
         childNode.isActive = isActive;
-        walker(childNode, data);
+
+        fnCallResolver(// Before Compile the element...
+          beforeCompile!.call(context, childNode, dataToUse as any)
+        );
+
+        // Executing...
+        walker(childNode, dataToUse);
+
+        fnCallResolver( // After Compile the element...
+          afterCompile!.call(context, childNode, dataToUse as any)
+        );
       });
     };
 
-    walker(rootElement, data);
+    walker(rootElement, getElementData(rootElement, data));
+
+    fnCallResolver( // After Compile the element...
+      afterCompile!.call( context, rootElement, data as any)
+    );
 
     if (rootElement.hasAttribute && rootElement.hasAttribute(Constants.silent))
       rootElement.removeAttribute(Constants.silent);
 
-    if (isFunction(options.onDone)) {
-      fnCallResolver(options.onDone!.call(context, rootElement));
-    }
+    const onCompilationFinished = () => {
+      this.eventHandler.emit({
+        eventName: Constants.builtInEvents.compile,
+        attachedNode: rootElement,
+        once: true,
+        init: { detail: data }
+      });
 
-    this.eventHandler.emit({
-      eventName: Constants.builtInEvents.compile,
-      attachedNode: rootElement,
-      once: true,
-      init: { detail: data }
-    });
+      const dt: any = data;
+      fnCallResolver(onComponentLoad!.call(context, rootElement, dt));
+    };
 
-    return rootElement;
+    if (loadingComponents.length == 0)
+      return onCompilationFinished();
+
+    return Promise.all(loadingComponents)
+        .then(() => { onCompilationFinished() });
   }
 
   analize(htmlSnippet: string) {
@@ -308,6 +425,9 @@ export default class Compiler {
             tag: '<====================== Line Error ======================',
             ident: indentNumber + 1
           };
+          const lastOne = history[history.length - 1];
+          lastOne.ident--; // reducing the ident
+          indentNumber = lastOne.ident - 1;
         }
         continue;
       }
@@ -315,7 +435,13 @@ export default class Compiler {
 
     if (!isValid) {
       Logger.error(message +
-        history.map((h, i) => (i + 1) + '.' + Array(h.ident).fill(indentChar).join('') + h.tag).join('\n'));
+        history.map(
+          (h, i) => ((i + 1) + '').padStart(3, ' ') + ' | ' +
+            Array(h.ident)
+              .fill(indentChar)
+              .join('') + h.tag)
+              .join('\n')
+        );
     }
 
     return isValid;

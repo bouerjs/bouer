@@ -1,11 +1,11 @@
-import { IoC } from '../../..';
 import IBinderConfig from '../../../definitions/interfaces/IBinderConfig';
 import dynamic from '../../../definitions/types/Dynamic';
 import RenderContext from '../../../definitions/types/RenderContext';
 import Bouer from '../../../instance/Bouer';
 import Constants from '../../../shared/helpers/Constants';
 import Extend from '../../../shared/helpers/Extend';
-import Prop from '../../../shared/helpers/Prop';
+import IoC from '../../../shared/helpers/IoCContainer';
+import Property from '../../../shared/helpers/Property';
 import { code, createComment, ifNullReturn, toOwnerNode, trim } from '../../../shared/helpers/Utils';
 import Logger from '../../../shared/logger/Logger';
 import Binder from '../../binder/Binder';
@@ -13,10 +13,10 @@ import DelimiterHandler from '../../DelimiterHandler';
 import EventHandler from '../../event/EventHandler';
 import IMiddlewareResult from '../../middleware/IMiddlewareResult';
 import Middleware from '../../middleware/Middleware';
-import Reactive from '../../reactive/Reactive';
+import { $reactive } from '../../reactive/Reactive';
 import Skeleton from '../../Skeleton';
 import DataStore from '../../store/DataStore';
-import Compiler from '../Compiler';
+import Compiler, { CompilationHooks } from '../Compiler';
 
 export function $req(opitons: {
   node: Node,
@@ -25,8 +25,9 @@ export function $req(opitons: {
   delimiter: DelimiterHandler,
   context: RenderContext,
   eventHandler: EventHandler,
+  compilationHooks: CompilationHooks,
   binder: Binder,
-  data: object
+  data: object,
 }) {
   const {
     node,
@@ -83,7 +84,7 @@ export function $req(opitons: {
       node: node,
       fields: delimiters,
       context: context,
-      isReplaceProperty: false,
+      replaceable: false,
       onUpdate: () => onUpdate()
     });
 
@@ -182,7 +183,7 @@ export function $req(opitons: {
       if (!isValidResponse(response, expObject.type))
         return;
 
-      Reactive.transform({
+      $reactive({
         context: context,
         data: response
       });
@@ -197,7 +198,7 @@ export function $req(opitons: {
       if (!('data' in localDataStore)) {
         // Store the data
         localDataStore.data = undefined;
-        Prop.transfer(localDataStore, response, 'data');
+        Property.transfer(localDataStore, response, 'data');
       } else {
         // Update de local data
         return localDataStore.data = response.data;
@@ -214,8 +215,10 @@ export function $req(opitons: {
         (data as any)[variable] = response.data;
         return compiler.compile({
           el: ownerNode,
-          data: Reactive.transform({ context: context, data: data }),
-          context: context
+          data: $reactive({ context: context, data: data }),
+          context: context,
+          beforeCompile: opitons.compilationHooks.beforeCompile,
+          afterCompile: opitons.compilationHooks.afterCompile
         });
       }
 
@@ -230,11 +233,13 @@ export function $req(opitons: {
           Extend.array([forDirectiveContent], expObject.filters).join(' | ')
         );
 
-        Prop.set(mData, resUniqueName, Prop.descriptor(response, 'data')!);
+        Property.set(mData, resUniqueName, Property.descriptor(response, 'data')!);
         return compiler.compile({
           el: ownerNode,
           data: mData,
-          context: context
+          context: context,
+          beforeCompile: opitons.compilationHooks.beforeCompile,
+          afterCompile: opitons.compilationHooks.afterCompile
         });
       }
     };

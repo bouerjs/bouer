@@ -6,7 +6,7 @@ import {
   errorMsgEmptyNode,
   errorMsgNodeValue,
   findAttribute,
-  forEach, getRootElement,
+  filter, getRootElement,
   ifNullReturn,
   toOwnerNode,
   trim
@@ -15,9 +15,9 @@ import Logger from '../../../shared/logger/Logger';
 import Binder from '../../binder/Binder';
 import DelimiterHandler from '../../DelimiterHandler';
 import Evaluator from '../../Evaluator';
-import ReactiveEvent from '../../event/ReactiveEvent';
-import Reactive from '../../reactive/Reactive';
-import Compiler from '../Compiler';
+import ReactiveEvent from '../../reactive/ReactiveEvent';
+import ReactivePropertyDescriptor from '../../reactive/Reactive';
+import Compiler, { CompilationHooks } from '../Compiler';
 
 export function $if(opitons: {
   node: Node,
@@ -26,7 +26,8 @@ export function $if(opitons: {
   compiler: Compiler,
   delimiter: DelimiterHandler,
   context: RenderContext,
-  data: object
+  data: object,
+  compilationHooks: CompilationHooks
 }) {
   const {
     node,
@@ -53,7 +54,7 @@ export function $if(opitons: {
   if (nodeName === Constants.elseif || nodeName === Constants.else) return;
 
   let currentEl: Element | null = ownerNode;
-  const reactives: { attr: Attr, descriptor: Reactive<any, any> }[] = [];
+  const reactives: { attr: Attr, descriptor: ReactivePropertyDescriptor<any, any> }[] = [];
 
   // Inserting the comment ref
   container.insertBefore(comment, currentEl);
@@ -87,7 +88,7 @@ export function $if(opitons: {
     ReactiveEvent.once('AfterGet', event => {
       event.onemit = descriptor => {
         // Avoiding multiple binding in the same property
-        if (reactives.findIndex(item => item.descriptor.propName == descriptor.propName) !== -1)
+        if (reactives.findIndex(item => item.descriptor.$name == descriptor.$name) !== -1)
           return;
         reactives.push({ attr: attr, descriptor: descriptor });
       };
@@ -102,7 +103,7 @@ export function $if(opitons: {
     currentEl.removeAttribute(attr.nodeName);
   } while (currentEl = currentEl.nextElementSibling);
 
-  forEach(reactives, item => {
+  filter(reactives, item => {
     binder.binds.push({
       // Binder is connected if at least one of the chain and the comment is still connected
       isConnected: isActive,
@@ -111,7 +112,7 @@ export function $if(opitons: {
   });
 
   (execute = () => {
-    forEach(conditions, chainItem => {
+    filter(conditions, chainItem => {
       const element = getRootElement(chainItem.node);
       if (!element.parentElement) return;
       container.removeChild(element);
@@ -128,7 +129,7 @@ export function $if(opitons: {
 
     evaluator.exec({
       data: data,
-      isReturn: false,
+      returnable: false,
       code: conditionalExpression,
       context: context,
       aditional: {
@@ -140,7 +141,9 @@ export function $if(opitons: {
           compiler.compile({
             el: element,
             data: data,
-            context: context
+            context: context,
+            beforeCompile: opitons.compilationHooks.beforeCompile,
+            afterCompile: opitons.compilationHooks.afterCompile,
           });
         }
       }

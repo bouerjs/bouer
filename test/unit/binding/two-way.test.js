@@ -3,7 +3,7 @@ import {
   Compiler,
   toHtml,
   IoC
-} from '../../index';
+} from '../../index.js';
 
 describe('When using a "e-bind" for two way data binding ', () => {
   describe('On short binding', () => {
@@ -21,7 +21,7 @@ describe('When using a "e-bind" for two way data binding ', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: compiledEl => {
+        onComponentLoad: compiledEl => {
           expect(compiledEl.value).toBe(context.data.value);
 
           context.data.value = 'bound-value-changed';
@@ -33,7 +33,7 @@ describe('When using a "e-bind" for two way data binding ', () => {
       });
     });
 
-    it('Binds "checked" property when using <input type="checkbox"> element', async () => {
+    it('Binds "checked" property when using <input type="checkbox"> element', () => {
       const htmlSnippet = '<input type="checkbox" e-bind="value"/>';
       const element = toHtml(htmlSnippet);
       const context = Bouer.create({
@@ -47,7 +47,7 @@ describe('When using a "e-bind" for two way data binding ', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: () => {
+        onComponentLoad: () => {
           expect(element.checked).toBe(true);
 
           context.data.value = false;
@@ -79,7 +79,7 @@ describe('When using a "e-bind" for two way data binding ', () => {
         data: context.data,
         context: context,
         el: element,
-        onDone: () => {
+        onComponentLoad: () => {
           const maleInput = element.children[0];
           const femaleInput = element.children[1];
 

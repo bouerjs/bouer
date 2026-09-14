@@ -5,27 +5,35 @@ import ILifeCycleHooks from '../../definitions/interfaces/ILifeCycleHooks';
 import Constructor from '../../definitions/types/Constructor';
 import DataType from '../../definitions/types/DataType';
 import dynamic from '../../definitions/types/Dynamic';
+import WatchCallback from '../../definitions/types/WatchCallback';
 import Bouer from '../../instance/Bouer';
+import Extend from '../../shared/helpers/Extend';
 import IoC from '../../shared/helpers/IoCContainer';
-import Prop from '../../shared/helpers/Prop';
+import Property from '../../shared/helpers/Property';
 import UriHandler from '../../shared/helpers/UriHandler';
 import {
-  forEach,
-  isObject,
-  setData,
-  where
+    $default,
+    $internal,
+    createEl,
+    filter,
+    ifNullReturn,
+    isFunction,
+    isNull,
+    isObject,
+    pathResolver,
+    setData,
+    toLower,
+    trim
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
+import { DataProp } from '../compiler/Directive/DataInject';
 import EventHandler from '../event/EventHandler';
-import Reactive from '../reactive/Reactive';
+import { $reactive, InertProp } from '../reactive/Reactive';
 import ComponentHandler from './ComponentHandler';
 
-export default class Component<Data extends {} = {}> implements IComponentOptions {
-  readonly _IRT_ = true;
-
+export default class ComponentPrototype<Data extends {} = {}> implements IComponentOptions<Data> {
   readonly name: string;
   readonly path: string;
-  readonly data: DataType<Data, this> & dynamic;
   readonly template?: string;
   readonly keepAlive?: boolean;
   readonly prefetch?: boolean;
@@ -35,11 +43,13 @@ export default class Component<Data extends {} = {}> implements IComponentOption
   readonly isDefault?: boolean;
   readonly isNotFound?: boolean;
 
+  data: DataType<Data, this> & dynamic;
+
   /** Indicates if the component is destroyed or not */
   isDestroyed: boolean = false;
 
   /** The Component Class */
-  clazz: Constructor<any> | undefined;
+  ctor: Constructor<any>;
 
   /** The root element of the component */
   el?: Element;
@@ -47,31 +57,41 @@ export default class Component<Data extends {} = {}> implements IComponentOption
   /** Bouer instance of the component */
   bouer?: Bouer;
 
-  readonly children?: (Component | IComponentOptions | Constructor<Component>)[] = [];
+  /** The parent component */
+  parent?: ComponentPrototype;
+
+  /** The children of the component */
+  readonly children?: (Constructor<Component> | IComponentOptions | ComponentPrototype)[] = [];
 
   /** All the assets attached to the component */
   readonly assets: (HTMLScriptElement | HTMLStyleElement | HTMLLinkElement)[] = [];
 
   readonly restrictions?: (
-    (this: Bouer, component: Component | IComponentOptions) => boolean | Promise<boolean>
+    (this: Bouer, component: ComponentPrototype | IComponentOptions) => boolean | Promise<boolean>
   )[];
 
   /** Store temporarily this component UI orders */
   private events: IEventSubscription[] = [];
 
+  /** The function that will be called when the component is created */
+  init?(): void;
+
   /**
    * Default constructor
    * @param {string|object} optionsOrPath the path of the component or the compponent options
    */
-  constructor(optionsOrPath?: string | IComponentOptions, assets?: (IAsset | string)[]) {
+  constructor(optionsOrPath?: string | IComponentOptions<Data>, assets?: (IAsset | string)[]) {
+    $internal(this);
+    this.ctor = $default();
+
     let _name: string | undefined = undefined;
     let _path: string | undefined = undefined;
-    let _data: DataType<{}, Component> | undefined = undefined;
+    let _data: DataType<{}, ComponentPrototype> | undefined = undefined;
 
     if (isObject(optionsOrPath)) {
-      _name = (optionsOrPath as Component).name;
-      _path = (optionsOrPath as Component).path;
-      _data = (optionsOrPath as Component).data;
+      _name = (optionsOrPath as ComponentPrototype<Data>).name;
+      _path = (optionsOrPath as ComponentPrototype<Data>).path;
+      _data = (optionsOrPath as ComponentPrototype<Data>).data;
       Object.assign(this, optionsOrPath);
     } else {
       _path = optionsOrPath as string;
@@ -79,7 +99,7 @@ export default class Component<Data extends {} = {}> implements IComponentOption
 
     this.name = _name || '';
     this.path = _path || '';
-    this.data = Reactive.transform({
+    this.data = $reactive({
       context: this,
       data: _data || {}
     });
@@ -89,25 +109,105 @@ export default class Component<Data extends {} = {}> implements IComponentOption
       value: (optionsOrPath || {} as any).template || ''
     };
 
-    Prop.set(this, 'template', {
+    Property.set(this, 'template', {
       get: () => template.value,
       set: (v) => template.value = v
     });
 
-    ComponentHandler.prepareAssets(this, assets || []);
+    this.setAssets(assets || []);
+  }
+
+  setAssets(assets: (string | IAsset)[]) {
+    const component = this;
+
+    const $Assets: any[] = [];
+    const assetsTypeMapper: dynamic = {
+      js: 'script', css: 'link', scss: 'link',
+      sass: 'link', less: 'link', styl: 'link',
+      style: 'link'
+    };
+
+    const isValidAssetSrc = (src: string, index: number) => {
+      const isValid = (src || trim(src)) ? true : false;
+      if (!isValid) Logger.error('Invalid asset “src”, in assets[' + index + '].src');
+      return isValid;
+    };
+
+    const assetTypeGetter = (src: string, index: number) => {
+      const srcSplitted = src.split('.');
+      const type = assetsTypeMapper[toLower(srcSplitted[srcSplitted.length - 1])];
+
+      if (!type) return Logger.error('Couldn\'t find out what type of asset it is, provide ' +
+        'the “type” explicitly at assets[' + index + '].type');
+
+      return type;
+    };
+
+    filter(assets, (asset, index) => {
+      let src = '';
+      let type = '';
+      let scoped = true;
+
+      if (typeof asset === 'string') { // String type
+        if (!isValidAssetSrc(asset, index)) return;
+        type = assetTypeGetter(trim(src = asset.replace(/\.less|\.s[ac]ss|\.styl/i, '.css')), index);
+      } else { // Object Type
+        if (!isValidAssetSrc(trim(src = asset.src.replace(/\.less|\.s[ac]ss\.styl/i, '.css')), index)) return;
+
+        if (!asset.type) {
+          if (!(type = assetTypeGetter(src, index))) return;
+        } else {
+          type = assetsTypeMapper[toLower(asset.type)] || asset.type;
+        }
+
+        scoped = ifNullReturn(asset.scoped, true);
+      }
+
+      const isRelativePathImport = src[0] === '.';
+
+      if (isRelativePathImport && (!component.path || isNull(component.path))) {
+        Logger.warn('Component with no `path` cannot use imported assets, check component: ' + component.name);
+        return;
+      }
+
+      if (isRelativePathImport) {
+        src = pathResolver(component.path, src);
+        src = src[0] === '/' ? src.substring(1) : src;
+      }
+
+      const $Asset = createEl(type, el => {
+        if (ifNullReturn(scoped, true))
+          el.setAttribute('scoped', 'true');
+
+        switch (toLower(type)) {
+          case 'script': el.setAttribute('src', src); break;
+          case 'link':
+            el.setAttribute('href', src);
+            el.setAttribute('rel', 'stylesheet');
+            el.setAttribute('type', 'text/css');
+            break;
+          default: el.setAttribute('src', src); break;
+        }
+      }).build();
+
+      $Assets.push($Asset);
+    });
+
+    component.assets.splice(0, component.assets.length);
+    component.assets.push.apply(component.assets, $Assets);
   }
 
   /**
    * The data that should be exported from the `<script>` tag to the root element
    * @param {object} data the data to export
    */
-  export(data: dynamic) {
+  export(data: dynamic, props?: string[]) {
     if (!isObject(data))
       return Logger.error('Invalid object for component.export(...), only "Object Literal" is allowed.');
 
-    return forEach(Object.keys(data), key => {
+    return filter(props || Object.keys(data), key => {
       (this.data as any)[key] = (data as any)[key];
-      Prop.transfer(this.data, data, key as any);
+      Property.transfer(this.data, data, key as any);
     });
   }
 
@@ -133,7 +233,7 @@ export default class Component<Data extends {} = {}> implements IComponentOption
     handler.emit(this, 'destroyed');
 
     // Destroying all the events attached to the this instance
-    forEach(this.events, evt => this.off((evt.eventName as any), evt.callback));
+    filter(this.events, evt => this.off((evt.eventName as any), evt.callback));
     this.events = [];
 
     const components = handler.activeComponents;
@@ -192,7 +292,7 @@ export default class Component<Data extends {} = {}> implements IComponentOption
       callback: callback as any,
       attachedNode: this.el!,
     });
-    this.events = where(this.events, evt => !(evt.eventName == eventName && evt.callback == callback));
+    this.events = filter(this.events, evt => !(evt.eventName == eventName && evt.callback == callback));
   }
 
   /**
@@ -206,12 +306,116 @@ export default class Component<Data extends {} = {}> implements IComponentOption
     targetObject?: TargetObject
   ): InputData & TargetObject {
     const result = setData(this, inputData, targetObject);
-    forEach(Object.keys(inputData), key => Prop.transfer(this, inputData, key as keyof InputData));
+    filter(Object.keys(inputData), key => Property.transfer(this, inputData, key as keyof InputData));
     return result;
   }
 
-  init?(): void;
+  watch(propertyName: string, callback: WatchCallback<any>) {
+    return this.bouer!.watch(propertyName, callback, this.data);
+  }
 
+  prepareClass(
+    component: Component<any>
+  ) {
+    const proto: ComponentPrototype = this;
+    const hooks = [
+      'requested', 'created', 'beforeMount', 'mounted', 'beforeLoad',
+      'loaded', 'beforeDestroy', 'destroyed', 'blocked', 'failed'
+    ];
+    const ignorables: string[] = [
+      'el', 'bouer',  '__$proto__', 'init', 'constructor', 'export', 'watch'
+    ].concat(hooks);
+
+    const cachedInert: dynamic = {};
+    const properties = Object.getOwnPropertyNames(component);
+    const methods = Object.getOwnPropertyNames(component.constructor.prototype);
+
+    const fields = filter(Extend.array(properties, methods), key => ignorables.indexOf(key) < 0);
+
+    // Transfering the properties from the component to the data
+    filter(fields as any, (field: never) => {
+      const fieldValue: any = component[field];
+      if (fieldValue instanceof DataProp) return;
+
+      // If the value is a function, bind it to the component ifself
+      if (typeof fieldValue === 'function') {
+        Property.set(fieldValue, 'nobind', { value: true });
+        return proto.data[field] = fieldValue.bind(component);
+      }
+
+      //In case of InertProp, cache the object and return the value
+      if (fieldValue instanceof InertProp) {
+        cachedInert[field] = fieldValue;
+        Property.set(proto.data, field, {
+          get: function reactive() {
+            return cachedInert[field].get();
+          },
+          set: function reactive(value: any) {
+            cachedInert[field].set(value);
+          }
+        });
+      } else {
+        proto.data[field] = fieldValue;
+      }
+
+      Property.set(component, field, {
+        get: function reactive() { return proto.data[field]; },
+        set: function reactive(value) { proto.data[field] = value; }
+      });
+    });
+
+    // Transforming the data to reactive
+    $reactive({ context: proto, data: proto.data });
+
+    // Setting all the methods
+    filter(hooks as any, (hook: never) => {
+      if (isFunction(component[hook])) {
+        proto[hook] = (component[hook] as Function).bind(component) as never;
+      }
+    });
+  }
+}
+
+export class Component<Data extends object = {}> {
+  readonly __$proto__: ComponentPrototype<Data>;
+  public get el() { return this.__$proto__.el!; }
+  public get bouer() { return this.__$proto__.bouer!; }
+
+  constructor(
+    init?: string | IComponentOptions<Data>,
+    assets?: (IAsset | string)[]
+  ) {
+    this.__$proto__ = $default();
+
+    Property.set(this, '__$proto__', {
+      enumerable: false,  configurable: false,
+      value: new ComponentPrototype<Data>(init, assets)
+    });
+
+    const component = this.__$proto__;
+    if (component.name == '') {
+      // Setting the name of the component, according to the caller (Component) name if not configured
+      Property.set(component, 'name', { value: this.constructor.name });
+    }
+  }
+
+  destroy() {
+    this.__$proto__.destroy();
+  }
+
+  params() {
+    return this.__$proto__.params();
+  }
+
+  set(data: dynamic) {
+    return this.__$proto__.set(data);
+  }
+
+  watch(propertyName: string, callback: WatchCallback<any>) {
+    return this.__$proto__.watch(propertyName, callback);
+  }
+
+  init?(): void;
   requested?(event: CustomEvent): void;
   created?(event: CustomEvent): void;
   beforeMount?(event: CustomEvent): void;
@@ -222,4 +426,4 @@ export default class Component<Data extends {} = {}> implements IComponentOption
   destroyed?(event: CustomEvent): void;
   blocked?(event: CustomEvent): void;
   failed?(event: CustomEvent): void;
-}
+};

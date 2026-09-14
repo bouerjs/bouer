@@ -12,21 +12,21 @@ import Task from '../../shared/helpers/Task';
 import {
   createEl,
   findAttribute,
-  fnEmpty,
-  forEach,
+  $default,
   ifNullReturn,
   isNull,
   isObject,
   toArray,
   toStr,
   trim,
-  where,
+  filter,
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Compiler from '../compiler/Compiler';
 import Evaluator from '../Evaluator';
-import ReactiveEvent from '../event/ReactiveEvent';
+import ReactiveEvent from '../reactive/ReactiveEvent';
 import Middleware from '../middleware/Middleware';
+import { isComputed } from '../reactive/Computed';
 import Watch from './Watch';
 
 export default class Binder {
@@ -45,18 +45,25 @@ export default class Binder {
   constructor(bouer: Bouer, evaluator: Evaluator) {
     this.bouer = bouer;
     this.evaluator = evaluator;
-
     this.cleanup();
   }
 
   create(options: IBinderOptions) {
-    const { node, data, fields, isReplaceProperty, context } = options;
-    const originalValue = trim(ifNullReturn(node.nodeValue, ''));
+    const { node, data, fields, replaceable: isReplaceProperty, context } = options;
+    const originalValue = ifNullReturn(node.nodeValue, '');
     const originalName = node.nodeName;
     const ownerNode = (node as any).ownerElement || node.parentNode;
     const middleware = IoC.app(this.bouer).resolve(Middleware)!;
-    const onUpdate = options.onUpdate || ((v: any, n: Node) => { });
+
+    const onBind = options.onBind || $default;
+    const onUpdate = options.onUpdate || $default;
+    const onUnbind = options.onUnbind || $default;
+
     const isActive: () => boolean = ownerNode.isActive;
+
+    const bindingHooks = {
+      onBind, onUnbind, onUpdate
+    };
 
     // Clousure cache property settings
     const propertyBindConfig: IBinderConfig = {
@@ -70,27 +77,22 @@ export default class Binder {
     };
 
     // Middleware that runs before the bind or update is made
-    const $RunDirectiveMiddlewares = (type: 'onBind' | 'onUpdate') => {
+    const $RunDirectiveMiddlewares = (type: 'onBind' | 'onUpdate' | 'onUnbind') => {
+      // Running the hooks
+      bindingHooks[type](node, propertyBindConfig);
+
       middleware.run(originalName, {
         type: type,
-        action: (middleware) => {
+        action: middleware => {
           middleware(
-            {
-              binder: propertyBindConfig,
-              detail: {},
-            },
-            {
-              success() { },
-              fail() { },
-              done() { },
-            }
+            { binder: propertyBindConfig, detail: {} },
+            { success() {}, fail() {}, done() {} }
           );
         },
       });
     };
 
     const $BindOneWay = () => {
-
       // One-Way Data Binding
       let nodeToBind = node;
 
@@ -110,7 +112,6 @@ export default class Binder {
         ownerNode.setAttribute(propertyBindConfig.nodeName, originalValue);
         // Retrieve the new attr set
         nodeToBind = ownerNode.attributes[propertyBindConfig.nodeName];
-
         // Removing the e-[?] attr
         ownerNode.removeAttribute(node.nodeName);
       }
@@ -121,7 +122,7 @@ export default class Binder {
         let isHtml = false;
 
         // Looping all the fields to be setted
-        forEach(fields, (field) => {
+        filter(fields, (field) => {
           // Retrieving the delimiter used in this field
           const delimiter = field.delimiter;
 
@@ -129,18 +130,18 @@ export default class Binder {
           if (delimiter && delimiter.name === 'html') isHtml = true;
 
           // Evaluate the expression from the delimiter
-          let result = this.evaluator.exec({
+          let evaluetedValue = this.evaluator.exec({
             data: data,
             code: field.expression,
             context: context,
           });
 
-          result = isNull(result) ? '' : result;
-
-          result = this.applyPipes(result, field);
+          evaluetedValue = isComputed(evaluetedValue) ? evaluetedValue.get() : evaluetedValue;
+          evaluetedValue = isNull(evaluetedValue) ? '' : evaluetedValue;
+          evaluetedValue = this.applyPipes(evaluetedValue, field);
 
           // Replacing each field with the specific value
-          valueToSet = valueToSet.replace(field.field, toStr(result));
+          valueToSet = valueToSet.replace(field.field, toStr(evaluetedValue));
 
           if (delimiter && typeof delimiter.onUpdate === 'function')
             valueToSet = delimiter.onUpdate(valueToSet, node, data);
@@ -154,7 +155,7 @@ export default class Binder {
           .children();
 
         ownerNode.innerHTML = '';
-        forEach(htmlSnippets, (snippetNode: INode) => {
+        filter(htmlSnippets, (snippetNode: INode) => {
           ownerNode.appendChild(snippetNode);
           snippetNode.isActive = isActive;
           IoC.app(this.bouer).resolve(Compiler)!.compile({
@@ -167,21 +168,27 @@ export default class Binder {
 
       ReactiveEvent.once('AfterGet', (event) => {
         event.onemit = (descriptor) => {
+
+          const watch = descriptor.onChange(() => {
+            setter();
+            $RunDirectiveMiddlewares('onUpdate');
+          }, node);
+
+          watch.onDestroy = () => {
+            $RunDirectiveMiddlewares('onUnbind');
+          };
+
           this.binds.push({
             isConnected: isActive,
-            watch: descriptor.onChange(() => {
-              $RunDirectiveMiddlewares('onUpdate');
-              setter();
-              onUpdate(descriptor.propValue, node);
-            }, node),
+            watch: watch,
           });
         };
 
         setter();
       });
 
-      $RunDirectiveMiddlewares('onBind');
       propertyBindConfig.node = nodeToBind;
+      $RunDirectiveMiddlewares('onBind');
       return propertyBindConfig;
     };
 
@@ -215,6 +222,8 @@ export default class Binder {
 
       const bindingDirection: { [key: string]: (v: any) => void } = {
         fromDataToInput: (value: any) => {
+          value = isComputed(value) ? value.get() : value;
+
           // Normal Property Set
           if (!Array.isArray(boundPropertyValue)) {
             // In case of radio button we need to check if the value is the same to check it
@@ -242,7 +251,7 @@ export default class Binder {
 
           // select-multiple handling
           if (isSelectMultiple) {
-            return forEach(
+            return filter(
               toArray(ownerNode.options),
               (option: HTMLOptionElement) => {
                 option.selected =
@@ -269,9 +278,13 @@ export default class Binder {
         fromInputToData: (value: any) => {
           // Normal Property Set
           if (!Array.isArray(boundPropertyValue)) {
+            if (isComputed(boundPropertyValue)) {
+              return boundPropertyValue.set(value);
+            }
+
             // Default Binding
             return this.evaluator.exec({
-              isReturn: false,
+              returnable: false,
               context: context,
               data: Extend.obj(data, { $vl: value }),
               code: dataBindProperty + '=$vl',
@@ -290,7 +303,7 @@ export default class Binder {
           // select-multiple handling
           if (isSelectMultiple) {
             const optionCollection: string[] = [];
-            forEach(
+            filter(
               toArray(ownerNode.options),
               (option: HTMLOptionElement) => {
                 if (option.selected === true)
@@ -353,10 +366,9 @@ export default class Binder {
           this.binds.push({
             isConnected: isActive,
             watch: descriptor.onChange(() => {
-              $RunDirectiveMiddlewares('onUpdate');
               const value = getValue();
               setter('fromDataToInput', value);
-              onUpdate(value, node);
+              $RunDirectiveMiddlewares('onUpdate');
             }, node),
           });
         };
@@ -376,7 +388,7 @@ export default class Binder {
         listeners.push(ownerNode.localName);
 
       // Applying the events
-      forEach(listeners, (listener) => {
+      filter(listeners, (listener) => {
         if (listener === 'change' && ownerNode.localName !== 'select') return;
 
         // Adding the event to listen to the element change event
@@ -399,7 +411,7 @@ export default class Binder {
   }
 
   remove(boundNode: Node, boundAttrName?: string, boundPropName?: string) {
-    this.binds = where(this.binds, (bind) => {
+    this.binds = filter(this.binds, (bind) => {
       const node = bind.watch.node!;
 
       if (((node as any).ownerElement || node.parentElement) !== boundNode)
@@ -425,9 +437,8 @@ export default class Binder {
     let mWatch: Watch<Value, TargetObject> | undefined;
 
     ReactiveEvent.once('AfterGet', (event) => {
-      event.onemit = (descriptor) =>
-        (mWatch = descriptor.onChange(callback as WatchCallback) as any);
-      fnEmpty((targetObject as any)[propertyName]);
+      event.onemit = (d) => (mWatch = d.onChange(callback as any) as any);
+      Evaluator.run({ code: propertyName as string, data: targetObject as object });
     });
 
     return mWatch;
@@ -444,8 +455,8 @@ export default class Binder {
         if (
           watches.find(
             (w) =>
-              w.property === descriptor.propName &&
-              w.descriptor.propSource === descriptor.propSource
+              w.property === descriptor.$name &&
+              w.descriptor.source === descriptor.source
           )
         )
           return;
@@ -466,7 +477,7 @@ export default class Binder {
 
     return {
       watches: watches,
-      destroy: () => forEach(watches, w => w.destroy())
+      destroy: () => filter(watches, w => w.destroy())
     };
   }
 
@@ -476,12 +487,12 @@ export default class Binder {
     if (isNull($value) || trim($value + '') === '')
       return $value;
 
-    forEach(field.pipes || [], pipe => {
+    filter(field.pipes || [], pipe => {
       const args = pipe.args.slice().map(a => {
         return this.evaluator.exec({
           code: a as any,
           context: this.bouer,
-          isReturn: true,
+          returnable: true,
           data: this.bouer.data
         });
       });
@@ -509,7 +520,7 @@ export default class Binder {
     const autoUnbind = ifNullReturn(this.bouer.config.autoUnbind, true);
     if (autoUnbind == false) return;
     Task.run(() => {
-      this.binds = where(this.binds, (bind) => {
+      this.binds = filter(this.binds, (bind) => {
         if (bind.isConnected()) return true;
         bind.watch.destroy();
       });

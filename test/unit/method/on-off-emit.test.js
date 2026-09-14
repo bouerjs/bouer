@@ -1,6 +1,6 @@
 import {
   Bouer,
-} from '../../index';
+} from '../../index.js';
 
 describe('When "on" method is called', () => {
   it('Adds an event listener instance data and I can dispatch with emit method', () => {

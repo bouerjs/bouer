@@ -1,10 +1,9 @@
 import SkeletonOptions from '../definitions/types/SkeletonOptions';
 import Bouer from '../instance/Bouer';
 import Constants from '../shared/helpers/Constants';
-import { createEl, ifNullStop, DOM, forEach, toArray, code, isNull } from '../shared/helpers/Utils';
+import { createEl, ifNullStop, DOM, filter, toArray, code, isNull, $internal } from '../shared/helpers/Utils';
 
 export default class Skeleton {
-  readonly _IRT_ = true;
   bouer: Bouer;
   style: HTMLStyleElement;
   backgroudColor: string = '';
@@ -15,6 +14,7 @@ export default class Skeleton {
   numberOfItems: number = 1;
 
   constructor(bouer: Bouer) {
+    $internal(this);
     this.reset();
     this.bouer = bouer;
     this.style = createEl('style', el => el.id = this.identifier).build();
@@ -58,16 +58,15 @@ export default class Skeleton {
       '@keyframes loading { 100% { transform: translateX(100%); } }',
       '@-webkit-keyframes loading { 100% { transform: translateX(100%); } }'
     ];
-    forEach(rules, rule => this.style.sheet!.insertRule(rule));
+    filter(rules, rule => this.style.sheet!.insertRule(rule));
     this.style.innerText = rules.join(' ');
   }
 
   insertItems(node: Node) {
     const parentNode = node.parentElement || node.parentNode;
-    const mNode = (node as Element);
+    const mNode = node as Element;
 
-    if (parentNode == null) return;
-    if (this.numberOfItems <= 1) return;
+    if (parentNode == null || this.numberOfItems <= 1) return;
     if (!mNode.hasAttribute('e-skeleton') && isNull(mNode.querySelector('[e-skeleton]'))) return;
 
     const uid = code(6);
@@ -88,7 +87,7 @@ export default class Skeleton {
     if (!uid) return;
 
     mNode.removeAttribute('skeleton-clone-code');
-    forEach(
+    filter(
       [].slice.call(container.querySelectorAll('[skeleton-cloned="' + uid + '"]')),
       node => {
         container.removeChild(node);
@@ -99,6 +98,6 @@ export default class Skeleton {
     id = (id ? ('="' + id + '"') : '');
     const appEl = ifNullStop(this.bouer.el);
     const skeletons = toArray(appEl.querySelectorAll('[' + Constants.skeleton + id + ']'));
-    forEach(skeletons, (el: Element) => el.removeAttribute(Constants.skeleton));
+    filter(skeletons, (el: Element) => el.removeAttribute(Constants.skeleton));
   }
 }

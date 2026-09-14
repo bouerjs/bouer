@@ -4,9 +4,6 @@ import AppMain from './components/main/AppMain';
 import AppFooter from './components/footer/AppFooter';
 import Social from './components/social/Social';
 
-import './index.html';
-import './main.scss';
-
 new Bouer('#app', {
   data: {
     // Props

@@ -1,6 +1,7 @@
 import IMiddleware from '../../definitions/interfaces/IMiddleware';
 import IMiddlewareObject from '../../definitions/interfaces/IMiddlewareObject';
 import Bouer from '../../instance/Bouer';
+import { $internal } from '../../shared/helpers/Utils';
 import IMiddlewareResult from './IMiddlewareResult';
 
 type MiddlewareConfigType = (
@@ -12,16 +13,16 @@ type MiddlewareConfigType = (
 ) => void;
 
 export default class Middleware {
-  readonly _IRT_ = true;
   private middlewareConfigContainer: { [key: string]: IMiddlewareObject[] } = {};
   bouer: Bouer;
 
   constructor(bouer: Bouer) {
+    $internal(this);
     this.bouer = bouer;
   }
 
   run = (directive: string, runnable: {
-    type: 'onBind' | 'onUpdate',
+    type: 'onBind' | 'onUpdate' | 'onUnbind',
     action: (middleware: (context: IMiddleware, callbacks: {
       success: (response: any) => void,
       fail: (error: any) => void,
@@ -68,7 +69,8 @@ export default class Middleware {
   subscribe = (directive: string, actions: (
     this: Bouer,
     onBind: MiddlewareConfigType,
-    onUpdate: MiddlewareConfigType
+    onUpdate: MiddlewareConfigType,
+    onUnbind: MiddlewareConfigType
   ) => void) => {
     if (!this.middlewareConfigContainer[directive])
       this.middlewareConfigContainer[directive] = [];
@@ -77,7 +79,8 @@ export default class Middleware {
 
     actions.call(this.bouer,
       onBind => middleware.onBind = onBind,
-      onUpdate => middleware.onUpdate = onUpdate
+      onUpdate => middleware.onUpdate = onUpdate,
+      onUnbind => middleware.onUnbind = onUnbind,
     );
 
     this.middlewareConfigContainer[directive].push(middleware);
@@ -85,8 +88,7 @@ export default class Middleware {
 
   has = (directive: string) => {
     const middlewares = this.middlewareConfigContainer[directive];
-    if (!middlewares) return false;
-    return middlewares.length > 0;
+    return middlewares && middlewares.length > 0;
   };
 }
 

@@ -1,10 +1,9 @@
 import {
   Bouer,
   Compiler,
-  sleep,
   toHtml,
   IoC
-} from '../../index';
+} from '../../index.js';
 
 describe('When element is compiled with "e-if" directive', () => {
   const htmlSnippet = `
@@ -25,7 +24,7 @@ describe('When element is compiled with "e-if" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).not.toContain('Visible');
       }
     });
@@ -44,7 +43,7 @@ describe('When element is compiled with "e-if" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).toContain('Visible');
       }
     });
@@ -71,7 +70,7 @@ describe('When element is compiled with "e-if" and "e-else" directives', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).toContain('If-Block');
         expect(el.innerHTML).not.toContain('Else-Block');
       }
@@ -91,7 +90,7 @@ describe('When element is compiled with "e-if" and "e-else" directives', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).toContain('Else-Block');
         expect(el.innerHTML).not.toContain('If-Block');
       }
@@ -120,7 +119,7 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).toContain('Single-If-Block');
         expect(el.innerHTML).not.toContain('Else-If-Block');
         expect(el.innerHTML).not.toContain('Else-Block');
@@ -141,7 +140,7 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).not.toContain('Single-If-Block');
         expect(el.innerHTML).toContain('Else-If-Block');
         expect(el.innerHTML).not.toContain('Else-Block');
@@ -162,7 +161,7 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).not.toContain('Single-If-Block');
         expect(el.innerHTML).not.toContain('Else-If-Block');
         expect(el.innerHTML).toContain('Else-Block');
@@ -170,7 +169,7 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
     });
   });
 
-  it('Re-render the "if-chaining" elements when the value changes', async () => {
+  it('Re-render the "if-chaining" elements when the value changes', () => {
     const context = Bouer.create({
       data: {
         value: 0
@@ -184,8 +183,6 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
       context: context,
       el: element
     });
-
-    await sleep(1);
 
     const blocks = [
       {
@@ -203,9 +200,8 @@ describe('When element is compiled with "e-if", "e-else-if" and "e-else" directi
     ];
     for (let i = 0; i < blocks.length; i++) {
       context.data.value = i;
-      await sleep(1);
-
       const blockValue = blocks[i].content;
+
       expect(element.innerHTML).toContain(blockValue);
       expect(blocks[i].directive in element.attributes).toBe(false);
     }

@@ -1,48 +1,32 @@
 import dynamic from '../../definitions/types/Dynamic';
 import RenderContext from '../../definitions/types/RenderContext';
 import WatchCallback from '../../definitions/types/WatchCallback';
-import Prop from '../../shared/helpers/Prop';
+import IoC from '../../shared/helpers/IoCContainer';
+import Property from '../../shared/helpers/Property';
 import {
-  fnCallResolver,
-  forEach,
-  isFunction,
-  isNull,
-  isObject,
-  mapper,
-  toArray
+    $default,
+    $internal,
+    fnCallResolver,
+    filter,
+    isNull,
+    isObject,
+    mapper,
+    toArray
 } from '../../shared/helpers/Utils';
 import Logger from '../../shared/logger/Logger';
 import Watch from '../binder/Watch';
-import ReactiveEvent from '../event/ReactiveEvent';
+import Computed from './Computed';
+import ReactiveEvent from './ReactiveEvent';
 
-export default class Reactive<Value, Obj> implements PropertyDescriptor {
-  readonly _IRT_ = true;
-  propName: string;
-  propValue: Value;
-  propValueOld?: Value;
-  propSource: Obj;
-  baseDescriptor: PropertyDescriptor | undefined;
+export default class ReactivePropertyDescriptor<Value, Obj> implements PropertyDescriptor {
+  $name: string;
+  $value: Value;
+  $valueOld?: Value;
+  source: Obj;
+  base: PropertyDescriptor | undefined;
   watches: Watch<Value, Obj>[] = [];
-  isComputed: boolean;
   context: RenderContext;
-  fnComputed: Function | null = null;
-
-  computed() {
-    if (!this.isComputed)
-      return { get: () => { }, set: (v: any) => { } };
-
-    const computedResult = this.fnComputed!.call(this.context);
-
-    if (isNull(computedResult))
-      throw new Error('Invalid value used as return in “function $computed(){...}”.');
-
-    const isNotInferred = isObject(computedResult) || isFunction(computedResult);
-
-    return {
-      get: (isNotInferred && 'get' in computedResult) ? computedResult.get : (() => computedResult),
-      set: (isNotInferred && 'set' in computedResult) ? computedResult.set : undefined
-    };
-  }
+  computed?: Computed<Value, typeof this.context>;
 
   /**
    * Default constructor
@@ -56,99 +40,111 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
     /** function execution context */
     context: RenderContext
   }) {
-
-    this.propName = options.propName;
-    this.propSource = options.srcObject;
+    $internal(this);
+    this.$name = options.propName;
+    this.source = options.srcObject;
     this.context = options.context;
     // Setting the value of the property
 
-    this.baseDescriptor = Prop.descriptor(this.propSource as dynamic, this.propName);
+    this.base = Property.descriptor(this.source as dynamic, this.$name);
+    this.$value = this.base!.value as Value;
 
-    this.propValue = this.baseDescriptor!.value as Value;
-    this.isComputed = typeof this.propValue === 'function' && this.propValue.name === '$computed';
+    const propValue = this.$value as any;
+    const isFn = typeof propValue === 'function';
 
-    if (this.isComputed) {
-      this.fnComputed = this.propValue as any;
-      (this.propValue as any) = undefined;
+    // If the value is a function, we bind it to the context
+    if (isFn) this.$value = propValue.bind(this.context);
+
+    const isComputed = isFn && propValue.name === '$computed' ||
+      propValue instanceof Computed;
+
+    if (isComputed) {
+      this.computed = isObject(propValue)
+          // If the value is an object, we assume it's a computed object
+          ? propValue as Computed<Value, RenderContext>
+          // If the value is a function, we assume it's a computed function
+          : new Computed(propValue);
+
+      // Adding the context
+      const init = '_' in this.computed ? this.computed._ as Function : $default;
+
+      init({
+        context: this.context,
+        propName: this.$name,
+        propSource: this.source as dynamic
+      });
+
+      this.$valueOld = this.$value;
+      this.$value = undefined as any;
+
+      // Intercepting $value
+      Property.set(this as any, '$value', {
+        get: () => {
+          return fnCallResolver(this.computed!.get());
+        },
+        set: (v) => {
+          if (!this.computed!.set) return;
+          fnCallResolver(this.computed!.set(v));
+        },
+      });
     }
-
-    if (typeof this.propValue === 'function' && !this.isComputed)
-      this.propValue = this.propValue.bind(this.context);
   }
 
-  get = () => {
-    const computedGet = this.computed().get;
-
+  get = (function get (this: ReactivePropertyDescriptor<Value, Obj>) {
     ReactiveEvent.emit('BeforeGet', this);
-    this.propValue = this.isComputed ?
-      fnCallResolver(computedGet.call(this.context)) : this.propValue;
-    const value = this.propValue;
+    const value = this.$value;
     ReactiveEvent.emit('AfterGet', this);
     return value;
-  };
+  }).bind(this);
 
-  set = (value: Value) => {
-    if (this.propValue === value || (Number.isNaN(this.propValue) && Number.isNaN(value)))
-      return;
+  set = (function set (this: ReactivePropertyDescriptor<Value, Obj>, value: Value) {
+    if (this.$value === value || (Number.isNaN(this.$value) && Number.isNaN(value))) return;
 
-    const computedSet = this.computed().set;
-
-    if (this.isComputed && computedSet)
-      fnCallResolver(computedSet.call(this.context, value));
-    else if (this.isComputed && isNull(computedSet))
-      return;
-
-    this.propValueOld = this.propValue;
-
+    this.$valueOld = this.$value;
     ReactiveEvent.emit('BeforeSet', this);
 
     if (isObject(value) || Array.isArray(value)) {
-      if ((typeof this.propValue) !== (typeof value))
+      // Checking the type
+      if (this.$value != null && (typeof this.$value) !== (typeof value))
         return Logger.error(('Cannot set “' + (typeof value) + '” in “' +
-          this.propName + '” property.'));
+          this.$name + '” property.'));
 
-      if (Array.isArray(value)) {
-        Reactive.transform({
+      // Checking if the value is null
+      if (isNull(this.$value))
+        return;
+
+      // Transform if it is not an html element
+      if (this.$value instanceof Node)
+        this.$value = value;
+      else
+        ReactivePropertyDescriptor.transform({
           data: value,
           descriptor: this,
           context: this.context
         });
 
-        const propValue = this.propValue as any[];
-        propValue.splice(0, propValue.length);
-        propValue.push.apply(propValue, (value as any));
-      } else if (isObject(value)) {
-        if ((value instanceof Node)) // If some html element
-          this.propValue = value;
-        else {
-          Reactive.transform({
-            data: value as dynamic,
-            context: this.context
-          });
-          if (!isNull(this.propValue))
-            mapper(value as dynamic, this.propValue as dynamic);
-          else
-            this.propValue = value;
-        }
-      }
+      if (Array.isArray(value))
+        this.$value = value;
+
+      mapper(value as dynamic, this.$value as dynamic);
     } else {
-      this.propValue = value;
+      this.$value = value;
     }
 
     ReactiveEvent.emit('AfterSet', this);
     this.notify();
-  };
+  }).bind(this);
 
   /**
    * Force onChange callback calling
    */
   notify() {
-    const isObj = isObject(this.propValue);
+    const isObj = isObject(this.$value);
     // Running all the watches
-    forEach(this.watches, w => {
+    filter(this.watches, w => {
       // Remapping the binding from the parents to the children properties
       const reactiveEvent = isObj ? ReactiveEvent.on('AfterGet', descriptor => {
-        if (w.property === descriptor.propName) return;
+        if (w.property === descriptor.$name) return;
         const parentWatch = w as any;
 
         // If it's already bound, ignore
@@ -158,7 +154,7 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
         descriptor.watches.push(w as any);
       }) : { off: () => { } };
 
-      w.callback.call(this.context, this.propValue, this.propValueOld);
+      w.callback.call(this.context, this.$value, this.$valueOld);
       reactiveEvent.off();
     });
   }
@@ -186,26 +182,29 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
     /** The data having the property that needs to be transformed to a reactive one */
     data: InputObject,
     /** Reactive descriptor that needs to be provided in case of Array Object */
-    descriptor?: Reactive<any, any>,
+    descriptor?: ReactivePropertyDescriptor<any, any>,
     /** All the keys that needs to be transformed */
     keys?: string[]
   }) => {
     const context = options.context;
+    let tranformedData = new WeakSet();
+
     const executer = (
       data: InputObject | InputObject[],
-      visiting: any[], visited: any[],
-      descriptor?: Reactive<any, any>,
+      descriptor?: ReactivePropertyDescriptor<any, any>,
       keys?: string[],
     ) => {
+
       if (Array.isArray(data)) {
         if (descriptor == null) {
           Logger.warn('Cannot transform this array to a reactive one because no reactive object was provided');
           return data;
         }
 
-        if (visiting.indexOf(data) !== -1)
+        // Checking if the array has already been transformed
+        if (tranformedData.has(data as any))
           return data;
-        visiting.push(data);
+        tranformedData.add(data as any);
 
         const REACTIVE_ARRAY_METHODS = ['push', 'pop', 'unshift', 'shift', 'splice'];
         const inputArray = data as any;
@@ -213,7 +212,8 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
         Object.setPrototypeOf(inputArray, Object.create(Array.prototype));
         const prototype = Object.getPrototypeOf(inputArray);
 
-        forEach(REACTIVE_ARRAY_METHODS, method => {
+        filter(REACTIVE_ARRAY_METHODS, method => {
+
           // cache original method
           reference[method] = inputArray[method].bind(inputArray);
           // changing to the reactive one
@@ -222,20 +222,21 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
             const args = [].slice.call(arguments);
             switch (method) {
               case 'push': case 'unshift':
-                forEach(toArray(args), (arg: any) => {
+                filter(toArray(args), (arg: any) => {
                   if (!isObject(arg) && !Array.isArray(arg)) return;
-                  executer(arg, [], []);
+                  executer(arg);
                 });
             }
 
             const result = reference[method].apply(inputArray, args);
 
-            forEach(descriptor.watches, watch => watch.callback.call(context, inputArray, oldArrayValue, {
+            filter(descriptor.watches, watch => watch.callback.call(context, inputArray, oldArrayValue, {
               method: method,
               args: args
             }));
             return result;
           };
+
         });
 
         return inputArray;
@@ -244,42 +245,88 @@ export default class Reactive<Value, Obj> implements PropertyDescriptor {
       if (!isObject(data))
         return data;
 
-      if (visiting!.indexOf(data) !== -1)
+      // Checking if the array has already been transformed
+      if (tranformedData.has(data as any))
         return data;
-      visiting.push(data);
+      tranformedData.add(data as any);
 
-      forEach(keys || Object.keys(data as dynamic), key => {
+      filter(keys || Object.keys(data as dynamic), key => {
         const mInputObject = data as dynamic;
 
         // Already a reactive property, do nothing
-        if (!('value' in Prop.descriptor(data as dynamic, key)!))
+        if (!('value' in Property.descriptor(data as dynamic, key)!))
           return;
 
         const propValue = mInputObject[key];
 
-        if ((propValue instanceof Object) && ((propValue._IRT_) || (propValue instanceof Node)))
+        if ((propValue instanceof Object && 'ͼ' in propValue) || propValue instanceof Node)
           return;
 
-        const descriptor = new Reactive({
+        // If the value is a function, belonging to a component do nothing
+        if (typeof propValue === 'function' && 'nobind' in propValue)
+          return;
+
+        const descriptor = new ReactivePropertyDescriptor({
           propName: key,
           srcObject: data,
           context: context
         });
 
-        Prop.set(data as dynamic, key, descriptor);
-        if (Array.isArray(propValue)) {
-          executer(propValue as any, visiting, visited, descriptor); // Transform the array to a reactive one
-          forEach(propValue, (item: object) => executer(item as any, visiting, visited));
-        } else if (isObject(propValue))
-          executer(propValue, visiting, visited);
-      });
+        Property.set(data as dynamic, key, descriptor);
 
-      visiting.splice(visiting.indexOf(data), 1);
-      visited.push(data);
+        // If the value is a computed object, do nothing
+        if (isObject(propValue) && propValue instanceof Computed)
+          return;
+
+        if (Array.isArray(propValue)) {
+          executer(propValue as any, descriptor); // Transform the array to a reactive one
+          filter(propValue, (item: object) => executer(item as any));
+        } else if (isObject(propValue))
+          executer(propValue);
+      });
 
       return data;
     };
 
-    return executer(options.data, [], [], options.descriptor, options.keys);
+    executer(options.data, options.descriptor, options.keys);
+    tranformedData = new WeakSet();
+    return options.data as any;
   };
+}
+
+export class InertProp<T> {
+  private value?: T
+  constructor(v?: T) {
+    $internal(this);
+    this.value = v;
+  }
+  get() { return this.value; }
+  set(v: T) { this.value = v; }
+}
+
+export function $reactive<Data extends dynamic>(options: {
+    /** The context where this reactive property belongs */
+    context?: RenderContext,
+    /** Reactive descriptor that needs to be provided in case of Array Object */
+    descriptor?: ReactivePropertyDescriptor<any, any>,
+    /** The data having the property that needs to be transformed to a reactive one */
+    data: Data,
+    /** All the keys that needs to be transformed */
+    keys?: string[]
+  }) {
+  // If no context is provided, create one
+  if (options.context == null)
+    options.context = IoC.global;
+
+  return ReactivePropertyDescriptor.transform({
+    context: options.context!,
+    data: options.data,
+    descriptor: options.descriptor,
+    keys: options.keys
+  });
+}
+
+export function $inert<T>(entry?: T | undefined): T {
+  // Tricking the typescript compiler
+  return new InertProp<T>(entry) as T;
 }

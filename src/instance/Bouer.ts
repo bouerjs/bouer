@@ -5,58 +5,56 @@ import ViewChild from '../core/ViewChild';
 import Binder from '../core/binder/Binder';
 import Watch from '../core/binder/Watch';
 import Compiler from '../core/compiler/Compiler';
-import Component from '../core/component/Component';
+import ComponentPrototype, { Component } from '../core/component/Component';
 import ComponentHandler from '../core/component/ComponentHandler';
 import EventHandler from '../core/event/EventHandler';
 import Middleware from '../core/middleware/Middleware';
-import Reactive from '../core/reactive/Reactive';
 import Routing from '../core/routing/Routing';
 import DataStore from '../core/store/DataStore';
 import IBouerConfig from '../definitions/interfaces/IBouerConfig';
 import IBouerOptions from '../definitions/interfaces/IBouerOptions';
-import IComponentOptions from '../definitions/interfaces/IComponentOptions';
 import IDelimiter from '../definitions/interfaces/IDelimiter';
 import IEventSubscription from '../definitions/interfaces/IEventSubscription';
 import Constructor from '../definitions/types/Constructor';
-import Props from '../definitions/types/Data';
 import DataType from '../definitions/types/DataType';
 import dynamic from '../definitions/types/Dynamic';
 import Pipe from '../definitions/types/Pipe';
+import Props from '../definitions/types/Properties';
 import RenderContext from '../definitions/types/RenderContext';
 import SkeletonOptions from '../definitions/types/SkeletonOptions';
 import WatchCallback from '../definitions/types/WatchCallback';
-import Constants from '../shared/helpers/Constants';
 import Extend from '../shared/helpers/Extend';
 import IoC from '../shared/helpers/IoCContainer';
-import Prop from '../shared/helpers/Prop';
 import Task from '../shared/helpers/Task';
 import {
-  createEl, DOM,
-  forEach,
-  htmlToJsObj,
-  ifNullReturn,
-  ifNullStop,
-  isNull,
-  setData,
-  toArray, trim,
-  WIN
+    $internal,
+    createEl, DOM,
+    filter,
+    ifNullReturn,
+    ifNullStop,
+    isNull,
+    setData,
+    toArray, trim,
+    WIN
 } from '../shared/helpers/Utils';
 import Logger from '../shared/logger/Logger';
+
+import FormHandler from '../core/form/FormHandler';
+import version from './version';
+import IComponentOptions from '../definitions/interfaces/IComponentOptions';
+import { $reactive } from '../core/reactive/Reactive';
+import Params from '../definitions/types/Parameters';
 
 export default class Bouer<
   Data extends {} = {},
   Global extends {} = {},
   Deps extends {} = {}
 > implements IBouerOptions {
-  /** The name of the instance */
-  // Ignore Reactive Transformation
-  readonly _IRT_ = true;
   readonly name = 'Bouer';
-  readonly version = '3.2.0';
+  readonly version = version;
   readonly config: IBouerConfig;
   readonly data: DataType<Data, this> & dynamic;
   readonly globalData: DataType<Global, this> & dynamic;
-  readonly deps: DataType<Deps, this>;
   readonly pipes: Pipe;
 
   /** Unique Id of the instance */
@@ -178,31 +176,27 @@ export default class Bouer<
   readonly $components: {
     /**
      * Adds a component to the instance
-     * @param {object} component the component to be added
      */
     add(
-      component: Component | IComponentOptions | Constructor<Component>
+      component: Constructor<Component> | IComponentOptions
     ): void;
     /**
      * Gets a component from the instance
      * @param {string} name the name of the component to get
      */
-    get(name: string): Component | IComponentOptions,
+    get(name: string): ComponentPrototype | Component | IComponentOptions | null,
     /**
      * Retrieves the actives components matching the a provided expression
-     * @param {string} expression the expression that matches the wanted components
      */
-    viewBy<Child extends Component>(expression: (component: Child) => boolean): Child[],
+    viewBy<Child extends Component | ComponentPrototype>(expression: (component: Child) => boolean): Child[],
     /**
      * Retrieves the actives components matching the component name
-     * @param {string} componentName the name of the wanted components
      */
-    viewByName<Child extends Component>(componentName: string): Child[],
+    viewByName<Child extends Component | ComponentPrototype>(componentName: string): Child[],
     /**
-     * Retrieves the active component matching the component element or the root element id
-     * @param {string} componentId the component element id of the wanted component (in case of just one insertion)
+     * Retrieves the active component matching the class
      */
-    viewById<Child extends Component>(componentId: string): Child | null,
+    viewByClass<Child extends Component | ComponentPrototype>(ctor: Constructor<Child>): Child[]
   };
 
   /** Routing Handler */
@@ -211,10 +205,10 @@ export default class Bouer<
     routeView: Element | null;
 
     /** Store the Component defined has NotFound Page */
-    defaultPage?: Component | IComponentOptions;
+    defaultPage?: ComponentPrototype | IComponentOptions;
 
     /** Store the Component defined has NotFound Page */
-    notFoundPage?: Component | IComponentOptions;
+    notFoundPage?: ComponentPrototype | IComponentOptions;
 
     /**
      * Navigates to a certain page without reloading all the page
@@ -254,27 +248,28 @@ export default class Bouer<
     markActiveAnchorsWithRoute(route: string): void
   };
 
+  /** The dependencies of the instance */
+  readonly $deps: {
+    add<S extends Constructor<any>>(ctor: S, params?: Params<S>, isSingleton?: boolean): void,
+    resolve<S >(ctor: Constructor<S>): S | undefined,
+    clear(): void
+  };
+
+
   /**
    * Default constructor
    * @param {string} selector the selector of the element to be controlled by the instance
    * @param {object?} options the options to the instance
    */
   constructor(
-    selector: string,
+    selector?: string,
     options?: IBouerOptions<Data, Global, Deps>
   ) {
-
-    const $options = (options || {});
+    $internal(this);
+    const $options = options || {};
     this.options = $options;
     this.config = $options.config || {};
-    this.deps = $options.deps || {} as any;
     this.pipes = $options.pipes || {};
-
-    forEach(Object.keys(this.deps as {}), key => {
-      const deps = this.deps as any;
-      const value = deps[key];
-      deps[key] = typeof value === 'function' ? value.bind(this) : value;
-    });
 
     const app = this;
     const delimiters = $options.delimiters || [];
@@ -301,17 +296,18 @@ export default class Bouer<
     const compiler = IoC.app(this).resolve(Compiler)!;
     const skeleton = IoC.app(this).resolve(Skeleton)!;
     const delimiter = IoC.app(this).resolve(DelimiterHandler)!;
+    const eventHandler = IoC.app(this).resolve(EventHandler)!;
 
     // Register the middleware
     if (typeof $options.middleware === 'function')
       $options.middleware.call(this, (middleware.subscribe as () => void), this);
 
     // Transform the data properties into a reative
-    this.data = Reactive.transform({
+    this.data = $reactive({
       data: $options.data || {},
       context: this
     });
-    this.globalData = Reactive.transform({
+    this.globalData = $reactive({
       data: $options.globalData || {},
       context: this
     });
@@ -336,7 +332,7 @@ export default class Bouer<
           return Logger.warn('There is already a data stored with this key “' + key + '”.');
 
         if (ifNullReturn(toReactive, false) === true)
-          Reactive.transform({
+          $reactive({
             context: app,
             data: data as dynamic
           });
@@ -374,13 +370,13 @@ export default class Bouer<
         const mWait = dataStore.wait[key];
 
         mWait.data = data as dynamic;
-        forEach(mWait.nodes, nodeWaiting => {
+        filter(mWait.nodes, nodeWaiting => {
           if (!nodeWaiting) return;
 
           compiler.compile({
             el: nodeWaiting,
             context: mWait.context,
-            data: Reactive.transform({
+            data: $reactive({
               context: mWait.context,
               data: mWait.data as object
             }),
@@ -401,41 +397,32 @@ export default class Bouer<
     this.$components = {
       add: component => componentHandler.prepare([component]),
       get: name => componentHandler.components[name],
-      viewBy: <Child extends Component>(expression: (component: Child) => boolean) =>
-        ViewChild.by<Child>(this, expression),
+      viewBy: <Child extends Component | ComponentPrototype>(
+        expression: (component: Child) => boolean
+      ) => ViewChild.by<Child>(this, expression),
       viewByName: (componentName: string) => ViewChild.byName(this, componentName),
-      viewById: (componentId: string) => ViewChild.byId(this, componentId),
+      viewByClass: <Child extends Component | ComponentPrototype>(
+        ctor: Constructor<Child>
+      ) => ViewChild.byClass(this, ctor)
     };
 
-    Prop.set(this, 'refs', {
-      get: () => {
-        const mRefs: dynamic<Element> = {};
-        forEach(toArray(ifNullStop(this.el).querySelectorAll('[' + Constants.ref + ']')),
-          (ref: any) => {
-            const mRef = ref.attributes[Constants.ref] as Attr;
-            const value = trim(mRef.value) || ref.name || '';
+    this.$deps = IoC.app(this);
 
-            if (value === '')
-              return Logger.error('Expected an expression in “' + ref.name +
-                '” or at least “name” attribute to combine with “' + ref.name + '”.');
+    if (typeof $options.mounted === 'function')
+      eventHandler.on({ // Subscribe to the mounted event
+        eventName: $options.mounted.name,
+        callback: $options.mounted as any,
+        modifiers: { once: true },
+        context: app
+      });
 
-            if (value in mRefs) {
-              Logger.warn('The key “' + value + '” in “' + ref.name + '” is taken, choose another key.');
-              return Logger.warn(ref);
-            }
-
-            mRefs[value] = ref;
-          });
-
-        return mRefs;
-      }
-    });
+    eventHandler.emit({ eventName: 'mounted' });
 
     // Registering all the components
     componentHandler.prepare($options.components || []);
 
-    if (!isNull(selector) && trim(selector) !== '')
-      this.init(selector);
+    if (!isNull(selector) && trim(selector!) !== '')
+      this.init(selector!);
   }
 
   /**
@@ -459,32 +446,6 @@ export default class Bouer<
   }
 
   /**
-   * Compiles a `HTML snippet` to an `Object Literal`
-   * @param {string} input the input element
-   * @param {object?} options the options of the compilation
-   * @param {Function?} onSet a function that should be fired when a value is setted
-   * @returns the Object Compiled from the HTML
-   */
-  static toJsObj(
-    input: string | HTMLElement,
-    options?: {
-      /**
-       * attributes that tells the compiler to lookup to the element, e.g: [name],[data-name].
-       * * Note: The definition order matters.
-       */
-      names?: string,
-      /**
-       * attributes that tells the compiler where it going to get the value, e.g: [value],[data-value].
-       * * Note: The definition order matters.
-       */
-      values?: string
-    },
-    onSet?: (builtObjectLayer: object, propName: string, value: any, element: Element) => void
-  ) {
-    return htmlToJsObj(input, options, onSet);
-  }
-
-  /**
    * Initialize create application
    * @param {string} selector the selector of the element to be controlled by the instance
    */
@@ -493,20 +454,22 @@ export default class Bouer<
       return this;
 
     if (isNull(selector) || trim(selector) === '')
-      throw Logger.error(new Error('Invalid selector provided to the instance.'));
+      throw Logger.error(new Error('Invalid selector provided to Bouer instance.'));
 
     const app = this;
     const el = DOM.querySelector(selector);
     if (!(this.el = el)) throw Logger.error(new SyntaxError('Element with selector “' + selector + '” not found.'));
 
-    const options = this.options || {};
+    const options = this.options;
     const binder = IoC.app(this).resolve(Binder)!;
     const eventHandler = IoC.app(this).resolve(EventHandler)!;
     const routing = IoC.app(this).resolve(Routing)!;
     const skeleton = IoC.app(this).resolve(Skeleton)!;
     const compiler = IoC.app(this).resolve(Compiler)!;
+    const dataStore = IoC.app(this).resolve(DataStore)!;
 
-    forEach([options.beforeLoad, options.loaded, options.beforeDestroy, options.destroyed], hook => {
+
+    filter([options.beforeLoad, options.loaded, options.beforeDestroy, options.destroyed], hook => {
       if (typeof hook !== 'function') return;
       eventHandler.on({
         eventName: hook.name,
@@ -535,7 +498,7 @@ export default class Bouer<
       el: this.el,
       data: this.data,
       context: this,
-      onDone: () => eventHandler.emit({
+      onComponentLoad: () => eventHandler.emit({
         eventName: 'loaded',
         attachedNode: el
       })
@@ -551,6 +514,8 @@ export default class Bouer<
     Task.run(stopTask => {
       if (this.isDestroyed) return stopTask();
       if (el.isConnected) return;
+
+      dataStore.unlinkNodeData()
 
       eventHandler.emit({ eventName: 'beforeDestroy', attachedNode: el });
       this.destroy();
@@ -585,11 +550,10 @@ export default class Bouer<
    * Compiles a `HTML snippet` to an `Object Literal`
    * @param {string} input the input element
    * @param {object?} options the options of the compilation
-   * @param {Function?} onSet a function that should be fired when a value is setted
    * @returns the Object Compiled from the HTML
    */
   toJsObj(
-    input: string | HTMLElement,
+    input: string | Element,
     options?: {
       /**
        * attributes that tells the compiler to lookup to the element, e.g: [name],[data-name].
@@ -600,11 +564,16 @@ export default class Bouer<
        * attributes that tells the compiler where it going to get the value, e.g: [value],[data-value].
        * * Note: The definition order matters.
        */
-      values?: string
-    },
-    onSet?: (builtObjectLayer: object, propName: string, value: any, element: Element) => void
+      values?: string,
+    }
   ) {
-    return htmlToJsObj(input, options, onSet);
+    const formHandler = new FormHandler({}, Extend.obj({}, { type: 'STATIC' }, options as any)).init({
+      bouer: this,
+      context: this,
+      data: this.data,
+      element: input,
+    });
+    return formHandler.toObject();
   }
 
   /**
@@ -763,15 +732,24 @@ export default class Bouer<
     context?: RenderContext,
     /** The data that should be injected in the compilation */
     data?: Data,
+    /** The directives that should be ignored in the compilation */
+    directivesToIgnore?: string[],
+    /** The function that should be fired before an element is compiled */
+    beforeCompile?: (this: typeof options.context, element: Node, data?: Data) => void | Promise<any>,
+    /** The function that should be fired after an element is compiled */
+    afterCompile?: (this: typeof options.context, element: Node, data?: Data) => void | Promise<any>,
     /** The function that should be fired when the compilation is done */
-    onDone?: (this: typeof options.context, element: Element, data?: Data | undefined) => void
-  }): Element | void {
+    onComponentLoaded?: (this: typeof options.context, element: Element, data?: Data | undefined) => void
+  }) {
     return IoC.app(this).resolve(Compiler)!.
       compile({
         el: options.el,
         data: options.data,
         context: options.context || this,
-        onDone: options.onDone
+        directivesToIgnore: options.directivesToIgnore,
+        beforeCompile: options.beforeCompile,
+        afterCompile: options.afterCompile,
+        onComponentLoad: options.onComponentLoaded
       });
   }
 
@@ -780,14 +758,14 @@ export default class Bouer<
    */
   destroy() {
     const el = this.el!;
-    const $Events = IoC.app(this).resolve(EventHandler)!.$events;
-    const destroyedEvents = ($Events['destroyed'] || []).concat(($Events['component:destroyed'] || []));
+    const $events = IoC.app(this).resolve(EventHandler)!.$events;
+    const destroyedEvents = ($events['destroyed'] || []).concat(($events['component:destroyed'] || []));
 
     this.emit('destroyed', { element: this.el! });
     // Dispatching all the destroy events
-    forEach(destroyedEvents, es => es.emit({ once: true }));
-    $Events['destroyed'] = [];
-    $Events['component:destroyed'] = [];
+    filter(destroyedEvents, es => es.emit({ once: true }));
+    $events['destroyed'] = [];
+    $events['component:destroyed'] = [];
 
     if (el.tagName == 'BODY')
       el.innerHTML = '';

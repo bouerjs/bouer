@@ -1,6 +1,6 @@
 import {
   Bouer
-} from '../../index';
+} from '../../index.js';
 
 describe('When using "react" method', () => {
   it('Listen to all the properties change', () => {

@@ -1,12 +1,12 @@
-import Bouer, { Compiler, IoC } from '../../..';
 import dynamic from '../../../definitions/types/Dynamic';
 import RenderContext from '../../../definitions/types/RenderContext';
 import Extend from '../../../shared/helpers/Extend';
-import Prop from '../../../shared/helpers/Prop';
+import Property from '../../../shared/helpers/Property';
 import {
+  $internal,
   errorMsgEmptyNode,
   errorMsgNodeValue,
-  forEach,
+  filter,
   ifNullReturn,
   isObject,
   toOwnerNode,
@@ -15,9 +15,12 @@ import {
 import Logger from '../../../shared/logger/Logger';
 import DelimiterHandler from '../../DelimiterHandler';
 import Evaluator from '../../Evaluator';
-import ReactiveEvent from '../../event/ReactiveEvent';
-import Reactive from '../../reactive/Reactive';
+import ReactiveEvent from '../../reactive/ReactiveEvent';
+import { $reactive } from '../../reactive/Reactive';
 import DataStore from '../../store/DataStore';
+import Compiler, { CompilationHooks } from '../Compiler';
+import Bouer from '../../../instance/Bouer';
+import IoC from '../../../shared/helpers/IoCContainer';
 
 export function $data(opitons: {
   node: Node,
@@ -26,7 +29,8 @@ export function $data(opitons: {
   delimiter: DelimiterHandler,
   evaluator: Evaluator,
   context: RenderContext,
-  data: object
+  data: object,
+  compilationHooks: CompilationHooks
 }) {
   const {
     node,
@@ -46,16 +50,16 @@ export function $data(opitons: {
   ownerNode.removeAttribute(node.nodeName);
 
   let inputData: dynamic = {};
-  const mData = Extend.obj(data, { $data: data });
+  const mData = Extend.obj(data, { $data: data, $scope: data });
   const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
-    if (!(descriptor.propName in inputData))
-      inputData[descriptor.propName] = undefined;
-    Prop.set(inputData, descriptor.propName, descriptor);
+    if (!(descriptor.$name in inputData))
+      inputData[descriptor.$name] = undefined;
+    Property.set(inputData, descriptor.$name, descriptor);
   });
 
   // If data value is empty gets the main scope value
   if (nodeValue === '')
-    inputData = Extend.obj(bouer.data);
+    inputData = Extend.obj(data);
   else {
     // Other wise, compiles the object provided
     const mInputData = evaluator.exec({
@@ -69,7 +73,7 @@ export function $data(opitons: {
         '” and got “' + nodeValue + '”.');
 
     // Adding all non-existing properties
-    forEach(Object.keys(mInputData), key => {
+    filter(Object.keys(mInputData), key => {
       if (!(key in inputData))
         inputData[key] = mInputData[key];
     });
@@ -83,15 +87,20 @@ export function $data(opitons: {
     IoC.app(bouer).resolve(DataStore)!.set('data', dataKey, inputData);
   }
 
-  Reactive.transform({
+  $reactive({
     context: context,
     data: inputData
   });
+
+  // Signinng the element with it's data
+  IoC.app(bouer).resolve(DataStore)!.addNodeData(ownerNode, inputData);
 
   return compiler.compile({
     data: inputData,
     el: ownerNode,
     context: context,
+    afterCompile: opitons.compilationHooks.afterCompile,
+    beforeCompile: opitons.compilationHooks.beforeCompile
   });
 }
 
@@ -122,9 +131,9 @@ export function $def(opitons: {
 
   const inputData: dynamic = {};
   const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
-    if (!(descriptor.propName in inputData))
-      inputData[descriptor.propName] = undefined;
-    Prop.set(inputData, descriptor.propName, descriptor);
+    if (!(descriptor.$name in inputData))
+      inputData[descriptor.$name] = undefined;
+    Property.set(inputData, descriptor.$name, descriptor);
   });
 
   const mInputData = evaluator.exec({
@@ -138,7 +147,7 @@ export function $def(opitons: {
       '” and got “' + nodeValue + '”.');
 
   // Adding all non-existing properties
-  forEach(Object.keys(mInputData), key => {
+  filter(Object.keys(mInputData), key => {
     if (!(key in inputData))
       inputData[key] = mInputData[key];
   });
@@ -154,7 +163,8 @@ export function $wait(options: {
   bouer: Bouer,
   compiler: Compiler,
   delimiter: DelimiterHandler,
-  context: RenderContext
+  context: RenderContext,
+  compilationHooks: CompilationHooks
 }) {
   const { node, bouer, delimiter, compiler, context } = options;
   const ownerNode = toOwnerNode(node);
@@ -175,14 +185,15 @@ export function $wait(options: {
     // No data exposed yet
     if (!mWait.data) return;
     // Compile all the waiting nodes
-    forEach(mWait.nodes, (nodeWaiting) => {
+    filter(mWait.nodes, (nodeWaiting) => {
+      const $data = $reactive({ context: mWait.context, data: mWait.data! });
+      dataStore.addNodeData(nodeWaiting, $data);
       compiler.compile({
-        el: nodeWaiting as Element,
+        el: nodeWaiting,
         context: mWait.context,
-        data: Reactive.transform({
-          context: mWait.context,
-          data: mWait.data!
-        }),
+        data: $data,
+        beforeCompile: options.compilationHooks.beforeCompile,
+        afterCompile: options.compilationHooks.afterCompile,
       });
     });
 
@@ -192,3 +203,39 @@ export function $wait(options: {
 
   return dataStore.wait[nodeValue] = { nodes: [ownerNode], context: context };
 }
+
+export class DataProp<T, Constraint = 'required' | 'optional'> {
+  public value?: T;
+  public constraint: Constraint;
+  constructor(
+    value: T | undefined,
+    type: Constraint
+  ) {
+    $internal(this);
+    this.value = value;
+    this.constraint = type;
+  }
+
+  static required<T>() {
+    return new DataProp<T>(undefined as any, 'required') as T
+  }
+
+  static optional<T>(value?: T) {
+    return new DataProp<T>(value, 'optional') as T | undefined
+  }
+}
+
+const prop = Object.assign(
+  /** Default function represent optional Property */
+  function optional<T>(value?: T) {
+    return DataProp.optional<T>(value);
+  },
+  {
+    /** Optional Property, not expected in data directive */
+    optional: DataProp.optional,
+    /** Required Property, expected in data directive */
+    required: DataProp.required
+  }
+);
+
+export { prop };

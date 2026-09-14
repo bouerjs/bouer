@@ -5,7 +5,7 @@ import Constants from '../../../shared/helpers/Constants';
 import {
   errorMsgEmptyNode,
   errorMsgNodeValue,
-  forEach,
+  filter,
   ifNullReturn,
   isObject,
   toOwnerNode,
@@ -17,6 +17,8 @@ import Binder from '../../binder/Binder';
 import DelimiterHandler from '../../DelimiterHandler';
 import Evaluator from '../../Evaluator';
 import Routing from '../../routing/Routing';
+
+const constsValues = Object.values(Constants);
 
 export function $bind(opitons: {
   node: Node,
@@ -33,7 +35,7 @@ export function $bind(opitons: {
     data
   } = opitons;
   const ownerNode = toOwnerNode(node);
-  const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  const nodeValue = ifNullReturn(node.nodeValue, '');
 
   if (nodeValue === '')
     return Logger.error(errorMsgEmptyNode(node));
@@ -58,7 +60,7 @@ export function $text(opitons: {
     node,
   } = opitons;
   const ownerNode = toOwnerNode(node);
-  const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  const nodeValue = ifNullReturn(node.nodeValue, '');
 
   if (nodeValue === '')
     return Logger.error(errorMsgEmptyNode(node));
@@ -84,11 +86,15 @@ export function $property(opitons: {
     data
   } = opitons;
   const ownerNode = toOwnerNode(node) as Element;
-  const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  const nodeName = node.nodeName;
+  const nodeValue = ifNullReturn(node.nodeValue, '');
   let execute = (obj: object) => { };
 
   const errorInvalidValue = (node: Node) => ('Invalid value, expected an Object/Object Literal in “'
-    + node.nodeName + '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
+    + nodeName + '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
+
+  if (constsValues.includes(node.nodeName))
+    return;
 
   if (nodeValue === '')
     return Logger.error(errorInvalidValue(node));
@@ -108,7 +114,7 @@ export function $property(opitons: {
     data: data,
     node: node,
     context: context,
-    isReplaceProperty: false,
+    replaceable: false,
     fields: [{ expression: nodeValue, field: nodeValue, pipes: [] }],
     onUpdate: () => execute(evaluator.exec({
       data: data,
@@ -127,7 +133,7 @@ export function $property(opitons: {
       attr = (ownerNode.attributes as any)[attrNameToSet] as Attr;
     }
 
-    forEach(Object.keys(obj), key => {
+    filter(Object.keys(obj), key => {
       /* if has a falsy value remove the key */
       if (!obj[key]) return attr.value = trim(attr.value.replace(key, ''));
       attr.value = (attr.value.includes(key) ? attr.value : trim(attr.value + ' ' + key));
@@ -184,4 +190,18 @@ export function $href(opitons: {
       IoC.app(bouer).resolve(Routing)!
         .navigate(href.value);
     }, false);
+}
+
+export function $ref(options: {
+  node: Node,
+  bouer: Bouer
+}) {
+  const { node, bouer } = options;
+  const ownerNode = toOwnerNode(node);
+  const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+
+  if (nodeValue === '')
+    return Logger.error(errorMsgEmptyNode(node));
+
+  bouer.refs[nodeValue] = ownerNode;
 }

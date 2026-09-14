@@ -3,7 +3,7 @@ import {
   Compiler,
   toHtml,
   IoC
-} from '../../index';
+} from '../../index.js';
 
 describe('When element is compiled with "data" directive', () => {
   let context;
@@ -32,7 +32,7 @@ describe('When element is compiled with "data" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).toContain('hello injected');
       }
     });
@@ -48,7 +48,7 @@ describe('When element is compiled with "data" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).toContain('hello from bouer');
       }
     });
@@ -64,7 +64,7 @@ describe('When element is compiled with "data" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).toContain('bouer, Creator: AfonsoMatElias');
       }
     });
@@ -82,7 +82,7 @@ describe('When element is compiled with "data" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).toContain('bouer is cool 🤙');
       }
     });
@@ -100,7 +100,7 @@ describe('When element is compiled with "data" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: el => {
+      onComponentLoad: el => {
         expect(el.innerHTML).toContain('hello from bouer 🤙');
       }
     });

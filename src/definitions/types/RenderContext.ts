@@ -1,6 +1,6 @@
-import Component from '../../core/component/Component';
+import ComponentPrototype from '../../core/component/Component';
 import Bouer from '../../instance/Bouer';
 
-type RenderContext = Bouer | Component;
+type RenderContext = ComponentPrototype | Bouer;
 
 export default RenderContext;

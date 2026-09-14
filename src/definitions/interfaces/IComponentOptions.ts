@@ -1,12 +1,12 @@
-import Component from '../../core/component/Component';
-import Bouer from '../../instance/Bouer';
-import Constructor from '../types/Constructor';
-import DataType from '../types/DataType';
-import ILifeCycleHooks from './ILifeCycleHooks';
+import ComponentPrototype, { Component } from "../../core/component/Component";
+import Bouer from "../../instance/Bouer";
+import Constructor from "../types/Constructor";
+import DataType from "../types/DataType";
+import ILifeCycleHooks from "./ILifeCycleHooks";
 
 interface IComponentOptions<Data extends {} = {}> extends ILifeCycleHooks {
   /** The name of the component */
-  readonly name?: string
+  readonly name?: string;
 
   /** The path of the component (not required on e-entry directive) */
   readonly path?: string;
@@ -21,7 +21,7 @@ interface IComponentOptions<Data extends {} = {}> extends ILifeCycleHooks {
   readonly template?: string;
 
   /** The default data that should be injected in the component */
-  readonly data?: DataType<Data, Component<Data>>;
+  readonly data?: DataType<Data, ComponentPrototype<Data>>;
 
   /** Allow the component the keep the last state */
   readonly keepAlive?: boolean;
@@ -33,11 +33,11 @@ interface IComponentOptions<Data extends {} = {}> extends ILifeCycleHooks {
   readonly prefetch?: boolean;
 
   /** The children of the component that should inherit the `route` of the father */
-  readonly children?: (Component | IComponentOptions | Constructor<Component>)[];
+  readonly children?: (Constructor<Component> | IComponentOptions | ComponentPrototype)[];
 
   /** Defines a list of restrictions functions of the component */
   readonly restrictions?: (
-    (this: Bouer, component: Component | IComponentOptions) => boolean | Promise<boolean>
+    (this: Bouer, component: ComponentPrototype | IComponentOptions) => boolean | Promise<boolean>
   )[];
 
   /** Allow to set this component as the `default page` when the application loads */

@@ -1,0 +1,16 @@
+<div class="input-field">
+  <label e-text="{{ label }}"> Label Name </label>
+  <slot default></slot>
+  <small e-for="error of $form.get(name).errors"> {{ error.message }} </small>
+</div>
+
+<style scoped>
+  small {
+    color: red;
+  }
+  .input-field {
+    margin: 4px 0;
+    display: flex;
+    flex-direction: column;
+  }
+</style>

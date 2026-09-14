@@ -8,3 +8,5 @@ test/usage/js/dist
 test/usage/ts/dist
 
 *.tgz
+
+coverage

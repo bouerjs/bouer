@@ -7,17 +7,15 @@ export default class AppMain extends Component {
     super(html, [style]);
   }
 
-  data = {
-    socials: [{
-      name: 'Twitter',
-      url: 'www.twitter.com/bouerjs'
-    },
-    {
-      name: 'Reddit',
-      url: 'www.reddit.com/bouerjs'
-    }
-    ],
-  };
+  socials = [{
+    name: 'Twitter',
+    url: 'www.twitter.com/bouerjs'
+  },
+  {
+    name: 'Reddit',
+    url: 'www.reddit.com/bouerjs'
+  }
+  ];
 
   add() {
     const bouer = this.bouer;
@@ -26,7 +24,7 @@ export default class AppMain extends Component {
     if (!obj.name || !obj.url)
       return alert('Both of the fields are required.');
 
-    this.data.socials.push(obj);
+    this.socials.push(obj);
 
     bouer.refs.name.value = '';
     bouer.refs.url.value = '';

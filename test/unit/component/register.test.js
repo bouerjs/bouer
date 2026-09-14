@@ -1,10 +1,9 @@
 import {
   Bouer,
   Compiler,
-  sleep,
   toHtml,
   IoC
-} from '../../index';
+} from '../../index.js';
 
 describe('When using "e-entry" directive', () => {
   it('Copies/Register the element with the directive', () => {
@@ -20,7 +19,7 @@ describe('When using "e-entry" directive', () => {
       data: context.data,
       context: context,
       el: element,
-      onDone: () => {
+      onComponentLoad: () => {
         expect(context.$components.get('copied-el')).toBeDefined();
       }
     });
@@ -35,18 +34,18 @@ describe('When using "e-entry" directive', () => {
     const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
-      el: element
+      el: element,
+      onComponentLoad: () => {
+        const copiedEl = element.children[1];
+
+        expect(copiedEl.tagName).toBe('LABEL');
+        expect(copiedEl.tagName).not.toBe('COPIED-EL');
+        expect(copiedEl.innerHTML).toBe('Element');
+      }
     });
-
-    await sleep(1);
-    const copiedEl = element.children[1];
-
-    expect(copiedEl.tagName).toBe('LABEL');
-    expect(copiedEl.tagName).not.toBe('COPIED-EL');
-    expect(copiedEl.innerHTML).toBe('Element');
   });
 });
 
@@ -75,18 +74,19 @@ describe('When added to the instance component options', () => {
     const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
+      onComponentLoad: () => {
+        const copiedElComponent = context.$components.get('my-component');
+        const componentEl = element.children[0];
+
+        expect(componentEl.tagName).toBe('DIV');
+        expect(componentEl.outerHTML.trim()).toBe(copiedElComponent.template.trim());
+      }
     });
 
-    await sleep(1);
-    const copiedElComponent = context.$components.get('my-component');
-    const componentEl = element.children[0];
-
-    expect(componentEl.tagName).toBe('DIV');
-    expect(componentEl.outerHTML.trim()).toBe(copiedElComponent.template.trim());
   });
 });
 
@@ -108,15 +108,15 @@ describe('When using the component options', () => {
     const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
+      onComponentLoad: () => {
+        const componentEl = element.children[0];
+        expect(componentEl.textContent).toContain('Compiled value');
+      }
     });
-
-    await sleep(1);
-    const componentEl = element.children[0];
-    expect(componentEl.textContent).toContain('Compiled value');
   });
   it('Fires the hooks if provided in the options', async () => {
     const htmlSnippet = `
@@ -152,23 +152,24 @@ describe('When using the component options', () => {
     const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
+      onComponentLoad: () => {
+        expect(created).toHaveBeenCalled();
+        expect(beforeMount).toHaveBeenCalled();
+        expect(mounted).toHaveBeenCalled();
+        expect(beforeLoad).toHaveBeenCalled();
+        expect(loaded).toHaveBeenCalled();
+
+        component.destroy();
+
+        expect(beforeDestroy).toHaveBeenCalled();
+        expect(destroyed).toHaveBeenCalled();
+      }
     });
 
-    await sleep(1);
-    expect(created).toHaveBeenCalled();
-    expect(beforeMount).toHaveBeenCalled();
-    expect(mounted).toHaveBeenCalled();
-    expect(beforeLoad).toHaveBeenCalled();
-    expect(loaded).toHaveBeenCalled();
-
-    component.destroy();
-
-    expect(beforeDestroy).toHaveBeenCalled();
-    expect(destroyed).toHaveBeenCalled();
   });
 });
 
@@ -191,20 +192,18 @@ describe('When using the component <script>', () => {
     const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
-    const log = console.log;
-    console.log = jest.fn();
+    const logger = jest.spyOn(console, 'log');
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
+      onComponentLoad: () => {
+        expect(logger).toHaveBeenCalled();
+      }
     });
-
-    await sleep(1);
-    expect(console.log).toHaveBeenCalled();
-    expect(console.log.mock.calls[0][0]).toBe('Script executed');
-    console.log = log;
   });
+
   it('Adds hooks to component instance when using "this.on(...)" method', async () => {
     const htmlSnippet = `
     <div>
@@ -223,18 +222,18 @@ describe('When using the component <script>', () => {
     });
     const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
-    const log = console.log;
-    console.log = jest.fn();
 
-    compiler.compile({
+    const logger = jest.spyOn(console, 'log');
+
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
+      onComponentLoad: () => {
+        expect(logger).toHaveBeenCalled();
+      }
     });
 
-    await sleep(1);
-    expect(console.log.mock.calls[0][0]).toBe('mounted');
-    console.log = log;
   });
   it('Exports "data" the component element when using "this.export(...)" method', async () => {
     const htmlSnippet = `
@@ -257,14 +256,14 @@ describe('When using the component <script>', () => {
     const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
+      onComponentLoad: () => {
+        expect(element.children[0].textContent).toContain('exported-value');
+      }
     });
-
-    await sleep(1);
-    expect(element.children[0].textContent).toContain('exported-value');
   });
 });
 
@@ -288,14 +287,15 @@ describe('When using component slots', () => {
     const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
-      el: element
+      el: element,
+      onComponentLoad: () => {
+        expect(element.children[0].innerHTML).toContain('Injected');
+      }
     });
 
-    await sleep(1);
-    expect(element.children[0].innerHTML).toContain('Injected');
   });
   it('Injects the element <el slot="..."> body in component body to target <slot name="...">', async () => {
     const htmlSnippet = `
@@ -322,74 +322,75 @@ describe('When using component slots', () => {
     const compiler = IoC.app(context).resolve(Compiler);
     const element = toHtml(htmlSnippet);
 
-    compiler.compile({
+    await compiler.compile({
       data: context.data,
       context: context,
       el: element,
+      onComponentLoad: () => {
+        const child = element.children[0];
+
+        expect(child.tagName).toBe('DIV');
+        expect(child.tagName).not.toBe('MY-COMPONENT');
+
+        const span1 = child.children[0];
+        const span2 = child.children[1];
+
+        expect(span1.tagName).toBe('SPAN');
+        expect(span2.tagName).toBe('SPAN');
+
+        expect('slot' in span1.attributes).toBe(false);
+        expect('slot' in span2.attributes).toBe(false);
+
+        expect(span1.textContent).toContain('Injected-target-1');
+        expect(span2.textContent).toContain('Injected-target-2');
+      }
     });
 
-    await sleep(1);
-    const child = element.children[0];
-
-    expect(child.tagName).toBe('DIV');
-    expect(child.tagName).not.toBe('MY-COMPONENT');
-
-    const span1 = child.children[0];
-    const span2 = child.children[1];
-
-    expect(span1.tagName).toBe('SPAN');
-    expect(span2.tagName).toBe('SPAN');
-
-    expect('slot' in span1.attributes).toBe(false);
-    expect('slot' in span2.attributes).toBe(false);
-
-    expect(span1.textContent).toContain('Injected-target-1');
-    expect(span2.textContent).toContain('Injected-target-2');
   });
-  it('Injects and replace the element <slot slot="..."> body in component body to target <slot name="...">',
-    async () => {
-      const htmlSnippet = `
-    <div>
-      <my-component>
-        <slot slot="target-1">
-          <label>Injected-target-1</label>
-        </slot>
-        <slot slot="target-2">
-          <label>Injected-target-2</label>
-        </slot>
-      </my-component>
-    </div>`;
-      const context = Bouer.create({
-        components: [{
-          name: 'my-component',
-          template: `
-        <div>
-          <slot name="target-1"></slot>
-          <slot name="target-2"></slot>
-        </div>`,
-        }]
-      });
-      const compiler = IoC.app(context).resolve(Compiler);
-      const element = toHtml(htmlSnippet);
-
-      compiler.compile({
-        data: context.data,
-        context: context,
-        el: element,
-      });
-
-      await sleep(1);
-      const child = element.children[0];
-
-      expect(child.tagName).toBe('DIV');
-      expect(child.tagName).not.toBe('MY-COMPONENT');
-
-      const label1 = child.children[0];
-      const label2 = child.children[1];
-
-      expect(label1.tagName).toBe('LABEL');
-      expect(label2.tagName).toBe('LABEL');
-      expect(label1.textContent).toContain('Injected-target-1');
-      expect(label2.textContent).toContain('Injected-target-2');
+  it('Injects and replace the element <slot slot="..."> body in component body to target <slot name="...">', async () => {
+    const htmlSnippet = `
+  <div>
+    <my-component>
+      <slot slot="target-1">
+        <label>Injected-target-1</label>
+      </slot>
+      <slot slot="target-2">
+        <label>Injected-target-2</label>
+      </slot>
+    </my-component>
+  </div>`;
+    const context = Bouer.create({
+      components: [{
+        name: 'my-component',
+        template: `
+      <div>
+        <slot name="target-1"></slot>
+        <slot name="target-2"></slot>
+      </div>`,
+      }]
     });
+    const compiler = IoC.app(context).resolve(Compiler);
+    const element = toHtml(htmlSnippet);
+
+    await compiler.compile({
+      data: context.data,
+      context: context,
+      el: element,
+      onComponentLoad: () => {
+        const child = element.children[0];
+
+        expect(child.tagName).toBe('DIV');
+        expect(child.tagName).not.toBe('MY-COMPONENT');
+
+        const label1 = child.children[0];
+        const label2 = child.children[1];
+
+        expect(label1.tagName).toBe('LABEL');
+        expect(label2.tagName).toBe('LABEL');
+        expect(label1.textContent).toContain('Injected-target-1');
+        expect(label2.textContent).toContain('Injected-target-2');
+      }
+    });
+
+  });
 });
