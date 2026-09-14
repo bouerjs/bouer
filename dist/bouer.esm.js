@@ -14,981 +14,7 @@ var Logger = (function Logger() {
     },
     warn(w) {
       console.warn(prefix, w);
-    },
-    info(i) {
-      console.info(prefix, i);
     }
-  };
-})();
-class ReactiveEvent {
-  static on(eventName, callback) {
-    if (isNull(this.events[eventName]))
-      this.events[eventName] = [];
-    this.events[eventName].push(callback);
-    return {
-      eventName: eventName,
-      callback: callback,
-      off: () => ReactiveEvent.off(eventName, callback)
-    };
-  }
-  static off(eventName, callback) {
-    const events = this.events[eventName] || [];
-    events.splice(events.indexOf(callback), 1);
-    return true;
-  }
-  static once(eventName, callback) {
-    const event = {};
-    const mEvent = ReactiveEvent.on(eventName, (descriptor) => {
-      if (event.onemit)
-        event.onemit(descriptor);
-    });
-    try {
-      callback(event);
-    } catch (error) {
-      Logger.error(buildError(error));
-    } finally {
-      ReactiveEvent.off(eventName, mEvent.callback);
-    }
-  }
-  static emit(eventName, descriptor) {
-    try {
-      forEach((this.events[eventName] || []), evt => evt(descriptor));
-    } catch (error) {
-      Logger.error(buildError(error));
-    }
-  }
-}
-ReactiveEvent.events = {};
-class Computed {
-  constructor(entryValue) {
-    this.entryValue = entryValue;
-    this.context = undefined; // To avoid errors
-  }
-  configure() {
-    if (this.$get || this.$set)
-      return {
-        get: this.$get,
-        set: this.$set
-      };
-    const entryValue = this.entryValue;
-    const isFunctionEntry = typeof entryValue === 'function';
-    const value = isFunctionEntry ?
-      entryValue.call(this.context) :
-      entryValue;
-    if (isNull(value))
-      throw new Error('Invalid value used as return in property ' + this.propName + ': “function $computed(){...}” | “new Computed(...)”.');
-    const isExplicit = isObject(value) && (('get' in value) || ('set' in value));
-    this.$get = ((isExplicit && 'get' in value) ? value.get : (function() {
-      return isFunctionEntry ? entryValue.call(this) : value;
-    })).bind(this.context);
-    this.$set = ((isExplicit && 'set' in value) ? value.set : (function(v) {})).bind(this.context);
-    return {
-      get: this.$get,
-      set: this.$set
-    };
-  }
-  __(options) {
-    this.context = options.context;
-    this.propName = options.propName;
-    this.srcObject = options.propSource;
-  }
-  get() {
-    return this.configure().get();
-  }
-  set(value) {
-    this.configure().set(value);
-  }
-}
-var Prop = (function Prop() {
-  return {
-    /**
-     * Sets a property to an object
-     * @param {object} obj the object to set the property
-     * @param {string} propName the property name to be set
-     * @param {object} descriptor the descriptor of the object
-     * @returns the object with the new property
-     */
-    set(obj, propName, descriptor) {
-      const _obj = obj;
-      // If the property is not defined
-      if (!(propName in _obj))
-        _obj[propName] = undefined;
-      return Object.defineProperty(obj, propName, descriptor);
-    },
-    /**
-     * Retrieves the descriptor of an property
-     * @param {object} obj the object where the descriptor will be retrieved
-     * @param {string} propName the property name
-     * @returns the property descriptor or undefined
-     */
-    descriptor(obj, propName) {
-      return Object.getOwnPropertyDescriptor(obj, propName);
-    },
-    /**
-     * Makes a deep copy of a property from an object to another
-     * @param {object} destination the destination object
-     * @param {object} source the source object
-     * @param {string} propName the property to be transfered
-     */
-    transfer(destination, source, propName) {
-      const setter = (prop) => {
-        const descriptor = this.descriptor(source, prop);
-        this.set(destination, propName, descriptor);
-      };
-      if (Array.isArray(propName)) {
-        propName.forEach(prop => setter(prop));
-        return;
-      }
-      setter(propName);
-    }
-  };
-})();
-class Watch {
-  /**
-   * Default constructor
-   * @param {object} descriptor the reactive descriptor instance
-   * @param {Function} callback the callback that will be called on change
-   * @param {object?} options watch options where the node and onDestroy function are provided
-   */
-  constructor(descriptor, callback, options) {
-    /**
-     * Destroys/Stop the watching process
-     */
-    this.destroy = () => {
-      const watchIndex = this.descriptor.watches.indexOf(this);
-      if (watchIndex !== -1)
-        this.descriptor.watches.splice(watchIndex, 1);
-      (this.onDestroy || (() => {}))();
-    };
-    this.descriptor = descriptor;
-    this.property = descriptor.propName;
-    this.callback = callback;
-    if (options) {
-      this.node = options.node;
-      this.onDestroy = options.onDestroy;
-    }
-  }
-}
-class Reactive {
-  /**
-   * Default constructor
-   * @param {object} options the options of the reactive instance
-   */
-  constructor(options) {
-    this._IRT_ = true;
-    this.watches = [];
-    this.get = (function get() {
-      ReactiveEvent.emit('BeforeGet', this);
-      const value = this.propValue;
-      ReactiveEvent.emit('AfterGet', this);
-      return value;
-    }).bind(this);
-    this.set = (function set(value) {
-      if (this.propValue === value || (Number.isNaN(this.propValue) && Number.isNaN(value)))
-        return;
-      this.propValueOld = this.propValue;
-      ReactiveEvent.emit('BeforeSet', this);
-      if (isObject(value) || Array.isArray(value)) {
-        // Checking the type
-        if (this.propValue != null && (typeof this.propValue) !== (typeof value))
-          return Logger.error(('Cannot set “' + (typeof value) + '” in “' +
-            this.propName + '” property.'));
-        // Checking if the value is null
-        if (isNull(this.propValue))
-          return;
-        // Transform if it is not an html element
-        if (this.propValue instanceof Node)
-          this.propValue = value;
-        else
-          Reactive.transform({
-            data: value,
-            descriptor: this,
-            context: this.context
-          });
-        if (Array.isArray(value))
-          this.propValue = value;
-        mapper(value, this.propValue);
-      } else {
-        this.propValue = value;
-      }
-      ReactiveEvent.emit('AfterSet', this);
-      this.notify();
-    }).bind(this);
-    this.propName = options.propName;
-    this.propSource = options.srcObject;
-    this.context = options.context;
-    // Setting the value of the property
-    this.baseDescriptor = Prop.descriptor(this.propSource, this.propName);
-    this.propValue = this.baseDescriptor.value;
-    const propValue = this.propValue;
-    const isFn = typeof propValue === 'function';
-    // If the value is a function, we bind it to the context
-    if (isFn)
-      this.propValue = propValue.bind(this.context);
-    const isComputed = isFn && propValue.name === '$computed' ||
-      propValue instanceof Computed;
-    if (isComputed) {
-      this.computed = isObject(propValue)
-        // If the value is an object, we assume it's a computed object
-        ?
-        propValue
-        // If the value is a function, we assume it's a computed function
-        :
-        new Computed(propValue);
-      // Adding the context
-      this.computed.__({
-        context: this.context,
-        propName: this.propName,
-        propSource: this.propSource
-      });
-      this.propValueOld = this.propValue;
-      this.propValue = undefined;
-      // PropValue interceptor
-      Prop.set(this, 'propValue', {
-        get: () => {
-          return fnCallResolver(this.computed.get());
-        },
-        set: (v) => {
-          if (isNull(this.computed.set))
-            return;
-          fnCallResolver(this.computed.set(v));
-        },
-      });
-    }
-  }
-  /**
-   * Force onChange callback calling
-   */
-  notify() {
-    const isObj = isObject(this.propValue);
-    // Running all the watches
-    forEach(this.watches, w => {
-      // Remapping the binding from the parents to the children properties
-      const reactiveEvent = isObj ? ReactiveEvent.on('AfterGet', descriptor => {
-        if (w.property === descriptor.propName)
-          return;
-        const parentWatch = w;
-        // If it's already bound, ignore
-        if (descriptor.watches.indexOf(parentWatch) != -1)
-          return;
-        // Assotiating the child property with the parent watch
-        descriptor.watches.push(w);
-      }) : {
-        off: () => {}
-      };
-      w.callback.call(this.context, this.propValue, this.propValueOld);
-      reactiveEvent.off();
-    });
-  }
-  /**
-   * Subscribe an event that should be performed on property value change
-   * @param {Function} callback the callback function that will be called
-   * @param {Node?} node the node that should be attached (Optional)
-   * @returns A watch instance object
-   */
-  onChange(callback, node) {
-    const w = new Watch(this, callback, {
-      node: node
-    });
-    this.watches.push(w);
-    return w;
-  }
-}
-/**
- * Tranform a Object Litertal to a an Object with reactive properties
- * @param {object} options the options for object transformation
- * @returns the object transformed
- */
-Reactive.transform = (options) => {
-  const context = options.context;
-  let tranformedData = new WeakSet();
-  const executer = (data, descriptor, keys) => {
-    if (Array.isArray(data)) {
-      if (descriptor == null) {
-        Logger.warn('Cannot transform this array to a reactive one because no reactive object was provided');
-        return data;
-      }
-      // Checking if the array has already been transformed
-      if (tranformedData.has(data))
-        return data;
-      tranformedData.add(data);
-      const REACTIVE_ARRAY_METHODS = ['push', 'pop', 'unshift', 'shift', 'splice'];
-      const inputArray = data;
-      const reference = {}; // Using clousure to cache the array methods
-      Object.setPrototypeOf(inputArray, Object.create(Array.prototype));
-      const prototype = Object.getPrototypeOf(inputArray);
-      forEach(REACTIVE_ARRAY_METHODS, method => {
-        // cache original method
-        reference[method] = inputArray[method].bind(inputArray);
-        // changing to the reactive one
-        prototype[method] = function reactive() {
-          const oldArrayValue = inputArray.slice();
-          const args = [].slice.call(arguments);
-          switch (method) {
-            case 'push':
-            case 'unshift':
-              forEach(toArray(args), (arg) => {
-                if (!isObject(arg) && !Array.isArray(arg))
-                  return;
-                executer(arg);
-              });
-          }
-          const result = reference[method].apply(inputArray, args);
-          forEach(descriptor.watches, watch => watch.callback.call(context, inputArray, oldArrayValue, {
-            method: method,
-            args: args
-          }));
-          return result;
-        };
-      });
-      return inputArray;
-    }
-    if (!isObject(data))
-      return data;
-    // Checking if the array has already been transformed
-    if (tranformedData.has(data))
-      return data;
-    tranformedData.add(data);
-    forEach(keys || Object.keys(data), key => {
-      const mInputObject = data;
-      // Already a reactive property, do nothing
-      if (!('value' in Prop.descriptor(data, key)))
-        return;
-      const propValue = mInputObject[key];
-      if ((propValue instanceof Object) && ((propValue._IRT_) || (propValue instanceof Node)))
-        return;
-      const descriptor = new Reactive({
-        propName: key,
-        srcObject: data,
-        context: context
-      });
-      Prop.set(data, key, descriptor);
-      // If the value is a computed object, do nothing
-      if (isObject(propValue) && propValue instanceof Computed)
-        return;
-      if (Array.isArray(propValue)) {
-        executer(propValue, descriptor); // Transform the array to a reactive one
-        forEach(propValue, (item) => executer(item));
-      } else if (isObject(propValue))
-        executer(propValue);
-    });
-    return data;
-  };
-  executer(options.data, options.descriptor, options.keys);
-  tranformedData = new WeakSet();
-  return options.data;
-};
-class Ref {
-  constructor(value) {
-    this._IRT_ = true;
-    this.value = value;
-    this.name = undefined;
-    this.context = undefined;
-  }
-  get() {
-    return this.value;
-  }
-  set(value) {
-    this.value = value;
-  }
-  __(...args) {
-    if (args.length == 0)
-      return;
-    this.name = args[0];
-    this.context = args[1];
-    if (this.name == undefined || this.context == undefined)
-      return;
-    Reactive.transform({
-      context: this.context,
-      keys: ['value'],
-      data: this
-    });
-  }
-}
-// Quotes “'+  +'”
-function webRequest(url, options) {
-  if (!url)
-    return Promise.reject(new Error('Invalid Url'));
-  const createXhr = (method) => {
-    if (DOM.documentMode && (!method.match(/^(get|post)$/i) || !WIN.XMLHttpRequest)) {
-      return new WIN.ActiveXObject('Microsoft.XMLHTTP');
-    } else if (WIN.XMLHttpRequest) {
-      return new WIN.XMLHttpRequest();
-    }
-    throw new Error('This browser does not support XMLHttpRequest.');
-  };
-  const getOption = (key, mDefault) => {
-    const mOptions = (options || {});
-    const value = mOptions[key];
-    if (value)
-      return value;
-    return mDefault;
-  };
-  const headers = getOption('headers', {});
-  const method = getOption('method', 'get');
-  const body = getOption('body', undefined);
-  const beforeSend = getOption('body', (xhr) => {});
-  const xhr = createXhr(method);
-  return new Promise((resolve, reject) => {
-    const createResponse = (mFunction, ok, status, xhr, response) => {
-      mFunction({
-        url: url,
-        ok: ok,
-        status: status,
-        statusText: xhr.statusText || '',
-        headers: xhr.getAllResponseHeaders(),
-        json: () => Promise.resolve(JSON.stringify(response)),
-        text: () => Promise.resolve(response)
-      });
-    };
-    xhr.open(method, url, true);
-    forEach(Object.keys(headers), key => {
-      xhr.setRequestHeader(key, headers[key]);
-    });
-    xhr.onload = () => {
-      const response = ('response' in xhr) ? xhr.response : xhr.responseText;
-      let status = xhr.status === 1223 ? 204 : xhr.status;
-      if (status === 0)
-        status = response ? 200 : urlResolver(url).protocol === 'file' ? 404 : 0;
-      createResponse(resolve, (status >= 200 && status < 400), status, xhr, response);
-    };
-    xhr.onerror = () => {
-      createResponse(reject, false, xhr.status, xhr, '');
-    };
-    xhr.onabort = () => {
-      createResponse(reject, false, xhr.status, xhr, '');
-    };
-    xhr.ontimeout = () => {
-      createResponse(reject, false, xhr.status, xhr, '');
-    };
-    beforeSend(xhr);
-    xhr.send(body);
-  });
-}
-
-function code(len, prefix, sufix) {
-  const alpha = '01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  let out = '';
-  let lowerAlt = false;
-  for (let i = 0; i < (len || 8); i++) {
-    const pos = Math.floor(Math.random() * alpha.length);
-    out += lowerAlt ? toLower(alpha[pos]) : alpha[pos];
-    lowerAlt = !lowerAlt;
-  }
-  return ((prefix || '') + out + (sufix || ''));
-}
-
-function isNull(input) {
-  return (typeof input === 'undefined') || (input === undefined || input === null);
-}
-
-function isObject(input) {
-  return (typeof input === 'object') && (String(input) === '[object Object]');
-}
-
-function isFilledObj(input) {
-  if (isEmptyObject(input))
-    return false;
-  let oneFilledField = false;
-  const arrayObject = Object.keys(input);
-  for (let index = 0; index < arrayObject.length; index++) {
-    if (!isNull(arrayObject[index])) {
-      oneFilledField = true;
-      break;
-    }
-  }
-  return oneFilledField;
-}
-
-function isPrimitive(input) {
-  return (typeof input === 'string' ||
-    typeof input === 'number' ||
-    typeof input === 'symbol' ||
-    typeof input === 'boolean');
-}
-
-function isString(input) {
-  return (typeof input !== 'undefined') && (typeof input === 'string');
-}
-
-function isEmptyObject(input) {
-  if (!input || !isObject(input))
-    return true;
-  return Object.keys(input).length === 0;
-}
-
-function isFunction(input) {
-  return typeof input === 'function';
-}
-
-function isRef(input) {
-  return input instanceof Ref && typeof input.__ === 'function';
-}
-
-function isComputed(input) {
-  return input instanceof Computed && typeof input.__ === 'function';
-}
-
-function ifNullReturn(v, _return) {
-  return isNull(v) ? _return : v;
-}
-
-function ifNullStop(el) {
-  if (isNull(el))
-    throw new Error('Application is not initialized');
-  return el;
-}
-
-function trim(value) {
-  return value ? value.trim() : value;
-}
-
-function startWith(value, pattern) {
-  return (value.substring(0, pattern.length) === pattern);
-}
-
-function toLower(str) {
-  return str.toLowerCase();
-}
-
-function toPascalCase(value) {
-  return value[0].toUpperCase() + value.substring(1);
-}
-
-function toStr(input) {
-  if (isPrimitive(input)) {
-    return String(input);
-  } else if (isObject(input) || Array.isArray(input)) {
-    return JSON.stringify(input);
-  } else if (isFunction(input.toString)) {
-    return input.toString();
-  } else {
-    return String(input);
-  }
-}
-
-function forEach(iterable, callback, context) {
-  for (let i = 0; i < iterable.length; i++) {
-    callback.call(context, iterable[i], i);
-  }
-}
-
-function where(iterable, callback, context) {
-  const out = [];
-  for (let i = 0; i < iterable.length; i++) {
-    if (callback.call(context, iterable[i], i)) {
-      out.push(iterable[i]);
-    }
-  }
-  return out;
-}
-
-function findOneBy(iterable, callback, context) {
-  for (let i = 0; i < iterable.length; i++) {
-    if (callback.call(context, iterable[i], i)) {
-      return iterable[i];
-    }
-  }
-  return null;
-}
-
-function toArray(array) {
-  if (!array)
-    return [];
-  return [].slice.call(array);
-}
-
-function createComment(id, content) {
-  const comment = DOM.createComment(content || ' e ');
-  comment.id = id || code(8);
-  return comment;
-}
-
-function createEl(elName, callback) {
-  const el = DOM.createElement(elName);
-  if (isFunction(callback))
-    callback(el, DOM);
-  const returnObj = {
-    appendTo: (target) => {
-      target.appendChild(el);
-      return returnObj;
-    },
-    build: () => el,
-    child: () => el.children[0],
-    children: () => [].slice.call(el.childNodes),
-  };
-  return returnObj;
-}
-
-function removeEl(el) {
-  const parent = el.parentNode;
-  if (parent)
-    parent.removeChild(el);
-}
-
-function mapper(source, destination) {
-  let map = new WeakSet();
-
-  function walker(source, destination) {
-    if (map.has(source))
-      return;
-    map.add(source);
-    forEach(Object.keys(source), key => {
-      const sourceValue = source[key];
-      // If the key already in the destination, set
-      if ((key in destination)) {
-        // If the source value is an object
-        if (isObject(sourceValue)) {
-          return walker(sourceValue, destination[key]);
-        }
-        // Set the value directly to allow reactive
-        return destination[key] = sourceValue;
-      }
-      Prop.transfer(destination, source, key);
-    });
-  }
-  walker(source, destination);
-  map = new WeakSet();
-}
-
-function urlResolver(url) {
-  let href = url;
-  // Support: IE 9-11 only, /* doc.documentMode is only available on IE */
-  if ('documentMode' in DOM) {
-    ANCHOR.setAttribute('href', href);
-    href = ANCHOR.href;
-  }
-  ANCHOR.href = href;
-  let hostname = ANCHOR.hostname;
-  const ipv6InBrackets = ANCHOR.hostname === '[::1]';
-  if (!ipv6InBrackets && hostname.indexOf(':') > -1)
-    hostname = '[' + hostname + ']';
-  const $return = {
-    href: ANCHOR.href,
-    baseURI: ANCHOR.baseURI,
-    protocol: ANCHOR.protocol ? ANCHOR.protocol.replace(/:$/, '') : '',
-    host: ANCHOR.host,
-    search: ANCHOR.search ? ANCHOR.search.replace(/^\?/, '') : '',
-    hash: ANCHOR.hash ? ANCHOR.hash.replace(/^#/, '') : '',
-    hostname: hostname,
-    port: ANCHOR.port,
-    pathname: (ANCHOR.pathname.charAt(0) === '/') ? ANCHOR.pathname : '/' + ANCHOR.pathname,
-    origin: ''
-  };
-  $return.origin = $return.protocol + '://' + $return.host;
-  return $return;
-}
-
-function urlCombine(base, ...parts) {
-  const baseSplitted = base.split(/\/\//);
-  const protocol = baseSplitted.length > 1 ? (baseSplitted[0] + '//') : '';
-  const uriRemain = protocol === '' ? baseSplitted[0] : baseSplitted[1];
-  const uriRemainParts = uriRemain.split(/\//);
-  const partsToJoin = [];
-  forEach(uriRemainParts, p => trim(p) ? partsToJoin.push(p) : null);
-  forEach(parts, part => forEach(part.split(/\//), p => trim(p) ? partsToJoin.push(p) : null));
-  return protocol + partsToJoin.join('/');
-}
-/**
- * Relative path resolver
- * @param { string } relative the path of the actual path
- * @param { string } path the actual path
- * @returns { string } path with ./resolved-path
- */
-function pathResolver(relative, path) {
-  const isCurrentDir = (v) => v.substring(0, 2) === './';
-  const isParentDir = (v) => v.substring(0, 3) === '../';
-  const toDirPath = (v) => {
-    const values = v.split('/');
-    if (/\.html$|\.css$|\.js$/gi.test(v))
-      values.pop();
-    return {
-      relative: values.join('/'),
-      parts: values
-    };
-  };
-  if (isCurrentDir(path))
-    return toDirPath(relative).relative + path.substring(1);
-  if (!isParentDir(path))
-    return path;
-  const parts = toDirPath(relative).parts;
-  parts.push((function pathLookUp(value) {
-    if (!isParentDir(value))
-      return value;
-    parts.pop();
-    return pathLookUp(value.substring(3));
-  })(path));
-  return parts.join('/');
-}
-
-function buildError(error) {
-  if (!error)
-    return 'Unknown Error';
-  error.stack = '';
-  return error;
-}
-
-function $default(input, ...remains) {
-  return input;
-}
-
-function fnCallResolver(fn, cb) {
-  let fnValue = fn;
-  if (isNull(fnValue))
-    return fnValue;
-  cb = cb || $default;
-  if (typeof fnValue === 'function')
-    fnValue = fn();
-  if (!(fnValue instanceof Promise))
-    return fnValue;
-  if (fnValue instanceof Promise) {
-    fnValue.then(value => {
-      if (typeof cb === 'function')
-        cb(value);
-      return value;
-    });
-  }
-  cb(fnValue);
-  return fnValue;
-}
-
-function findAttribute(element, attrs, removeIfFound = false) {
-  let res = null;
-  if (!element)
-    return null;
-  for (let i = 0; i < attrs.length; i++)
-    if (res = element.attributes[attrs[i]])
-      break;
-  if (!isNull(res) && removeIfFound)
-    element.removeAttribute(res.name);
-  return res;
-}
-
-function findDirective(node, name) {
-  const attributes = node.attributes || [];
-  return attributes.getNamedItem(name) ||
-    toArray(attributes).find((attr) => (attr.name === name || startWith(attr.name, name + ':')));
-}
-
-function getRootElement(el) {
-  return el.root || el;
-}
-
-function setData(context, inputData, targetObject) {
-  if (isNull(targetObject))
-    targetObject = context.data;
-  if (!isObject(inputData)) {
-    Logger.error('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".');
-    return targetObject;
-  }
-  if (isObject(targetObject) && targetObject == null) {
-    Logger.error('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".');
-    return inputData;
-  }
-  // Transforming the input
-  Reactive.transform({
-    data: inputData,
-    context: context
-  });
-  // Transfering the properties
-  forEach(Object.keys(inputData), key => {
-    let source;
-    let destination;
-    ReactiveEvent.once('AfterGet', evt => {
-      evt.onemit = descriptor => source = descriptor;
-      Prop.descriptor(inputData, key).get();
-    });
-    ReactiveEvent.once('AfterGet', evt => {
-      evt.onemit = descriptor => destination = descriptor;
-      const desc = Prop.descriptor(targetObject, key);
-      if (desc && isFunction(desc.get))
-        desc.get();
-    });
-    Prop.transfer(targetObject, inputData, key);
-    if (!destination || !source)
-      return;
-    // Adding the previous watches to the property that is being set
-    forEach(destination.watches, watch => {
-      if (source.watches.indexOf(watch) === -1)
-        source.watches.push(watch);
-    });
-    // Notifying the bounds and watches
-    source.notify();
-  });
-  return targetObject;
-}
-
-function $computed(entryValue) {
-  return new Computed(entryValue);
-}
-
-function toOwnerNode(node) {
-  return node.ownerElement || node.parentNode;
-}
-
-function errorMsgEmptyNode(node) {
-  return ('Expected an expression in “' + node.nodeName +
-    '” and got an <empty string>.');
-}
-
-function errorMsgNodeValue(node) {
-  return ('Expected an expression in “' + node.nodeName +
-    '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
-}
-const WIN = window;
-const DOM = document;
-const ANCHOR = createEl('a').build();
-class DelimiterHandler {
-  constructor(bouer, delimiters) {
-    this.delimiters = [];
-    this.bouer = bouer;
-    this.delimiters = delimiters;
-  }
-  add(item) {
-    this.delimiters.push(item);
-  }
-  remove(name) {
-    const index = this.delimiters.findIndex(item => item.name === name);
-    this.delimiters.splice(index, 1);
-  }
-  run(content) {
-    if (isNull(content) || trim(content) === '')
-      return [];
-    let mDelimiter = null;
-    const checkContent = (text, flag) => {
-      const center = '([\\S\\s]*?)';
-      for (let i = 0; i < this.delimiters.length; i++) {
-        const item = this.delimiters[i];
-        const result = text.match(new RegExp(item.delimiter.open + center + item.delimiter.close, flag || ''));
-        if (result) {
-          mDelimiter = item;
-          return result;
-        }
-      }
-    };
-    const result = checkContent(content, 'g');
-    if (!result)
-      return [];
-    return result.map(item => {
-      const matches = checkContent(item);
-      const delimiterField = matches[0];
-      const delimiterExpression = matches[1];
-      // Composing the expression: price | currency:$ -> [ price, currency:$ ]
-      const expressionComposed = delimiterExpression.trim().split(' | ').map(e => trim(e));
-      // Extracting the field only
-      const expression = expressionComposed.shift();
-      // Builing the pipes structure
-      const pipes = expressionComposed.map(e => {
-        // currency:$ -> currency [ $ ]
-        const args = e.split(':');
-        const fn = args.shift();
-        return {
-          fn: fn,
-          args: args
-        };
-      });
-      return {
-        field: delimiterField,
-        expression: trim(expression),
-        delimiter: mDelimiter,
-        pipes: pipes
-      };
-    });
-  }
-  shorthand(attrName) {
-    if (isNull(attrName) || trim(attrName) === '')
-      return null;
-    const match = attrName.match(new RegExp('{([\\w{$,-}]*?)}'));
-    if (!match)
-      return null;
-    return this.run('{{' + trim(match[1]) + '}}')[0];
-  }
-}
-var Extend = (function Extend() {
-  const obj = (...args) => {
-    const out = {};
-    forEach(args, arg => {
-      if (isNull(arg))
-        return;
-      forEach(Object.keys(arg), key => {
-        Prop.transfer(out, arg, key);
-      });
-    });
-    return out;
-  };
-  const mixin = (out, ...args) => {
-    // Props to mix with out object
-    const props = obj.apply({}, args);
-    forEach(Object.keys(props), key => {
-      const hasOwnProp = key in out;
-      Prop.transfer(out, props, key);
-      if (hasOwnProp) {
-        const mOut = out;
-        mOut[key] = $default(mOut[key]);
-      }
-    });
-    return out;
-  };
-  const array = (...args) => {
-    const out = [];
-    forEach(args, arg => {
-      if (isNull(arg))
-        return;
-      if (!Array.isArray(arg))
-        return out.push(arg);
-      forEach(Object.keys(arg), (key) => {
-        const value = arg[key];
-        if (isNull(value))
-          return;
-        if (Array.isArray(value))
-                    [].push.apply(out, value);
-        else
-          out.push(value);
-      });
-    });
-    return out;
-  };
-  const matcher = (t1, t2) => {
-    const exec = (src, dst) => {
-      forEach(Object.keys(src), key => {
-        if (key in dst)
-          return;
-        const hasOwnProp = key in src;
-        Prop.transfer(dst, src, key);
-        if (hasOwnProp) {
-          src[key] = $default(src[key]);
-        }
-      });
-    };
-    exec(t1, t2);
-    exec(t2, t1);
-  };
-  return {
-    /**
-     * Combines different object into a new one
-     * @param {object} args Objects to be combined
-     * @returns A new object having the properties of all the objects
-     */
-    obj,
-    /**
-     * Adds properties to the first object provided
-     * @param {object} out the object that should be added all the properties from the other one
-     * @param {object} args the objects where the properties should be extracted from
-     * @returns the first object with all the new properties added on
-     */
-    mixin,
-    /**
-     * Combines different arrays into a new one
-     * @param {object} args arrays to be combined
-     * @returns a new arrat having the items of all the arrays
-     */
-    array,
-    /**
-     * transfers the props of first object to the second and the seconds to the first
-     * @param {object} t1 the first object
-     * @param {object} t2 the second object
-     */
-    matcher,
   };
 })();
 class Evaluator {
@@ -1025,149 +51,14 @@ class Evaluator {
     }
   }
 }
-const Constants = {
-  skip: 'e-skip',
-  if: 'e-if',
-  elseif: 'e-else-if',
-  else: 'e-else',
-  show: 'e-show',
-  req: 'e-req',
-  for: 'e-for',
-  form: {
-    property: 'e-form',
-    schema: 'e-schema',
-    build: 'e-build',
-    abuild: 'e-build:array',
-    array: 'e-array',
-  },
-  data: 'data',
-  def: 'e-def',
-  wait: 'wait-data',
-  text: 'e-text',
-  bind: 'e-bind',
-  property: 'e-',
-  skeleton: 'e-skeleton',
-  route: 'route-view',
-  href: ':href',
-  entry: 'e-entry',
-  on: 'on:',
-  silent: '--s',
-  slot: 'slot',
-  ref: 'ref',
-  put: 'e-put',
-  builtInEvents: {
-    add: 'add',
-    compile: 'compile',
-    request: 'request',
-    response: 'response',
-    fail: 'fail',
-    done: 'done',
-  },
-  check(node, cmd) {
-    if (node.nodeName in {
-        [this.form.schema]: 1,
-        'e-build': 1,
-        'e-build:array': 1,
-        'e-array': 1
-      })
-      return false;
-    return startWith(node.nodeName, cmd);
-  }
-};
-class Skeleton {
-  constructor(bouer) {
-    this._IRT_ = true;
-    this.backgroudColor = '';
-    this.waveColor = '';
-    this.defaultBackgroudColor = '#E2E2E2';
-    this.defaultWaveColor = '#ffffff5d';
-    this.identifier = 'bouer';
-    this.numberOfItems = 1;
-    this.reset();
-    this.bouer = bouer;
-    this.style = createEl('style', el => el.id = this.identifier).build();
-  }
-  reset() {
-    this.backgroudColor = this.defaultBackgroudColor;
-    this.waveColor = this.defaultWaveColor;
-  }
-  init(color) {
-    if (!this.style)
-      return;
-    if (!DOM.getElementById(this.identifier))
-      DOM.head.appendChild(this.style);
-    if (!this.style.sheet)
-      return;
-    for (let i = 0; i < this.style.sheet.cssRules.length; i++)
-      this.style.sheet.deleteRule(i);
-    if (color) {
-      this.backgroudColor = color.background || this.defaultBackgroudColor;
-      this.waveColor = color.wave || this.defaultWaveColor;
-      this.numberOfItems = color.numberOfItems || this.numberOfItems;
-    } else {
-      this.reset();
-    }
-    const dir = Constants.skeleton;
-    const bgc = this.backgroudColor;
-    const wvc = this.waveColor;
-    const rules = [
-            '[--s]{ display: none!important; }',
-            '[' + dir + '] { background-color: ' + bgc + '!important; position: relative!important; overflow: hidden; }',
-            '[' + dir + '],[' + dir + '] * { color: transparent!important; }',
-            '[' + dir + ']::before, [' + dir + ']::after { content: ""; position: absolute; top: 0; left: 0; right: 0; ' +
-                'bottom: 0; display: block; }',
-            '[' + dir + ']::before { background-color: ' + bgc + '!important; z-index: 1;}',
-            '[' + dir + ']::after { transform: translateX(-100%); background: linear-gradient(90deg, transparent, ' + wvc +
-                ', transparent); animation: loading 1.5s infinite; z-index: 2; }',
-            '@keyframes loading { 100% { transform: translateX(100%); } }',
-            '@-webkit-keyframes loading { 100% { transform: translateX(100%); } }'
-        ];
-    forEach(rules, rule => this.style.sheet.insertRule(rule));
-    this.style.innerText = rules.join(' ');
-  }
-  insertItems(node) {
-    const parentNode = node.parentElement || node.parentNode;
-    const mNode = node;
-    if (parentNode == null)
-      return;
-    if (this.numberOfItems <= 1)
-      return;
-    if (!mNode.hasAttribute('e-skeleton') && isNull(mNode.querySelector('[e-skeleton]')))
-      return;
-    const uid = code(6);
-    node.setAttribute('skeleton-clone-code', uid);
-    for (let i = 0; i < (this.numberOfItems - 1); i++) {
-      const cloned = node.cloneNode(true);
-      cloned.setAttribute('skeleton-cloned', uid);
-      parentNode.insertBefore(cloned, node);
-    }
-  }
-  clearItems(node) {
-    const mNode = node;
-    const container = (node.parentElement || node.parentNode);
-    const uid = mNode.getAttribute('skeleton-clone-code');
-    if (!uid)
-      return;
-    mNode.removeAttribute('skeleton-clone-code');
-    forEach([].slice.call(container.querySelectorAll('[skeleton-cloned="' + uid + '"]')), node => {
-      container.removeChild(node);
-    });
-  }
-  clear(id) {
-    id = (id ? ('="' + id + '"') : '');
-    const appEl = ifNullStop(this.bouer.el);
-    const skeletons = toArray(appEl.querySelectorAll('[' + Constants.skeleton + id + ']'));
-    forEach(skeletons, (el) => el.removeAttribute(Constants.skeleton));
-  }
-}
 /**
  * It's a **Service Provider** container with all the services that will be used in the application.
  */
-var IoC = (function IoC() {
+const IoC = (function() {
   let bouerId = 1;
-  const globalApp = {
+  const global = $default({
     isDestroyed: false
-  };
+  });
   const serviceCollection = new WeakMap();
   const add = (app, ctor, params, isSingleton) => {
     if (app.isDestroyed)
@@ -1181,57 +72,57 @@ var IoC = (function IoC() {
       args: params
     });
   };
-  const resolve = (app, clazz) => {
+  const resolve = (app, ctor) => {
+    var _a;
     if (app.isDestroyed)
       throw new Error('Application already disposed.');
     const collection = serviceCollection.get(app);
     if (!collection)
-      return null;
-    const service = collection.get(clazz);
+      return undefined;
+    const service = collection.get(ctor);
     if (service == null)
-      return null;
-    if (service.isSingleton) {
-      if (service.instance)
-        return service.instance;
-      // Otherwise, creates the singleton instance
-      return service.instance = newInstance(clazz, service.args, app);
-    }
-    return newInstance(clazz, service.args, app);
+      return undefined;
+    if (!service.isSingleton)
+      return newInstance(ctor, service.args, app);
+    if (service.instance)
+      return service.instance;
+    // Otherwise, creates the singleton instance
+    return ((_a = service.instance) !== null && _a !== void 0 ? _a : (service.instance = newInstance(ctor, service.args, app)));
   };
   /**
    * Creates a new instance of a class provided
-   * @param clazz the class that the new instance should be created
+   * @param ctor the class that the new instance should be created
    * @param params the parameter list that will be injected in the constructor
    * @returns new intance of the class provided
    */
-  const newInstance = (clazz, params, app) => {
+  const newInstance = (ctor, params, app) => {
     const paramsToProvide = [];
-    const mParams = params || [];
+    const $params = params || [];
     const data = {
-      __ctor0: clazz
+      __ctor0: ctor
     };
     // Looping all the provided params of the class constructor
-    forEach(mParams, (paramValue, index) => {
+    filter($params, (param, index) => {
       // Creating a unique name for the argument
       const paramName = '__arg' + index;
-      const paramValueAsAny = paramValue;
       // If the param is a class
       // eslint-disable-next-line no-prototype-builtins
-      if (paramValue && paramValueAsAny.hasOwnProperty('prototype')) {
+      if (param && param.hasOwnProperty('prototype')) {
         if (app) {
-          const paramInstance = resolve(app, paramValueAsAny);
-          if (!isNull(paramValueAsAny)) {
-            paramValue = paramInstance;
+          const localInstance = resolve(app, param);
+          const globalInstance = (!localInstance && app != global) ? resolve(global, param) : localInstance;
+          if (!isNull(param)) {
+            param = localInstance || globalInstance;
           } else {
-            Logger.warn('Could not create an instance of ' + paramValueAsAny.name || paramValueAsAny +
-              '. Make sure it is added as a service in IoC[.app].add(Service).');
+            Logger.warn('Could not create an instance of ' + param.name || param +
+              '. Make sure it is added as a service in IoC[.app(Bouer)].add(Service).');
           }
         } else {
-          paramValue = null;
+          param = null;
         }
       }
       // Setting the param name and value
-      data[paramName] = paramValue;
+      data[paramName] = param;
       // Adding the unique name
       paramsToProvide.push(paramName);
     });
@@ -1240,12 +131,12 @@ var IoC = (function IoC() {
       code: 'new __ctor0(' + paramsToProvide.join(',') + ')',
       data: data,
       returnable: true
-    });
+    }) || undefined;
   };
   const clear = (app) => {
     return serviceCollection.delete(app);
   };
-  return {
+  const methods = {
     /**
      * Adds a service to generic app
      * @param ctor the service that should be resolved future on
@@ -1253,7 +144,7 @@ var IoC = (function IoC() {
      * @param isSingleton mark the service as singleton to avoid creating an instance whenever it's requested
      */
     add(ctor, params, isSingleton) {
-      return add(globalApp, ctor, (params || []), isSingleton);
+      return add(global, ctor, (params || []), isSingleton);
     },
     /**
      * Resolves the Service with all it's dependencies
@@ -1261,7 +152,7 @@ var IoC = (function IoC() {
      * @returns the instance of the class resolved
      */
     resolve(ctor) {
-      return resolve(globalApp, ctor);
+      return resolve(global, ctor);
     },
     /**
      * Defines the bouer app containing all the services that needs to be provided in this app
@@ -1306,7 +197,7 @@ var IoC = (function IoC() {
     new(ctor, params, app) {
       if (ctor instanceof Bouer) {
         Logger.error('Cannot create an instance of Bouer using IoC');
-        return null;
+        return undefined;
       }
       return newInstance(ctor, (params || []), app);
     },
@@ -1316,9 +207,805 @@ var IoC = (function IoC() {
      */
     newId() {
       return bouerId++;
-    }
+    },
+    global
   };
+  return methods;
 })();
+class Watch {
+  /**
+   * Default constructor
+   * @param {object} descriptor the reactive descriptor instance
+   * @param {Function} callback the callback that will be called on change
+   * @param {object?} options watch options where the node and onDestroy function are provided
+   */
+  constructor(descriptor, callback, options) {
+    /**
+     * Destroys/Stop the watching process
+     */
+    this.destroy = () => {
+      const watchIndex = this.descriptor.watches.indexOf(this);
+      if (watchIndex !== -1)
+        this.descriptor.watches.splice(watchIndex, 1);
+      (this.onDestroy || (() => {}))();
+    };
+    this.descriptor = descriptor;
+    this.property = descriptor.$name;
+    this.callback = callback;
+    if (options) {
+      this.node = options.node;
+      this.onDestroy = options.onDestroy;
+    }
+  }
+}
+
+function isComputed(input) {
+  return input instanceof Computed && '_' in input && typeof input._ === 'function';
+}
+class Computed {
+  constructor(entryValue) {
+    this.entry = entryValue;
+    this.context = undefined; // To avoid errors
+    Property.set(this, '_', {
+      configurable: false,
+      enumerable: false,
+      value: (options) => {
+        this.context = options.context;
+        this.name = options.propName;
+        this.source = options.propSource;
+      }
+    });
+  }
+  configure() {
+    if (this.$get || this.$set)
+      return {
+        get: this.$get,
+        set: this.$set
+      };
+    const entry = this.entry;
+    const isFnEntry = typeof entry === 'function';
+    const value = isFnEntry ?
+      entry.call(this.context) :
+      entry;
+    if (isNull(value))
+      throw new Error('Invalid value used as return in property ' + this.name + ': “function $computed(){...}” | “$computed({...})”.');
+    const isExplicit = isObject(value) && (('get' in value) || ('set' in value));
+    this.$get = ((isExplicit && 'get' in value) ? value.get : (function() {
+      return isFnEntry ? entry.call(this) : value;
+    })).bind(this.context);
+    this.$set = ((isExplicit && 'set' in value) ? value.set : (function(v) {})).bind(this.context);
+    return {
+      get: this.$get,
+      set: this.$set
+    };
+  }
+  get() {
+    return this.configure().get();
+  }
+  set(value) {
+    this.configure().set(value);
+  }
+}
+
+function $computed(entryValue) {
+  return new Computed(entryValue);
+}
+class ReactiveEvent {
+  static on(eventName, callback) {
+    if (isNull(this.events[eventName]))
+      this.events[eventName] = [];
+    this.events[eventName].push(callback);
+    return {
+      eventName: eventName,
+      callback: callback,
+      off: () => ReactiveEvent.off(eventName, callback)
+    };
+  }
+  static off(eventName, callback) {
+    const events = this.events[eventName] || [];
+    events.splice(events.indexOf(callback), 1);
+    return true;
+  }
+  static once(eventName, callback) {
+    const event = {};
+    const mEvent = ReactiveEvent.on(eventName, (descriptor) => {
+      if (event.onemit)
+        event.onemit(descriptor);
+    });
+    try {
+      callback(event);
+    } catch (error) {
+      Logger.error(buildError(error));
+    } finally {
+      ReactiveEvent.off(eventName, mEvent.callback);
+    }
+  }
+  static emit(eventName, descriptor) {
+    try {
+      filter((this.events[eventName] || []), evt => evt(descriptor));
+    } catch (error) {
+      Logger.error(buildError(error));
+    }
+  }
+}
+ReactiveEvent.events = {};
+class ReactivePropertyDescriptor {
+  /**
+   * Default constructor
+   * @param {object} options the options of the reactive instance
+   */
+  constructor(options) {
+    this.watches = [];
+    this.get = (function get() {
+      ReactiveEvent.emit('BeforeGet', this);
+      const value = this.$value;
+      ReactiveEvent.emit('AfterGet', this);
+      return value;
+    }).bind(this);
+    this.set = (function set(value) {
+      if (this.$value === value || (Number.isNaN(this.$value) && Number.isNaN(value)))
+        return;
+      this.$valueOld = this.$value;
+      ReactiveEvent.emit('BeforeSet', this);
+      if (isObject(value) || Array.isArray(value)) {
+        // Checking the type
+        if (this.$value != null && (typeof this.$value) !== (typeof value))
+          return Logger.error(('Cannot set “' + (typeof value) + '” in “' +
+            this.$name + '” property.'));
+        // Checking if the value is null
+        if (isNull(this.$value))
+          return;
+        // Transform if it is not an html element
+        if (this.$value instanceof Node)
+          this.$value = value;
+        else
+          ReactivePropertyDescriptor.transform({
+            data: value,
+            descriptor: this,
+            context: this.context
+          });
+        if (Array.isArray(value))
+          this.$value = value;
+        mapper(value, this.$value);
+      } else {
+        this.$value = value;
+      }
+      ReactiveEvent.emit('AfterSet', this);
+      this.notify();
+    }).bind(this);
+    $internal(this);
+    this.$name = options.propName;
+    this.source = options.srcObject;
+    this.context = options.context;
+    // Setting the value of the property
+    this.base = Property.descriptor(this.source, this.$name);
+    this.$value = this.base.value;
+    const propValue = this.$value;
+    const isFn = typeof propValue === 'function';
+    // If the value is a function, we bind it to the context
+    if (isFn)
+      this.$value = propValue.bind(this.context);
+    const isComputed = isFn && propValue.name === '$computed' ||
+      propValue instanceof Computed;
+    if (isComputed) {
+      this.computed = isObject(propValue)
+        // If the value is an object, we assume it's a computed object
+        ?
+        propValue
+        // If the value is a function, we assume it's a computed function
+        :
+        new Computed(propValue);
+      // Adding the context
+      const init = '_' in this.computed ? this.computed._ : $default;
+      init({
+        context: this.context,
+        propName: this.$name,
+        propSource: this.source
+      });
+      this.$valueOld = this.$value;
+      this.$value = undefined;
+      // Intercepting $value
+      Property.set(this, '$value', {
+        get: () => {
+          return fnCallResolver(this.computed.get());
+        },
+        set: (v) => {
+          if (!this.computed.set)
+            return;
+          fnCallResolver(this.computed.set(v));
+        },
+      });
+    }
+  }
+  /**
+   * Force onChange callback calling
+   */
+  notify() {
+    const isObj = isObject(this.$value);
+    // Running all the watches
+    filter(this.watches, w => {
+      // Remapping the binding from the parents to the children properties
+      const reactiveEvent = isObj ? ReactiveEvent.on('AfterGet', descriptor => {
+        if (w.property === descriptor.$name)
+          return;
+        const parentWatch = w;
+        // If it's already bound, ignore
+        if (descriptor.watches.indexOf(parentWatch) != -1)
+          return;
+        // Assotiating the child property with the parent watch
+        descriptor.watches.push(w);
+      }) : {
+        off: () => {}
+      };
+      w.callback.call(this.context, this.$value, this.$valueOld);
+      reactiveEvent.off();
+    });
+  }
+  /**
+   * Subscribe an event that should be performed on property value change
+   * @param {Function} callback the callback function that will be called
+   * @param {Node?} node the node that should be attached (Optional)
+   * @returns A watch instance object
+   */
+  onChange(callback, node) {
+    const w = new Watch(this, callback, {
+      node: node
+    });
+    this.watches.push(w);
+    return w;
+  }
+}
+/**
+ * Tranform a Object Litertal to a an Object with reactive properties
+ * @param {object} options the options for object transformation
+ * @returns the object transformed
+ */
+ReactivePropertyDescriptor.transform = (options) => {
+  const context = options.context;
+  let tranformedData = new WeakSet();
+  const executer = (data, descriptor, keys) => {
+    if (Array.isArray(data)) {
+      if (descriptor == null) {
+        Logger.warn('Cannot transform this array to a reactive one because no reactive object was provided');
+        return data;
+      }
+      // Checking if the array has already been transformed
+      if (tranformedData.has(data))
+        return data;
+      tranformedData.add(data);
+      const REACTIVE_ARRAY_METHODS = ['push', 'pop', 'unshift', 'shift', 'splice'];
+      const inputArray = data;
+      const reference = {}; // Using clousure to cache the array methods
+      Object.setPrototypeOf(inputArray, Object.create(Array.prototype));
+      const prototype = Object.getPrototypeOf(inputArray);
+      filter(REACTIVE_ARRAY_METHODS, method => {
+        // cache original method
+        reference[method] = inputArray[method].bind(inputArray);
+        // changing to the reactive one
+        prototype[method] = function reactive() {
+          const oldArrayValue = inputArray.slice();
+          const args = [].slice.call(arguments);
+          switch (method) {
+            case 'push':
+            case 'unshift':
+              filter(toArray(args), (arg) => {
+                if (!isObject(arg) && !Array.isArray(arg))
+                  return;
+                executer(arg);
+              });
+          }
+          const result = reference[method].apply(inputArray, args);
+          filter(descriptor.watches, watch => watch.callback.call(context, inputArray, oldArrayValue, {
+            method: method,
+            args: args
+          }));
+          return result;
+        };
+      });
+      return inputArray;
+    }
+    if (!isObject(data))
+      return data;
+    // Checking if the array has already been transformed
+    if (tranformedData.has(data))
+      return data;
+    tranformedData.add(data);
+    filter(keys || Object.keys(data), key => {
+      const mInputObject = data;
+      // Already a reactive property, do nothing
+      if (!('value' in Property.descriptor(data, key)))
+        return;
+      const propValue = mInputObject[key];
+      if ((propValue instanceof Object && 'ͼ' in propValue) || propValue instanceof Node)
+        return;
+      // If the value is a function, belonging to a component do nothing
+      if (typeof propValue === 'function' && 'nobind' in propValue)
+        return;
+      const descriptor = new ReactivePropertyDescriptor({
+        propName: key,
+        srcObject: data,
+        context: context
+      });
+      Property.set(data, key, descriptor);
+      // If the value is a computed object, do nothing
+      if (isObject(propValue) && propValue instanceof Computed)
+        return;
+      if (Array.isArray(propValue)) {
+        executer(propValue, descriptor); // Transform the array to a reactive one
+        filter(propValue, (item) => executer(item));
+      } else if (isObject(propValue))
+        executer(propValue);
+    });
+    return data;
+  };
+  executer(options.data, options.descriptor, options.keys);
+  tranformedData = new WeakSet();
+  return options.data;
+};
+class InertProp {
+  constructor(value) {
+    $internal(this);
+    this.value = value;
+  }
+  get() {
+    return this.value;
+  }
+  set(value) {
+    this.value = value;
+  }
+}
+
+function $reactive(options) {
+  // If no context is provided, create one
+  if (options.context == null)
+    options.context = IoC.global;
+  return ReactivePropertyDescriptor.transform({
+    context: options.context,
+    data: options.data,
+    descriptor: options.descriptor,
+    keys: options.keys
+  });
+}
+
+function $inert(entry) {
+  // Tricking the typescript compiler
+  return new InertProp(entry);
+}
+class Property {
+  /**
+   * Sets a property to an object
+   * @param {object} obj the object to set the property
+   * @param {string} propName the property name to be set
+   * @param {object} descriptor the descriptor of the object
+   * @returns the object with the new property
+   */
+  static set(obj, propName, descriptor) {
+    const destinationDescriptor = Property.descriptor(obj, propName);
+    if ((descriptor instanceof ReactivePropertyDescriptor || !('value' in descriptor)) &&
+      destinationDescriptor == descriptor)
+      return; // Ignores if the descriptor is the same
+    const _obj = obj;
+    // If the property is not defined
+    if (!(propName in _obj))
+      _obj[propName] = undefined;
+    return Object.defineProperty(obj, propName, descriptor);
+  }
+  /**
+   * Retrieves the descriptor of an property
+   * @param {object} obj the object where the descriptor will be retrieved
+   * @param {string} propName the property name
+   * @returns the property descriptor or undefined
+   */
+  static descriptor(obj, propName) {
+    return Object.getOwnPropertyDescriptor(obj, propName);
+  }
+  /**
+   * Makes a deep copy of a property from an object to another
+   * @param {object} destination the destination object
+   * @param {object} source the source object
+   * @param {string} propName the property to be transfered
+   */
+  static transfer(destination, source, propName) {
+    const setter = (prop) => {
+      const descriptor = this.descriptor(source, prop);
+      this.set(destination, propName, descriptor);
+    };
+    if (Array.isArray(propName)) {
+      propName.forEach(prop => setter(prop));
+      return;
+    }
+    setter(propName);
+  }
+}
+class Extend {
+  /**
+   * Combines different object into a new one
+   * @param {object} args Objects to be combined
+   * @returns A new object having the properties of all the objects
+   */
+  static obj(...args) {
+    const out = {};
+    filter(args, arg => {
+      if (isNull(arg))
+        return;
+      filter(Object.keys(arg), key => {
+        Property.transfer(out, arg, key);
+      });
+    });
+    return out;
+  }
+  /**
+   * Adds properties to the first object provided
+   * @param {object} out the object that should be added all the properties from the other one
+   * @param {object} args the objects where the properties should be extracted from
+   * @returns the first object with all the new properties added on
+   */
+  static mixin(out, ...args) {
+    // Props to mix with out object
+    const props = Extend.obj.apply({}, args);
+    filter(Object.keys(props), key => {
+      const hasOwnProp = key in out;
+      Property.transfer(out, props, key);
+      if (hasOwnProp) {
+        const mOut = out;
+        mOut[key] = $default(mOut[key]);
+      }
+    });
+    return out;
+  }
+  /**
+   * Combines different arrays into a new one
+   * @param {object} args arrays to be combined
+   * @returns a new arrat having the items of all the arrays
+   */
+  static array(...args) {
+    const out = [];
+    filter(args, arg => {
+      if (isNull(arg))
+        return;
+      if (!Array.isArray(arg))
+        return out.push(arg);
+      filter(Object.keys(arg), (key) => {
+        const value = arg[key];
+        if (isNull(value))
+          return;
+        if (Array.isArray(value))
+                    [].push.apply(out, value);
+        else
+          out.push(value);
+      });
+    });
+    return out;
+  }
+  /**
+   * transfers the props of first object to the second and the seconds to the first
+   * @param {object} t1 the first object
+   * @param {object} t2 the second object
+   */
+  static matcher(t1, t2) {
+    const exec = (src, dst) => {
+      filter(Object.keys(src), key => {
+        if (key in dst)
+          return;
+        const hasOwnProp = key in src;
+        Property.transfer(dst, src, key);
+        if (hasOwnProp) {
+          src[key] = $default(src[key]);
+        }
+      });
+    };
+    exec(t1, t2);
+    exec(t2, t1);
+  }
+}
+class UriHandler {
+  constructor(url) {
+    $internal(this);
+    this.url = url || DOM.location.href;
+  }
+  params(urlPattern) {
+    const mParams = {};
+    if (urlPattern && isString(urlPattern)) {
+      const urlWithQueryParamsIgnored = this.url.split('?')[0];
+      const urlPartsReversed = urlWithQueryParamsIgnored.split('/').reverse();
+      if (urlPartsReversed[0] === '')
+        urlPartsReversed.shift();
+      const urlPatternReversed = urlPattern.split('/').reverse();
+      filter(urlPatternReversed, (value, index) => {
+        const valueExec = RegExp('{([\\S\\s]*?)}', 'ig').exec(value);
+        if (Array.isArray(valueExec))
+          mParams[valueExec[1]] = urlPartsReversed[index];
+      });
+    }
+    // Building from query string
+    const queryStr = this.url.split('?')[1];
+    if (!queryStr)
+      return mParams;
+    const keys = queryStr.split('&');
+    filter(keys, key => {
+      const pair = key.split('=');
+      mParams[pair[0]] = (pair[1] || '').split('#')[0];
+    });
+    return mParams;
+  }
+  add(params) {
+    const mParams = [];
+    filter(Object.keys(params), key => {
+      mParams.push(key + '=' + params[key]);
+    });
+    const joined = mParams.join('&');
+    return (this.url.includes('?')) ? '&' + joined : '?' + joined;
+  }
+}
+class DataStore {
+  constructor() {
+    this.wait = {};
+    this.data = {};
+    this.req = {};
+    this.element = {
+      data: new WeakMap(),
+      keys: new Array()
+    };
+    $internal(this);
+  }
+  set(key, dataKey, data) {
+    if (key === 'wait')
+      return Logger.warn('Only “get” is allowed for type of data');
+    this[key][dataKey] = data;
+  }
+  get(key, dataKey, once) {
+    const result = this[key][dataKey];
+    if (once === true)
+      this.unset(key, dataKey);
+    return result;
+  }
+  unset(key, dataKey) {
+    delete this[key][dataKey];
+  }
+  getNodeData(element, defaultData) {
+    var _a;
+    if (!this.element.data.has(element))
+      return defaultData;
+    return (_a = this.element.data.get(element)) !== null && _a !== void 0 ? _a : defaultData;
+  }
+  addNodeData(element, data) {
+    if (this.element.keys.indexOf(element))
+      this.element.keys.push(element);
+    this.element.data.set(element, data);
+  }
+  unlinkNodeData() {
+    filter(this.element.keys, (el) => {
+      const isUnlinked = !el.isConnected || (el.isActive || (() => {
+        return false;
+      }))();
+      if (!isUnlinked)
+        return;
+      this.element.data.delete(el);
+    });
+  }
+}
+
+function $data(opitons) {
+  const {
+    node,
+    bouer,
+    delimiter,
+    context,
+    evaluator,
+    compiler,
+    data
+  } = opitons;
+  const ownerNode = toOwnerNode(node);
+  const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  if (delimiter.run(nodeValue).length !== 0)
+    return Logger.error('The “data” attribute cannot contain delimiter.');
+  ownerNode.removeAttribute(node.nodeName);
+  let inputData = {};
+  const mData = Extend.obj(data, {
+    $data: data,
+    $scope: data
+  });
+  const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
+    if (!(descriptor.$name in inputData))
+      inputData[descriptor.$name] = undefined;
+    Property.set(inputData, descriptor.$name, descriptor);
+  });
+  // If data value is empty gets the main scope value
+  if (nodeValue === '')
+    inputData = Extend.obj(data);
+  else {
+    // Other wise, compiles the object provided
+    const mInputData = evaluator.exec({
+      data: mData,
+      code: nodeValue,
+      context: context
+    });
+    if (!isObject(mInputData))
+      return Logger.error('Expected a valid Object Literal expression in “' + node.nodeName +
+        '” and got “' + nodeValue + '”.');
+    // Adding all non-existing properties
+    filter(Object.keys(mInputData), key => {
+      if (!(key in inputData))
+        inputData[key] = mInputData[key];
+    });
+  }
+  ReactiveEvent.off('AfterGet', reactiveEvent.callback);
+  let dataKey = node.nodeName.split(':')[1];
+  if (dataKey) {
+    dataKey = dataKey.replace(/\[|\]/g, '');
+    IoC.app(bouer).resolve(DataStore).set('data', dataKey, inputData);
+  }
+  $reactive({
+    context: context,
+    data: inputData
+  });
+  // Signinng the element with it's data
+  IoC.app(bouer).resolve(DataStore).addNodeData(ownerNode, inputData);
+  return compiler.compile({
+    data: inputData,
+    el: ownerNode,
+    context: context,
+    afterCompile: opitons.compilationHooks.afterCompile,
+    beforeCompile: opitons.compilationHooks.beforeCompile
+  });
+}
+
+function $def(opitons) {
+  const {
+    node,
+    bouer,
+    delimiter,
+    context,
+    evaluator,
+    data
+  } = opitons;
+  const ownerNode = toOwnerNode(node);
+  const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  if (nodeValue === '')
+    return Logger.error(errorMsgEmptyNode(node));
+  if (delimiter.run(nodeValue).length !== 0)
+    return Logger.error(errorMsgNodeValue(node));
+  const inputData = {};
+  const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
+    if (!(descriptor.$name in inputData))
+      inputData[descriptor.$name] = undefined;
+    Property.set(inputData, descriptor.$name, descriptor);
+  });
+  const mInputData = evaluator.exec({
+    data: data,
+    code: nodeValue,
+    context: context
+  });
+  if (!isObject(mInputData))
+    return Logger.error('Expected a valid Object Literal expression in “' + node.nodeName +
+      '” and got “' + nodeValue + '”.');
+  // Adding all non-existing properties
+  filter(Object.keys(mInputData), key => {
+    if (!(key in inputData))
+      inputData[key] = mInputData[key];
+  });
+  ReactiveEvent.off('AfterGet', reactiveEvent.callback);
+  bouer.set(inputData, data);
+  ownerNode.removeAttribute(node.nodeName);
+}
+
+function $wait(options) {
+  const {
+    node,
+    bouer,
+    delimiter,
+    compiler,
+    context
+  } = options;
+  const ownerNode = toOwnerNode(node);
+  const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  if (nodeValue === '')
+    return Logger.error(errorMsgEmptyNode(node));
+  if (delimiter.run(nodeValue).length !== 0)
+    return Logger.error(errorMsgNodeValue(node));
+  ownerNode.removeAttribute(node.nodeName);
+  const dataStore = IoC.app(bouer).resolve(DataStore);
+  const mWait = dataStore.wait[nodeValue];
+  if (mWait) {
+    mWait.nodes.push(ownerNode);
+    // No data exposed yet
+    if (!mWait.data)
+      return;
+    // Compile all the waiting nodes
+    filter(mWait.nodes, (nodeWaiting) => {
+      const $data = $reactive({
+        context: mWait.context,
+        data: mWait.data
+      });
+      dataStore.addNodeData(nodeWaiting, $data);
+      compiler.compile({
+        el: nodeWaiting,
+        context: mWait.context,
+        data: $data,
+        beforeCompile: options.compilationHooks.beforeCompile,
+        afterCompile: options.compilationHooks.afterCompile,
+      });
+    });
+    if (ifNullReturn(mWait.once, false))
+      delete dataStore.wait[nodeValue];
+  }
+  return dataStore.wait[nodeValue] = {
+    nodes: [ownerNode],
+    context: context
+  };
+}
+class DataProp {
+  constructor(value, type) {
+    $internal(this);
+    this.value = value;
+    this.constraint = type;
+  }
+  static required() {
+    return new DataProp(undefined, 'required');
+  }
+  static optional(value) {
+    return new DataProp(value, 'optional');
+  }
+}
+const prop = Object.assign(
+  /** Default function represent optional Property */
+  function optional(value) {
+    return DataProp.optional(value);
+  }, {
+    /** Optional Property, not expected in data directive */
+    optional: DataProp.optional,
+    /** Required Property, expected in data directive */
+    required: DataProp.required
+  });
+const Constants = {
+  skip: 'e-skip',
+  if: 'e-if',
+  elseif: 'e-else-if',
+  else: 'e-else',
+  show: 'e-show',
+  req: 'e-req',
+  for: 'e-for',
+  form: {
+    property: 'e-form',
+    schema: 'e-schema',
+    build: 'e-build',
+    buildarray: 'e-build:array',
+    array: 'e-array',
+  },
+  data: 'data',
+  def: 'e-def',
+  wait: 'wait-data',
+  text: 'e-text',
+  bind: 'e-bind',
+  property: 'e-',
+  skeleton: 'e-skeleton',
+  route: 'route-view',
+  href: ':href',
+  entry: 'e-entry',
+  on: 'on:',
+  silent: '--s',
+  slot: 'slot',
+  ref: 'ref',
+  put: 'e-put',
+  builtInEvents: {
+    add: 'add',
+    compile: 'compile',
+    request: 'request',
+    response: 'response',
+    fail: 'fail',
+    done: 'done',
+  },
+  check(node, cmd) {
+    if (node.nodeName in {
+            [this.form.schema]: 1,
+            [this.form.build]: 1,
+            [this.form.buildarray]: 1,
+            [this.form.array]: 1
+      })
+      return false;
+    return startWith(node.nodeName, cmd);
+  }
+};
 var Task = (function Task() {
   return {
     run(callback, milliseconds) {
@@ -1328,6 +1015,186 @@ var Task = (function Task() {
     }
   };
 })();
+class EventHandler {
+  constructor(bouer, evaluator) {
+    this.$events = {};
+    this.input = createEl('input').build();
+    $internal(this);
+    this.bouer = bouer;
+    this.evaluator = evaluator;
+    this.cleanup();
+  }
+  compile(node, data, context) {
+    const ownerNode = (node.ownerElement || node.parentNode);
+    const nodeName = node.nodeName;
+    if (isNull(ownerNode))
+      return Logger.error('Invalid ParentElement of “' + nodeName + '”');
+    // <button on:submit.once.stop="times++"/>
+    const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+    const eventNameWithModifiers = nodeName.substring(Constants.on.length);
+    const allModifiers = eventNameWithModifiers.split('.');
+    const eventName = allModifiers[0];
+    allModifiers.shift();
+    if (nodeValue === '')
+      return Logger.error('Expected an expression in the “' + nodeName + '” and got an <empty string>.');
+    ownerNode.removeAttribute(nodeName);
+    const callback = (evt) => {
+      // Calling the modifiers
+      const availableModifiersFunction = {
+        'prevent': 'preventDefault',
+        'stop': 'stopPropagation'
+      };
+      filter(allModifiers, modifier => {
+        const modifierFunctionName = availableModifiersFunction[modifier];
+        if (evt[modifierFunctionName])
+          evt[modifierFunctionName]();
+      });
+      const mArguments = [evt];
+      const response = this.evaluator.exec({
+        data: data,
+        code: nodeValue,
+        args: mArguments,
+        aditional: {
+          event: evt
+        },
+        context: context
+      });
+      if (isFunction(response)) {
+        try {
+          fnCallResolver('nobind' in response ? response : response.apply(context, mArguments));
+        } catch (error) {
+          Logger.error(buildError(error));
+        }
+      }
+    };
+    const modifiersObject = {};
+    const addEventListenerOptions = ['capture', 'once', 'passive'];
+    filter(allModifiers, md => {
+      md = md.toLocaleLowerCase();
+      if (addEventListenerOptions.indexOf(md) !== -1) {
+        modifiersObject[md] = true;
+      }
+    });
+    if (!('on' + eventName in this.input))
+      this.on({
+        context: context,
+        eventName: eventName,
+        callback: callback,
+        modifiers: modifiersObject,
+        attachedNode: ownerNode
+      });
+    else
+      ownerNode.addEventListener(eventName, callback, modifiersObject);
+  }
+  on(options) {
+    const handler = this;
+    const {
+      eventName,
+      callback,
+      context,
+      attachedNode,
+      modifiers
+    } = options;
+    const iEventSubCallback = (evt) => callback.apply(context || this.bouer, [evt]);
+    const event = {
+      eventName: eventName,
+      attachedNode: attachedNode,
+      modifiers: modifiers,
+      callback: iEventSubCallback,
+      destroy: () => handler.off({
+        callback: iEventSubCallback,
+        attachedNode,
+        eventName,
+      }),
+      emit: options => this.emit({
+        eventName: eventName,
+        attachedNode: attachedNode,
+        init: (options || {}).init,
+        once: (options || {}).once,
+      })
+    };
+    if (!this.$events[eventName])
+      this.$events[eventName] = [];
+    this.$events[eventName].push(event);
+    return event;
+  }
+  off(options) {
+    const {
+      eventName,
+      callback,
+      attachedNode
+    } = options;
+    if (!this.$events[eventName])
+      return;
+    this.$events[eventName] = filter(this.$events[eventName], evt => {
+      const isEqual = (evt.eventName === eventName && callback == evt.callback);
+      if (attachedNode && (evt.attachedNode === attachedNode) && isEqual)
+        return false;
+      // In this case remove all
+      const isRemoveAll = (evt.eventName === eventName &&
+        evt.attachedNode === attachedNode && !callback);
+      if (isRemoveAll)
+        return;
+      return !isEqual;
+    });
+  }
+  emit(options) {
+    const {
+      eventName,
+      init,
+      once,
+      attachedNode
+    } = options;
+    const events = this.$events[eventName];
+    if (!events)
+      return;
+    const emitter = (node, callback) => {
+      node.addEventListener(eventName, callback, {
+        once: true
+      });
+      node.dispatchEvent(new CustomEvent(eventName, init));
+      node.removeEventListener(eventName, callback);
+    };
+    this.$events[eventName] = filter(events, evt => {
+      const node = evt.attachedNode;
+      const isOnceEvent = ifNullReturn((evt.modifiers || {}).once, false) || ifNullReturn(once, false);
+      // If a node was provided, just dispatch the events in this node
+      if (attachedNode) {
+        if (node !== attachedNode)
+          return true;
+        emitter(node, evt.callback);
+        return !isOnceEvent;
+      }
+      // Otherwise, if this events has a node, dispatch the node event
+      if (node) {
+        emitter(node, evt.callback);
+        return !isOnceEvent;
+      }
+      // Otherwise, dispatch the event
+      fnCallResolver(evt.callback.call(this.bouer, new CustomEvent(eventName, init)));
+      return !isOnceEvent;
+    });
+  }
+  cleanup() {
+    const autoOffEvent = ifNullReturn(this.bouer.config.autoOffEvent, true);
+    if (autoOffEvent == false)
+      return;
+    Task.run(() => {
+      filter(Object.keys(this.$events), key => {
+        this.$events[key] = filter(this.$events[key], event => {
+          var _a;
+          if ((event.modifiers || {}).autodestroy === false)
+            return true;
+          if (!event.attachedNode)
+            return true;
+          const isActive = (_a = event.attachedNode.isActive) !== null && _a !== void 0 ? _a : (() => event.attachedNode.isConnected);
+          if (isActive())
+            return true;
+        });
+      });
+    });
+  }
+}
 class FormSchema {
   constructor(options) {
     this.path = '';
@@ -1338,7 +1205,7 @@ class FormSchema {
   static isBuild(currentNode) {
     const cform = Constants.form;
     const attributes = currentNode.attributes;
-    return (cform.build in attributes || cform.abuild in attributes) &&
+    return (cform.build in attributes || cform.buildarray in attributes) &&
       !currentNode.$$buildAddedInScope;
   }
   init(options) {
@@ -1352,12 +1219,12 @@ class FormSchema {
     // Mark the element as already build
     node.$$buildAddedInScope = true;
     // Get the build value
-    const attrBuild = findAttribute(node, [cform.build, cform.abuild]);
+    const attrBuild = findAttribute(node, [cform.build, cform.buildarray]);
     if (attrBuild == null)
       return;
     let buildValue = attrBuild.nodeValue;
     // Check if the element is an array type
-    if ((cform.array in attributes || cform.abuild in attributes)) {
+    if ((cform.array in attributes || cform.buildarray in attributes)) {
       //Retrieve the actual index of the current element
       const parentElement = node.parentElement;
       const elements = Extend.array(toArray(parentElement.querySelectorAll(`*>[e-build\\:array="${attrBuild.value}"]`)), toArray(parentElement.querySelectorAll(`*>[e-build="${attrBuild.value}"][e-array]`)));
@@ -1380,11 +1247,11 @@ class FormSchema {
 }
 class Routing {
   constructor(bouer) {
-    this._IRT_ = true;
     this.routeView = null;
     this.activeAnchors = [];
     // Store `href` value of the <base /> tag
     this.base = null;
+    $internal(this);
     this.bouer = bouer;
   }
   setRouteView(routeView) {
@@ -1441,7 +1308,7 @@ class Routing {
     if (!page && route.endsWith('.html'))
       return;
     const componentElement = createEl(page.name, el => {
-        el.setAttribute('data', isObject(options.data) ? '$navigate' : '$data');
+        el.setAttribute('data', !isNull(options.data) ? '$navigate' : '$data');
       }).appendTo(this.routeView)
       .build();
     // Document info configuration
@@ -1498,12 +1365,12 @@ class Routing {
     if (isNull(route))
       return;
     // Removing the active mark
-    forEach(this.activeAnchors, anchor => anchor.classList.remove(className));
+    filter(this.activeAnchors, anchor => anchor.classList.remove(className));
     // Removing the active mark
-    forEach([].slice.call(appEl.querySelectorAll('a.' + className)), (anchor) => anchor.classList.remove(className));
+    filter([].slice.call(appEl.querySelectorAll('a.' + className)), (anchor) => anchor.classList.remove(className));
     this.activeAnchors = [];
     // Adding the className and storing all the active anchors
-    forEach(toArray(anchors), (anchor) => {
+    filter(toArray(anchors), (anchor) => {
       if (anchor.href.split('?')[0] !== route.split('?')[0])
         return;
       anchor.classList.add(className);
@@ -1514,8 +1381,8 @@ class Routing {
     const className = this.bouer.config.activeClassName || 'active-link';
     if (isNull(anchor))
       return;
-    forEach(this.activeAnchors, anchor => anchor.classList.remove(className));
-    forEach([].slice.call(ifNullStop(this.bouer.el).querySelectorAll('a.' + className)), (anchor) => anchor.classList.remove(className));
+    filter(this.activeAnchors, anchor => anchor.classList.remove(className));
+    filter([].slice.call(ifNullStop(this.bouer.el).querySelectorAll('a.' + className)), (anchor) => anchor.classList.remove(className));
     anchor.classList.add(className);
     this.activeAnchors = [anchor];
   }
@@ -1524,12 +1391,12 @@ class Routing {
   }
   /**
    * Allow to configure the `Default Page` and `NotFound Page`
-   * @param {Component|IComponentOptions} component the component to be checked
+   * @param {ComponentPrototype} component the component to be checked
    */
   configure(component) {
-    if (component.isDefault === true && !isNull(this.defaultPage))
+    if (component.isDefault === true && this.defaultPage)
       return Logger.warn('There are multiple “Default Page” provided, check the “' + component.route + '” route.');
-    if (component.isNotFound === true && !isNull(this.notFoundPage))
+    if (component.isNotFound === true && this.notFoundPage)
       return Logger.warn('There are multiple “NotFound Page” provided, check the “' + component.route + '” route.');
     if (component.isDefault === true)
       this.defaultPage = component;
@@ -1537,55 +1404,8 @@ class Routing {
       this.notFoundPage = component;
   }
 }
-class DataStore {
-  constructor() {
-    this._IRT_ = true;
-    this.wait = {};
-    this.data = {};
-    this.req = {};
-    this.element = {
-      data: new WeakMap(),
-      keys: new Array()
-    };
-  }
-  set(key, dataKey, data) {
-    if (key === 'wait')
-      return Logger.warn('Only “get” is allowed for type of data');
-    this[key][dataKey] = data;
-  }
-  get(key, dataKey, once) {
-    const result = this[key][dataKey];
-    if (once === true)
-      this.unset(key, dataKey);
-    return result;
-  }
-  unset(key, dataKey) {
-    delete this[key][dataKey];
-  }
-  getNodeData(element, defaultData) {
-    var _a;
-    if (!this.element.data.has(element))
-      return defaultData;
-    return (_a = this.element.data.get(element)) !== null && _a !== void 0 ? _a : defaultData;
-  }
-  addNodeData(element, data) {
-    this.element.data.set(element, data);
-    this.element.keys.push(element);
-  }
-  unlinkNodeData() {
-    forEach(this.element.keys, (el) => {
-      const isUnlinked = !el.isConnected || (el.isActive || (() => {
-        return false;
-      }))();
-      if (!isUnlinked)
-        return;
-      this.element.data.delete(el);
-    });
-  }
-}
 class Middleware {
   constructor(bouer) {
-    this._IRT_ = true;
     this.middlewareConfigContainer = {};
     this.run = (directive, runnable) => {
       const middlewares = this.middlewareConfigContainer[directive];
@@ -1629,10 +1449,9 @@ class Middleware {
     };
     this.has = (directive) => {
       const middlewares = this.middlewareConfigContainer[directive];
-      if (!middlewares)
-        return false;
-      return middlewares.length > 0;
+      return middlewares && middlewares.length > 0;
     };
+    $internal(this);
     this.bouer = bouer;
   }
 }
@@ -1722,7 +1541,7 @@ class Binder {
         let valueToSet = propertyBindConfig.nodeValue;
         let isHtml = false;
         // Looping all the fields to be setted
-        forEach(fields, (field) => {
+        filter(fields, (field) => {
           // Retrieving the delimiter used in this field
           const delimiter = field.delimiter;
           // Mark isHtml as true if it's a HTML delimiter type
@@ -1734,7 +1553,7 @@ class Binder {
             code: field.expression,
             context: context,
           });
-          evaluetedValue = isRef(evaluetedValue) || isComputed(evaluetedValue) ? evaluetedValue.get() : evaluetedValue;
+          evaluetedValue = isComputed(evaluetedValue) ? evaluetedValue.get() : evaluetedValue;
           evaluetedValue = isNull(evaluetedValue) ? '' : evaluetedValue;
           evaluetedValue = this.applyPipes(evaluetedValue, field);
           // Replacing each field with the specific value
@@ -1748,7 +1567,7 @@ class Binder {
         const htmlSnippets = createEl('div', el => el.innerHTML = valueToSet)
           .children();
         ownerNode.innerHTML = '';
-        forEach(htmlSnippets, (snippetNode) => {
+        filter(htmlSnippets, (snippetNode) => {
           ownerNode.appendChild(snippetNode);
           snippetNode.isActive = isActive;
           IoC.app(this.bouer).resolve(Compiler).compile({
@@ -1801,7 +1620,7 @@ class Binder {
       let boundModelValue;
       const bindingDirection = {
         fromDataToInput: (value) => {
-          value = isRef(value) || isComputed(value) ? value.get() : value;
+          value = isComputed(value) ? value.get() : value;
           // Normal Property Set
           if (!Array.isArray(boundPropertyValue)) {
             // In case of radio button we need to check if the value is the same to check it
@@ -1825,7 +1644,7 @@ class Binder {
             });
           // select-multiple handling
           if (isSelectMultiple) {
-            return forEach(toArray(ownerNode.options), (option) => {
+            return filter(toArray(ownerNode.options), (option) => {
               option.selected =
                 boundPropertyValue.indexOf(trim(option.value)) !== -1;
             });
@@ -1848,8 +1667,7 @@ class Binder {
         fromInputToData: (value) => {
           // Normal Property Set
           if (!Array.isArray(boundPropertyValue)) {
-            // Check Ref<?>
-            if (isRef(boundPropertyValue) || isComputed(boundPropertyValue)) {
+            if (isComputed(boundPropertyValue)) {
               return boundPropertyValue.set(value);
             }
             // Default Binding
@@ -1873,7 +1691,7 @@ class Binder {
           // select-multiple handling
           if (isSelectMultiple) {
             const optionCollection = [];
-            forEach(toArray(ownerNode.options), (option) => {
+            filter(toArray(ownerNode.options), (option) => {
               if (option.selected === true)
                 optionCollection.push(trim(option.value));
             });
@@ -1932,7 +1750,7 @@ class Binder {
       if (listeners.indexOf(ownerNode.localName) === -1)
         listeners.push(ownerNode.localName);
       // Applying the events
-      forEach(listeners, (listener) => {
+      filter(listeners, (listener) => {
         if (listener === 'change' && ownerNode.localName !== 'select')
           return;
         // Adding the event to listen to the element change event
@@ -1949,7 +1767,7 @@ class Binder {
     return $BindOneWay();
   }
   remove(boundNode, boundAttrName, boundPropName) {
-    this.binds = where(this.binds, (bind) => {
+    this.binds = filter(this.binds, (bind) => {
       const node = bind.watch.node;
       if ((node.ownerElement || node.parentElement) !== boundNode)
         return true;
@@ -1964,8 +1782,11 @@ class Binder {
   onPropertyChange(propertyName, callback, targetObject) {
     let mWatch;
     ReactiveEvent.once('AfterGet', (event) => {
-      event.onemit = (descriptor) => (mWatch = descriptor.onChange(callback));
-      $default(targetObject[propertyName]);
+      event.onemit = (d) => (mWatch = d.onChange(callback));
+      Evaluator.run({
+        code: propertyName,
+        data: targetObject
+      });
     });
     return mWatch;
   }
@@ -1974,8 +1795,8 @@ class Binder {
     ReactiveEvent.once('AfterGet', (evt) => {
       evt.onemit = (descriptor) => {
         // Using scope watch avoid listen to the same property twice
-        if (watches.find((w) => w.property === descriptor.propName &&
-            w.descriptor.propSource === descriptor.propSource))
+        if (watches.find((w) => w.property === descriptor.$name &&
+            w.descriptor.source === descriptor.source))
           return;
         // Execution handler
         let isExecuting = false;
@@ -1991,14 +1812,14 @@ class Binder {
     });
     return {
       watches: watches,
-      destroy: () => forEach(watches, w => w.destroy())
+      destroy: () => filter(watches, w => w.destroy())
     };
   }
   applyPipes(value, field) {
     let $value = value;
     if (isNull($value) || trim($value + '') === '')
       return $value;
-    forEach(field.pipes || [], pipe => {
+    filter(field.pipes || [], pipe => {
       const args = pipe.args.slice().map(a => {
         return this.evaluator.exec({
           code: a,
@@ -2025,191 +1846,10 @@ class Binder {
     if (autoUnbind == false)
       return;
     Task.run(() => {
-      this.binds = where(this.binds, (bind) => {
+      this.binds = filter(this.binds, (bind) => {
         if (bind.isConnected())
           return true;
         bind.watch.destroy();
-      });
-    });
-  }
-}
-class EventHandler {
-  constructor(bouer, evaluator) {
-    this._IRT_ = true;
-    this.$events = {};
-    this.input = createEl('input').build();
-    this.bouer = bouer;
-    this.evaluator = evaluator;
-    this.cleanup();
-  }
-  compile(node, data, context) {
-    const ownerNode = (node.ownerElement || node.parentNode);
-    const nodeName = node.nodeName;
-    if (isNull(ownerNode))
-      return Logger.error('Invalid ParentElement of “' + nodeName + '”');
-    // <button on:submit.once.stop="times++"/>
-    const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-    const eventNameWithModifiers = nodeName.substring(Constants.on.length);
-    const allModifiers = eventNameWithModifiers.split('.');
-    const eventName = allModifiers[0];
-    allModifiers.shift();
-    if (nodeValue === '')
-      return Logger.error('Expected an expression in the “' + nodeName + '” and got an <empty string>.');
-    ownerNode.removeAttribute(nodeName);
-    const callback = (evt) => {
-      // Calling the modifiers
-      const availableModifiersFunction = {
-        'prevent': 'preventDefault',
-        'stop': 'stopPropagation'
-      };
-      forEach(allModifiers, modifier => {
-        const modifierFunctionName = availableModifiersFunction[modifier];
-        if (evt[modifierFunctionName])
-          evt[modifierFunctionName]();
-      });
-      const mArguments = [evt];
-      const isResultFunction = this.evaluator.exec({
-        data: data,
-        code: nodeValue,
-        args: mArguments,
-        aditional: {
-          event: evt
-        },
-        context: context
-      });
-      if (isFunction(isResultFunction)) {
-        try {
-          fnCallResolver(isResultFunction.apply(context, mArguments));
-        } catch (error) {
-          Logger.error(buildError(error));
-        }
-      }
-    };
-    const modifiersObject = {};
-    const addEventListenerOptions = ['capture', 'once', 'passive'];
-    forEach(allModifiers, md => {
-      md = md.toLocaleLowerCase();
-      if (addEventListenerOptions.indexOf(md) !== -1) {
-        modifiersObject[md] = true;
-      }
-    });
-    if (!('on' + eventName in this.input))
-      this.on({
-        context: context,
-        eventName: eventName,
-        callback: callback,
-        modifiers: modifiersObject,
-        attachedNode: ownerNode
-      });
-    else
-      ownerNode.addEventListener(eventName, callback, modifiersObject);
-  }
-  on(options) {
-    const instance = this;
-    const {
-      eventName,
-      callback,
-      context,
-      attachedNode,
-      modifiers
-    } = options;
-    const iEventSubCallback = (evt) => callback.apply(context || this.bouer, [evt]);
-    const event = {
-      eventName: eventName,
-      attachedNode: attachedNode,
-      modifiers: modifiers,
-      callback: iEventSubCallback,
-      destroy: () => instance.off({
-        callback: iEventSubCallback,
-        attachedNode,
-        eventName,
-      }),
-      emit: options => this.emit({
-        eventName: eventName,
-        attachedNode: attachedNode,
-        init: (options || {}).init,
-        once: (options || {}).once,
-      })
-    };
-    if (!this.$events[eventName])
-      this.$events[eventName] = [];
-    this.$events[eventName].push(event);
-    return event;
-  }
-  off(options) {
-    const {
-      eventName,
-      callback,
-      attachedNode
-    } = options;
-    if (!this.$events[eventName])
-      return;
-    this.$events[eventName] = where(this.$events[eventName], evt => {
-      const isEqual = (evt.eventName === eventName && callback == evt.callback);
-      if (attachedNode && (evt.attachedNode === attachedNode) && isEqual)
-        return false;
-      // In this case remove all
-      const isRemoveAll = (evt.eventName === eventName &&
-        evt.attachedNode === attachedNode &&
-        isNull(callback));
-      if (isRemoveAll)
-        return;
-      return !isEqual;
-    });
-  }
-  emit(options) {
-    const {
-      eventName,
-      init,
-      once,
-      attachedNode
-    } = options;
-    const events = this.$events[eventName];
-    if (!events)
-      return;
-    const emitter = (node, callback) => {
-      node.addEventListener(eventName, callback, {
-        once: true
-      });
-      node.dispatchEvent(new CustomEvent(eventName, init));
-      node.removeEventListener(eventName, callback);
-    };
-    this.$events[eventName] = where(events, evt => {
-      const node = evt.attachedNode;
-      const isOnceEvent = ifNullReturn((evt.modifiers || {}).once, false) || ifNullReturn(once, false);
-      // If a node was provided, just dispatch the events in this node
-      if (attachedNode) {
-        if (node !== attachedNode)
-          return true;
-        emitter(node, evt.callback);
-        return !isOnceEvent;
-      }
-      // Otherwise, if this events has a node, dispatch the node event
-      if (node) {
-        emitter(node, evt.callback);
-        return !isOnceEvent;
-      }
-      // Otherwise, dispatch the event
-      fnCallResolver(evt.callback.call(this.bouer, new CustomEvent(eventName, init)));
-      return !isOnceEvent;
-    });
-  }
-  cleanup() {
-    const autoOffEvent = ifNullReturn(this.bouer.config.autoOffEvent, true);
-    if (autoOffEvent == false)
-      return;
-    Task.run(() => {
-      forEach(Object.keys(this.$events), key => {
-        this.$events[key] = where(this.$events[key], event => {
-          var _a;
-          if ((event.modifiers || {}).autodestroy === false)
-            return true;
-          if (!event.attachedNode)
-            return true;
-          const isActive = (_a = event.attachedNode.isActive) !== null && _a !== void 0 ? _a : (() => event.attachedNode.isConnected);
-          if (isActive())
-            return true;
-        });
       });
     });
   }
@@ -2307,7 +1947,7 @@ function $property(opitons) {
       (ownerNode.setAttribute(attrNameToSet, ''));
       attr = ownerNode.attributes[attrNameToSet];
     }
-    forEach(Object.keys(obj), key => {
+    filter(Object.keys(obj), key => {
       /* if has a falsy value remove the key */
       if (!obj[key])
         return attr.value = trim(attr.value.replace(key, ''));
@@ -2350,6 +1990,22 @@ function $href(opitons) {
       IoC.app(bouer).resolve(Routing)
         .navigate(href.value);
     }, false);
+}
+
+function $ref(options) {
+  const {
+    node,
+    bouer
+  } = options;
+  const ownerNode = toOwnerNode(node);
+  const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
+  if (nodeValue === '')
+    return Logger.error(errorMsgEmptyNode(node));
+  if (nodeValue in bouer.refs) {
+    Logger.warn('The key ref “' + nodeValue + '” for “' + ownerNode.nodeName + '” is taken, choose another key.');
+    return;
+  }
+  bouer.refs[nodeValue] = ownerNode;
 }
 
 function $entry(opitons) {
@@ -2477,7 +2133,7 @@ function $if(opitons) {
     ReactiveEvent.once('AfterGet', event => {
       event.onemit = descriptor => {
         // Avoiding multiple binding in the same property
-        if (reactives.findIndex(item => item.descriptor.propName == descriptor.propName) !== -1)
+        if (reactives.findIndex(item => item.descriptor.$name == descriptor.$name) !== -1)
           return;
         reactives.push({
           attr: attr,
@@ -2492,7 +2148,7 @@ function $if(opitons) {
     });
     currentEl.removeAttribute(attr.nodeName);
   } while (currentEl = currentEl.nextElementSibling);
-  forEach(reactives, item => {
+  filter(reactives, item => {
     binder.binds.push({
       // Binder is connected if at least one of the chain and the comment is still connected
       isConnected: isActive,
@@ -2500,7 +2156,7 @@ function $if(opitons) {
     });
   });
   (execute = () => {
-    forEach(conditions, chainItem => {
+    filter(conditions, chainItem => {
       const element = getRootElement(chainItem.node);
       if (!element.parentElement)
         return;
@@ -2615,153 +2271,89 @@ function custom(opitons) {
     return ifNullReturn($CustomDirective.onBind(node, bindConfig), false);
   return false;
 }
-
-function $data(opitons) {
-  const {
-    node,
-    bouer,
-    delimiter,
-    context,
-    evaluator,
-    compiler,
-    data
-  } = opitons;
-  const ownerNode = toOwnerNode(node);
-  const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-  if (delimiter.run(nodeValue).length !== 0)
-    return Logger.error('The “data” attribute cannot contain delimiter.');
-  ownerNode.removeAttribute(node.nodeName);
-  let inputData = {};
-  const mData = Extend.obj(data, {
-    $data: data,
-    $scope: data
-  });
-  const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
-    if (!(descriptor.propName in inputData))
-      inputData[descriptor.propName] = undefined;
-    Prop.set(inputData, descriptor.propName, descriptor);
-  });
-  // If data value is empty gets the main scope value
-  if (nodeValue === '')
-    inputData = Extend.obj(data);
-  else {
-    // Other wise, compiles the object provided
-    const mInputData = evaluator.exec({
-      data: mData,
-      code: nodeValue,
-      context: context
-    });
-    if (!isObject(mInputData))
-      return Logger.error('Expected a valid Object Literal expression in “' + node.nodeName +
-        '” and got “' + nodeValue + '”.');
-    // Adding all non-existing properties
-    forEach(Object.keys(mInputData), key => {
-      if (!(key in inputData))
-        inputData[key] = mInputData[key];
-    });
+class Skeleton {
+  constructor(bouer) {
+    this.backgroudColor = '';
+    this.waveColor = '';
+    this.defaultBackgroudColor = '#E2E2E2';
+    this.defaultWaveColor = '#ffffff5d';
+    this.identifier = 'bouer';
+    this.numberOfItems = 1;
+    $internal(this);
+    this.reset();
+    this.bouer = bouer;
+    this.style = createEl('style', el => el.id = this.identifier).build();
   }
-  ReactiveEvent.off('AfterGet', reactiveEvent.callback);
-  let dataKey = node.nodeName.split(':')[1];
-  if (dataKey) {
-    dataKey = dataKey.replace(/\[|\]/g, '');
-    IoC.app(bouer).resolve(DataStore).set('data', dataKey, inputData);
+  reset() {
+    this.backgroudColor = this.defaultBackgroudColor;
+    this.waveColor = this.defaultWaveColor;
   }
-  Reactive.transform({
-    context: context,
-    data: inputData
-  });
-  // Signinng the element with it's data
-  IoC.app(bouer).resolve(DataStore).addNodeData(ownerNode, inputData);
-  return compiler.compile({
-    data: inputData,
-    el: ownerNode,
-    context: context,
-    afterCompile: opitons.compilationHooks.afterCompile,
-    beforeCompile: opitons.compilationHooks.beforeCompile
-  });
-}
-
-function $def(opitons) {
-  const {
-    node,
-    bouer,
-    delimiter,
-    context,
-    evaluator,
-    data
-  } = opitons;
-  const ownerNode = toOwnerNode(node);
-  const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-  if (nodeValue === '')
-    return Logger.error(errorMsgEmptyNode(node));
-  if (delimiter.run(nodeValue).length !== 0)
-    return Logger.error(errorMsgNodeValue(node));
-  const inputData = {};
-  const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
-    if (!(descriptor.propName in inputData))
-      inputData[descriptor.propName] = undefined;
-    Prop.set(inputData, descriptor.propName, descriptor);
-  });
-  const mInputData = evaluator.exec({
-    data: data,
-    code: nodeValue,
-    context: context
-  });
-  if (!isObject(mInputData))
-    return Logger.error('Expected a valid Object Literal expression in “' + node.nodeName +
-      '” and got “' + nodeValue + '”.');
-  // Adding all non-existing properties
-  forEach(Object.keys(mInputData), key => {
-    if (!(key in inputData))
-      inputData[key] = mInputData[key];
-  });
-  ReactiveEvent.off('AfterGet', reactiveEvent.callback);
-  bouer.set(inputData, data);
-  ownerNode.removeAttribute(node.nodeName);
-}
-
-function $wait(options) {
-  const {
-    node,
-    bouer,
-    delimiter,
-    compiler,
-    context
-  } = options;
-  const ownerNode = toOwnerNode(node);
-  const nodeValue = trim(ifNullReturn(node.nodeValue, ''));
-  if (nodeValue === '')
-    return Logger.error(errorMsgEmptyNode(node));
-  if (delimiter.run(nodeValue).length !== 0)
-    return Logger.error(errorMsgNodeValue(node));
-  ownerNode.removeAttribute(node.nodeName);
-  const dataStore = IoC.app(bouer).resolve(DataStore);
-  const mWait = dataStore.wait[nodeValue];
-  if (mWait) {
-    mWait.nodes.push(ownerNode);
-    // No data exposed yet
-    if (!mWait.data)
+  init(color) {
+    if (!this.style)
       return;
-    // Compile all the waiting nodes
-    forEach(mWait.nodes, (nodeWaiting) => {
-      compiler.compile({
-        el: nodeWaiting,
-        context: mWait.context,
-        data: Reactive.transform({
-          context: mWait.context,
-          data: mWait.data
-        }),
-        beforeCompile: options.compilationHooks.beforeCompile,
-        afterCompile: options.compilationHooks.afterCompile,
-      });
-    });
-    if (ifNullReturn(mWait.once, false))
-      delete dataStore.wait[nodeValue];
+    if (!DOM.getElementById(this.identifier))
+      DOM.head.appendChild(this.style);
+    if (!this.style.sheet)
+      return;
+    for (let i = 0; i < this.style.sheet.cssRules.length; i++)
+      this.style.sheet.deleteRule(i);
+    if (color) {
+      this.backgroudColor = color.background || this.defaultBackgroudColor;
+      this.waveColor = color.wave || this.defaultWaveColor;
+      this.numberOfItems = color.numberOfItems || this.numberOfItems;
+    } else {
+      this.reset();
+    }
+    const dir = Constants.skeleton;
+    const bgc = this.backgroudColor;
+    const wvc = this.waveColor;
+    const rules = [
+            '[--s]{ display: none!important; }',
+            '[' + dir + '] { background-color: ' + bgc + '!important; position: relative!important; overflow: hidden; }',
+            '[' + dir + '],[' + dir + '] * { color: transparent!important; }',
+            '[' + dir + ']::before, [' + dir + ']::after { content: ""; position: absolute; top: 0; left: 0; right: 0; ' +
+                'bottom: 0; display: block; }',
+            '[' + dir + ']::before { background-color: ' + bgc + '!important; z-index: 1;}',
+            '[' + dir + ']::after { transform: translateX(-100%); background: linear-gradient(90deg, transparent, ' + wvc +
+                ', transparent); animation: loading 1.5s infinite; z-index: 2; }',
+            '@keyframes loading { 100% { transform: translateX(100%); } }',
+            '@-webkit-keyframes loading { 100% { transform: translateX(100%); } }'
+        ];
+    filter(rules, rule => this.style.sheet.insertRule(rule));
+    this.style.innerText = rules.join(' ');
   }
-  return dataStore.wait[nodeValue] = {
-    nodes: [ownerNode],
-    context: context
-  };
+  insertItems(node) {
+    const parentNode = node.parentElement || node.parentNode;
+    const mNode = node;
+    if (parentNode == null || this.numberOfItems <= 1)
+      return;
+    if (!mNode.hasAttribute('e-skeleton') && isNull(mNode.querySelector('[e-skeleton]')))
+      return;
+    const uid = code(6);
+    node.setAttribute('skeleton-clone-code', uid);
+    for (let i = 0; i < (this.numberOfItems - 1); i++) {
+      const cloned = node.cloneNode(true);
+      cloned.setAttribute('skeleton-cloned', uid);
+      parentNode.insertBefore(cloned, node);
+    }
+  }
+  clearItems(node) {
+    const mNode = node;
+    const container = (node.parentElement || node.parentNode);
+    const uid = mNode.getAttribute('skeleton-clone-code');
+    if (!uid)
+      return;
+    mNode.removeAttribute('skeleton-clone-code');
+    filter([].slice.call(container.querySelectorAll('[skeleton-cloned="' + uid + '"]')), node => {
+      container.removeChild(node);
+    });
+  }
+  clear(id) {
+    id = (id ? ('="' + id + '"') : '');
+    const appEl = ifNullStop(this.bouer.el);
+    const skeletons = toArray(appEl.querySelectorAll('[' + Constants.skeleton + id + ']'));
+    filter(skeletons, (el) => el.removeAttribute(Constants.skeleton));
+  }
 }
 
 function $req(opitons) {
@@ -2887,7 +2479,7 @@ function $req(opitons) {
     const responseHandler = (response) => {
       if (!isValidResponse(response, expObject.type))
         return;
-      Reactive.transform({
+      $reactive({
         context: context,
         data: response
       });
@@ -2900,7 +2492,7 @@ function $req(opitons) {
       if (!('data' in localDataStore)) {
         // Store the data
         localDataStore.data = undefined;
-        Prop.transfer(localDataStore, response, 'data');
+        Property.transfer(localDataStore, response, 'data');
       } else {
         // Update de local data
         return localDataStore.data = response.data;
@@ -2914,7 +2506,7 @@ function $req(opitons) {
         data[variable] = response.data;
         return compiler.compile({
           el: ownerNode,
-          data: Reactive.transform({
+          data: $reactive({
             context: context,
             data: data
           }),
@@ -2931,7 +2523,7 @@ function $req(opitons) {
           [resUniqueName]: response.data
         }, data);
         ownerNode.setAttribute(Constants.for, Extend.array([forDirectiveContent], expObject.filters).join(' | '));
-        Prop.set(mData, resUniqueName, Prop.descriptor(response, 'data'));
+        Property.set(mData, resUniqueName, Property.descriptor(response, 'data'));
         return compiler.compile({
           el: ownerNode,
           data: mData,
@@ -2977,6 +2569,738 @@ function $req(opitons) {
       }
     });
   };
+}
+const Validator = (function() {
+  function innerValidateRequired(fieldInfo) {
+    var _a;
+    const errors = [];
+    const {
+      field,
+      name,
+      value
+    } = fieldInfo;
+    const required = (_a = fieldInfo.required) !== null && _a !== void 0 ? _a : false;
+    const isValidValue = () => {
+      return required == true ? (value != null && (value + '').trim() != '') : true;
+    };
+    if (!isValidValue()) {
+      errors.push({
+        rule: 'required',
+        message: `The field ${name} is required.`,
+        field: field,
+        value: value
+      });
+    }
+    return {
+      errors,
+      isValidValue,
+    };
+  }
+
+  function innerValidateCheck(fieldSchema) {
+    const errors = [];
+    const {
+      field,
+      name,
+      value,
+      check
+    } = fieldSchema;
+    // Check validation
+    if (check != null && check.indexOf(value) < 0) {
+      errors.push({
+        rule: 'check',
+        message: `The field ${name} with value ${value} does not match the required options.`,
+        field: field,
+        value: value
+      });
+    }
+    return {
+      errors
+    };
+  }
+
+  function innerValidateFunction(fieldSchema) {
+    const errors = [];
+    if (!fieldSchema.fn)
+      return {
+        errors,
+        clearPreviousError: false
+      };
+    const {
+      name,
+      field,
+      value,
+      fn
+    } = fieldSchema;
+    const result = fn(fieldSchema);
+    const {
+      valid,
+      message,
+      override
+    } = typeof result == 'object' ? result : {
+      valid: result,
+      message: `The field ${name} does not have the expected value.`,
+      override: false
+    };
+    const clearPreviousError = valid == false && override == true;
+    if (!valid) {
+      errors.push({
+        rule: 'function',
+        message: message,
+        field: field,
+        value: value
+      });
+    }
+    return {
+      errors,
+      clearPreviousError
+    };
+  }
+
+  function validateString(fieldSchema) {
+    const {
+      field,
+      pattern,
+      name,
+      value,
+      length
+    } = fieldSchema;
+    const {
+      min,
+      max
+    } = typeof length == 'object' ? length : {
+      min: 0,
+      max: length
+    };
+    const {
+      errors,
+      isValidValue
+    } = innerValidateRequired(fieldSchema);
+    if (errors.length > 0)
+      return errors;
+    // Minimum length validation
+    if (min != null && isValidValue() && value.length < min) {
+      errors.push({
+        rule: 'length:min',
+        message: `The field ${name} should have at least ${min} characters. Current length: ${value.length}.`,
+        field: field,
+        value: value
+      });
+    }
+    // Maximum length validation
+    if (max != null && isValidValue() && value.length > max) {
+      errors.push({
+        rule: 'length:max',
+        message: `The field ${name} should have at most ${max} characters. Current length: ${value.length}.`,
+        field: field,
+        value: value
+      });
+    }
+    // Regex validation
+    if (pattern != null && isValidValue()) {
+      const validator = {
+        'date': () => {
+          return value.match(
+            // eslint-disable-next-line max-len
+            /^(?:\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])|(?:0[1-9]|1[0-2])\/(?:0[1-9]|[12]\d|3[01])\/\d{4}|(?:0[1-9]|[12]\d|3[01])\/(?:0[1-9]|1[0-2])\/\d{4})$/);
+        },
+        'date-time': () => {
+          return value.match(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])[T ]([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(\.\d{1,3})?Z?$/);
+        },
+        'email': () => {
+          return value.match(/^[a-zA-Z0-9._%+-]{3,}@[a-zA-Z0-9.-]{3,}\.[a-zA-Z]{2,}(?:\.[a-zA-Z]{2,})?$/);
+        },
+        'regex': () => {
+          return value.match(new RegExp(pattern));
+        }
+      };
+      // Validates the pattern as named pattern, otherwise, validate the the pattern as regex
+      const isValidPattern = (validator[pattern] || validator['regex'])();
+      if (!isValidPattern) {
+        errors.push({
+          rule: 'regex',
+          message: `The field ${name} does not match the ${(pattern in validator) ? pattern : 'regex'} pattern.`,
+          field: field,
+          value: value
+        });
+      }
+    }
+    // Check validation
+    errors.push(...innerValidateCheck(fieldSchema).errors);
+    // Function validation
+    const fnValidation = innerValidateFunction(fieldSchema);
+    if (fnValidation.clearPreviousError) {
+      errors.splice(0, errors.length);
+      errors.push(...fnValidation.errors);
+    }
+    return errors;
+  }
+
+  function validateNumber(fieldSchema) {
+    let {
+      name,
+      value,
+      length,
+      field
+    } = fieldSchema;
+    const {
+      min,
+      max
+    } = typeof length == 'object' ? length : {
+      min: 0,
+      max: length
+    };
+    const {
+      errors
+    } = innerValidateRequired(fieldSchema);
+    if (errors.length > 0)
+      return errors;
+    // is value a valid number
+    if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.exec(value)) {
+      errors.push({
+        rule: 'number',
+        message: `The field ${name} should have a number value.`,
+        field: field,
+        value: value
+      });
+    } else {
+      value = value * 1; // Convert to the presented number
+    }
+    // Minimum validation
+    if (min != null && value < min) {
+      errors.push({
+        rule: 'length:min',
+        message: `The field ${name} should be greater than or equal to ${min}.`,
+        field: field,
+        value: value
+      });
+    }
+    // Maximum validation
+    if (max != null && value > max) {
+      errors.push({
+        rule: 'length:max',
+        message: `The field ${name} should be less than or equal to ${max}.`,
+        field: field,
+        value: value
+      });
+    }
+    // Check validation
+    errors.push(...innerValidateCheck(fieldSchema).errors);
+    // Function validation
+    const fnValidation = innerValidateFunction(fieldSchema);
+    if (fnValidation.clearPreviousError) {
+      errors.splice(0, errors.length);
+      errors.push(...fnValidation.errors);
+    }
+    return errors;
+  }
+
+  function validateBoolean(fieldSchema) {
+    let {
+      name,
+      value,
+      field
+    } = fieldSchema;
+    const {
+      errors,
+      isValidValue
+    } = innerValidateRequired(fieldSchema);
+    if (errors.length > 0)
+      return errors;
+    // is value a valid number
+    if (!isValidValue() && !/^(TRUE|True|true|1|FALSE|False|false|0)?$/.exec(value)) {
+      errors.push({
+        rule: 'boolean',
+        message: `The field ${name} should be a boolean. Current value: ${value}`,
+        field: field,
+        value: value
+      });
+    } else {
+      // Convert to the presented boolean value
+      value = ['true', '1'].indexOf(value.toString().toLowerCase()) > -1 ? true : false;
+    }
+    // Function validation
+    const fnValidation = innerValidateFunction(fieldSchema);
+    if (fnValidation.clearPreviousError) {
+      errors.splice(0, errors.length);
+      errors.push(...fnValidation.errors);
+    }
+    return errors;
+  }
+
+  function validate(fieldSchema) {
+    const type = fieldSchema.type = fieldSchema.type || 'string';
+    switch (type) {
+      case 'text':
+      case 'string':
+      case 'checkbox':
+      case 'password':
+        return validateString(fieldSchema);
+      case 'number':
+      case 'range':
+        return validateNumber(fieldSchema);
+      case 'radio':
+      case 'boolean':
+        return validateBoolean(fieldSchema);
+      default:
+        return validateString(fieldSchema);
+    }
+  }
+  return {
+    validate(fieldSchema) {
+      return validate(fieldSchema);
+    }
+  };
+})();
+class FieldSchema {
+  constructor(options) {
+    this.errors = [];
+    this.field = undefined;
+    this.name = undefined;
+    this.type = undefined;
+    this.value = undefined;
+    Object.assign(this, options || {});
+  }
+  init(options) {
+    Object.assign(this, options);
+    return this;
+  }
+  merge(schema) {
+    const _this = this;
+    Object.keys(schema).forEach((key) => {
+      if (key in _this && isNull(_this[key]))
+        _this[key] = schema[key];
+    });
+    return this;
+  }
+  isValid() {
+    const errors = Validator.validate(this);
+    return (this.errors = errors).length === 0;
+  }
+  validate() {
+    return this.isValid();
+  }
+}
+
+function $field(schema) {
+  return new FieldSchema(schema);
+}
+class SchemaBuilder {
+  constructor(context, compiler, evaluator) {
+    this.schemas = [];
+    $internal(this);
+    this.context = context;
+    this.compiler = compiler;
+    this.evaluator = evaluator;
+    this.schema = {};
+  }
+  build(entry) {
+    const data = entry.data;
+    const $schema = this.schema = entry.schema;
+    const compiler = this.compiler;
+    const evaluator = this.evaluator;
+    const rootElement = entry.element;
+    const options = entry.options || {};
+    const isReactive = (options.type || 'REACTIVE') === 'REACTIVE';
+    const cform = Constants.form;
+    // Remove `[ ]` and `,` and return an array of the names provided
+    const mNames = (options.names || '[name]').replace(/\[|\]/g, '').split(',');
+    const mValues = (options.values || '[value]').replace(/\[|\]/g, '').split(',');
+    // Elements that skipped on serialization process
+    const escapes = {
+      BUTTON: true
+    };
+    const checkables = {
+      checkbox: true,
+      radio: true
+    };
+    const formLayerSchema = new WeakMap();
+    const trySetBuilderInFormSchema = (currentScope, $schema) => {
+      const formSchema = currentScope.$form;
+      if (!formSchema || formSchema.schema)
+        return;
+      formSchema.schema = $schema;
+    };
+    const getValue = (el, fieldName) => {
+      if (fieldName in el)
+        return el[fieldName];
+      return el.getAttribute(fieldName) || el.innerText;
+    };
+    const getFieldValue = (el) => {
+      let val = undefined;
+      mValues.find((field) => (val = getValue(el, field)) ? true : false);
+      return val;
+    };
+    const getFieldStructure = (schema, fieldName, el, scopeData) => {
+      const field = findAttribute(el, [cform.schema], true);
+      const codeFieldInfo = schema[fieldName] || {};
+      if (field == null)
+        return codeFieldInfo;
+      const htmlFieldInfo = evaluator.exec({
+        data: scopeData,
+        context: this.context,
+        code: field.value,
+        returnable: true
+      }) || {};
+      if (!isEmptyObject(htmlFieldInfo) && !isEmptyObject(codeFieldInfo)) {
+        Logger.warn(`WARNING in <${toLower(el.tagName)} name="${fieldName}" />: You cannot ` +
+          `use both \`schema\` attribute “e-schema” and \`schema\` code at the same time.`);
+      }
+      if (codeFieldInfo instanceof FieldSchema) {
+        return codeFieldInfo.merge(htmlFieldInfo);
+      }
+      return Extend.obj(htmlFieldInfo, codeFieldInfo);
+    };
+    // Use the up array to map the layers and check what layer the compiler is
+    const findParentBuildElement = function(el) {
+      const parentElement = el.parentElement;
+      if (parentElement == rootElement || parentElement == null)
+        return rootElement;
+      const isBuild = parentElement.hasAttribute(cform.build) ||
+        parentElement.hasAttribute(cform.buildarray);
+      if (isBuild)
+        return parentElement;
+      return findParentBuildElement(parentElement);
+    };
+    const processInput = (options) => {
+      const {
+        el: input,
+        schema,
+        scopeData
+      } = options;
+      const attr = findAttribute(input, mNames);
+      // Checking if the element has the names on it
+      if (!attr)
+        return;
+      const attrName = attr.value;
+      const type = findAttribute(input, ['type']);
+      const typeName = type ? toLower(type.value) : 'text';
+      // If is escapable, stop
+      if (escapes[input.tagName] === true)
+        return;
+      // If it's is checkable and it's not selected, stop
+      if ((input instanceof HTMLInputElement) && (checkables[input.type] === true && input.checked === false))
+        return;
+      // Retrieving the value if it needs to be build as arry property
+      const isArray = findAttribute(input, [cform.array]) != null;
+      // if it is not an array built type, just set the value
+      const fieldStructure = getFieldStructure(schema, attrName, input, scopeData);
+      // Form Field
+      const $fieldSchema = fieldStructure instanceof FieldSchema ?
+        fieldStructure :
+        new FieldSchema(fieldStructure);
+      $fieldSchema.init({
+        field: input,
+        name: attrName,
+        type: isArray ? typeName + '[]' : typeName
+      });
+      $fieldSchema.form = scopeData.$form;
+      // Assigning the value of element if there is not a
+      if (isNull($fieldSchema.value))
+        $fieldSchema.value = getFieldValue(input);
+      // Transforming the value and errors to reactive
+      $reactive({
+        context: this.context,
+        data: $fieldSchema,
+        keys: ['value', 'errors']
+      });
+      if (!Constants.check(input, 'e-bind'))
+        input.setAttribute('e-bind', 'value');
+      compiler.compile({
+        context: this.context,
+        data: $fieldSchema,
+        el: input
+      });
+      // Adding the element a list to be easier to validate
+      this.schemas.push($fieldSchema);
+      // Setting the element prop in the schema
+      // if it is not an array built type, just set the value
+      if (!isArray) {
+        if (attrName in schema)
+          delete schema[attrName];
+        schema[attrName] = $fieldSchema;
+      } else {
+        // Getting the value from if exists, otherwise set default value as empty array
+        const $oldValue = (schema[attrName] || []);
+        schema[attrName] = $oldValue.concat($schema);
+      }
+      if (isReactive) {
+        $reactive({
+          context: this.context,
+          data: schema,
+          keys: [attrName]
+        }); // Setting the property to reactive
+      }
+    };
+    const getSchema = (options) => {
+      const currentElement = options.el;
+      const currentScopeData = options.scopeData;
+      const parentBuild = findParentBuildElement(currentElement);
+      const currentSchema = formLayerSchema.get(parentBuild);
+      trySetBuilderInFormSchema(currentScopeData, currentSchema);
+      return currentSchema;
+    };
+    const setSchema = (options) => {
+      const currentElement = options.el;
+      const currentScopeData = options.scopeData;
+      const currentParentBuild = findParentBuildElement(currentElement);
+      const currentSchema = formLayerSchema.get(currentParentBuild);
+      // Finding e-build property
+      const attrBuild = findAttribute(currentElement, [
+                cform.build,
+                cform.buildarray,
+            ]);
+      if (!attrBuild)
+        return currentSchema;
+      const attrValue = attrBuild.value;
+      const attrName = attrBuild.name;
+      // Retrieving the value if it needs to be build as arry property
+      const isArray = attrName === cform.buildarray || findAttribute(currentElement, [cform.array]) != null;
+      let $$schema = {};
+      let currentSchemaValue = currentSchema[attrValue];
+      // Setting the element prop in the schema
+      // if it is not an array built type, just set the value
+      if (!isArray) {
+        // if there is already a value, do nothing
+        if (currentSchemaValue) {
+          $$schema = currentSchemaValue;
+        }
+        // Field Info Set
+        currentSchema[attrValue] = $$schema;
+      } else {
+        const values = currentSchemaValue;
+        // Check if there is already a value and the first element is a FieldSchema
+        if (values && values.length > 0) {
+          $$schema = values[values.length - 1];
+        } else {
+          // Getting the value from if exists, otherwise set default value as empty array
+          const $oldValue = (currentSchema[attrValue] || []);
+          currentSchema[attrValue] = $oldValue.concat($$schema);
+        }
+      }
+      if (isReactive) {
+        $reactive({
+          context: this.context,
+          data: currentSchema,
+          keys: [attrValue]
+        }); // Setting the property to reactive
+      }
+      formLayerSchema.set(currentElement, $$schema);
+      trySetBuilderInFormSchema(currentScopeData, currentSchema);
+    };
+    // Clearing the Schemas, in case of FormBuilder re-use
+    this.schemas = [];
+    // Initializing the Schema Layer
+    formLayerSchema.set(rootElement, $schema);
+    if (isReactive) {
+      const arrayElements = Extend.array(toArray(rootElement.querySelectorAll('[e-build\\:array]')), toArray(rootElement.querySelectorAll(`[${cform.array}]`)));
+      filter(arrayElements, (el) => {
+        const attr = findAttribute(el, [cform.buildarray, cform.build]);
+        if (!attr)
+          return;
+        el.setAttribute('e-for', `${code(3, '_')} of $form.parent.get('${attr.value}')`);
+      });
+    }
+    compiler.compile({
+      context: this.context,
+      data: data,
+      el: rootElement,
+      beforeCompile: (element, scopeData) => {
+        if (!(element instanceof Element))
+          return;
+        setSchema({
+          el: element,
+          scopeData: scopeData
+        });
+      },
+      afterCompile: (element, scopeData) => {
+        if (!(element instanceof Element))
+          return;
+        processInput({
+          el: element,
+          schema: getSchema({
+            el: element,
+            scopeData: scopeData
+          }),
+          scopeData: scopeData
+        });
+      }
+    });
+    return this;
+  }
+  toObject() {
+    return (function walker(schema, $obj) {
+      for (const key in schema) {
+        const property = schema[key];
+        if (property instanceof FieldSchema) {
+          Property.set($obj, key, {
+            enumerable: true,
+            get() {
+              return property.value;
+            },
+            set(v) {
+              property.value = v;
+            }
+          });
+          $obj[key] = property.value;
+        } else if (property instanceof Array) {
+          $obj[key] = property.map((item) => walker(item, {}));
+        } else if (typeof property == 'object') {
+          $obj[key] = walker(property, {});
+        }
+      }
+      return $obj;
+    })(this.schema, {});
+  }
+}
+class FormHandler {
+  constructor(schema, builderOptions) {
+    this.schemas = [];
+    $internal(this);
+    // Assigning an empty object if formObject is not provided
+    this.schema = schema || {};
+    this.builderOptions = builderOptions || {};
+    this.evaluator = $default();
+    this.formElement = $default();
+  }
+  resolveElement(el) {
+    // If it's not a HTML Element, just return
+    if (el instanceof Element)
+      return el;
+    if (!(typeof el === 'string'))
+      return undefined;
+    try {
+      // If it's a string try to get the element
+      const element = DOM.querySelector(el);
+      if (!element) {
+        Logger.error('Element with "' + element + '" selector not found.');
+        return undefined;
+      }
+      return element;
+    } catch (error) {
+      // Unknown error
+      Logger.error(buildError(error));
+      return undefined;
+    }
+  }
+  init(options) {
+    const {
+      element,
+      context,
+      data,
+      bouer
+    } = options;
+    this.bouer = bouer;
+    this.context = context;
+    this.formElement = this.resolveElement(element);
+    this.schemas = [];
+    const compiler = IoC.app(bouer).resolve(Compiler);
+    const evaluator = this.evaluator = IoC.app(bouer).resolve(Evaluator);
+    const $builder = this.$builder = new SchemaBuilder(this.context, compiler, evaluator);
+    const dataToUse = Extend.obj(data, {
+      $form: new FormSchema({
+        currentNode: this.formElement,
+        scopeData: data
+      })
+    });
+    IoC.app(bouer).resolve(DataStore)
+      .addNodeData(this.formElement, dataToUse);
+    $builder.build({
+      element: this.formElement,
+      schema: this.schema,
+      options: this.builderOptions,
+      data: dataToUse
+    });
+    this.schemas = $builder.schemas;
+    return this;
+  }
+  get(path) {
+    var _a;
+    if (path == null || path == '')
+      return undefined;
+    if (this.evaluator == null) {
+      (_a = Logger.error('FormHandler is not initialized')) !== null && _a !== void 0 ? _a : undefined;
+      return undefined;
+    }
+    return this.evaluator.exec({
+      returnable: true,
+      context: this.context,
+      data: this.schema,
+      code: path,
+    });
+  }
+  set(path, value) {
+    const field = this.get(path);
+    if (field == null)
+      return;
+    field.value = value;
+  }
+  validate() {
+    let isValid = true;
+    this.schemas.forEach(f => f.isValid() ? 1 : isValid = false);
+    return isValid;
+  }
+  toObject() {
+    if (this.$builder == null) {
+      Logger.error('SchemaBuilder is not initialized.');
+      return {};
+    }
+    return this.$builder.toObject();
+  }
+  clear() {
+    this.schemas.forEach(f => f.value = '');
+  }
+}
+
+function $form(schema, builderOptions) {
+  return new FormHandler(schema, builderOptions);
+}
+
+function $formHandling(opitons) {
+  const {
+    node,
+    context,
+    evaluator,
+    data
+  } = opitons;
+  const ownerNode = toOwnerNode(node); // The Form that needs to be initialized
+  const nodeName = node.nodeName;
+  const nodeValue = ifNullReturn(node.nodeValue, '');
+  const errorInvalidValue = (node) => ('Invalid value, expected an Object/Object Literal in “' +
+    nodeName + '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
+  if (nodeValue === '')
+    return Logger.error(errorInvalidValue(node));
+  let formEntryDataSource = $default();
+  const reactiveEvent = ReactiveEvent.on('AfterGet', (descriptor) => {
+    formEntryDataSource = descriptor.source;
+  });
+  const entryForm = evaluator.exec({
+    data: data,
+    code: nodeValue,
+    context: context
+  });
+  reactiveEvent.off();
+  if (!isObject(entryForm))
+    return Logger.error(errorInvalidValue(node));
+  const formHandler = entryForm instanceof FormHandler
+    // Return the FormHandler
+    ?
+    entryForm
+    // Create a new annonymous FormHandler
+    :
+    new FormHandler(entryForm.schema, entryForm.builderOptions);
+  // Removing the form directive
+  ownerNode.removeAttribute(node.nodeName);
+  if (formEntryDataSource) {
+    delete formEntryDataSource[nodeValue];
+    formEntryDataSource[nodeValue] = formHandler;
+  }
+  return formHandler.init({
+    element: ownerNode,
+    context: context,
+    bouer: opitons.compiler.bouer,
+    data: data,
+  });
 }
 
 function $for(opitons) {
@@ -3051,7 +3375,7 @@ function $for(opitons) {
         return list;
       }
       const newListCopy = [];
-      forEach(list, item => {
+      filter(list, item => {
         let isValid = false;
         if (isNull(wKeys)) {
           isValid = toStr(item).toLowerCase().includes(wValue.toLowerCase());
@@ -3115,7 +3439,7 @@ function $for(opitons) {
     forData[itemKey] = item;
     forData[indexOrValue] = isForOf ? index : sourceValue[item];
     forData[mIndex] = index;
-    return Reactive.transform({
+    return $reactive({
       data: forData,
       context: context
     });
@@ -3197,7 +3521,7 @@ function $for(opitons) {
         const indexOrValue = leftHandParts[1] || '_index_or_value';
         if (indexOrValue === '_index_or_value')
           return;
-        forEach(array, (item, index) => {
+        filter(array, (item, index) => {
           item.data[indexOrValue] = index;
         });
       }).then(mCaller => mCaller(listedItemsHandler));
@@ -3217,13 +3541,13 @@ function $for(opitons) {
         let index = args[0];
         const deleteCount = args[1];
         const removedItems = mListedItems.splice(index, deleteCount);
-        forEach(removedItems, (item) => removeEl(getRootElement(item.el)));
+        filter(removedItems, (item) => removeEl(getRootElement(item.el)));
         expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
         const leftHandParts = expObj.leftHandParts;
         const indexOrValue = leftHandParts[1] || '_index_or_value';
         const insertArgs = [].slice.call(args, 2);
         // Adding the items to the dom
-        forEach(insertArgs, item => {
+        filter(insertArgs, item => {
           index++;
           $InsertForItem({
             // Getting the next reference
@@ -3250,7 +3574,7 @@ function $for(opitons) {
         let indexRef = isUnshift ? 0 : mListedItems.length;
         let reference = isUnshift ? getRootElement(element) : comment;
         // Adding the items to the dom
-        forEach([].slice.call(args), item => {
+        filter([].slice.call(args), item => {
           const ref = $InsertForItem({
             index: indexRef++,
             reference,
@@ -3284,17 +3608,17 @@ function $for(opitons) {
   });
   let expObj = $ExpressionBuilder(node.nodeValue);
   const filters = expObj.filters;
-  const findFilter = (fName) => filters.filter(item => item.substring(0, fName.length) === fName);
+  const findFilter = (fName) => filters.filter(f => f.substring(0, fName.length) === fName);
   const whereFilterConfigs = findFilter('where');
   // Applying the filter before rendering the items
-  forEach(whereFilterConfigs, config => applyWhere(expObj.sourceValue, config));
+  filter(whereFilterConfigs, config => applyWhere(expObj.sourceValue, config));
   reactivePropertyEvent.off();
   (execute = () => {
     expObj = expObj || $ExpressionBuilder(trim(ifNullReturn(node.nodeValue, '')));
     const iterable = expObj.iterableExpression;
     const orderFilterConfigs = findFilter('order');
     // Cleaning the existing items
-    forEach(listedItemsHandler, item => {
+    filter(listedItemsHandler, item => {
       const element = getRootElement(item.el);
       if (!element.parentElement)
         return;
@@ -3308,7 +3632,7 @@ function $for(opitons) {
       code: 'var __e = __each, __fl = __filters, __f = __for; ' +
         '__f(__fl(' + iterable + '), function($$itm, $$idx) { __e($$itm, $$idx); })',
       aditional: {
-        __for: forEach,
+        __for: filter,
         __each: (item, index) => $InsertForItem({
           index,
           item
@@ -3316,7 +3640,7 @@ function $for(opitons) {
         __filters: (list) => {
           let listCopy = Extend.array(list);
           // applying where:
-          forEach(whereFilterConfigs, config => listCopy = applyWhere(listCopy, config));
+          filter(whereFilterConfigs, config => listCopy = applyWhere(listCopy, config));
           // applying order:
           const applyOrder = (config) => {
             const parts = config.split(':').map(item => trim(item));
@@ -3327,7 +3651,7 @@ function $for(opitons) {
               listCopy = $Order(listCopy, parts[1], parts[2]);
             }
           };
-          forEach(orderFilterConfigs, config => applyOrder(config));
+          filter(orderFilterConfigs, config => applyOrder(config));
           return listCopy;
         }
       }
@@ -3351,7 +3675,7 @@ function $skeleton(opitons) {
   if (!uid)
     return;
   ownerNode.removeAttribute('skeleton-clone-code');
-  forEach([].slice.call((_a = bouer.el) === null || _a === void 0 ? void 0 : _a.querySelectorAll('[="' + uid + '"]')), (el) => {
+  filter([].slice.call((_a = bouer.el) === null || _a === void 0 ? void 0 : _a.querySelectorAll('[="' + uid + '"]')), (el) => {
     (el.parentElement || el.parentNode).removeChild(el);
   });
 }
@@ -3362,701 +3686,10 @@ function $skip(options) {
   } = options;
   node.nodeValue = 'true';
 }
-const Validator = (function() {
-  const invalidInputClass = 'is-invalid';
-
-  function innerValidateRequired(fieldInfo) {
-    var _a;
-    const errorList = [];
-    const {
-      field,
-      name,
-      value,
-      type
-    } = fieldInfo;
-    const required = (_a = fieldInfo.required) !== null && _a !== void 0 ? _a : false;
-    const isValidValue = () => {
-      return required == true ? (value != null && (value + '').trim() != '') : true;
-    };
-    const addError = (error, clear) => {
-      if (clear === true)
-        errorList.splice(0, errorList.length);
-      errorList.push(error);
-      field.classList.add(invalidInputClass);
-    };
-    if (!isValidValue()) {
-      addError({
-        rule: 'required',
-        message: `The field ${name} is required.`,
-        field: field,
-        value: value
-      });
-    }
-    return {
-      errors: errorList,
-      isValidValue,
-      addError
-    };
-  }
-
-  function innerValidateCheck(fieldInfo, isValidValue, addError) {
-    const {
-      field,
-      name,
-      value,
-      check
-    } = fieldInfo;
-    // Check validation
-    if (check != null && check.indexOf(value) < 0) {
-      addError({
-        rule: 'check',
-        message: `The field ${name} with value ${value} does not match the required options.`,
-        field: field,
-        value: value
-      });
-      field.classList.add(invalidInputClass);
-    }
-  }
-
-  function innerValidateFunction(fieldInfo, addError) {
-    if (!fieldInfo.fn)
-      return;
-    const {
-      name,
-      field,
-      value,
-      fn
-    } = fieldInfo;
-    const result = fn(fieldInfo);
-    const {
-      valid,
-      message,
-      override
-    } = typeof result == 'object' ? result : {
-      valid: result,
-      message: `The field ${name} does not have the expected value.`,
-      override: false
-    };
-    const clearPreviousError = valid == false && override == true;
-    if (!valid) {
-      field.classList.add(invalidInputClass);
-      addError({
-        rule: 'function',
-        message: message,
-        field: field,
-        value: value
-      }, clearPreviousError);
-      field.classList.add(invalidInputClass);
-    }
-  }
-
-  function validateString(fieldInfo) {
-    const {
-      field,
-      pattern,
-      name,
-      value,
-      length
-    } = fieldInfo;
-    const {
-      min,
-      max
-    } = typeof length == 'object' ? length : {
-      min: 0,
-      max: length
-    };
-    const {
-      errors,
-      isValidValue,
-      addError
-    } = innerValidateRequired(fieldInfo);
-    // Minimum length validation
-    if (min != null && isValidValue() && value.length < min) {
-      addError({
-        rule: 'length:min',
-        message: `The field ${name} should have at least ${min} characters. Current length: ${value.length}.`,
-        field: field,
-        value: value
-      });
-    }
-    // Maximum length validation
-    if (max != null && isValidValue() && value.length > max) {
-      addError({
-        rule: 'length:max',
-        message: `The field ${name} should have at most ${max} characters. Current length: ${value.length}.`,
-        field: field,
-        value: value
-      });
-    }
-    // Regex validation
-    if (pattern != null && isValidValue()) {
-      const validator = {
-        'date': () => {
-          return value.match(
-            // eslint-disable-next-line max-len
-            /^(?:\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])|(?:0[1-9]|1[0-2])\/(?:0[1-9]|[12]\d|3[01])\/\d{4}|(?:0[1-9]|[12]\d|3[01])\/(?:0[1-9]|1[0-2])\/\d{4})$/);
-        },
-        'date-time': () => {
-          return value.match(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])[T ]([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(\.\d{1,3})?Z?$/);
-        },
-        'email': () => {
-          return value.match(/^[a-zA-Z0-9._%+-]{3,}@[a-zA-Z0-9.-]{3,}\.[a-zA-Z]{2,}(?:\.[a-zA-Z]{2,})?$/);
-        },
-        'regex': () => {
-          return value.match(new RegExp(pattern));
-        }
-      };
-      // Validates the pattern as named pattern, otherwise, validate the the pattern as regex
-      const isValidPattern = (validator[pattern] || validator['regex'])();
-      if (!isValidPattern) {
-        addError({
-          rule: 'regex',
-          message: `The field ${name} does not match the ${(pattern in validator) ? pattern : 'regex'} pattern.`,
-          field: field,
-          value: value
-        });
-      }
-    }
-    // Check validation
-    innerValidateCheck(fieldInfo, isValidValue, addError);
-    // Function validation
-    innerValidateFunction(fieldInfo, addError);
-    return errors;
-  }
-
-  function validateNumber(fieldInfo) {
-    let {
-      name,
-      value,
-      length,
-      field
-    } = fieldInfo;
-    const {
-      min,
-      max
-    } = typeof length == 'object' ? length : {
-      min: 0,
-      max: length
-    };
-    const {
-      errors,
-      isValidValue,
-      addError
-    } = innerValidateRequired(fieldInfo);
-    // is value a valid number
-    if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.exec(value)) {
-      addError({
-        rule: 'number',
-        message: `The field ${name} should have a number value.`,
-        field: field,
-        value: value
-      });
-    } else {
-      value = value * 1; // Convert to the presented number
-    }
-    // Minimum validation
-    if (min != null && value < min) {
-      addError({
-        rule: 'length:min',
-        message: `The field ${name} should be greater than or equal to ${min}.`,
-        field: field,
-        value: value
-      });
-    }
-    // Maximum validation
-    if (max != null && value > max) {
-      addError({
-        rule: 'length:max',
-        message: `The field ${name} should be less than or equal to ${max}.`,
-        field: field,
-        value: value
-      });
-    }
-    // Check validation
-    innerValidateCheck(fieldInfo, isValidValue, addError);
-    // Function validation
-    innerValidateFunction(fieldInfo, addError);
-    return errors;
-  }
-
-  function validateBoolean(fieldInfo) {
-    let {
-      name,
-      value,
-      field
-    } = fieldInfo;
-    const {
-      errors,
-      isValidValue,
-      addError
-    } = innerValidateRequired(fieldInfo);
-    // is value a valid number
-    if (!isValidValue() && !/^(TRUE|True|true|1|FALSE|False|false|0)?$/.exec(value)) {
-      addError({
-        rule: 'boolean',
-        message: `The field ${name} should be a boolean. Current value: ${value}`,
-        field: field,
-        value: value
-      });
-    } else {
-      value = ['true', '1'].indexOf(value.toLowerCase()) > -1 ? true : false; // Convert to the presented boolean value
-    }
-    // Function validation
-    innerValidateFunction(fieldInfo, addError);
-    return errors;
-  }
-
-  function validate(fieldInfo) {
-    const type = fieldInfo.type = fieldInfo.type || 'string';
-    switch (type) {
-      case 'string':
-        return validateString(fieldInfo);
-      case 'number':
-        return validateNumber(fieldInfo);
-      case 'boolean':
-        return validateBoolean(fieldInfo);
-      default:
-        return [];
-    }
-  }
-  return class FormValidator {
-    static validate(fieldInfo) {
-      return validate(fieldInfo);
-    }
-  };
-})();
-class FieldSchema {
-  constructor(options) {
-    this.errors = [];
-    this.field = undefined;
-    this.name = undefined;
-    this.type = undefined;
-    this.value = undefined;
-    Object.assign(this, options || {});
-  }
-  init(options) {
-    Object.assign(this, options);
-    return this;
-  }
-  isValid() {
-    const errors = Validator.validate(this);
-    return (this.errors = errors).length === 0;
-  }
-  validate() {
-    return this.isValid();
-  }
-}
-class SchemaBuilder {
-  constructor(context, compiler, evaluator) {
-    this._IRT_ = true;
-    this.schemas = [];
-    this.context = context;
-    this.compiler = compiler;
-    this.evaluator = evaluator;
-    this.schema = {};
-  }
-  build(entry) {
-    const data = entry.data;
-    const $schema = this.schema = entry.schema;
-    const compiler = this.compiler;
-    const evaluator = this.evaluator;
-    const rootElement = entry.element;
-    const options = entry.options || {};
-    const buildType = options.type || 'REACTIVE';
-    const isReactive = buildType === 'REACTIVE';
-    // Remove `[ ]` and `,` and return an array of the names provided
-    const mNames = (options.names || '[name]').replace(/\[|\]/g, '').split(',');
-    const mValues = (options.values || '[value]').replace(/\[|\]/g, '').split(',');
-    // Elements that skipped on serialization process
-    const escapes = {
-      BUTTON: true
-    };
-    const checkables = {
-      checkbox: true,
-      radio: true
-    };
-    const formLayerSchema = new WeakMap();
-    const trySetBuilderInFormSchema = (currentScope, $schema) => {
-      const formSchema = currentScope.$form;
-      if (!formSchema || formSchema.schema)
-        return;
-      formSchema.schema = $schema;
-    };
-    const getValue = (el, fieldName) => {
-      if (fieldName in el)
-        return el[fieldName];
-      return el.getAttribute(fieldName) || el.innerText;
-    };
-    const getFieldValue = (el) => {
-      let val = undefined;
-      mValues.find((field) => (val = getValue(el, field)) ? true : false);
-      return val;
-    };
-    const getFieldStructure = (schema, fieldName, el, scopeData) => {
-      const field = findAttribute(el, [Constants.form.schema], true);
-      const codeFieldInfo = schema[fieldName] || {};
-      if (field == null)
-        return codeFieldInfo;
-      const htmlFieldInfo = evaluator.exec({
-        data: scopeData,
-        context: this.context,
-        code: field.value,
-        returnable: true
-      }) || {};
-      if (!isEmptyObject(htmlFieldInfo) && !isEmptyObject(codeFieldInfo)) {
-        Logger.warn(`WARNING in <${toLower(el.tagName)} name="${fieldName}" />: You cannot ` +
-          `use both \`schema\` attribute “e-schema” and \`schema\` code at the same time.`);
-      }
-      return Extend.obj(htmlFieldInfo, codeFieldInfo);
-    };
-    // Use the up array to map the layers and check what layer the compiler is
-    const findParentBuildElement = function(el) {
-      const parentElement = el.parentElement;
-      if (parentElement == rootElement || parentElement == null)
-        return rootElement;
-      const isBuild = parentElement.hasAttribute(Constants.form.build) ||
-        parentElement.hasAttribute(Constants.form.abuild);
-      if (isBuild)
-        return parentElement;
-      return findParentBuildElement(parentElement);
-    };
-    const processInput = (options) => {
-      const {
-        el: input,
-        schema,
-        scopeData
-      } = options;
-      const attr = findAttribute(input, mNames);
-      // Checking if the element has the names on it
-      if (!attr)
-        return;
-      const attrName = attr.value;
-      const type = findAttribute(input, ['type']);
-      const typeName = (!type || toLower(type.value) == 'text') ? 'string' : toLower(type.value);
-      // If is escapable, stop
-      if (escapes[input.tagName] === true)
-        return;
-      // If it's is checkable and it's not selected, stop
-      if ((input instanceof HTMLInputElement) && (checkables[input.type] === true && input.checked === false))
-        return;
-      // Retrieving the value if it needs to be build as arry property
-      const isArray = findAttribute(input, ['e-array']) != null;
-      // if it is not an array built type, just set the value
-      // Form Field
-      const $fieldSchema = new FieldSchema(getFieldStructure(schema, attrName, input, scopeData)).init({
-        field: input,
-        name: attrName,
-        type: isArray ? 'array' : typeName
-      });
-      $fieldSchema.form = scopeData.$form;
-      // Assigning the value of element if there is not a
-      if (isNull($fieldSchema.value))
-        $fieldSchema.value = getFieldValue(input);
-      // Transforming the value and errors to reactive
-      Reactive.transform({
-        context: this.context,
-        data: $fieldSchema,
-        keys: ['value', 'errors']
-      });
-      if (!Constants.check(input, 'e-bind'))
-        input.setAttribute('e-bind', 'value');
-      compiler.compile({
-        context: this.context,
-        data: $fieldSchema,
-        el: input
-      });
-      // Adding the element a list to be easier to validate
-      this.schemas.push($fieldSchema);
-      // Setting the element prop in the schema
-      // if it is not an array built type, just set the value
-      if (!isArray) {
-        // Field Info Set
-        if (attrName in schema)
-          delete schema[attrName];
-        schema[attrName] = $fieldSchema;
-      } else {
-        // Getting the value from if exists, otherwise set default value as empty array
-        const $oldValue = (schema[attrName] || []);
-        schema[attrName] = $oldValue.concat($schema);
-      }
-      if (isReactive) {
-        Reactive.transform({
-          context: this.context,
-          data: schema,
-          keys: [attrName]
-        }); // Setting the property to reactive
-      }
-    };
-    const getSchema = (options) => {
-      const currentElement = options.el;
-      const currentScopeData = options.scopeData;
-      const parentBuild = findParentBuildElement(currentElement);
-      const currentSchema = formLayerSchema.get(parentBuild);
-      trySetBuilderInFormSchema(currentScopeData, currentSchema);
-      return currentSchema;
-    };
-    const setSchema = (options) => {
-      const currentElement = options.el;
-      const currentScopeData = options.scopeData;
-      const currentParentBuild = findParentBuildElement(currentElement);
-      const currentSchema = formLayerSchema.get(currentParentBuild);
-      // Finding e-build property
-      const attrBuild = findAttribute(currentElement, [
-                Constants.form.build,
-                Constants.form.abuild,
-            ]);
-      if (!attrBuild)
-        return currentSchema;
-      const attrValue = attrBuild.value;
-      const attrName = attrBuild.name;
-      // Retrieving the value if it needs to be build as arry property
-      const isArray = attrName === 'e-build:array' || findAttribute(currentElement, ['e-array']) != null;
-      let $$schema = {};
-      let currentSchemaValue = currentSchema[attrValue];
-      // Setting the element prop in the schema
-      // if it is not an array built type, just set the value
-      if (!isArray) {
-        // if there is already a value, do nothing
-        if (currentSchemaValue) {
-          $$schema = currentSchemaValue;
-        }
-        // Field Info Set
-        currentSchema[attrValue] = $$schema;
-      } else {
-        const values = currentSchemaValue;
-        // Check if there is already a value and the first element is a FieldSchema
-        if (values && values.length > 0) {
-          $$schema = values[values.length - 1];
-        } else {
-          // Getting the value from if exists, otherwise set default value as empty array
-          const $oldValue = (currentSchema[attrValue] || []);
-          currentSchema[attrValue] = $oldValue.concat($$schema);
-        }
-      }
-      if (isReactive) {
-        Reactive.transform({
-          context: this.context,
-          data: currentSchema,
-          keys: [attrValue]
-        }); // Setting the property to reactive
-      }
-      formLayerSchema.set(currentElement, $$schema);
-      trySetBuilderInFormSchema(currentScopeData, currentSchema);
-    };
-    // Clearing the Schemas, in case of FormBuilder re-use
-    this.schemas = [];
-    // Initializing the Schema Layer
-    formLayerSchema.set(rootElement, $schema);
-    if (isReactive) {
-      const arrayElements = Extend.array(toArray(rootElement.querySelectorAll('[e-build\\:array]')), toArray(rootElement.querySelectorAll('[e-array]')));
-      forEach(arrayElements, (el) => {
-        const attr = findAttribute(el, ['e-build:array', 'e-build']);
-        if (!attr)
-          return;
-        const varName = code(3, '_');
-        el.setAttribute('e-for', `${varName} of $form.parent.get('${attr.value}')`);
-      });
-    }
-    compiler.compile({
-      context: this.context,
-      data: data,
-      el: rootElement,
-      beforeCompile: (element, scopeData) => {
-        if (!(element instanceof Element))
-          return;
-        setSchema({
-          el: element,
-          scopeData: scopeData
-        });
-      },
-      afterCompile: (element, scopeData) => {
-        if (!(element instanceof Element))
-          return;
-        processInput({
-          el: element,
-          schema: getSchema({
-            el: element,
-            scopeData: scopeData
-          }),
-          scopeData: scopeData
-        });
-      }
-    });
-    return this;
-  }
-  toObject() {
-    return (function walker(schema, $obj) {
-      for (const key in schema) {
-        const property = schema[key];
-        if (property instanceof FieldSchema) {
-          Prop.set($obj, key, {
-            enumerable: true,
-            get() {
-              return property.value;
-            },
-            set(v) {
-              property.value = v;
-            }
-          });
-          $obj[key] = property.value;
-        } else if (property instanceof Array) {
-          $obj[key] = property.map((item) => walker(item, {}));
-        } else if (typeof property == 'object') {
-          $obj[key] = walker(property, {});
-        }
-      }
-      return $obj;
-    })(this.schema, {});
-  }
-}
-class FormHandler {
-  constructor(schema, builderOptions) {
-    this._IRT_ = true;
-    this.schemas = [];
-    // Assigning an empty object if formObject is not provided
-    this.schema = schema || {};
-    this.builderOptions = builderOptions || {};
-    this.evaluator = $default();
-    this.formElement = $default();
-  }
-  resolveElement(el) {
-    let element = el;
-    // If it's not a HTML Element, just return
-    if ((element instanceof Element))
-      return element;
-    // If it's a string try to get the element
-    else if (typeof element === 'string') {
-      try {
-        if (!(element = DOM.querySelector(element))) {
-          Logger.error('Element with "' + element + '" selector not found.');
-          return undefined;
-        }
-      } catch (error) {
-        // Unknown error
-        Logger.error(buildError(error));
-        return undefined;
-      }
-    }
-    // If the element is not
-    if (isNull(element))
-      throw Logger.error('Invalid element provided at “' + element + '”.');
-    return element;
-  }
-  init(options) {
-    const {
-      element,
-      context,
-      data,
-      bouer
-    } = options;
-    this.bouer = bouer;
-    this.context = context;
-    this.formElement = this.resolveElement(element);
-    this.schemas = [];
-    const compiler = IoC.app(bouer).resolve(Compiler);
-    const evaluator = this.evaluator = IoC.app(bouer).resolve(Evaluator);
-    const $builder = this.$builder = new SchemaBuilder(this.context, compiler, evaluator);
-    $builder.build({
-      element: this.formElement,
-      schema: this.schema,
-      options: this.builderOptions,
-      data: Extend.obj(data, {
-        $form: new FormSchema({
-          currentNode: this.formElement,
-          scopeData: data
-        })
-      }),
-    });
-    this.schemas = $builder.schemas;
-    return this;
-  }
-  get(path) {
-    if (path == null || path == '')
-      return undefined;
-    if (this.evaluator == null) {
-      Logger.error('FormHandler is not initialized');
-      return undefined;
-    }
-    return this.evaluator.exec({
-      returnable: true,
-      context: this.context,
-      data: this.schema,
-      code: path,
-    });
-  }
-  set(path, value) {
-    const field = this.get(path);
-    if (field == null)
-      return;
-    field.value = value;
-  }
-  validate() {
-    let isValid = true;
-    for (const field of this.schemas) {
-      if (!field.isValid())
-        isValid = false;
-    }
-    return isValid;
-  }
-  toObject() {
-    if (this.$builder == null) {
-      Logger.error('SchemaBuilder is not initialized.');
-      return {};
-    }
-    return this.$builder.toObject();
-  }
-}
-
-function $form(opitons) {
-  const {
-    node,
-    context,
-    evaluator,
-    data
-  } = opitons;
-  const ownerNode = toOwnerNode(node); // The Form that needs to be initialized
-  const nodeName = node.nodeName;
-  const nodeValue = ifNullReturn(node.nodeValue, '');
-  const errorInvalidValue = (node) => ('Invalid value, expected an Object/Object Literal in “' +
-    nodeName + '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
-  if (nodeValue === '')
-    return Logger.error(errorInvalidValue(node));
-  let formEntryDataSource = $default();
-  const reactiveEvent = ReactiveEvent.on('AfterGet', (descriptor) => {
-    formEntryDataSource = descriptor.propSource;
-  });
-  const entryForm = evaluator.exec({
-    data: data,
-    code: nodeValue,
-    context: context
-  });
-  reactiveEvent.off();
-  if (!isObject(entryForm))
-    return Logger.error(errorInvalidValue(node));
-  const formHandler = entryForm instanceof FormHandler
-    // Return the FormHandler
-    ?
-    entryForm
-    // Create a new annonymous FormHandler
-    :
-    new FormHandler(entryForm.schema);
-  // Removing the form directive
-  ownerNode.removeAttribute(node.nodeName);
-  if (formEntryDataSource) {
-    delete formEntryDataSource[nodeValue];
-    formEntryDataSource[nodeValue] = formHandler;
-  }
-  return formHandler.init({
-    element: ownerNode,
-    context: context,
-    bouer: opitons.compiler.bouer,
-    data: data,
-  });
-}
 class Directive {
   constructor(compiler, customDirective, compilerContext) {
-    this._IRT_ = true;
     this.customDirectives = {};
+    $internal(this);
     this.compiler = compiler;
     this.context = compilerContext;
     this.bouer = compiler.bouer;
@@ -4217,7 +3850,7 @@ class Directive {
     });
   }
   form(node, data) {
-    return $form({
+    return $formHandling({
       evaluator: this.evaluator,
       context: this.context,
       compiler: this.compiler,
@@ -4231,14 +3864,20 @@ class Directive {
       bouer: this.bouer
     });
   }
+  ref(node) {
+    return $ref({
+      node: node,
+      bouer: this.bouer
+    });
+  }
 }
 class Compiler {
   constructor(bouer, binder, delimiterHandler, eventHandler, componentHandler, directives) {
-    this._IRT_ = true;
     this.NODES_TO_IGNORE_IN_COMPILATION = {
       'SCRIPT': 1,
       '#comment': 8
     };
+    $internal(this);
     this.bouer = bouer;
     this.directives = directives !== null && directives !== void 0 ? directives : {};
     this.binder = binder;
@@ -4267,12 +3906,15 @@ class Compiler {
         return defaultData;
       return this.dataStore.getNodeData(node, defaultData);
     };
-    if (!rootElement)
-      return Logger.error('Invalid element provided to the compiler.');
+    if (!rootElement) {
+      Logger.error('Invalid element provided to the compiler.');
+      return fnCallResolver(onComponentLoad.call(context, rootElement, data));
+    }
     const iNode = rootElement;
     const isActive = iNode.isActive = (_a = iNode.isActive) !== null && _a !== void 0 ? _a : (() => rootElement.isConnected);
-    if (!this.analize(rootElement.outerHTML))
-      return rootElement;
+    if (!this.analize(rootElement.outerHTML)) {
+      return fnCallResolver(onComponentLoad.call(context, rootElement, data));
+    }
     const directive = new Directive(this, this.directives || {}, context);
     const loadingComponents = [];
     fnCallResolver(beforeCompile.call(context, rootElement, data));
@@ -4289,8 +3931,11 @@ class Compiler {
         if (Constants.skip in attributes)
           return directive.skip(currentNode);
         // Intercept Directive in the Element
-        if (findOneBy(directivesToIgnore, (dir) => dir in attributes))
+        if (directivesToIgnore.find(dir => dir in attributes))
           return;
+        // ref directive
+        if (Constants.ref in attributes)
+          directive.ref(findDirective(currentNode, Constants.ref));
         // e-def="{...}" directive
         if (Constants.def in attributes)
           directive.def(findDirective(currentNode, Constants.def), scopeData);
@@ -4378,7 +4023,7 @@ class Compiler {
         if (routing.routeView === currentNode)
           return;
         // Looping the attributes
-        forEach(toArray(attributes), (attr) => walker(attr, scopeData));
+        filter(toArray(attributes), (attr) => walker(attr, scopeData));
       }
       // :href="..." or !href="..." directive
       if (Constants.check(currentNode, Constants.href))
@@ -4432,7 +4077,7 @@ class Compiler {
         });
       }
       const dataToUse = getElementData(currentNode, scopeData);
-      forEach(toArray(currentNode.childNodes), (childNode) => {
+      filter(toArray(currentNode.childNodes), (childNode) => {
         childNode.isActive = isActive;
         fnCallResolver( // Before Compile the element...
           beforeCompile.call(context, childNode, dataToUse));
@@ -4460,12 +4105,11 @@ class Compiler {
       fnCallResolver(onComponentLoad.call(context, rootElement, dt));
     };
     if (loadingComponents.length == 0)
-      onCompilationFinished();
-    else
-      Promise.all(loadingComponents)
-      .then(() => onCompilationFinished())
-      .catch(() => onCompilationFinished());
-    return rootElement;
+      return onCompilationFinished();
+    return Promise.all(loadingComponents)
+      .then(() => {
+        onCompilationFinished();
+      });
   }
   analize(htmlSnippet) {
     const tagRegexRule = '<([a-z0-9-_]{1,}|/[a-z0-9-_]{1,})((.|\n|\r)*?)>';
@@ -4542,55 +4186,733 @@ class Compiler {
     return isValid;
   }
 }
-class UriHandler {
-  constructor(url) {
-    this._IRT_ = true;
-    this.url = url || DOM.location.href;
+class ComponentHandler {
+  constructor(bouer, delimiterHandler, eventHandler, evaluator, routing) {
+    // Handle all the components web requests to avoid multiple requests
+    this.requests = {};
+    this.components = {};
+    // Avoids adding multiple styles of the same component if it's already in use
+    this.stylesController = {};
+    this.activeComponents = [];
+    $internal(this);
+    this.bouer = bouer;
+    this.delimiter = delimiterHandler;
+    this.eventHandler = eventHandler;
+    this.evaluator = evaluator;
+    this.rounting = routing;
   }
-  params(urlPattern) {
-    const mParams = {};
-    if (urlPattern && isString(urlPattern)) {
-      const urlWithQueryParamsIgnored = this.url.split('?')[0];
-      const urlPartsReversed = urlWithQueryParamsIgnored.split('/').reverse();
-      if (urlPartsReversed[0] === '')
-        urlPartsReversed.shift();
-      const urlPatternReversed = urlPattern.split('/').reverse();
-      forEach(urlPatternReversed, (value, index) => {
-        const valueExec = RegExp('{([\\S\\s]*?)}', 'ig').exec(value);
-        if (Array.isArray(valueExec))
-          mParams[valueExec[1]] = urlPartsReversed[index];
+  check(nodeName) {
+    return (nodeName in this.components);
+  }
+  request(path, response) {
+    if (!isNull(this.requests[path]))
+      return this.requests[path].push(response);
+    this.requests[path] = [response];
+    const baseElement = DOM.head.querySelector('base');
+    const resolver = baseElement !== null && baseElement !== void 0 ? baseElement : urlResolver('/');
+    // Building the URL according to the main path
+    const componentPath = urlCombine(resolver.baseURI, path.replace(resolver.baseURI, ''));
+    webRequest(componentPath, {
+        headers: {
+          'Content-Type': 'text/plain'
+        }
+      })
+      .then(response => {
+        if (!response.ok)
+          throw new Error(response.statusText);
+        return response.text();
+      })
+      .then(content => {
+        filter(this.requests[path], (request) => {
+          request.success(content, path);
+        });
+        delete this.requests[path];
+      })
+      .catch(error => {
+        if (!baseElement)
+          Logger.warn('It seems like you are not using the “<base href="/base/components/path/" />” ' +
+            'element, try to add as the first child into “<head></head>” element.');
+        filter(this.requests[path], (request) => request.fail(error, path));
+        delete this.requests[path];
+      });
+  }
+  prepare(components, parent) {
+    filter(components, (entry) => {
+      const isComponentClass = (entry.prototype instanceof Component);
+      // Assuming that is a ComponentPrototype
+      let $protoComponent = entry;
+      let $classComponent;
+      // if it is a class
+      if (isComponentClass) {
+        // Resolve the instance of the class
+        $classComponent = IoC.app(this.bouer).resolve(entry) || IoC.resolve(entry) || IoC.new(entry);
+        if (!$protoComponent)
+          return Logger.error('Could not create the “' + entry.name + '” component');
+        $protoComponent = $classComponent.__$proto__;
+        Property.set($protoComponent, 'ctor', {
+          configurable: false,
+          enumerable: false,
+          writable: false,
+          value: entry
+        });
+      }
+      // In case of no-named-component, creates a name
+      if (isNull($protoComponent.name)) {
+        // But, if the component has a path, generate a beautiful name for it
+        if (!isNull($protoComponent.path) || !$protoComponent.path) {
+          const pathSplitted = $protoComponent.path.toLowerCase().split('/');
+          let componentName = pathSplitted[pathSplitted.length - 1].replace('.html', '') || Component.name;
+          // If the component name already exists generate a new one
+          if (this.components[componentName])
+            componentName = toLower(code(8, componentName + '-component-'));
+          $protoComponent.name = componentName;
+        } else {
+          // Generate a random name
+          $protoComponent.name = toLower(code(8, 'templ' + '-component-'));
+        }
+      }
+      // Normalize the name
+      $protoComponent.name = $protoComponent.name.toLowerCase();
+      let parentRoute = '';
+      if (this.components[$protoComponent.name])
+        return Logger.warn('The component name “' + $protoComponent.name + '” is already define, ' +
+          'try changing the “component.name” property.');
+      if (!isNull(parent))
+        // Inherit the parent info
+        parentRoute = parent.route || '';
+      if (!isNull($protoComponent.route)) // Completing the route
+        $protoComponent.route = '/' + urlCombine(parentRoute, $protoComponent.route);
+      if (Array.isArray($protoComponent.children))
+        this.prepare($protoComponent.children, $protoComponent);
+      this.components[$protoComponent.name] = $classComponent || $protoComponent;
+      IoC.app(this.bouer).resolve(Routing)
+        .configure($protoComponent);
+      const getContent = (path) => {
+        if (!path)
+          return;
+        this.request($protoComponent.path, {
+          success: content => {
+            $protoComponent.template = content;
+          },
+          fail: error => {
+            Logger.error(buildError(error));
+          }
+        });
+      };
+      if ($protoComponent.prefetch === false)
+        return;
+      if (($protoComponent.prefetch = ifNullReturn(this.bouer.config.prefetch, true)) == false)
+        return;
+      return getContent($protoComponent.path);
+    });
+  }
+  order(options) {
+    const {
+      componentElement,
+      data,
+      context,
+      onComponentLoad
+    } = options;
+    const $name = toLower(componentElement.nodeName);
+    const $component = this.components[$name];
+    const protoComponent = toComponentOrOptions($component);
+    const onComponentFail = options.onComponentFail || $default;
+    if (!protoComponent) {
+      onComponentFail(componentElement);
+      return Logger.error('No component with name “' + $name + '” registered.');
+    }
+    const mainExecutionWrapper = () => {
+      const newComponent = (entry) => {
+        const protoComponent = toComponentOrOptions(entry);
+        const configure = (proto) => {
+          proto.bouer = this.bouer;
+          Property.set(proto, 'template', {
+            get: () => protoComponent.template
+          });
+          Property.set(proto, 'parent', {
+            // only assing the parent if is a component prototype
+            value: context instanceof ComponentPrototype ? context : null
+          });
+          return proto;
+        };
+        // If the component is set has keep-alive, just return it
+        if (protoComponent.keepAlive == true) {
+          configure(protoComponent);
+          return entry;
+        }
+        let $protoComponent;
+        let $classComponent = null;
+        if (entry instanceof Component) {
+          const ctor = entry.__$proto__.ctor;
+          const $newClassComponent = IoC.app(this.bouer).resolve(ctor) ||
+            IoC.resolve(ctor) || IoC.new(ctor);
+          $classComponent = $newClassComponent;
+          $protoComponent = $newClassComponent.__$proto__;
+          $protoComponent.prepareClass($newClassComponent);
+        } else {
+          $protoComponent = new ComponentPrototype(entry);
+        }
+        if ($protoComponent.keepAlive === true)
+          this.components[$name] = $protoComponent;
+        configure($protoComponent);
+        return $classComponent || $protoComponent;
+      };
+      const isGroupableComponent = !protoComponent.template && !protoComponent.path;
+      if (protoComponent.template || isGroupableComponent)
+        return this.insert({
+          componentElement: componentElement,
+          component: newComponent($component),
+          directiveToIgnore: options.directivesToIgnore,
+          data: data,
+          onComponentLoad: onComponentLoad,
+          onComponentFail: onComponentFail,
+          compilationHooks: options.compilationHooks
+        });
+      if (!protoComponent.path) {
+        onComponentFail(componentElement);
+        return Logger.error('Expected a valid value in `path` or `template` got invalid value at “' + $name + '” component.');
+      }
+      this.addEvent('requested', componentElement, protoComponent, this.bouer)
+        .emit();
+      // Make component request or Add
+      this.request(protoComponent.path, {
+        success: content => {
+          protoComponent.template = content;
+          this.insert({
+            componentElement: componentElement,
+            component: newComponent($component),
+            data: data,
+            onComponentLoad: onComponentLoad,
+            onComponentFail: onComponentFail,
+            directiveToIgnore: options.directivesToIgnore,
+            compilationHooks: options.compilationHooks
+          });
+        },
+        fail: (error) => {
+          Logger.error('Failed to request <' + $name + '/> component with path “' +
+            protoComponent.path + '”.');
+          Logger.error(buildError(error));
+          this.addEvent('failed', componentElement, protoComponent, this.bouer).emit();
+          onComponentFail(componentElement);
+        }
+      });
+    };
+    // Checking the restrictions
+    if (protoComponent && protoComponent.restrictions && protoComponent.restrictions.length > 0) {
+      const blockedRestrictions = [];
+      const restrictions = protoComponent.restrictions.map(restriction => {
+        const restrictionResult = restriction.call(this.bouer, protoComponent);
+        if (restrictionResult === false)
+          blockedRestrictions.push(restriction);
+        else if (restrictionResult instanceof Promise)
+          restrictionResult
+          .then(value => {
+            if (value === false)
+              blockedRestrictions.push(restriction);
+          })
+          .catch(() => blockedRestrictions.push(restriction));
+        return restrictionResult;
+      });
+      const blockedEvent = this.addEvent('blocked', componentElement, protoComponent || $component, this.bouer);
+      const emitFailEvent = () => {
+        onComponentFail(componentElement);
+        blockedEvent.emit({
+          detail: {
+            component: protoComponent || $component,
+            message: 'Component “' + (protoComponent || $component).name + '” blocked by restriction(s)',
+            blocks: blockedRestrictions
+          }
+        });
+      };
+      return Promise.all(restrictions)
+        .then(restrictionValues => {
+          if (restrictionValues.every(value => value == true))
+            mainExecutionWrapper();
+          else {
+            emitFailEvent();
+          }
+        })
+        .catch(() => emitFailEvent());
+    }
+    return mainExecutionWrapper();
+  }
+  find(predicate) {
+    const keys = Object.keys(this.components);
+    for (let i = 0; i < keys.length; i++) {
+      const $component = this.components[keys[i]];
+      const component = toComponentOrOptions($component);
+      if (predicate(component))
+        return component;
+    }
+    return null;
+  }
+  /**
+   * Subscribe the hooks of the instance
+   * @param { Key } eventName the event name to be added
+   * @param { Element } element the element to attach the event
+   * @param { any } component the component object
+   * @param { object } context the context of the compilation process
+   */
+  addEvent(eventName, element, component, context) {
+    const callback = component[eventName];
+    if (typeof callback === 'function')
+      this.eventHandler.on({
+        eventName,
+        callback: evt => callback.call(context || component, evt),
+        attachedNode: element,
+        modifiers: {
+          once: true
+        },
+        context: context || component
+      });
+    const emitter = (init) => {
+      this.eventHandler.emit({
+        attachedNode: element,
+        once: true,
+        eventName,
+        init
+      });
+      this.eventHandler.emit({
+        eventName: 'component:' + eventName,
+        init: {
+          detail: {
+            component: component
+          }
+        }
+      });
+    };
+    return {
+      emit: (init) => emitter(init)
+    };
+  }
+  insert(options) {
+    var _a, _b;
+    const componentElement = options.componentElement;
+    const $classComponent = options.component;
+    const $protoComponent = toComponentOrOptions($classComponent);
+    const data = options.data || Extend.obj(this.bouer.data);
+    const onComponentLoad = options.onComponentLoad || $default;
+    const onComponentFail = options.onComponentFail || $default;
+    const directivesToIgnore = options.directiveToIgnore;
+    const beforeCompile = ((_a = options.compilationHooks) === null || _a === void 0 ? void 0 : _a.beforeCompile) || $default;
+    const afterCompile = ((_b = options.compilationHooks) === null || _b === void 0 ? void 0 : _b.afterCompile) || $default;
+    const $name = toLower(componentElement.nodeName);
+    const container = componentElement.parentElement;
+    const compiler = IoC.app(this.bouer).resolve(Compiler);
+    const context = $protoComponent.parent;
+    if (!container) {
+      return onComponentFail(componentElement);
+    }
+    if (isNull($protoComponent.template)) {
+      onComponentFail(componentElement);
+      return Logger.error('The <' + $name + '/> component is not ready yet to be inserted.');
+    }
+    if (!compiler.analize($protoComponent.template)) {
+      return onComponentFail(componentElement);
+    }
+    const slotContainer = createEl('SlotContainer', el => {
+      el.innerHTML = componentElement.innerHTML;
+      componentElement.innerHTML = '';
+    }).build();
+    const isKeepAlive = componentElement.hasAttribute('keep-alive') || ifNullReturn($protoComponent.keepAlive, false);
+    // Component Creation
+    if (isKeepAlive === false || !$protoComponent.el) {
+      $protoComponent.el = createEl('body', htmlSnippet => {
+        // If both .path and .template are invalid, it means that it's a groupable component
+        const template = !$protoComponent.path && !$protoComponent.template ? '<div></div>' : $protoComponent.template;
+        htmlSnippet.innerHTML = template;
+        filter([].slice.call(htmlSnippet.children), (asset) => {
+          if (['SCRIPT', 'LINK', 'STYLE'].indexOf(asset.nodeName) === -1)
+            return;
+          $protoComponent.assets.push(asset);
+          htmlSnippet.removeChild(asset);
+        });
+        if (htmlSnippet.children.length === 0)
+          return Logger.error(('The component <' + $name + '/> seems to be empty or it ' +
+            'has not a root element. Example: <div></div>, to be included.'));
+        if (htmlSnippet.children.length > 1)
+          return Logger.error(('The component <' + $name + '/> seems to have multiple ' +
+            'root element, it must have only one root.'));
+      }).child();
+    }
+    const mainComponentElement = $protoComponent.el;
+    if (!mainComponentElement)
+      return onComponentFail(componentElement);
+    // Handling Slots
+    if (slotContainer.childNodes.length > 0) {
+      const hasSkippedParent = (child) => {
+        if (child.hasAttribute(Constants.skip))
+          return true;
+        const parent = child.parentElement;
+        if (parent == null)
+          return false;
+        return hasSkippedParent(parent);
+      };
+      // # slot[default]
+      const slotContainerChildren = toArray(slotContainer.children);
+      const slotDefaults = toArray(mainComponentElement.querySelectorAll('slot[default]'));
+      // Looping all the slots defaults target
+      filter(slotDefaults, (slotTarget) => {
+        if (hasSkippedParent(slotTarget))
+          return;
+        const slotTargetContainer = slotTarget.parentElement;
+        // Adding the children
+        filter(slotContainerChildren, (child) => {
+          slotTargetContainer.insertBefore(child.cloneNode(true), slotTarget);
+        });
+        // Removing the targets
+        slotTargetContainer.removeChild(slotTarget);
+      });
+      // # div[slot='name'] || slot[slot=name]
+      const slotNamed = toArray(mainComponentElement.querySelectorAll('slot[name]'));
+      // Looping all the slots defaults target
+      filter(slotNamed, (slotTarget) => {
+        if (hasSkippedParent(slotTarget))
+          return;
+        const slotTargetContainer = slotTarget.parentElement;
+        const slotName = slotTarget.getAttribute('name');
+        // Adding the children
+        filter(slotContainerChildren, (child) => {
+          if ( // slot[slot='name']
+            child.nodeName.toLowerCase() == 'slot' &&
+            child.getAttribute('slot') == slotName) {
+            // Adding the children
+            filter(toArray(child.childNodes), (child) => {
+              slotTargetContainer.insertBefore(child.cloneNode(true), slotTarget);
+            });
+          }
+          if ( // div[slot='name']
+            child.nodeName.toLowerCase() != 'slot' &&
+            child.getAttribute('slot') == slotName) {
+            const inserted = slotTargetContainer.insertBefore(child.cloneNode(true), slotTarget);
+            inserted.removeAttribute('slot');
+          }
+        });
+        // Removing the target
+        slotTargetContainer.removeChild(slotTarget);
       });
     }
-    // Building from query string
-    const queryStr = this.url.split('?')[1];
-    if (!queryStr)
-      return mParams;
-    const keys = queryStr.split('&');
-    forEach(keys, key => {
-      const pair = key.split('=');
-      mParams[pair[0]] = (pair[1] || '').split('#')[0];
+    // Adding the listeners
+    const createdEvent = this.addEvent('created', mainComponentElement, $protoComponent);
+    const beforeMountEvent = this.addEvent('beforeMount', mainComponentElement, $protoComponent);
+    const mountedEvent = this.addEvent('mounted', mainComponentElement, $protoComponent);
+    const beforeLoadEvent = this.addEvent('beforeLoad', mainComponentElement, $protoComponent);
+    const loadedEvent = this.addEvent('loaded', mainComponentElement, $protoComponent);
+    this.addEvent('beforeDestroy', mainComponentElement, $protoComponent);
+    this.addEvent('destroyed', mainComponentElement, $protoComponent);
+    const scriptsAssets = filter($protoComponent.assets, asset => asset.nodeName === 'SCRIPT');
+    const initializer = $protoComponent.init;
+    if (isFunction(initializer))
+      fnCallResolver(initializer.call($protoComponent));
+    const processDataAttr = (attr) => {
+      // Listening to all the reactive properties
+      const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
+        if (!(descriptor.$name in inputData))
+          inputData[descriptor.$name] = undefined;
+        Property.set(inputData, descriptor.$name, descriptor);
+      });
+      let inputData = {};
+      if (attr.value.trim() === '') {
+        reactiveEvent.off();
+        // Data to apply: {...Bouer.data, ...component.data}
+        return data;
+      }
+      // Otherwise, compiles the object provided
+      const dataAttrValue = IoC.app(this.bouer).resolve(Evaluator)
+        .exec({
+          data: Extend.obj(data, {
+            $data: data,
+            $scope: data,
+            $navigate: data
+          }),
+          code: attr.value,
+          context: context !== null && context !== void 0 ? context : this.bouer
+        });
+      if (!isObject(dataAttrValue))
+        Logger.error('Expected a valid Object Literal expression in “' + attr.nodeName +
+          '” and got “' + attr.value + '”.');
+      else {
+        // Adding all non-existing properties
+        filter(Object.keys(dataAttrValue), key => {
+          if (!(key in inputData))
+            inputData[key] = dataAttrValue[key];
+        });
+      }
+      reactiveEvent.off();
+      return inputData;
+    };
+    const compile = (scriptContent) => {
+      try {
+        let dataToUse = {};
+        let dataAttr = null;
+        // If the attr is `data`, prepare and inject the value into component `data`
+        if (dataAttr = findDirective(componentElement, Constants.data)) {
+          const attr = dataAttr;
+          if (this.delimiter.run(attr.value).length !== 0) {
+            Logger.error(('The “data” attribute cannot contain delimiter, source element: ' + '<' + $name + '/>.'));
+          } else {
+            dataToUse = processDataAttr(attr);
+          }
+          componentElement.removeAttribute(attr.name);
+        } else {
+          // if there is no data attr, use the component data mixed with the provided data
+          dataToUse = Extend.obj($protoComponent.data, data);
+        }
+        $protoComponent.data = Extend.obj(dataToUse, $protoComponent.data);
+        // Executing the mixed scripts
+        IoC.app(this.bouer).resolve(Evaluator)
+          .eval((scriptContent || ''), $protoComponent);
+        $reactive({
+          context: $protoComponent,
+          data: $protoComponent.data
+        });
+        if ($classComponent != $protoComponent) {
+          filter(Object.getOwnPropertyNames($classComponent), (key) => {
+            const prop = $classComponent[key];
+            // If it is not InputData, skip it
+            if (!(prop instanceof DataProp))
+              return;
+            const dataPropValue = $protoComponent.data[key];
+            // If the property is null and it is required type
+            if (isNull(dataPropValue) && prop.constraint == 'required') {
+              Logger.error('The property “' + key + '” is required, please inject it via data directive.');
+              return Property.set($classComponent, key, {
+                value: undefined
+              });
+            }
+            // If the property is null and it it optional
+            if (isNull(dataPropValue) && prop.constraint == 'optional') {
+              $protoComponent.data[key] = prop.value;
+            }
+            $reactive({
+              context: $protoComponent,
+              data: $protoComponent.data,
+              keys: [key]
+            });
+            Property.transfer($classComponent, $protoComponent.data, key);
+          });
+        }
+        // Signing the element with it's data
+        IoC.app(this.bouer).resolve(DataStore).addNodeData(mainComponentElement, $protoComponent.data);
+        createdEvent.emit();
+        // tranfering the attributes
+        filter(toArray(componentElement.attributes), (attr) => {
+          // if the attr is the class, transfer the items to the root element
+          if (attr.nodeName === 'class')
+            return componentElement.classList.forEach(cls => {
+              mainComponentElement.classList.add(cls);
+            });
+          if (Constants.silent == attr.name)
+            return;
+          // sets the attr to the root element
+          mainComponentElement.setAttribute(attr.name, attr.value);
+        });
+        beforeMountEvent.emit();
+        // Attaching the root element to the component element
+        if (!('root' in componentElement))
+          Property.set(componentElement, 'root', {
+            value: mainComponentElement
+          });
+        // Mouting the element
+        container.replaceChild(mainComponentElement, componentElement);
+        mountedEvent.emit();
+        // Adding the component to the active component list if it is not added
+        if (this.activeComponents.indexOf($classComponent || $protoComponent) < 0)
+          this.activeComponents.push($classComponent || $protoComponent);
+        const rootClassList = {};
+        // Retrieving all the classes of the root element
+        mainComponentElement.classList.forEach(key => rootClassList[key] = true);
+        // Changing each selector to avoid conflits
+        const changeSelector = (style, styleId) => {
+          const rules = [];
+          const isStyle = (style.nodeName === 'STYLE');
+          if (!style.sheet)
+            return;
+          const cssRules = style.sheet.cssRules;
+          for (let i = 0; i < cssRules.length; i++) {
+            const rule = cssRules.item(i);
+            if (!rule)
+              continue;
+            // .item .title, .item .desc
+            const ruleText = rule.selectorText;
+            if (ruleText) {
+              const classStyleId = '.' + styleId;
+              /**
+               * From: [.item .title, .item .desc]
+               *
+               * To: [
+               *  .item.e-A1bcD .title,
+               *  .e-A1bcD .item .title,
+               *  .item.e-A1bcD .desc
+               *  .e-A1bcD .item .desc
+               * ]
+               */
+              rule.selectorText = ruleText.split(',')
+                .flatMap(($selector) => {
+                  const $selectors = $selector.split(' ');
+                  $selectors[0] = $selectors[0] + classStyleId;
+                  return [$selectors.join(' '), classStyleId + ' ' + $selector];
+                })
+                .join(',');
+            }
+            // Adds the cssText only if the element is <style>
+            if (isStyle)
+              rules.push(rule.cssText);
+          }
+          if (isStyle)
+            style.innerText = rules.join(' ');
+        };
+        const stylesAssets = filter($protoComponent.assets, asset => asset.nodeName !== 'SCRIPT');
+        const styleAttrName = 'component-style';
+        // Configuring the styles
+        filter(stylesAssets, asset => {
+          const mStyle = asset.cloneNode(true);
+          if (mStyle instanceof HTMLLinkElement) {
+            const path = $protoComponent.path[0] === '/' ? $protoComponent.path.substring(1) : $protoComponent.path;
+            mStyle.href = pathResolver(path, mStyle.getAttribute('href') || '');
+            mStyle.rel = 'stylesheet';
+          }
+          // Checking if this component already have styles added
+          if (this.stylesController[$name]) {
+            const controller = this.stylesController[$name];
+            if (controller.elements.indexOf(mainComponentElement) > -1)
+              return;
+            controller.elements.push(mainComponentElement);
+            return filter(controller.styles, $style => {
+              mainComponentElement.classList.add($style.getAttribute(styleAttrName));
+            });
+          }
+          const styleId = code(8, 'e-');
+          mStyle.setAttribute(styleAttrName, styleId);
+          if ((mStyle instanceof HTMLLinkElement) && mStyle.hasAttribute('scoped'))
+            mStyle.onload = evt => changeSelector(evt.target, styleId);
+          this.stylesController[$name] = {
+            styles: [DOM.head.appendChild(mStyle)],
+            elements: [mainComponentElement]
+          };
+          if (!mStyle.hasAttribute('scoped'))
+            return;
+          mainComponentElement.classList.add(styleId);
+          if (mStyle instanceof HTMLStyleElement)
+            return changeSelector(mStyle, styleId);
+        });
+        beforeLoadEvent.emit();
+        // Compiling the rootElement
+        compiler.compile({
+          el: mainComponentElement,
+          context: $protoComponent,
+          data: $protoComponent.data,
+          directivesToIgnore: directivesToIgnore,
+          beforeCompile: beforeCompile,
+          afterCompile: afterCompile,
+          onComponentLoad: () => {
+            onComponentLoad($protoComponent);
+            loadedEvent.emit();
+            if (!this.rounting.routeView) {
+              const routeView = mainComponentElement.hasAttribute('route-vew') ?
+                mainComponentElement : mainComponentElement.querySelector('[route-view]');
+              if (routeView)
+                this.rounting.setRouteView(routeView);
+            }
+          }
+        });
+        const autoComponentDestroy = ifNullReturn(this.bouer.config.autoComponentDestroy, true);
+        if (autoComponentDestroy === false)
+          return;
+        // Listening the component to be destroyed
+        Task.run(stopTask => {
+          if ($protoComponent.el.isConnected)
+            return;
+          if (this.bouer.isDestroyed)
+            return stopTask();
+          $protoComponent.destroy();
+          stopTask();
+          const stylesController = this.stylesController[$protoComponent.name];
+          if (!stylesController)
+            return;
+          const index = stylesController.elements.indexOf($protoComponent.el);
+          stylesController.elements.splice(index, 1);
+          if (stylesController.elements.length > 0 || container.isConnected)
+            return;
+          // No elements using the style
+          filter(stylesController.styles, style => filter(toArray(DOM.head.children), item => {
+            if (item === style)
+              return DOM.head.removeChild(style);
+          }));
+          delete this.stylesController[$protoComponent.name];
+        });
+      } catch (error) {
+        Logger.error('Error in <' + $name + '/> component.');
+        Logger.error(buildError(error));
+        onComponentFail(componentElement);
+      }
+    };
+    if (scriptsAssets.length === 0)
+      return compile();
+    const localScriptsContent = [];
+    const onlineScriptsContent = [];
+    const onlineScriptsUrls = [];
+    const webRequestChecker = {};
+    // Grouping the online scripts and collecting the online url
+    filter(scriptsAssets, (script) => {
+      if (script.src == '' || script.innerHTML)
+        localScriptsContent.push(script.innerHTML);
+      else {
+        const path = $protoComponent.path[0] === '/' ? $protoComponent.path.substring(1) : $protoComponent.path;
+        script.src = pathResolver(path, script.getAttribute('src') || '');
+        onlineScriptsUrls.push(script.src);
+      }
     });
-    return mParams;
-  }
-  add(params) {
-    const mParams = [];
-    forEach(Object.keys(params), key => {
-      mParams.push(key + '=' + params[key]);
+    // No online scripts detected
+    if (onlineScriptsUrls.length == 0)
+      return compile(localScriptsContent.join('\n\n'));
+    // Load the online scripts and run it
+    return filter(onlineScriptsUrls, (url, index) => {
+      webRequestChecker[url] = true;
+      // Getting script content from a web request
+      webRequest(url, {
+        headers: {
+          'Content-Type': 'text/plain'
+        }
+      }).then(response => {
+        if (!response.ok)
+          throw new Error(response.statusText);
+        return response.text();
+      }).then(text => {
+        delete webRequestChecker[url];
+        // Adding the scripts according to the defined order
+        onlineScriptsContent[index] = text;
+        // if there are not web requests compile the element
+        if (Object.keys(webRequestChecker).length === 0)
+          return compile(Extend.array(onlineScriptsContent, localScriptsContent).join('\n\n'));
+      }).catch(error => {
+        error.stack = '';
+        Logger.error(('Error loading the <script src=\'' + url + '\'></script> in ' +
+          '<' + $name + '/> component, remove it in order to be compiled.'));
+        Logger.error(error);
+        onComponentFail(componentElement);
+      });
     });
-    const joined = mParams.join('&');
-    return (this.url.includes('?')) ? '&' + joined : '?' + joined;
   }
-  remove(param) {
-    return param;
+  /**
+   * Dispatch an event of the component
+   * @param {string} eventName the event name
+   * @param {object?} init the CustomEventInit object where we can provid the event detail
+   */
+  emit(component, eventName, init) {
+    IoC.app(this.bouer).resolve(EventHandler).emit({
+      eventName: eventName,
+      attachedNode: component.el,
+      init: init
+    });
   }
 }
-class Component {
+class ComponentPrototype {
   /**
    * Default constructor
    * @param {string|object} optionsOrPath the path of the component or the compponent options
    */
   constructor(optionsOrPath, assets) {
-    this._IRT_ = true;
     /** Indicates if the component is destroyed or not */
     this.isDestroyed = false;
     /** The children of the component */
@@ -4599,6 +4921,8 @@ class Component {
     this.assets = [];
     /** Store temporarily this component UI orders */
     this.events = [];
+    $internal(this);
+    this.ctor = $default();
     let _name = undefined;
     let _path = undefined;
     let _data = undefined;
@@ -4612,7 +4936,7 @@ class Component {
     }
     this.name = _name || '';
     this.path = _path || '';
-    this.data = Reactive.transform({
+    this.data = $reactive({
       context: this,
       data: _data || {}
     });
@@ -4620,11 +4944,87 @@ class Component {
     const template = {
       value: (optionsOrPath || {}).template || ''
     };
-    Prop.set(this, 'template', {
+    Property.set(this, 'template', {
       get: () => template.value,
       set: (v) => template.value = v
     });
-    ComponentHandler.prepareAssets(this, assets || []);
+    this.setAssets(assets || []);
+  }
+  setAssets(assets) {
+    const component = this;
+    const $Assets = [];
+    const assetsTypeMapper = {
+      js: 'script',
+      css: 'link',
+      scss: 'link',
+      sass: 'link',
+      less: 'link',
+      styl: 'link',
+      style: 'link'
+    };
+    const isValidAssetSrc = (src, index) => {
+      const isValid = (src || trim(src)) ? true : false;
+      if (!isValid)
+        Logger.error('Invalid asset “src”, in assets[' + index + '].src');
+      return isValid;
+    };
+    const assetTypeGetter = (src, index) => {
+      const srcSplitted = src.split('.');
+      const type = assetsTypeMapper[toLower(srcSplitted[srcSplitted.length - 1])];
+      if (!type)
+        return Logger.error('Couldn\'t find out what type of asset it is, provide ' +
+          'the “type” explicitly at assets[' + index + '].type');
+      return type;
+    };
+    filter(assets, (asset, index) => {
+      let src = '';
+      let type = '';
+      let scoped = true;
+      if (typeof asset === 'string') { // String type
+        if (!isValidAssetSrc(asset, index))
+          return;
+        type = assetTypeGetter(trim(src = asset.replace(/\.less|\.s[ac]ss|\.styl/i, '.css')), index);
+      } else { // Object Type
+        if (!isValidAssetSrc(trim(src = asset.src.replace(/\.less|\.s[ac]ss\.styl/i, '.css')), index))
+          return;
+        if (!asset.type) {
+          if (!(type = assetTypeGetter(src, index)))
+            return;
+        } else {
+          type = assetsTypeMapper[toLower(asset.type)] || asset.type;
+        }
+        scoped = ifNullReturn(asset.scoped, true);
+      }
+      const isRelativePathImport = src[0] === '.';
+      if (isRelativePathImport && (!component.path || isNull(component.path))) {
+        Logger.warn('Component with no `path` cannot use imported assets, check component: ' + component.name);
+        return;
+      }
+      if (isRelativePathImport) {
+        src = pathResolver(component.path, src);
+        src = src[0] === '/' ? src.substring(1) : src;
+      }
+      const $Asset = createEl(type, el => {
+        if (ifNullReturn(scoped, true))
+          el.setAttribute('scoped', 'true');
+        switch (toLower(type)) {
+          case 'script':
+            el.setAttribute('src', src);
+            break;
+          case 'link':
+            el.setAttribute('href', src);
+            el.setAttribute('rel', 'stylesheet');
+            el.setAttribute('type', 'text/css');
+            break;
+          default:
+            el.setAttribute('src', src);
+            break;
+        }
+      }).build();
+      $Assets.push($Asset);
+    });
+    component.assets.splice(0, component.assets.length);
+    component.assets.push.apply(component.assets, $Assets);
   }
   /**
    * The data that should be exported from the `<script>` tag to the root element
@@ -4633,38 +5033,9 @@ class Component {
   export (data, props) {
     if (!isObject(data))
       return Logger.error('Invalid object for component.export(...), only "Object Literal" is allowed.');
-    const isDataAComponent = (data instanceof Component);
-    let nonExportableFields = null;
-    if (isDataAComponent)
-      nonExportableFields = new Set([
-                'name',
-                'path',
-                'title',
-                'route',
-                'template',
-                'data',
-                'keepAlive',
-                'prefetch',
-                'children',
-                'restrictions',
-                'isDefault',
-                'isNotFound',
-                'requested',
-                'created',
-                'beforeMount',
-                'mounted',
-                'beforeLoad',
-                'loaded',
-                'beforeDestroy',
-                'destroyed',
-                'blocked',
-                'failed'
-            ]);
-    return forEach(props || Object.keys(data), key => {
-      if (nonExportableFields && nonExportableFields.has(key))
-        return;
+    return filter(props || Object.keys(data), key => {
       this.data[key] = data[key];
-      Prop.transfer(this.data, data, key);
+      Property.transfer(this.data, data, key);
     });
   }
   /**
@@ -4684,7 +5055,7 @@ class Component {
       container.removeChild(this.el);
     handler.emit(this, 'destroyed');
     // Destroying all the events attached to the this instance
-    forEach(this.events, evt => this.off(evt.eventName, evt.callback));
+    filter(this.events, evt => this.off(evt.eventName, evt.callback));
     this.events = [];
     const components = handler.activeComponents;
     components.splice(components.indexOf(this), 1);
@@ -4734,7 +5105,7 @@ class Component {
       callback: callback,
       attachedNode: this.el,
     });
-    this.events = where(this.events, evt => !(evt.eventName == eventName && evt.callback == callback));
+    this.events = filter(this.events, evt => !(evt.eventName == eventName && evt.callback == callback));
   }
   /**
    * Sets data into a target object, by default is the `component.data`
@@ -4744,804 +5115,622 @@ class Component {
    */
   set(inputData, targetObject) {
     const result = setData(this, inputData, targetObject);
-    forEach(Object.keys(inputData), key => Prop.transfer(this, inputData, key));
+    filter(Object.keys(inputData), key => Property.transfer(this, inputData, key));
     return result;
   }
-}
-class ComponentHandler {
-  constructor(bouer, delimiterHandler, eventHandler, evaluator, routing) {
-    this._IRT_ = true;
-    // Handle all the components web requests to avoid multiple requests
-    this.requests = {};
-    this.components = {};
-    // Avoids adding multiple styles of the same component if it's already in use
-    this.stylesController = {};
-    this.activeComponents = [];
-    this.bouer = bouer;
-    this.delimiter = delimiterHandler;
-    this.eventHandler = eventHandler;
-    this.evaluator = evaluator;
-    this.rounting = routing;
+  watch(propertyName, callback) {
+    return this.bouer.watch(propertyName, callback, this.data);
   }
-  check(nodeName) {
-    return (nodeName in this.components);
-  }
-  request(path, response) {
-    if (!isNull(this.requests[path]))
-      return this.requests[path].push(response);
-    this.requests[path] = [response];
-    const baseElement = DOM.head.querySelector('base');
-    const resolver = baseElement !== null && baseElement !== void 0 ? baseElement : urlResolver('/');
-    // Building the URL according to the main path
-    const componentPath = urlCombine(resolver.baseURI, path.replace(resolver.baseURI, ''));
-    webRequest(componentPath, {
-        headers: {
-          'Content-Type': 'text/plain'
-        }
-      })
-      .then(response => {
-        if (!response.ok)
-          throw new Error(response.statusText);
-        return response.text();
-      })
-      .then(content => {
-        forEach(this.requests[path], (request) => {
-          request.success(content, path);
+  prepareClass(component) {
+    const proto = this;
+    const hooks = [
+            'requested', 'created', 'beforeMount', 'mounted', 'beforeLoad',
+            'loaded', 'beforeDestroy', 'destroyed', 'blocked', 'failed'
+        ];
+    const ignorables = [
+            'el', 'bouer', '__$proto__', 'init', 'constructor', 'export', 'watch'
+        ].concat(hooks);
+    const cachedInert = {};
+    const properties = Object.getOwnPropertyNames(component);
+    const methods = Object.getOwnPropertyNames(component.constructor.prototype);
+    const fields = filter(Extend.array(properties, methods), key => ignorables.indexOf(key) < 0);
+    // Transfering the properties from the component to the data
+    filter(fields, (field) => {
+      const fieldValue = component[field];
+      if (fieldValue instanceof DataProp)
+        return;
+      // If the value is a function, bind it to the component ifself
+      if (typeof fieldValue === 'function') {
+        Property.set(fieldValue, 'nobind', {
+          value: true
         });
-        delete this.requests[path];
-      })
-      .catch(error => {
-        if (!baseElement)
-          Logger.warn('It seems like you are not using the “<base href="/base/components/path/" />” ' +
-            'element, try to add as the first child into “<head></head>” element.');
-        forEach(this.requests[path], (request) => request.fail(error, path));
-        delete this.requests[path];
-      });
-  }
-  prepare(components, parent) {
-    forEach(components, (entry) => {
-      const isComponentClass = (entry.prototype instanceof Component);
-      let component = entry;
-      if (isComponentClass) {
-        // Resolve the instance of the class
-        component = IoC.app(this.bouer).resolve(entry) || IoC.new(entry);
-        component.clazz = entry;
+        return proto.data[field] = fieldValue.bind(component);
       }
-      // In case of no-named-component, creates a name
-      if (isNull(component.name) || !component.name) {
-        // Generate a random name
-        component.name = toLower(code(8, 'templ' + '-component-'));
-        // But, if the component has a path, generate a beautiful name for it
-        if (!isNull(component.path) || !component.path) {
-          const pathSplitted = component.path.toLowerCase().split('/');
-          let componentName = pathSplitted[pathSplitted.length - 1].replace('.html', '') || Component.name;
-          // If the component name already exists generate a new one
-          if (this.components[componentName]) {
-            componentName = toLower(code(8, componentName + '-component-'));
-          }
-          component.name = componentName;
-        }
-      }
-      // Normalize the name
-      component.name = component.name.toLowerCase();
-      let parentRoute = '';
-      if (this.components[component.name])
-        return Logger.warn('The component name “' + component.name + '” is already define, ' +
-          'try changing the “component.name” property.');
-      if (!isNull(parent)) {
-        /** TODO: Inherit the parent info */
-        parentRoute = parent.route || '';
-      }
-      if (!isNull(component.route)) { // Completing the route
-        component.route = '/' + urlCombine(parentRoute, component.route);
-      }
-      if (Array.isArray(component.children))
-        this.prepare(component.children, component);
-      IoC.app(this.bouer).resolve(Routing)
-        .configure(this.components[component.name] = component);
-      const getContent = (path) => {
-        if (!path)
-          return;
-        this.request(component.path, {
-          success: content => {
-            component.template = content;
+      //In case of InertProp, cache the object and return the value
+      if (fieldValue instanceof InertProp) {
+        cachedInert[field] = fieldValue;
+        Property.set(proto.data, field, {
+          get: function reactive() {
+            return cachedInert[field].get();
           },
-          fail: error => {
-            Logger.error(buildError(error));
+          set: function reactive(value) {
+            cachedInert[field].set(value);
           }
         });
-      };
-      if (!isNull(component.prefetch)) {
-        if (component.prefetch === true)
-          return getContent(component.path);
-        return;
+      } else {
+        proto.data[field] = fieldValue;
       }
-      if (!(component.prefetch = ifNullReturn(this.bouer.config.prefetch, true)))
-        return;
-      return getContent(component.path);
+      Property.set(component, field, {
+        get: function reactive() {
+          return proto.data[field];
+        },
+        set: function reactive(value) {
+          proto.data[field] = value;
+        }
+      });
+    });
+    // Transforming the data to reactive
+    $reactive({
+      context: proto,
+      data: proto.data
+    });
+    // Setting all the methods
+    filter(hooks, (hook) => {
+      if (isFunction(component[hook])) {
+        proto[hook] = component[hook].bind(component);
+      }
     });
   }
-  order(options) {
-    const {
-      componentElement,
-      data,
-      context,
-      onComponentLoad
-    } = options;
-    const $name = toLower(componentElement.nodeName);
-    const component = this.components[$name];
-    const onComponentFail = options.onComponentFail || $default;
-    if (!component) {
-      onComponentFail(componentElement);
-      return Logger.error('No component with name “' + $name + '” registered.');
+}
+class Component {
+  get el() {
+    return this.__$proto__.el;
+  }
+  get bouer() {
+    return this.__$proto__.bouer;
+  }
+  constructor(init, assets) {
+    this.__$proto__ = $default();
+    Property.set(this, '__$proto__', {
+      enumerable: false,
+      configurable: false,
+      value: new ComponentPrototype(init, assets)
+    });
+    const component = this.__$proto__;
+    if (component.name == '') {
+      // Setting the name of the component, according to the caller (Component) name if not configured
+      Property.set(component, 'name', {
+        value: this.constructor.name
+      });
     }
-    const mainExecutionWrapper = () => {
-      const resolveComponentInstance = (c) => {
-        let mComponent;
-        if ((c instanceof Component) && c.clazz)
-          mComponent = IoC.app(this.bouer).resolve(c.clazz) || IoC.new(c.clazz);
-        else if (c instanceof Component)
-          mComponent = structuredClone(c);
-        else
-          mComponent = new Component(c);
-        if (mComponent.keepAlive === true)
-          this.components[$name] = mComponent;
-        mComponent.template = c.template;
-        mComponent.bouer = this.bouer;
-        mComponent.parent = context;
-        return mComponent;
-      };
-      const isGroupableComponent = !component.template && !component.path;
-      if (component.template || isGroupableComponent)
-        return this.insert({
-          componentElement: componentElement,
-          component: resolveComponentInstance(component),
-          directiveToIgnore: options.directivesToIgnore,
-          data: data,
-          onComponentLoad: onComponentLoad,
-          onComponentFail: onComponentFail,
-          compilationHooks: options.compilationHooks
-        });
-      if (!component.path) {
-        onComponentFail(componentElement);
-        return Logger.error('Expected a valid value in `path` or `template` got invalid value at “' + $name + '” component.');
+  }
+  destroy() {
+    this.__$proto__.destroy();
+  }
+  params() {
+    return this.__$proto__.params();
+  }
+  set(data) {
+    return this.__$proto__.set(data);
+  }
+  watch(propertyName, callback) {
+    return this.__$proto__.watch(propertyName, callback);
+  }
+}
+// Quotes “'+  +'”
+function webRequest(url, options) {
+  if (!url)
+    return Promise.reject(new Error('Invalid Url'));
+  const createXhr = (method) => {
+    if (DOM.documentMode && (!method.match(/^(get|post)$/i) || !WIN.XMLHttpRequest)) {
+      return new WIN.ActiveXObject('Microsoft.XMLHTTP');
+    } else if (WIN.XMLHttpRequest) {
+      return new WIN.XMLHttpRequest();
+    }
+    throw new Error('This browser does not support XMLHttpRequest.');
+  };
+  const getOption = (key, mDefault) => {
+    const mOptions = (options || {});
+    const value = mOptions[key];
+    if (value)
+      return value;
+    return mDefault;
+  };
+  const headers = getOption('headers', {});
+  const method = getOption('method', 'get');
+  const body = getOption('body', undefined);
+  const beforeSend = getOption('body', (xhr) => {});
+  const xhr = createXhr(method);
+  return new Promise((resolve, reject) => {
+    const createResponse = (mFunction, ok, status, xhr, response) => {
+      mFunction({
+        url: url,
+        ok: ok,
+        status: status,
+        statusText: xhr.statusText || '',
+        headers: xhr.getAllResponseHeaders(),
+        json: () => Promise.resolve(JSON.stringify(response)),
+        text: () => Promise.resolve(response)
+      });
+    };
+    xhr.open(method, url, true);
+    filter(Object.keys(headers), key => {
+      xhr.setRequestHeader(key, headers[key]);
+    });
+    xhr.onload = () => {
+      const response = ('response' in xhr) ? xhr.response : xhr.responseText;
+      let status = xhr.status === 1223 ? 204 : xhr.status;
+      if (status === 0)
+        status = response ? 200 : urlResolver(url).protocol === 'file' ? 404 : 0;
+      createResponse(resolve, (status >= 200 && status < 400), status, xhr, response);
+    };
+    xhr.onerror = () => {
+      createResponse(reject, false, xhr.status, xhr, '');
+    };
+    xhr.onabort = () => {
+      createResponse(reject, false, xhr.status, xhr, '');
+    };
+    xhr.ontimeout = () => {
+      createResponse(reject, false, xhr.status, xhr, '');
+    };
+    beforeSend(xhr);
+    xhr.send(body);
+  });
+}
+
+function code(len, prefix, sufix) {
+  const alpha = '01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let out = '';
+  let lowerAlt = false;
+  for (let i = 0; i < (len || 8); i++) {
+    const pos = Math.floor(Math.random() * alpha.length);
+    out += lowerAlt ? toLower(alpha[pos]) : alpha[pos];
+    lowerAlt = !lowerAlt;
+  }
+  return ((prefix || '') + out + (sufix || ''));
+}
+
+function isNull(input) {
+  return (typeof input === 'undefined') || (input === undefined || input === null);
+}
+
+function isObject(input) {
+  return (typeof input === 'object') && (String(input) === '[object Object]');
+}
+
+function isPrimitive(input) {
+  return (typeof input === 'string' ||
+    typeof input === 'number' ||
+    typeof input === 'symbol' ||
+    typeof input === 'boolean');
+}
+
+function isString(input) {
+  return typeof input === 'string';
+}
+
+function isEmptyObject(input) {
+  if (!input || !isObject(input))
+    return true;
+  return Object.keys(input).length === 0;
+}
+
+function isFunction(input) {
+  return typeof input === 'function';
+}
+
+function ifNullReturn(v, _return) {
+  return isNull(v) ? _return : v;
+}
+
+function ifNullStop(el) {
+  if (!el)
+    throw new Error('Application is not initialized');
+  return el;
+}
+
+function trim(value) {
+  return value ? value.trim() : value;
+}
+
+function startWith(value, pattern) {
+  return (value.substring(0, pattern.length) === pattern);
+}
+
+function toLower(str) {
+  return str.toLowerCase();
+}
+
+function toStr(input) {
+  if (isPrimitive(input)) {
+    return String(input);
+  } else if (isObject(input) || Array.isArray(input)) {
+    return JSON.stringify(input);
+  } else if (isFunction(input.toString)) {
+    return input.toString();
+  } else {
+    return String(input);
+  }
+}
+
+function filter(iterable, callback, context) {
+  const out = [];
+  for (let i = 0; i < iterable.length; i++) {
+    if (callback.call(context, iterable[i], i))
+      out.push(iterable[i]);
+  }
+  return out;
+}
+
+function toArray(array) {
+  if (!array)
+    return [];
+  return [].slice.call(array);
+}
+
+function createComment(id, content) {
+  const comment = DOM.createComment(content || ' e ');
+  comment.id = code(8);
+  return comment;
+}
+
+function createEl(elName, callback) {
+  const el = DOM.createElement(elName);
+  if (isFunction(callback))
+    callback(el, DOM);
+  const returnObj = {
+    appendTo: (target) => {
+      target.appendChild(el);
+      return returnObj;
+    },
+    build: () => el,
+    child: () => el.children[0],
+    children: () => [].slice.call(el.childNodes),
+  };
+  return returnObj;
+}
+
+function removeEl(el) {
+  const parent = el.parentElement || el.parentNode;
+  if (parent)
+    parent.removeChild(el);
+}
+
+function mapper(source, destination) {
+  let map = new WeakSet();
+
+  function walker(source, destination) {
+    if (map.has(source))
+      return;
+    map.add(source);
+    filter(Object.keys(source), key => {
+      const sourceValue = source[key];
+      // If the key already in the destination, set
+      if ((key in destination)) {
+        // If the source value is an object
+        if (isObject(sourceValue)) {
+          return walker(sourceValue, destination[key]);
+        }
+        // Set the value directly to allow reactive
+        return destination[key] = sourceValue;
       }
-      this.addEvent('requested', componentElement, component, this.bouer)
-        .emit();
-      // Make component request or Add
-      this.request(component.path, {
-        success: content => {
-          component.template = content;
-          this.insert({
-            componentElement: componentElement,
-            component: resolveComponentInstance(component),
-            data: data,
-            onComponentLoad: onComponentLoad,
-            onComponentFail: onComponentFail,
-            directiveToIgnore: options.directivesToIgnore,
-            compilationHooks: options.compilationHooks
-          });
-        },
-        fail: (error) => {
-          Logger.error('Failed to request <' + $name + '/> component with path “' +
-            component.path + '”.');
-          Logger.error(buildError(error));
-          this.addEvent('failed', componentElement, component, this.bouer).emit();
-          onComponentFail(componentElement);
-        }
-      });
-    };
-    // Checking the restrictions
-    if (component.restrictions && component.restrictions.length > 0) {
-      const blockedRestrictions = [];
-      const restrictions = component.restrictions.map(restriction => {
-        const restrictionResult = restriction.call(this.bouer, component);
-        if (restrictionResult === false)
-          blockedRestrictions.push(restriction);
-        else if (restrictionResult instanceof Promise)
-          restrictionResult
-          .then(value => {
-            if (value === false)
-              blockedRestrictions.push(restriction);
-          })
-          .catch(() => blockedRestrictions.push(restriction));
-        return restrictionResult;
-      });
-      const blockedEvent = this.addEvent('blocked', componentElement, component, this.bouer);
-      const emitFailEvent = () => blockedEvent.emit({
-        detail: {
-          component: component.name,
-          message: 'Component “' + component.name + '” blocked by restriction(s)',
-          blocks: blockedRestrictions
-        }
-      });
-      return Promise.all(restrictions)
-        .then(restrictionValues => {
-          if (restrictionValues.every(value => value == true))
-            mainExecutionWrapper();
-          else {
-            onComponentFail(componentElement);
-            emitFailEvent();
-          }
-        })
-        .catch(() => emitFailEvent());
-    }
-    return mainExecutionWrapper();
+      Property.transfer(destination, source, key);
+    });
   }
-  find(predicate) {
-    const keys = Object.keys(this.components);
-    for (let i = 0; i < keys.length; i++) {
-      const component = this.components[keys[i]];
-      if (predicate(component))
-        return component;
-    }
-    return null;
+  walker(source, destination);
+  map = new WeakSet();
+}
+
+function urlResolver(url) {
+  let href = url;
+  // Support: IE 9-11 only, /* doc.documentMode is only available on IE */
+  if ('documentMode' in DOM) {
+    ANCHOR.setAttribute('href', href);
+    href = ANCHOR.href;
   }
-  /**
-   * Subscribe the hooks of the instance
-   * @param { Key } eventName the event name to be added
-   * @param { Element } element the element to attach the event
-   * @param { any } component the component object
-   * @param { object } context the context of the compilation process
-   */
-  addEvent(eventName, element, component, context) {
-    const callback = component[eventName];
-    if (typeof callback === 'function')
-      this.eventHandler.on({
-        eventName,
-        callback: evt => callback.call(context || component, evt),
-        attachedNode: element,
-        modifiers: {
-          once: true
-        },
-        context: context || component
-      });
-    const emitter = (init) => {
-      this.eventHandler.emit({
-        attachedNode: element,
-        once: true,
-        eventName,
-        init
-      });
-      this.eventHandler.emit({
-        eventName: 'component:' + eventName,
-        init: {
-          detail: {
-            component: component
-          }
-        }
-      });
-    };
+  ANCHOR.href = href;
+  let hostname = ANCHOR.hostname;
+  const ipv6InBrackets = ANCHOR.hostname === '[::1]';
+  if (!ipv6InBrackets && hostname.indexOf(':') > -1)
+    hostname = '[' + hostname + ']';
+  const $return = {
+    href: ANCHOR.href,
+    baseURI: ANCHOR.baseURI,
+    protocol: ANCHOR.protocol ? ANCHOR.protocol.replace(/:$/, '') : '',
+    host: ANCHOR.host,
+    search: ANCHOR.search ? ANCHOR.search.replace(/^\?/, '') : '',
+    hash: ANCHOR.hash ? ANCHOR.hash.replace(/^#/, '') : '',
+    hostname: hostname,
+    port: ANCHOR.port,
+    pathname: (ANCHOR.pathname.charAt(0) === '/') ? ANCHOR.pathname : '/' + ANCHOR.pathname,
+    origin: ''
+  };
+  $return.origin = $return.protocol + '://' + $return.host;
+  return $return;
+}
+
+function urlCombine(base, ...parts) {
+  const baseSplitted = base.split(/\/\//);
+  const protocol = baseSplitted.length > 1 ? (baseSplitted[0] + '//') : '';
+  const uriRemain = protocol === '' ? baseSplitted[0] : baseSplitted[1];
+  const uriRemainParts = uriRemain.split(/\//);
+  const partsToJoin = [];
+  filter(uriRemainParts, p => trim(p) ? partsToJoin.push(p) : null);
+  filter(parts, part => filter(part.split(/\//), p => trim(p) ? partsToJoin.push(p) : null));
+  return protocol + partsToJoin.join('/');
+}
+/**
+ * Relative path resolver
+ * @param { string } relative the path of the actual path
+ * @param { string } path the actual path
+ * @returns { string } path with ./resolved-path
+ */
+function pathResolver(relative, path) {
+  const isCurrentDir = (v) => v.substring(0, 2) === './';
+  const isParentDir = (v) => v.substring(0, 3) === '../';
+  const toDirPath = (v) => {
+    const values = v.split('/');
+    if (/\.html$|\.css$|\.js$/gi.test(v))
+      values.pop();
     return {
-      emit: (init) => emitter(init)
+      relative: values.join('/'),
+      parts: values
     };
-  }
-  insert(options) {
-    var _a, _b;
-    const componentElement = options.componentElement;
-    const component = options.component;
-    const data = options.data;
-    const onComponentLoad = options.onComponentLoad || $default;
-    const onComponentFail = options.onComponentFail || $default;
-    const directivesToIgnore = options.directiveToIgnore;
-    const beforeCompile = ((_a = options.compilationHooks) === null || _a === void 0 ? void 0 : _a.beforeCompile) || $default;
-    const afterCompile = ((_b = options.compilationHooks) === null || _b === void 0 ? void 0 : _b.afterCompile) || $default;
-    const $name = toLower(componentElement.nodeName);
-    const container = componentElement.parentElement;
-    const compiler = IoC.app(this.bouer).resolve(Compiler);
-    const context = component.parent;
-    if (!container) {
-      return onComponentFail(componentElement);
-    }
-    if (isNull(component.template)) {
-      onComponentFail(componentElement);
-      return Logger.error('The <' + $name + '/> component is not ready yet to be inserted.');
-    }
-    if (!compiler.analize(component.template)) {
-      return onComponentFail(componentElement);
-    }
-    // Adding the component to the active component list if it is not added
-    if (this.activeComponents.indexOf(component) < 0)
-      this.activeComponents.push(component);
-    const slotContainer = createEl('SlotContainer', el => {
-      el.innerHTML = componentElement.innerHTML;
-      componentElement.innerHTML = '';
-    }).build();
-    const isKeepAlive = componentElement.hasAttribute('keep-alive') || ifNullReturn(component.keepAlive, false);
-    // Component Creation
-    if (isKeepAlive === false || isNull(component.el)) {
-      createEl('body', htmlSnippet => {
-        // If both .path and .template are invalid, it means that it's a groupable component
-        const template = !component.path && !component.template ? '<div></div>' : component.template;
-        htmlSnippet.innerHTML = template;
-        forEach([].slice.call(htmlSnippet.children), (asset) => {
-          if (['SCRIPT', 'LINK', 'STYLE'].indexOf(asset.nodeName) === -1)
-            return;
-          component.assets.push(asset);
-          htmlSnippet.removeChild(asset);
-        });
-        if (htmlSnippet.children.length === 0)
-          return Logger.error(('The component <' + $name + '/> seems to be empty or it ' +
-            'has not a root element. Example: <div></div>, to be included.'));
-        if (htmlSnippet.children.length > 1)
-          return Logger.error(('The component <' + $name + '/> seems to have multiple ' +
-            'root element, it must have only one root.'));
-        component.el = htmlSnippet.children[0];
-      });
-    }
-    const mainComponentElement = component.el;
-    if (isNull(mainComponentElement))
-      return onComponentFail(componentElement);
-    // Handling Slots
-    if (slotContainer.childNodes.length > 0) {
-      const hasSkippedParent = (child) => {
-        if (child.hasAttribute(Constants.skip))
-          return true;
-        const parent = child.parentElement;
-        if (parent == null)
-          return false;
-        return hasSkippedParent(parent);
-      };
-      // # slot[default]
-      const slotContainerChildren = toArray(slotContainer.children);
-      const slotDefaults = toArray(mainComponentElement.querySelectorAll('slot[default]'));
-      // Looping all the slots defaults target
-      forEach(slotDefaults, (slotTarget) => {
-        if (hasSkippedParent(slotTarget))
-          return;
-        const slotTargetContainer = slotTarget.parentElement;
-        // Adding the children
-        forEach(slotContainerChildren, (child) => {
-          slotTargetContainer.insertBefore(child.cloneNode(true), slotTarget);
-        });
-        // Removing the targets
-        slotTargetContainer.removeChild(slotTarget);
-      });
-      // # div[slot='name'] || slot[slot=name]
-      const slotNamed = toArray(mainComponentElement.querySelectorAll('slot[name]'));
-      // Looping all the slots defaults target
-      forEach(slotNamed, (slotTarget) => {
-        if (hasSkippedParent(slotTarget))
-          return;
-        const slotTargetContainer = slotTarget.parentElement;
-        const slotName = slotTarget.getAttribute('name');
-        // Adding the children
-        forEach(slotContainerChildren, (child) => {
-          if ( // slot[slot='name']
-            child.nodeName.toLowerCase() == 'slot' &&
-            child.getAttribute('slot') == slotName) {
-            // Adding the children
-            forEach(toArray(child.childNodes), (child) => {
-              slotTargetContainer.insertBefore(child.cloneNode(true), slotTarget);
-            });
-          }
-          if ( // div[slot='name']
-            child.nodeName.toLowerCase() != 'slot' &&
-            child.getAttribute('slot') == slotName) {
-            const inserted = slotTargetContainer.insertBefore(child.cloneNode(true), slotTarget);
-            inserted.removeAttribute('slot');
-          }
-        });
-        // Removing the target
-        slotTargetContainer.removeChild(slotTarget);
-      });
-    }
-    // Transforming all unknown variables to reactive
-    forEach(Object.keys(component), propName => {
-      let prop = component[propName];
-      // If it's a computed property, wrap it in a ref
-      if (!isNull(prop) && isComputed(prop))
-        prop = component[propName] = new Ref(prop);
-      if (!isNull(prop) && isRef(prop))
-        prop.__(propName, component);
+  };
+  if (isCurrentDir(path))
+    return toDirPath(relative).relative + path.substring(1);
+  if (!isParentDir(path))
+    return path;
+  const parts = toDirPath(relative).parts;
+  parts.push((function pathLookUp(value) {
+    if (!isParentDir(value))
+      return value;
+    parts.pop();
+    return pathLookUp(value.substring(3));
+  })(path));
+  return parts.join('/');
+}
+
+function buildError(error) {
+  if (!error)
+    return 'Unknown Error';
+  error.stack = '';
+  return error;
+}
+
+function $default(entry, ...remains) {
+  return entry;
+}
+
+function fnCallResolver(fn, cb) {
+  let fnValue = fn;
+  if (isNull(fnValue))
+    return fnValue;
+  cb = cb || $default;
+  if (typeof fnValue === 'function')
+    fnValue = fn();
+  if (!(fnValue instanceof Promise))
+    return fnValue;
+  if (fnValue instanceof Promise) {
+    fnValue = fnValue.then(value => {
+      if (typeof cb === 'function')
+        cb(value);
+      return value;
+    }).catch(error => {
+      throw Error(buildError(error));
     });
-    // Adding the listeners
-    const createdEvent = this.addEvent('created', mainComponentElement, component);
-    const beforeMountEvent = this.addEvent('beforeMount', mainComponentElement, component);
-    const mountedEvent = this.addEvent('mounted', mainComponentElement, component);
-    const beforeLoadEvent = this.addEvent('beforeLoad', mainComponentElement, component);
-    const loadedEvent = this.addEvent('loaded', mainComponentElement, component);
-    this.addEvent('beforeDestroy', mainComponentElement, component);
-    this.addEvent('destroyed', mainComponentElement, component);
-    const scriptsAssets = where(component.assets, asset => asset.nodeName === 'SCRIPT');
-    const initializer = component.init;
-    if (isFunction(initializer))
-      fnCallResolver(initializer.call(component));
-    const processDataAttr = (attr) => {
-      // Listening to all the reactive properties
-      const reactiveEvent = ReactiveEvent.on('AfterGet', descriptor => {
-        if (!(descriptor.propName in inputData))
-          inputData[descriptor.propName] = undefined;
-        Prop.set(inputData, descriptor.propName, descriptor);
-      });
-      let inputData = {};
-      if (attr.value.trim() === '') {
-        reactiveEvent.off();
-        // Data to apply: {...Bouer.data, ...component.data}
-        return Extend.obj(data, component.data);
-      }
-      // Otherwise, compiles the object provided
-      const dataAttrValue = IoC.app(this.bouer).resolve(Evaluator)
-        .exec({
-          data: Extend.obj(data, {
-            $data: data,
-            $scope: data,
-            $navigate: data
-          }),
-          code: attr.value,
-          context: context !== null && context !== void 0 ? context : this.bouer
-        });
-      if (!isObject(dataAttrValue))
-        Logger.error('Expected a valid Object Literal expression in “' + attr.nodeName +
-          '” and got “' + attr.value + '”.');
-      else {
-        // Adding all non-existing properties
-        forEach(Object.keys(dataAttrValue), key => {
-          if (!(key in inputData))
-            inputData[key] = dataAttrValue[key];
-        });
-      }
-      reactiveEvent.off();
-      return Extend.obj(Reactive.transform({
-        context: component,
-        data: inputData
-      }), component.data);
-    };
-    const compile = (scriptContent) => {
-      try {
-        let dataToUse = {};
-        let dataAttr = null;
-        // If the attr is `data`, prepare and inject the value into component `data`
-        if (dataAttr = findDirective(componentElement, Constants.data)) {
-          const attr = dataAttr;
-          if (this.delimiter.run(attr.value).length !== 0) {
-            Logger.error(('The “data” attribute cannot contain delimiter, source element: ' + '<' + $name + '/>.'));
-          } else {
-            dataToUse = processDataAttr(attr);
-            // Signinng the element with it's data
-            IoC.app(this.bouer).resolve(DataStore).addNodeData(mainComponentElement, dataToUse);
-          }
-          componentElement.removeAttribute(attr.name);
-        } else {
-          dataToUse = component.data;
+  }
+  cb(fnValue);
+  return fnValue;
+}
+
+function findAttribute(element, attrs, removeIfFound) {
+  let res = null;
+  if (!element)
+    return null;
+  for (let i = 0; i < attrs.length; i++)
+    if (res = element.attributes[attrs[i]])
+      break;
+  if (!isNull(res) && removeIfFound === true)
+    element.removeAttribute(res.name);
+  return res;
+}
+
+function findDirective(node, name) {
+  const attributes = node.attributes || [];
+  return attributes.getNamedItem(name) ||
+    toArray(attributes).find((attr) => (attr.name === name || startWith(attr.name, name + ':')));
+}
+
+function getRootElement(el) {
+  return el.root || el;
+}
+
+function setData(context, inputData, targetObject) {
+  if (isNull(targetObject))
+    targetObject = context.data;
+  if (!isObject(inputData)) {
+    Logger.error('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".');
+    return targetObject;
+  }
+  if (isObject(targetObject) && targetObject == null) {
+    Logger.error('Invalid targetObject value, expected an "Object Literal" and got "' + (typeof targetObject) + '".');
+    return inputData;
+  }
+  // Transforming the input
+  $reactive({
+    data: inputData,
+    context: context
+  });
+  // Transfering the properties
+  filter(Object.keys(inputData), key => {
+    let source;
+    let destination;
+    ReactiveEvent.once('AfterGet', evt => {
+      evt.onemit = descriptor => source = descriptor;
+      Property.descriptor(inputData, key).get();
+    });
+    ReactiveEvent.once('AfterGet', evt => {
+      evt.onemit = descriptor => destination = descriptor;
+      const desc = Property.descriptor(targetObject, key);
+      if (desc && isFunction(desc.get))
+        desc.get();
+    });
+    Property.transfer(targetObject, inputData, key);
+    if (!destination || !source)
+      return;
+    // Adding the previous watches to the property that is being set
+    filter(destination.watches, watch => {
+      if (source.watches.indexOf(watch) === -1)
+        source.watches.push(watch);
+    });
+    // Notifying the bounds and watches
+    source.notify();
+  });
+  return targetObject;
+}
+
+function toOwnerNode(node) {
+  return node.ownerElement || node.parentNode;
+}
+
+function errorMsgEmptyNode(node) {
+  return ('Expected an expression in “' + node.nodeName +
+    '” and got an <empty string>.');
+}
+
+function errorMsgNodeValue(node) {
+  return ('Expected an expression in “' + node.nodeName +
+    '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
+}
+
+function $internal($this) {
+  Object.defineProperty($this, 'ͼ', {
+    enumerable: false,
+    configurable: false,
+    writable: false,
+    value: undefined
+  });
+  return $this;
+}
+
+function toComponentOrOptions(entry) {
+  return entry instanceof Component ?
+    entry.__$proto__ :
+    entry instanceof ComponentPrototype ?
+    entry : entry;
+}
+const WIN = window;
+const DOM = WIN.document;
+const ANCHOR = createEl('a').build();
+class DelimiterHandler {
+  constructor(bouer, delimiters) {
+    this.delimiters = [];
+    this.bouer = bouer;
+    this.delimiters = delimiters;
+  }
+  add(item) {
+    this.delimiters.push(item);
+  }
+  remove(name) {
+    const index = this.delimiters.findIndex(item => item.name === name);
+    this.delimiters.splice(index, 1);
+  }
+  run(content) {
+    if (isNull(content) || trim(content) === '')
+      return [];
+    let mDelimiter = null;
+    const checkContent = (text, flag) => {
+      const center = '([\\S\\s]*?)';
+      for (let i = 0; i < this.delimiters.length; i++) {
+        const item = this.delimiters[i];
+        const result = text.match(new RegExp(item.delimiter.open + center + item.delimiter.close, flag || ''));
+        if (result) {
+          mDelimiter = item;
+          return result;
         }
-        // Executing the mixed scripts
-        IoC.app(this.bouer).resolve(Evaluator)
-          .eval((scriptContent || ''), component);
-        createdEvent.emit();
-        // tranfering the attributes
-        forEach(toArray(componentElement.attributes), (attr) => {
-          // if the attr is the class, transfer the items to the root element
-          if (attr.nodeName === 'class')
-            return componentElement.classList.forEach(cls => {
-              mainComponentElement.classList.add(cls);
-            });
-          if (Constants.silent == attr.name)
-            return;
-          // sets the attr to the root element
-          mainComponentElement.setAttribute(attr.name, attr.value);
-        });
-        beforeMountEvent.emit();
-        // Attaching the root element to the component element
-        if (!('root' in componentElement))
-          Prop.set(componentElement, 'root', {
-            value: mainComponentElement
-          });
-        // Mouting the element
-        container.replaceChild(mainComponentElement, componentElement);
-        mountedEvent.emit();
-        const rootClassList = {};
-        // Retrieving all the classes of the root element
-        mainComponentElement.classList.forEach(key => rootClassList[key] = true);
-        // Changing each selector to avoid conflits
-        const changeSelector = (style, styleId) => {
-          const rules = [];
-          const isStyle = (style.nodeName === 'STYLE');
-          if (!style.sheet)
-            return;
-          const cssRules = style.sheet.cssRules;
-          for (let i = 0; i < cssRules.length; i++) {
-            const rule = cssRules.item(i);
-            if (!rule)
-              continue;
-            const mRule = rule;
-            // .item .title, .item .desc
-            const ruleText = mRule.selectorText;
-            if (ruleText) {
-              const classStyleId = '.' + styleId;
-              /**
-               * From: [.item .title, .item .desc]
-               *
-               * To: [
-               *  .item.e-A1bcD .title,
-               *  .e-A1bcD .item .title,
-               *  .item.e-A1bcD .desc
-               *  .e-A1bcD .item .desc
-               * ]
-               */
-              mRule.selectorText = ruleText.split(',')
-                .flatMap(($selector) => {
-                  const $selectors = $selector.split(' ');
-                  $selectors[0] = $selectors[0] + classStyleId;
-                  return [$selectors.join(' '), classStyleId + ' ' + $selector];
-                })
-                .join(',');
-            }
-            // Adds the cssText only if the element is <style>
-            if (isStyle)
-              rules.push(mRule.cssText);
-          }
-          if (isStyle)
-            style.innerText = rules.join(' ');
+      }
+    };
+    const result = checkContent(content, 'g');
+    if (!result)
+      return [];
+    return result.map(item => {
+      const matches = checkContent(item);
+      const delimiterField = matches[0];
+      const delimiterExpression = matches[1];
+      // Composing the expression: price | currency:$ -> [ price, currency:$ ]
+      const expressionComposed = delimiterExpression.trim().split(' | ').map(e => trim(e));
+      // Extracting the field only
+      const expression = expressionComposed.shift();
+      // Builing the pipes structure
+      const pipes = expressionComposed.map(e => {
+        // currency:$ -> currency [ $ ]
+        const args = e.split(':');
+        const fn = args.shift();
+        return {
+          fn: fn,
+          args: args
         };
-        const stylesAssets = where(component.assets, asset => asset.nodeName !== 'SCRIPT');
-        const styleAttrName = 'component-style';
-        // Configuring the styles
-        forEach(stylesAssets, asset => {
-          const mStyle = asset.cloneNode(true);
-          if (mStyle instanceof HTMLLinkElement) {
-            const path = component.path[0] === '/' ? component.path.substring(1) : component.path;
-            mStyle.href = pathResolver(path, mStyle.getAttribute('href') || '');
-            mStyle.rel = 'stylesheet';
-          }
-          // Checking if this component already have styles added
-          if (this.stylesController[$name]) {
-            const controller = this.stylesController[$name];
-            if (controller.elements.indexOf(mainComponentElement) > -1)
-              return;
-            controller.elements.push(mainComponentElement);
-            return forEach(controller.styles, $style => {
-              mainComponentElement.classList.add($style.getAttribute(styleAttrName));
-            });
-          }
-          const styleId = code(8, 'e-');
-          mStyle.setAttribute(styleAttrName, styleId);
-          if ((mStyle instanceof HTMLLinkElement) && mStyle.hasAttribute('scoped'))
-            mStyle.onload = evt => changeSelector(evt.target, styleId);
-          this.stylesController[$name] = {
-            styles: [DOM.head.appendChild(mStyle)],
-            elements: [mainComponentElement]
-          };
-          if (!mStyle.hasAttribute('scoped'))
-            return;
-          mainComponentElement.classList.add(styleId);
-          if (mStyle instanceof HTMLStyleElement)
-            return changeSelector(mStyle, styleId);
-        });
-        beforeLoadEvent.emit();
-        // Compiling the rootElement
-        compiler.compile({
-          el: mainComponentElement,
-          context: component,
-          data: Reactive.transform({
-            context: component,
-            data: dataToUse
-          }),
-          directivesToIgnore: directivesToIgnore,
-          beforeCompile: beforeCompile,
-          afterCompile: afterCompile,
-          onComponentLoad: () => {
-            onComponentLoad(component);
-            loadedEvent.emit();
-            if (!this.rounting.routeView) {
-              const routeView = mainComponentElement.hasAttribute('route-vew') ?
-                mainComponentElement : mainComponentElement.querySelector('[route-view]');
-              if (routeView)
-                this.rounting.setRouteView(routeView);
-            }
-          }
-        });
-        const autoComponentDestroy = ifNullReturn(this.bouer.config.autoComponentDestroy, true);
-        if (autoComponentDestroy === false)
-          return;
-        // Listening the component to be destroyed
-        Task.run(stopTask => {
-          if (component.el.isConnected)
-            return;
-          if (this.bouer.isDestroyed)
-            return stopTask();
-          component.destroy();
-          stopTask();
-          const stylesController = this.stylesController[component.name];
-          if (!stylesController)
-            return;
-          const index = stylesController.elements.indexOf(component.el);
-          stylesController.elements.splice(index, 1);
-          if (stylesController.elements.length > 0 || container.isConnected)
-            return;
-          // No elements using the style
-          forEach(stylesController.styles, style => forEach(toArray(DOM.head.children), item => {
-            if (item === style)
-              return DOM.head.removeChild(style);
-          }));
-          delete this.stylesController[component.name];
-        });
-      } catch (error) {
-        Logger.error('Error in <' + $name + '/> component.');
-        Logger.error(buildError(error));
-        onComponentFail(componentElement);
-      }
-    };
-    if (scriptsAssets.length === 0)
-      return compile();
-    const localScriptsContent = [];
-    const onlineScriptsContent = [];
-    const onlineScriptsUrls = [];
-    const webRequestChecker = {};
-    // Grouping the online scripts and collecting the online url
-    forEach(scriptsAssets, (script) => {
-      if (script.src == '' || script.innerHTML)
-        localScriptsContent.push(script.innerHTML);
-      else {
-        const path = component.path[0] === '/' ? component.path.substring(1) : component.path;
-        script.src = pathResolver(path, script.getAttribute('src') || '');
-        onlineScriptsUrls.push(script.src);
-      }
-    });
-    // No online scripts detected
-    if (onlineScriptsUrls.length == 0)
-      return compile(localScriptsContent.join('\n\n'));
-    // Load the online scripts and run it
-    return forEach(onlineScriptsUrls, (url, index) => {
-      webRequestChecker[url] = true;
-      // Getting script content from a web request
-      webRequest(url, {
-        headers: {
-          'Content-Type': 'text/plain'
-        }
-      }).then(response => {
-        if (!response.ok)
-          throw new Error(response.statusText);
-        return response.text();
-      }).then(text => {
-        delete webRequestChecker[url];
-        // Adding the scripts according to the defined order
-        onlineScriptsContent[index] = text;
-        // if there are not web requests compile the element
-        if (Object.keys(webRequestChecker).length === 0)
-          return compile(Extend.array(onlineScriptsContent, localScriptsContent).join('\n\n'));
-      }).catch(error => {
-        error.stack = '';
-        Logger.error(('Error loading the <script src=\'' + url + '\'></script> in ' +
-          '<' + $name + '/> component, remove it in order to be compiled.'));
-        Logger.error(error);
-        onComponentFail(componentElement);
       });
+      return {
+        field: delimiterField,
+        expression: trim(expression),
+        delimiter: mDelimiter,
+        pipes: pipes
+      };
     });
   }
-  /**
-   * Adds assets to the component
-   * @param {string|object} assets the list of assets to be included
-   */
-  static prepareAssets(component, assets) {
-    const $Assets = [];
-    const assetsTypeMapper = {
-      js: 'script',
-      css: 'link',
-      scss: 'link',
-      sass: 'link',
-      less: 'link',
-      styl: 'link',
-      style: 'link',
-    };
-    const isValidAssetSrc = (src, index) => {
-      const isValid = (src || trim(src)) ? true : false;
-      if (!isValid)
-        Logger.error('Invalid asset “src”, in assets[' + index + '].src');
-      return isValid;
-    };
-    const assetTypeGetter = (src, index) => {
-      const srcSplitted = src.split('.');
-      const type = assetsTypeMapper[toLower(srcSplitted[srcSplitted.length - 1])];
-      if (!type)
-        return Logger.error('Couldn\'t find out what type of asset it is, provide ' +
-          'the “type” explicitly at assets[' + index + '].type');
-      return type;
-    };
-    forEach(assets, (asset, index) => {
-      let src = '';
-      let type = '';
-      let scoped = true;
-      if (typeof asset === 'string') { // String type
-        if (!isValidAssetSrc(asset, index))
-          return;
-        type = assetTypeGetter(trim(src = asset.replace(/\.less|\.s[ac]ss|\.styl/i, '.css')), index);
-      } else { // Object Type
-        if (!isValidAssetSrc(trim(src = asset.src.replace(/\.less|\.s[ac]ss\.styl/i, '.css')), index))
-          return;
-        if (!asset.type) {
-          if (!(type = assetTypeGetter(src, index)))
-            return;
-        } else {
-          type = assetsTypeMapper[toLower(asset.type)] || asset.type;
-        }
-        scoped = ifNullReturn(asset.scoped, true);
-      }
-      const isRelativePathImport = src[0] === '.';
-      if (isRelativePathImport && (!component.path || isNull(component.path))) {
-        Logger.warn('Component with no `path` cannot use imported assets, check component: ' + component.path);
-        return;
-      }
-      if (isRelativePathImport) {
-        const pathSections = component.path.split('/').slice(0, -1);
-        if (pathSections[0] === '')
-          pathSections.shift();
-        src = pathSections.join('/') + src.substring(1, src.length);
-      }
-      const $Asset = createEl(type, el => {
-        if (ifNullReturn(scoped, true))
-          el.setAttribute('scoped', 'true');
-        switch (toLower(type)) {
-          case 'script':
-            el.setAttribute('src', src);
-            break;
-          case 'link':
-            el.setAttribute('href', src);
-            el.setAttribute('rel', 'stylesheet');
-            el.setAttribute('type', 'text/css');
-            break;
-          default:
-            el.setAttribute('src', src);
-            break;
-        }
-      }).build();
-      $Assets.push($Asset);
-    });
-    component.assets.splice(0, component.assets.length);
-    component.assets.push.apply(component.assets, $Assets);
-  }
-  /**
-   * Dispatch an event of the component
-   * @param {string} eventName the event name
-   * @param {object?} init the CustomEventInit object where we can provid the event detail
-   */
-  emit(component, eventName, init) {
-    IoC.app(this.bouer).resolve(EventHandler).emit({
-      eventName: eventName,
-      attachedNode: component.el,
-      init: init
-    });
+  shorthand(attrName) {
+    if (isNull(attrName) || trim(attrName) === '')
+      return null;
+    const match = attrName.match(new RegExp('{([\\w{$,-}]*?)}'));
+    if (!match)
+      return null;
+    return this.run('{{' + trim(match[1]) + '}}')[0];
   }
 }
 class ViewChild {
   /**
    * Retrieves the actives components matching the a provided expression
-   * @param {Bouer} bouer the app instance
+   * @param {Bouer} app the Bouer instance
    * @param {Function} expression the expression function to match the required component
    * @returns a list of components matching the expression
    */
-  static by(bouer, expression) {
+  static by(app, expression) {
     // Retrieving the active component
-    const activeComponents = IoC.app(bouer).resolve(ComponentHandler)
+    const activeComponents = IoC.app(app).resolve(ComponentHandler)
       .activeComponents;
     // Applying filter to the find the component
-    return where(activeComponents, expression);
+    return filter(activeComponents, expression);
   }
   /**
-   * Retrieves the active component matching the component element or the root element id
-   * @param {Bouer} bouer the app instance
-   * @param {string} id the id o the component
-   * @returns The Component or null
+   * Retrieves the actives components matching class
+   * @param {Bouer} app the Bouer instance
+   * @param {Function} ctor the class to match
+   * @returns a list of components matching the expression
    */
-  static byId(bouer, id) {
+  static byClass(app, ctor) {
     // Retrieving the active component
-    const activeComponents = IoC.app(bouer).resolve(ComponentHandler)
+    const activeComponents = IoC.app(app).resolve(ComponentHandler)
       .activeComponents;
     // Applying filter to the find the component
-    return where(activeComponents, c => (c.el && getRootElement(c.el).id == id))[0];
+    return filter(activeComponents, c => c instanceof ctor);
   }
   /**
    * Retrieves the actives components matching the component name
-   * @param {Bouer} bouer the app instance
+   * @param {Bouer} app the Bouer instance
    * @param {string} name the component name
    * @returns a list of components matching the name
    */
-  static byName(bouer, name) {
+  static byName(app, name) {
     // Retrieving the active component
-    const activeComponents = IoC.app(bouer).resolve(ComponentHandler)
+    const activeComponents = IoC.app(app).resolve(ComponentHandler)
       .activeComponents;
     // Applying filter to the find the component
-    return where(activeComponents, c => c.name.toLowerCase() == (name || '').toLowerCase());
+    return filter(activeComponents, c => {
+      const $proto = c instanceof Component ? c.__$proto__ : c;
+      return $proto.name.toLowerCase() == (name || '').toLowerCase();
+    });
   }
 }
 var version = '3.3.0';
@@ -5552,9 +5741,6 @@ class Bouer {
    * @param {object?} options the options to the instance
    */
   constructor(selector, options) {
-    /** The name of the instance */
-    // Ignore Reactive Transformation
-    this._IRT_ = true;
     this.name = 'Bouer';
     this.version = version;
     /** Unique Id of the instance */
@@ -5568,16 +5754,11 @@ class Bouer {
     this.isDestroyed = false;
     /** Provides state of the app, if it is already initialized */
     this.isInitialized = false;
-    const $options = (options || {});
+    $internal(this);
+    const $options = options || {};
     this.options = $options;
     this.config = $options.config || {};
-    this.deps = $options.deps || {};
     this.pipes = $options.pipes || {};
-    forEach(Object.keys(this.deps), key => {
-      const deps = this.deps;
-      const value = deps[key];
-      deps[key] = typeof value === 'function' ? value.bind(this) : value;
-    });
     const app = this;
     const delimiters = $options.delimiters || [];
     // Adding Dependency Injection Services
@@ -5601,15 +5782,16 @@ class Bouer {
     const compiler = IoC.app(this).resolve(Compiler);
     const skeleton = IoC.app(this).resolve(Skeleton);
     const delimiter = IoC.app(this).resolve(DelimiterHandler);
+    const eventHandler = IoC.app(this).resolve(EventHandler);
     // Register the middleware
     if (typeof $options.middleware === 'function')
       $options.middleware.call(this, middleware.subscribe, this);
     // Transform the data properties into a reative
-    this.data = Reactive.transform({
+    this.data = $reactive({
       data: $options.data || {},
       context: this
     });
-    this.globalData = Reactive.transform({
+    this.globalData = $reactive({
       data: $options.globalData || {},
       context: this
     });
@@ -5641,7 +5823,7 @@ class Bouer {
         if (key in dataStore.data)
           return Logger.warn('There is already a data stored with this key “' + key + '”.');
         if (ifNullReturn(toReactive, false) === true)
-          Reactive.transform({
+          $reactive({
             context: app,
             data: data
           });
@@ -5674,13 +5856,13 @@ class Bouer {
           };
         const mWait = dataStore.wait[key];
         mWait.data = data;
-        forEach(mWait.nodes, nodeWaiting => {
+        filter(mWait.nodes, nodeWaiting => {
           if (!nodeWaiting)
             return;
           compiler.compile({
             el: nodeWaiting,
             context: mWait.context,
-            data: Reactive.transform({
+            data: $reactive({
               context: mWait.context,
               data: mWait.data
             }),
@@ -5700,25 +5882,20 @@ class Bouer {
       get: name => componentHandler.components[name],
       viewBy: (expression) => ViewChild.by(this, expression),
       viewByName: (componentName) => ViewChild.byName(this, componentName),
-      viewById: (componentId) => ViewChild.byId(this, componentId),
+      viewByClass: (ctor) => ViewChild.byClass(this, ctor)
     };
-    Prop.set(this, 'refs', {
-      get: () => {
-        const mRefs = {};
-        forEach(toArray(ifNullStop(this.el).querySelectorAll('[' + Constants.ref + ']')), (ref) => {
-          const mRef = ref.attributes[Constants.ref];
-          const value = trim(mRef.value) || ref.name || '';
-          if (value === '')
-            return Logger.error('Expected an expression in “' + ref.name +
-              '” or at least “name” attribute to combine with “' + ref.name + '”.');
-          if (value in mRefs) {
-            Logger.warn('The key “' + value + '” in “' + ref.name + '” is taken, choose another key.');
-            return Logger.warn(ref);
-          }
-          mRefs[value] = ref;
-        });
-        return mRefs;
-      }
+    this.$deps = IoC.app(this);
+    if (typeof $options.mounted === 'function')
+      eventHandler.on({
+        eventName: $options.mounted.name,
+        callback: $options.mounted,
+        modifiers: {
+          once: true
+        },
+        context: app
+      });
+    eventHandler.emit({
+      eventName: 'mounted'
     });
     // Registering all the components
     componentHandler.prepare($options.components || []);
@@ -5746,19 +5923,19 @@ class Bouer {
     if (this.isInitialized)
       return this;
     if (isNull(selector) || trim(selector) === '')
-      throw Logger.error(new Error('Invalid selector provided to the instance.'));
+      throw Logger.error(new Error('Invalid selector provided to Bouer instance.'));
     const app = this;
     const el = DOM.querySelector(selector);
     if (!(this.el = el))
       throw Logger.error(new SyntaxError('Element with selector “' + selector + '” not found.'));
-    const options = this.options || {};
+    const options = this.options;
     const binder = IoC.app(this).resolve(Binder);
     const eventHandler = IoC.app(this).resolve(EventHandler);
     const routing = IoC.app(this).resolve(Routing);
     const skeleton = IoC.app(this).resolve(Skeleton);
     const compiler = IoC.app(this).resolve(Compiler);
     const dataStore = IoC.app(this).resolve(DataStore);
-    forEach([options.beforeLoad, options.loaded, options.beforeDestroy, options.destroyed], hook => {
+    filter([options.beforeLoad, options.loaded, options.beforeDestroy, options.destroyed], hook => {
       if (typeof hook !== 'function')
         return;
       eventHandler.on({
@@ -5967,7 +6144,10 @@ class Bouer {
       el: options.el,
       data: options.data,
       context: options.context || this,
-      onComponentLoad: options.onDone
+      directivesToIgnore: options.directivesToIgnore,
+      beforeCompile: options.beforeCompile,
+      afterCompile: options.afterCompile,
+      onComponentLoad: options.onComponentLoaded
     });
   }
   /**
@@ -5975,17 +6155,17 @@ class Bouer {
    */
   destroy() {
     const el = this.el;
-    const $Events = IoC.app(this).resolve(EventHandler).$events;
-    const destroyedEvents = ($Events['destroyed'] || []).concat(($Events['component:destroyed'] || []));
+    const $events = IoC.app(this).resolve(EventHandler).$events;
+    const destroyedEvents = ($events['destroyed'] || []).concat(($events['component:destroyed'] || []));
     this.emit('destroyed', {
       element: this.el
     });
     // Dispatching all the destroy events
-    forEach(destroyedEvents, es => es.emit({
+    filter(destroyedEvents, es => es.emit({
       once: true
     }));
-    $Events['destroyed'] = [];
-    $Events['component:destroyed'] = [];
+    $events['destroyed'] = [];
+    $events['component:destroyed'] = [];
     if (el.tagName == 'BODY')
       el.innerHTML = '';
     else if (DOM.contains(el))
@@ -5995,64 +6175,40 @@ class Bouer {
     IoC.app(this).clear();
   }
 }
+/**
+ * Creates a new bouer app
+ * @param {string} selector the selector of the element to be controlled by the instance
+ * @param {object?} options the options to the instance
+ * @returns Bouer instance
+ */
+function $createApp(selector, options) {
+  return new Bouer(selector, options);
+}
 export {
   $computed,
-  $default,
-  ANCHOR,
+  $createApp,
+  $field,
+  $form,
+  $inert,
+  $reactive,
   Compiler,
   Component,
+  ComponentPrototype,
   Computed,
-  DOM,
   Extend,
   FieldSchema,
   FormHandler,
   FormSchema,
   IoC,
-  Prop,
-  Reactive,
-  Ref,
+  Property,
+  ReactivePropertyDescriptor,
   Routing,
   ViewChild,
-  WIN,
   Watch,
-  buildError,
   code,
-  createComment,
-  createEl,
   Bouer as
   default,
-  errorMsgEmptyNode,
-  errorMsgNodeValue,
-  findAttribute,
-  findDirective,
-  findOneBy,
-  fnCallResolver,
-  forEach,
-  getRootElement,
-  ifNullReturn,
-  ifNullStop,
-  isComputed,
-  isEmptyObject,
-  isFilledObj,
-  isFunction,
-  isNull,
-  isObject,
-  isPrimitive,
-  isRef,
-  isString,
-  mapper,
-  pathResolver,
-  removeEl,
+  prop,
   setData,
-  startWith,
-  toArray,
-  toLower,
-  toOwnerNode,
-  toPascalCase,
-  toStr,
-  trim,
-  urlCombine,
-  urlResolver,
-  webRequest,
-  where
+  webRequest
 };
