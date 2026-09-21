@@ -7,6 +7,7 @@ import DataType from '../../definitions/types/DataType';
 import dynamic from '../../definitions/types/Dynamic';
 import WatchCallback from '../../definitions/types/WatchCallback';
 import Bouer from '../../instance/Bouer';
+import Constants from '../../shared/helpers/Constants';
 import Extend from '../../shared/helpers/Extend';
 import IoC from '../../shared/helpers/IoCContainer';
 import Property from '../../shared/helpers/Property';
@@ -215,7 +216,7 @@ export default class ComponentPrototype<Data extends {} = {}> implements ICompon
    * Destroys the component
    */
   destroy() {
-    if (!this.el) return false;
+    if (!this.el) return;
 
     if (this.isDestroyed && this.bouer && this.bouer.isDestroyed)
       return;
@@ -323,7 +324,7 @@ export default class ComponentPrototype<Data extends {} = {}> implements ICompon
       'loaded', 'beforeDestroy', 'destroyed', 'blocked', 'failed'
     ];
     const ignorables: string[] = [
-      'el', 'bouer',  '__$proto__', 'init', 'constructor', 'export', 'watch'
+      Constants.$, 'el', 'bouer',  '__$proto__', 'init', 'constructor', 'export', 'watch'
     ].concat(hooks);
 
     const cachedInert: dynamic = {};
@@ -347,20 +348,16 @@ export default class ComponentPrototype<Data extends {} = {}> implements ICompon
       if (fieldValue instanceof InertProp) {
         cachedInert[field] = fieldValue;
         Property.set(proto.data, field, {
-          get: function reactive() {
-            return cachedInert[field].get();
-          },
-          set: function reactive(value: any) {
-            cachedInert[field].set(value);
-          }
+          get: function linked() { return fieldValue.get(); },
+          set: function linked(v) { fieldValue.set(v); }
         });
       } else {
         proto.data[field] = fieldValue;
       }
 
       Property.set(component, field, {
-        get: function reactive() { return proto.data[field]; },
-        set: function reactive(value) { proto.data[field] = value; }
+        get: function linked() { return proto.data[field]; },
+        set: function linked(v) { proto.data[field] = v; }
       });
     });
 
