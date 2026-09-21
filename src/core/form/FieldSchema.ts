@@ -1,11 +1,13 @@
 import { FieldErrorMessage, FieldFnValidation, IFieldInfo, IFieldInfoSnapshot, IFieldInit } from '../../definitions/interfaces/IFieldSchema';
 import dynamic from '../../definitions/types/Dynamic';
-import { isNull } from '../../shared/helpers/Utils';
+import { $internal, isNull } from '../../shared/helpers/Utils';
 import FormSchema from './FormSchema';
 import Validator from './Validator';
 
 export default class FieldSchema implements IFieldInfo {
   constructor(options: IFieldInfoSnapshot) {
+    $internal(this);
+
     this.field = undefined as unknown as Element;
     this.name = undefined as unknown as string;
     this.type = undefined as unknown as string;

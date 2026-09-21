@@ -41,6 +41,7 @@ export default class ReactivePropertyDescriptor<Value, Obj> implements PropertyD
     context: RenderContext
   }) {
     $internal(this);
+
     this.$name = options.propName;
     this.source = options.srcObject;
     this.context = options.context;

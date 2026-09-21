@@ -1,6 +1,7 @@
 import { startWith } from './Utils';
 
 const Constants = {
+  $: 'ͼ',
   skip: 'e-skip',
 
   if: 'e-if',
