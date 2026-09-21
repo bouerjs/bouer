@@ -1,46 +1,46 @@
 import IBouerOptions from './definitions/interfaces/IBouerOptions';
 import Bouer from './instance/Bouer';
-
-export { default as ComponentPrototype, Component } from './core/component/Component';
-
-export { default as ReactivePropertyDescriptor, $reactive, $inert } from './core/reactive/Reactive';
-export { default as Computed, $computed } from './core/reactive/Computed';
+import IoCContainer, { $inject } from './shared/helpers/IoCContainer';
 
 export { default as Compiler } from './core/compiler/Compiler';
-export { default as Routing } from './core/routing/Routing';
+export { Component, default as ComponentPrototype } from './core/component/Component';
+
+export { $computed, default as Computed } from './core/reactive/Computed';
+export { $inert, $reactive, default as ReactivePropertyDescriptor } from './core/reactive/Reactive';
+
 export { default as Watch } from './core/binder/Watch';
+export { default as Routing } from './core/routing/Routing';
 export { default as ViewChild } from './core/ViewChild';
 
-export { default as FormHandler, $form } from './core/form/FormHandler';
+export { $field, default as FieldSchema } from './core/form/FieldSchema';
+export { $form, default as FormHandler } from './core/form/FormHandler';
 export { default as FormSchema } from './core/form/FormSchema';
-export { default as FieldSchema, $field } from './core/form/FieldSchema';
 
 export { default as Extend } from './shared/helpers/Extend';
 export { default as Property } from './shared/helpers/Property';
-export { default as IoC } from './shared/helpers/IoCContainer';
 
+export { default as IMiddlewareResult } from './core/middleware/IMiddlewareResult';
+export { default as IAsset } from './definitions/interfaces/IAsset';
+export { default as IBinderConfig } from './definitions/interfaces/IBinderConfig';
 export { default as IBouerConfig } from './definitions/interfaces/IBouerConfig';
 export { default as IComponentOptions } from './definitions/interfaces/IComponentOptions';
-export { default as IBinderConfig } from './definitions/interfaces/IBinderConfig';
 export { default as IDelimiter } from './definitions/interfaces/IDelimiter';
 export { default as IDelimiterResponse } from './definitions/interfaces/IDelimiterResponse';
-export { default as IMiddleware } from './definitions/interfaces/IMiddleware';
+export { default as IEventEmitterOptions } from './definitions/interfaces/IEventEmitterOptions';
 export { default as IEventModifiers } from './definitions/interfaces/IEventModifiers';
 export { default as IEventSubscription } from './definitions/interfaces/IEventSubscription';
-export { default as IEventEmitterOptions } from './definitions/interfaces/IEventEmitterOptions';
-export { default as IAsset } from './definitions/interfaces/IAsset';
-export { default as IMiddlewareResult } from './core/middleware/IMiddlewareResult';
+export { default as IMiddleware } from './definitions/interfaces/IMiddleware';
 
-export { default as dynamic } from './definitions/types/Dynamic';
 export { default as CustomDirective } from './definitions/types/CustomDirective';
+export { default as DataType } from './definitions/types/DataType';
+export { default as dynamic } from './definitions/types/Dynamic';
 export { default as RenderContext } from './definitions/types/RenderContext';
 export { default as SkeletonOptions } from './definitions/types/SkeletonOptions';
 export { default as WatchCallback } from './definitions/types/WatchCallback';
-export { default as DataType } from './definitions/types/DataType';
 
 export * from './definitions/interfaces/IFieldSchema';
-export { code, webRequest, setData } from './shared/helpers/Utils';
 export { prop } from './core/compiler/Directive/DataInject';
+export { code, setData, webRequest } from './shared/helpers/Utils';
 
 /**
  * Creates a new bouer app
@@ -52,7 +52,12 @@ export function $createApp<Data extends {} = {}, Global extends {} = {}, Deps ex
   selector?: string, options?: IBouerOptions<Data, Global, Deps>
 ) {
   return new Bouer<Data, Global, Deps>(selector, options);
-}
+};
+
+const IoC = {
+  add: IoCContainer.add,
+  resolve: IoCContainer.resolve
+};
 
 export default Bouer;
-export { IBouerOptions };
+export { $inject, IBouerOptions, IoC };
