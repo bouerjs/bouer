@@ -8,6 +8,7 @@ import IComponentOptions from '../../definitions/interfaces/IComponentOptions';
 import dynamic from '../../definitions/types/Dynamic';
 import RenderContext from '../../definitions/types/RenderContext';
 import Logger from '../logger/Logger';
+import Constants from './Constants';
 import Property from './Property';
 
 export function webRequest(url: string, options?: {
@@ -419,7 +420,9 @@ export function setData<
   targetObject?: Data
 ): OutData {
   if (isNull(targetObject))
-    targetObject = context.data as any;
+    targetObject = context instanceof Component
+      ? context.__$proto__.data
+      : context.data as any;
 
   if (!isObject(inputData)) {
     Logger.error('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".');
@@ -480,12 +483,12 @@ export function errorMsgEmptyNode(node: Node) {
 
 export function errorMsgNodeValue(node: Node) {
   return ('Expected an expression in “' + node.nodeName +
-    '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
+    '” and got “' + ifNullReturn(node.nodeValue, '') + '”.');
 }
 
 export function $internal($this: any) {
-  Object.defineProperty($this, 'ͼ', {
-    enumerable: false, configurable: false, writable: false, value: undefined
+  if (!(Constants.$ in $this)) Object.defineProperty($this, Constants.$, {
+    enumerable: false, configurable: false, writable: false, value: !0
   });
   return $this;
 }
@@ -498,7 +501,6 @@ export function toComponentOrOptions(
     : entry instanceof ComponentPrototype
       ? entry : entry;
 };
-
 
 export const WIN = window;
 export const DOM = WIN.document;

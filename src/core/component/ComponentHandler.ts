@@ -248,8 +248,7 @@ export default class ComponentHandler {
 
         if (entry instanceof Component) {
           const ctor = entry.__$proto__.ctor
-          const $newClassComponent: Component<any> = IoC.app(this.bouer).resolve(ctor) ||
-            IoC.resolve(ctor) || IoC.new(ctor)!;
+          const $newClassComponent: Component<any> = IoC.resolve(ctor) || IoC.new(ctor)!;
 
           $classComponent = $newClassComponent;
           $protoComponent = $newClassComponent.__$proto__;
