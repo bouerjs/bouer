@@ -1,5 +1,4 @@
 import Bouer, {
-  IoC,
   Compiler,
   Computed,
   $computed,
@@ -8,9 +7,12 @@ import Bouer, {
   $form,
   $inert,
   $field,
-  prop
+  prop,
+  $inject
 } from '../src/index';
 import { createEl } from '../src/shared/helpers/Utils';
+
+import IoC from '../src/shared/helpers/IoCContainer';
 
 import { setTimeout as sleep } from 'node:timers/promises';
 
@@ -45,4 +47,5 @@ export {
   $form,
   $inert,
   $field,
+  $inject
 };
