@@ -4,7 +4,8 @@ import {
   Component,
   toHtml,
   IoC,
-  $inert
+  $inert,
+  $inject
 } from '../../index.js';
 
 describe('Dependency Injection - IoC Container', () => {
@@ -47,7 +48,7 @@ describe('Dependency Injection - IoC Container', () => {
       context: context,
       el: element,
       onComponentLoad: () => {
-        const customComponent = context.$components.viewByName(CustomComponent.name)[0];
+        const customComponent = context.$components.viewByClass(CustomComponent)[0];
         expect(customComponent.webClient).toBe(undefined);
       }
     });
@@ -63,7 +64,7 @@ describe('Dependency Injection - IoC Container', () => {
     const context = Bouer.create({
       components: [CustomComponent],
       mounted: function () {
-        IoC.app(this).add(WebClient, ['http://localhost:5000/api']);
+        IoC.add(WebClient, ['http://localhost:5000/api']);
       }
     });
 
@@ -74,7 +75,7 @@ describe('Dependency Injection - IoC Container', () => {
       context: context,
       el: element,
       onComponentLoad: () => {
-        const customComponent = context.$components.viewByName(CustomComponent.name)[0];
+        const customComponent = context.$components.viewByClass(CustomComponent)[0];
         expect(customComponent.webClient).toBe(undefined);
       }
     });
@@ -90,8 +91,8 @@ describe('Dependency Injection - IoC Container', () => {
     const context = Bouer.create({
       components: [CustomComponent],
       mounted: function () {
-        IoC.app(this).add(WebClient, ['http://localhost:5000/api']);
-        IoC.app(this).add(CustomComponent, [WebClient]);
+        IoC.add(WebClient, ['http://localhost:5000/api']);
+        IoC.add(CustomComponent, [WebClient]);
       }
     });
 
@@ -102,7 +103,7 @@ describe('Dependency Injection - IoC Container', () => {
       context: context,
       el: element,
       onComponentLoad: () => {
-        const customComponent = context.$components.viewByName(CustomComponent.name)[0];
+        const customComponent = context.$components.viewByClass(CustomComponent)[0];
         expect(customComponent.webClient).toBeInstanceOf(WebClient);
       }
     });
@@ -122,7 +123,7 @@ describe('Dependency Injection - IoC Container', () => {
         IoC.add(WebClient, ['http://localhost:5000/api']);
 
         // Instance Dependency
-        IoC.app(this).add(CustomComponent, [WebClient]);
+        IoC.add(CustomComponent, [WebClient]);
       }
     });
 
@@ -135,6 +136,45 @@ describe('Dependency Injection - IoC Container', () => {
       onComponentLoad: () => {
         const customComponent = context.$components.viewByClass(CustomComponent)[0];
         expect(customComponent.webClient).toBeInstanceOf(WebClient);
+      }
+    });
+  });
+
+  it('Also injects the dependency as expected if `webClient` is registered global as dependency', async () => {
+    // Local Class
+    class CustomComponent extends Component {
+      webClient = $inject(WebClient);
+
+      constructor() {
+        super({
+          template: '<h1>Testing...</h1>',
+        });
+      }
+    }
+
+    const htmlSnippet = `
+    <div id="app">
+      <CustomComponent></CustomComponent>
+    </div>`;
+    const element = toHtml(htmlSnippet);
+
+    const context = Bouer.create({
+      components: [CustomComponent],
+      mounted: function () {
+        IoC.add(WebClient, ['http://localhost:5000/api']);
+      }
+    });
+
+    const compiler = IoC.app(context).resolve(Compiler);
+
+    await compiler.compile({
+      data: context.data,
+      context: context,
+      el: element,
+      onComponentLoad: () => {
+        const customComponent = context.$components.viewByClass(CustomComponent)[0];
+        expect(customComponent.webClient).toBeInstanceOf(WebClient);
+        expect(customComponent.webClient.url).toBe('http://localhost:5000/api');
       }
     });
   });
