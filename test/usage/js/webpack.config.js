@@ -1,70 +1,66 @@
-const path = require('path');
-const HtmlMinimizerPlugin = require('html-minimizer-webpack-plugin');
-const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
-const TerserPlugin = require('terser-webpack-plugin');
+import path from 'node:path';
+import HtmlWebpackPlugin from 'html-webpack-plugin';
 
-module.exports = {
-  entry: path.resolve(__dirname, 'src', 'app.js'),
+const __dirname = import.meta.dirname;
+
+export default {
+  entry: './app.js',
+  mode: 'development',
+  context: path.resolve(__dirname, 'src'),
+
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'app.js'
+    filename: '[name].js'
   },
-  optimization: {
-    minimize: true,
-    minimizer: [
-      new CssMinimizerPlugin({
-        test: /\.css$/i,
-      }),
-      new HtmlMinimizerPlugin({
-        test: /\.html$/i,
-      }),
-      new TerserPlugin({
-        test: /\.js(\?.*)?$/i,
-      }),
-    ],
-  },
+  plugins: [
+    new HtmlWebpackPlugin({
+      template: './index.html',
+      filename: 'index.html'
+    })
+  ],
   module: {
-    rules: [{ // Processing `js` files
-      test: /\.js$/,
-      exclude: /node_modules/,
-      use: ['babel-loader']
-    },
-    { // Processing `html` files
-      test: /\.html$/i,
-      use: {
-        loader: 'file-loader',
+    rules: [
+      { // Processing `js` files
+        test: /\.js$/,
+        exclude: [/node_modules/],
+        use: ['babel-loader']
+      },
+
+      { // Process the `index.html` file
+        test: /\.html$/i,
+        include: [/index\.html$/],
+        exclude: [/node_modules/],
+        loader: 'html-loader',
         options: {
-          name: '[path][name].[ext]',
-          context: './src',
+          sources: true
+        },
+      },
+
+      { // Processing `html` files except `index.html`
+        test: /\.html$/i,
+        exclude: [/node_modules/, /index\.html$/],
+        type: 'asset/resource',
+        generator: {
+          filename: '[path][name].[ext]'
         }
       },
-      exclude: [/node_modules/]
-    },
-    { // Processing `css` files
-      test: /\.css$/,
-      use: {
-        loader: 'file-loader',
-        options: {
-          name: '[path][name].[ext]',
-          context: './src',
+
+      { // Processing `css` files
+        test: /\.css$/i,
+        type: 'asset/resource',
+        generator: {
+          filename: '[path][name].[ext]'
         }
       },
-      exclude: [/node_modules/]
-    },
-    { // Processing `sass` files
-      test: /\.s[ac]ss$/i,
-      use: [{ // Output the files
-        loader: 'file-loader',
-        options: {
-          name: '[path][name].css',
-          context: './src',
-        }
-      },
-      // Compiles Sass to CSS
-      'sass-loader',
-      ],
-      exclude: [/node_modules/]
-    },
+
+      { // Processing `scss` files, and compiling them into `css`
+        test: /\.s[ac]ss$/i,
+        type: 'asset/resource',
+        generator: {
+          filename: '[path][name].css'
+        },
+        use: ['sass-loader']
+      }
     ]
   }
 };
