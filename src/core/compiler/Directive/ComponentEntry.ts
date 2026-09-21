@@ -1,4 +1,6 @@
-import Bouer, { IoC, RenderContext } from '../../..';
+import RenderContext from '../../../definitions/types/RenderContext';
+import Bouer from '../../../instance/Bouer';
+import IoC from '../../../shared/helpers/IoCContainer';
 import {
   createEl,
   errorMsgEmptyNode,

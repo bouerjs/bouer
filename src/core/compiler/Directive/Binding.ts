@@ -1,7 +1,7 @@
-import { IoC } from '../../..';
 import RenderContext from '../../../definitions/types/RenderContext';
 import Bouer from '../../../instance/Bouer';
 import Constants from '../../../shared/helpers/Constants';
+import IoC from '../../../shared/helpers/IoCContainer';
 import {
   errorMsgEmptyNode,
   errorMsgNodeValue,
