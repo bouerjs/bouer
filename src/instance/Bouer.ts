@@ -31,19 +31,18 @@ import {
     createEl, DOM,
     filter,
     ifNullReturn,
-    ifNullStop,
     isNull,
     setData,
-    toArray, trim,
+    trim,
     WIN
 } from '../shared/helpers/Utils';
 import Logger from '../shared/logger/Logger';
 
 import FormHandler from '../core/form/FormHandler';
-import version from './version';
-import IComponentOptions from '../definitions/interfaces/IComponentOptions';
 import { $reactive } from '../core/reactive/Reactive';
+import IComponentOptions from '../definitions/interfaces/IComponentOptions';
 import Params from '../definitions/types/Parameters';
+import version from './version';
 
 export default class Bouer<
   Data extends {} = {},
@@ -250,9 +249,12 @@ export default class Bouer<
 
   /** The dependencies of the instance */
   readonly $deps: {
-    add<S extends Constructor<any>>(ctor: S, params?: Params<S>, isSingleton?: boolean): void,
-    resolve<S >(ctor: Constructor<S>): S | undefined,
-    clear(): void
+    add<S extends Constructor<S>>(
+      ctor: S,
+      params?: Params<S>,
+      isSingleton?: boolean
+    ): void,
+    resolve<S>(ctor: Constructor<S>): S | undefined
   };
 
 
@@ -266,29 +268,25 @@ export default class Bouer<
     options?: IBouerOptions<Data, Global, Deps>
   ) {
     $internal(this);
+    const app = this;
     const $options = options || {};
+
     this.options = $options;
     this.config = $options.config || {};
     this.pipes = $options.pipes || {};
 
-    const app = this;
-    const delimiters = $options.delimiters || [];
-
     // Adding Dependency Injection Services
-    IoC.app(this).add(DataStore, [], true);
-    IoC.app(this).add(Evaluator, [this]);
-    IoC.app(this).add(Middleware, [this], true);
-    IoC.app(this).add(Binder, [this, Evaluator], true);
-    IoC.app(this).add(EventHandler, [this, Evaluator], true);
-    IoC.app(this).add(ComponentHandler, [
-      this, DelimiterHandler, EventHandler, Evaluator, Routing
-    ], true);
-    IoC.app(this).add(Skeleton, [this], true);
-    IoC.app(this).add(Routing, [this], true);
-    IoC.app(this).add(DelimiterHandler, [this, delimiters], true);
-    IoC.app(this).add(Compiler, [
-      this, Binder, DelimiterHandler, EventHandler, ComponentHandler, $options.directives
-    ], true);
+    IoC.app(this)
+       .add(DataStore, [], true)
+       .add(Evaluator, [this])
+       .add(Middleware, [this], true)
+       .add(Binder, [this, Evaluator], true)
+       .add(EventHandler, [this, Evaluator], true)
+       .add(ComponentHandler, [this, DelimiterHandler, EventHandler, Evaluator, Routing], true)
+       .add(Skeleton, [this], true)
+       .add(Routing, [this], true, true)
+       .add(DelimiterHandler, [this], true)
+       .add(Compiler, [this, Binder, DelimiterHandler, EventHandler, ComponentHandler],true, true);
 
     const dataStore = IoC.app(this).resolve(DataStore)!;
     const middleware = IoC.app(this).resolve(Middleware)!;
@@ -311,11 +309,6 @@ export default class Bouer<
       data: $options.globalData || {},
       context: this
     });
-
-    delimiters.push.apply(delimiters, [
-      { name: 'html', delimiter: { open: '{{:html ', close: '}}' } },
-      { name: 'common', delimiter: { open: '{{', close: '}}' } },
-    ]);
 
     this.$routing = IoC.app(this).resolve(Routing)!;
 
@@ -406,7 +399,7 @@ export default class Bouer<
       ) => ViewChild.byClass(this, ctor)
     };
 
-    this.$deps = IoC.app(this);
+    this.$deps = { add: IoC.add, resolve: IoC.resolve };
 
     if (typeof $options.mounted === 'function')
       eventHandler.on({ // Subscribe to the mounted event
@@ -568,7 +561,6 @@ export default class Bouer<
     }
   ) {
     const formHandler = new FormHandler({}, Extend.obj({}, { type: 'STATIC' }, options as any)).init({
-      bouer: this,
       context: this,
       data: this.data,
       element: input,
