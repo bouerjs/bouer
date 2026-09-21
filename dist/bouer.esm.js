@@ -192,23 +192,12 @@ const IoC$1 = (function() {
     return serviceCollection.delete(this);
   }
   const methods = {
-    /**
-     * Adds a service to generic app
-     * @param ctor the service that should be resolved future on
-     * @param params the parameter that needs to be resolved every time the service is requested.
-     * @param isSingleton mark the service as singleton to avoid creating an instance whenever it's requested
-     */
     add: function(ctor, params, isSingleton) {
       add.call(global, ctor, params, isSingleton);
       return {
         add: this.add
       };
     },
-    /**
-     * Resolves the Service with all it's dependencies
-     * @param ctor the class the needs to be resolved
-     * @returns the instance of the class resolved
-     */
     resolve: function(ctor) {
       const service = resolve.call(global, ctor);
       if (service)
@@ -242,9 +231,6 @@ const IoC$1 = (function() {
         resolve: function(ctor) {
           return resolve.call(app, ctor);
         },
-        /**
-         * Dispose all the added service of the current app
-         */
         clear: clear.bind(app)
       };
     },
@@ -6225,10 +6211,20 @@ class Bouer {
 function $createApp(selector, options) {
   return new Bouer(selector, options);
 }
-const IoC = {
-  add: IoC$1.add,
-  resolve: IoC$1.resolve
-};
+class IoC {}
+/**
+ * Adds a service to generic app
+ * @param ctor the service that should be resolved future on
+ * @param params the parameter that needs to be resolved every time the service is requested.
+ * @param isSingleton mark the service as singleton to avoid creating an instance whenever it's requested
+ */
+IoC.add = IoC$1.add;
+/**
+ * Resolves the Service with all it's dependencies
+ * @param ctor the class the needs to be resolved
+ * @returns the instance of the class resolved
+ */
+IoC.resolve = IoC$1.resolve;
 export {
   $computed,
   $createApp,
