@@ -2,12 +2,12 @@ import IBouerOptions from './definitions/interfaces/IBouerOptions';
 import Bouer from './instance/Bouer';
 import IoCContainer, { $inject } from './shared/helpers/IoCContainer';
 
+export default Bouer;
+
 export { default as Compiler } from './core/compiler/Compiler';
 export { Component, default as ComponentPrototype } from './core/component/Component';
-
 export { $computed, default as Computed } from './core/reactive/Computed';
 export { $inert, $reactive, default as ReactivePropertyDescriptor } from './core/reactive/Reactive';
-
 export { default as Watch } from './core/binder/Watch';
 export { default as Routing } from './core/routing/Routing';
 export { default as ViewChild } from './core/ViewChild';
@@ -54,10 +54,20 @@ export function $createApp<Data extends {} = {}, Global extends {} = {}, Deps ex
   return new Bouer<Data, Global, Deps>(selector, options);
 };
 
-const IoC = {
-  add: IoCContainer.add,
-  resolve: IoCContainer.resolve
-};
+export class IoC {
+  /**
+   * Adds a service to generic app
+   * @param ctor the service that should be resolved future on
+   * @param params the parameter that needs to be resolved every time the service is requested.
+   * @param isSingleton mark the service as singleton to avoid creating an instance whenever it's requested
+   */
+  static add = IoCContainer.add;
+  /**
+   * Resolves the Service with all it's dependencies
+   * @param ctor the class the needs to be resolved
+   * @returns the instance of the class resolved
+   */
+  static resolve = IoCContainer.resolve;
+}
 
-export default Bouer;
-export { $inject, IBouerOptions, IoC };
+export { $inject, IBouerOptions };

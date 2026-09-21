@@ -108,21 +108,10 @@ const IoC = (function () {
   };
 
   const methods = {
-    /**
-     * Adds a service to generic app
-     * @param ctor the service that should be resolved future on
-     * @param params the parameter that needs to be resolved every time the service is requested.
-     * @param isSingleton mark the service as singleton to avoid creating an instance whenever it's requested
-     */
     add: function <S>(ctor: Constructor<S>, params?: Params<Constructor<S>>, isSingleton?: boolean) {
       add.call(global, ctor, params as [], isSingleton);
       return { add: this.add };
     },
-    /**
-     * Resolves the Service with all it's dependencies
-     * @param ctor the class the needs to be resolved
-     * @returns the instance of the class resolved
-     */
     resolve: function <S>(ctor: Constructor<S>): S | undefined {
       const service = resolve.call(global, ctor) as S;
       if (service) $internal(service); // Add internal mark to skip reactivity
@@ -153,9 +142,6 @@ const IoC = (function () {
         resolve: function <S>(ctor: Constructor<S>): S | undefined {
           return resolve.call(app, ctor) as S;
         },
-        /**
-         * Dispose all the added service of the current app
-         */
         clear: clear.bind(app)
       };
     },
