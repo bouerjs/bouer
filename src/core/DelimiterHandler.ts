@@ -7,9 +7,14 @@ export default class DelimiterHandler {
   delimiters: IDelimiter[] = [];
   bouer: Bouer;
 
-  constructor(bouer: Bouer, delimiters: IDelimiter[]) {
+  constructor(bouer: Bouer) {
     this.bouer = bouer;
-    this.delimiters = delimiters;
+    this.delimiters = [
+      { name: 'html', delimiter: { open: '{{:html ', close: '}}' } },
+      { name: 'common', delimiter: { open: '{{', close: '}}' } },
+    ];
+
+    this.delimiters.push.apply(this.delimiters, bouer.options.delimiters || []);
   }
 
   add(item: IDelimiter) {
