@@ -50,17 +50,16 @@ export default class Compiler {
     binder: Binder,
     delimiterHandler: DelimiterHandler,
     eventHandler: EventHandler,
-    componentHandler: ComponentHandler,
-    directives?: CustomDirective
+    componentHandler: ComponentHandler
   ) {
     $internal(this);
 
     this.bouer = bouer;
-    this.directives = directives ?? {};
     this.binder = binder;
     this.delimiter = delimiterHandler;
     this.eventHandler = eventHandler;
     this.component = componentHandler;
+    this.directives = bouer.options.directives || {};
     this.dataStore = IoC.app(bouer).resolve(DataStore)!;
   }
 
@@ -98,7 +97,6 @@ export default class Compiler {
     const beforeCompile = options.beforeCompile || $default;
     const afterCompile = options.afterCompile || $default;
     const onComponentLoad = options.onComponentLoad || $default;
-
 
     const getElementData = (node: Element | Node, defaultData: dynamic) => {
       if (!(node instanceof Element)) return defaultData;
