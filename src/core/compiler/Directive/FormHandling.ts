@@ -65,7 +65,6 @@ export function $formHandling(opitons: {
   return formHandler.init({
     element: ownerNode,
     context: context,
-    bouer: opitons.compiler.bouer,
     data: data,
   });
 }

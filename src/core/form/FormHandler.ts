@@ -24,7 +24,6 @@ export type BuildOptions = {
   * * Note: The definition order matters.
   */
   values?: string,
-
   /**
    * The build type, it can be `REACTIVE` or `STATIC`,
    *
@@ -45,7 +44,6 @@ export default class FormHandler {
     // Assigning an empty object if formObject is not provided
     this.schema = schema || {};
     this.builderOptions = builderOptions || {};
-    this.evaluator = $default();
     this.formElement = $default();
   }
 
@@ -53,8 +51,6 @@ export default class FormHandler {
   public schemas: FieldSchema[] = [];
   public builderOptions: BuildOptions;
 
-  public bouer?: Bouer;
-  public evaluator: Evaluator;
   public context?: RenderContext;
 
   public formElement: Element;
@@ -84,21 +80,28 @@ export default class FormHandler {
     }
   }
 
+  /**
+   * Initialize the form
+   * @param options
+   * @returns
+   */
   public init(options: {
+    /** The form element or the form selector */
     element: Element | string,
-    bouer: Bouer,
+    /** The render context (Bouer|Component) */
     context: RenderContext,
+    /** The form data */
     data: dynamic,
   }) {
-    const { element, context, data, bouer } = options;
+    const { element, context, data } = options;
 
-    this.bouer = bouer;
+    const bouer = context instanceof Bouer ? context : context.bouer!;
     this.context = context;
     this.formElement = this.resolveElement(element)!;
     this.schemas = [];
 
     const compiler = IoC.app(bouer).resolve(Compiler)!
-    const evaluator = this.evaluator = IoC.app(bouer).resolve(Evaluator)!
+    const evaluator = IoC.app(bouer).resolve(Evaluator)!
     const $builder = this.$builder = new SchemaBuilder(
       this.context,
       compiler,
@@ -126,17 +129,25 @@ export default class FormHandler {
     return this;
   }
 
+  /**
+   * Get a field by path
+   * @param path the path of the field
+   */
   public get(path: string): FieldSchema | undefined {
 
     if (path == null || path == '')
       return undefined;
 
-    if (this.evaluator == null) {
+    if (this.context == null) {
       Logger.error('FormHandler is not initialized') ?? undefined;
       return undefined;
     }
 
-    return this.evaluator.exec({
+    const bouer = this.context instanceof Bouer
+      ? this.context
+      : this.context!.bouer!
+
+    return IoC.app(bouer).resolve(Evaluator)!.exec({
       returnable: true,
       context: this.context!,
       data: this.schema,
@@ -144,18 +155,30 @@ export default class FormHandler {
     }) as FieldSchema | undefined;
   }
 
+  /**
+   * Set the value of a field by path
+   * @param path the path of the field
+   * @param value the value to set
+   */
   public set(path: string, value: string) {
     const field = this.get(path);
     if (field == null) return;
     field.value = value;
   }
 
+  /**
+   * Validate the form
+   * @returns `true` if the form is valid
+   */
   public validate() {
     let isValid = true;
     this.schemas.forEach(f => f.isValid() ? 1 : isValid = false);
     return isValid;
   }
 
+  /**
+   * Get the form data as an object
+   */
   public toObject() {
     if (this.$builder == null) {
       Logger.error('SchemaBuilder is not initialized.');
@@ -164,6 +187,9 @@ export default class FormHandler {
     return this.$builder.toObject();
   }
 
+  /**
+   * Clear the form
+   */
   public clear() {
     this.schemas.forEach(f => f.value = '');
   }
