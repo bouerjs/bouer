@@ -3,6 +3,56 @@
  * Copyright Easy.js 2018-2020 | 2021-2026 Afonso Matumona
  * Released under the MIT License.
  */
+const Constants = {
+  $: 'ͼ',
+  skip: 'e-skip',
+  if: 'e-if',
+  elseif: 'e-else-if',
+  else: 'e-else',
+  show: 'e-show',
+  req: 'e-req',
+  for: 'e-for',
+  form: {
+    property: 'e-form',
+    schema: 'e-schema',
+    build: 'e-build',
+    buildarray: 'e-build:array',
+    array: 'e-array',
+  },
+  data: 'data',
+  def: 'e-def',
+  wait: 'wait-data',
+  text: 'e-text',
+  bind: 'e-bind',
+  property: 'e-',
+  skeleton: 'e-skeleton',
+  route: 'route-view',
+  href: ':href',
+  entry: 'e-entry',
+  on: 'on:',
+  silent: '--s',
+  slot: 'slot',
+  ref: 'ref',
+  put: 'e-put',
+  builtInEvents: {
+    add: 'add',
+    compile: 'compile',
+    request: 'request',
+    response: 'response',
+    fail: 'fail',
+    done: 'done',
+  },
+  check(node, cmd) {
+    if (node.nodeName in {
+            [this.form.schema]: 1,
+            [this.form.build]: 1,
+            [this.form.buildarray]: 1,
+            [this.form.array]: 1
+      })
+      return false;
+    return startWith(node.nodeName, cmd);
+  }
+};
 var Logger = (function Logger() {
   const prefix = '[Bouer]';
   return {
@@ -54,68 +104,72 @@ class Evaluator {
 /**
  * It's a **Service Provider** container with all the services that will be used in the application.
  */
-const IoC = (function() {
+const IoC$1 = (function() {
   let bouerId = 1;
   const global = $default({
     isDestroyed: false
   });
   const serviceCollection = new WeakMap();
-  const add = (app, ctor, params, isSingleton) => {
-    if (app.isDestroyed)
+
+  function add(ctor, params, isSingleton, sync) {
+    if (this.isDestroyed)
       throw new Error('Application already disposed.');
-    if (!serviceCollection.has(app))
-      serviceCollection.set(app, new WeakMap());
-    const collection = serviceCollection.get(app);
+    if (!serviceCollection.has(this))
+      serviceCollection.set(this, new WeakMap());
+    const collection = serviceCollection.get(this);
+    if (collection.has(ctor))
+      return;
     collection.set(ctor, {
       ctor: ctor,
       isSingleton: ifNullReturn(isSingleton, false),
       args: params
     });
-  };
-  const resolve = (app, ctor) => {
+    if (sync)
+      add.call(global, ctor, params, isSingleton);
+  }
+
+  function resolve(ctor) {
     var _a;
-    if (app.isDestroyed)
+    if (this.isDestroyed)
       throw new Error('Application already disposed.');
-    const collection = serviceCollection.get(app);
+    const collection = serviceCollection.get(this);
     if (!collection)
       return undefined;
     const service = collection.get(ctor);
     if (service == null)
       return undefined;
     if (!service.isSingleton)
-      return newInstance(ctor, service.args, app);
+      return newInstance(ctor, service.args, this);
     if (service.instance)
       return service.instance;
     // Otherwise, creates the singleton instance
-    return ((_a = service.instance) !== null && _a !== void 0 ? _a : (service.instance = newInstance(ctor, service.args, app)));
-  };
+    return ((_a = service.instance) !== null && _a !== void 0 ? _a : (service.instance = newInstance(ctor, service.args, this)));
+  }
   /**
    * Creates a new instance of a class provided
    * @param ctor the class that the new instance should be created
    * @param params the parameter list that will be injected in the constructor
    * @returns new intance of the class provided
    */
-  const newInstance = (ctor, params, app) => {
+  function newInstance(ctor, params, app) {
     const paramsToProvide = [];
     const $params = params || [];
     const data = {
-      __ctor0: ctor
+      __ctor: ctor
     };
     // Looping all the provided params of the class constructor
     filter($params, (param, index) => {
       // Creating a unique name for the argument
       const paramName = '__arg' + index;
       // If the param is a class
-      // eslint-disable-next-line no-prototype-builtins
       if (param && param.hasOwnProperty('prototype')) {
         if (app) {
-          const localInstance = resolve(app, param);
-          const globalInstance = (!localInstance && app != global) ? resolve(global, param) : localInstance;
-          if (!isNull(param)) {
-            param = localInstance || globalInstance;
-          } else {
-            Logger.warn('Could not create an instance of ' + param.name || param +
-              '. Make sure it is added as a service in IoC[.app(Bouer)].add(Service).');
+          const localInstance = resolve.call(app, param);
+          const globalInstance = (!localInstance && app != global) ? resolve.call(global, param) : localInstance;
+          param = localInstance || globalInstance;
+          if (isNull(param)) {
+            Logger.warn('Could not create an instance of ' + paramName + ' in ' + ctor.name +
+              '. Make sure it is added as a service in IoC.add(Service).');
           }
         } else {
           param = null;
@@ -128,14 +182,15 @@ const IoC = (function() {
     });
     // Creating a new instance according to above process
     return Evaluator.run({
-      code: 'new __ctor0(' + paramsToProvide.join(',') + ')',
+      code: 'new __ctor(' + paramsToProvide.join(',') + ')',
       data: data,
       returnable: true
     }) || undefined;
-  };
-  const clear = (app) => {
-    return serviceCollection.delete(app);
-  };
+  }
+
+  function clear() {
+    return serviceCollection.delete(this);
+  }
   const methods = {
     /**
      * Adds a service to generic app
@@ -143,16 +198,22 @@ const IoC = (function() {
      * @param params the parameter that needs to be resolved every time the service is requested.
      * @param isSingleton mark the service as singleton to avoid creating an instance whenever it's requested
      */
-    add(ctor, params, isSingleton) {
-      return add(global, ctor, (params || []), isSingleton);
+    add: function(ctor, params, isSingleton) {
+      add.call(global, ctor, params, isSingleton);
+      return {
+        add: this.add
+      };
     },
     /**
      * Resolves the Service with all it's dependencies
      * @param ctor the class the needs to be resolved
      * @returns the instance of the class resolved
      */
-    resolve(ctor) {
-      return resolve(global, ctor);
+    resolve: function(ctor) {
+      const service = resolve.call(global, ctor);
+      if (service)
+        $internal(service); // Add internal mark to skip reactivity
+      return service;
     },
     /**
      * Defines the bouer app containing all the services that needs to be provided in this app
@@ -167,23 +228,24 @@ const IoC = (function() {
          * @param params the parameter that needs to be resolved every time the service is requested.
          * @param isSingleton mark the service as singleton to avoid creating an instance whenever it's requested
          */
-        add(ctor, params, isSingleton) {
-          return add(app, ctor, (params || []), isSingleton);
+        add: function(ctor, params, isSingleton, sync) {
+          add.call(app, ctor, params, isSingleton, sync);
+          return {
+            add: this.add
+          };
         },
         /**
          * Resolves the Service with all it's dependencies
          * @param ctor the class the needs to be resolved
          * @returns the instance of the class resolved
          */
-        resolve(ctor) {
-          return resolve(app, ctor);
+        resolve: function(ctor) {
+          return resolve.call(app, ctor);
         },
         /**
          * Dispose all the added service of the current app
          */
-        clear() {
-          clear(app);
-        }
+        clear: clear.bind(app)
       };
     },
     /**
@@ -195,7 +257,7 @@ const IoC = (function() {
      * @returns new intance of the class provided
      */
     new(ctor, params, app) {
-      if (ctor instanceof Bouer) {
+      if (ctor === Bouer) {
         Logger.error('Cannot create an instance of Bouer using IoC');
         return undefined;
       }
@@ -212,6 +274,14 @@ const IoC = (function() {
   };
   return methods;
 })();
+/**
+ * Resolves the Service with all it's dependencies
+ * @param ctor the class the needs to be resolved
+ * @returns the instance of the class resolved
+ */
+function $inject(ctor) {
+  return IoC$1.resolve(ctor);
+}
 class Watch {
   /**
    * Default constructor
@@ -558,7 +628,7 @@ class InertProp {
 function $reactive(options) {
   // If no context is provided, create one
   if (options.context == null)
-    options.context = IoC.global;
+    options.context = IoC$1.global;
   return ReactivePropertyDescriptor.transform({
     context: options.context,
     data: options.data,
@@ -833,14 +903,14 @@ function $data(opitons) {
   let dataKey = node.nodeName.split(':')[1];
   if (dataKey) {
     dataKey = dataKey.replace(/\[|\]/g, '');
-    IoC.app(bouer).resolve(DataStore).set('data', dataKey, inputData);
+    IoC$1.app(bouer).resolve(DataStore).set('data', dataKey, inputData);
   }
   $reactive({
     context: context,
     data: inputData
   });
   // Signinng the element with it's data
-  IoC.app(bouer).resolve(DataStore).addNodeData(ownerNode, inputData);
+  IoC$1.app(bouer).resolve(DataStore).addNodeData(ownerNode, inputData);
   return compiler.compile({
     data: inputData,
     el: ownerNode,
@@ -904,7 +974,7 @@ function $wait(options) {
   if (delimiter.run(nodeValue).length !== 0)
     return Logger.error(errorMsgNodeValue(node));
   ownerNode.removeAttribute(node.nodeName);
-  const dataStore = IoC.app(bouer).resolve(DataStore);
+  const dataStore = IoC$1.app(bouer).resolve(DataStore);
   const mWait = dataStore.wait[nodeValue];
   if (mWait) {
     mWait.nodes.push(ownerNode);
@@ -957,55 +1027,6 @@ const prop = Object.assign(
     /** Required Property, expected in data directive */
     required: DataProp.required
   });
-const Constants = {
-  skip: 'e-skip',
-  if: 'e-if',
-  elseif: 'e-else-if',
-  else: 'e-else',
-  show: 'e-show',
-  req: 'e-req',
-  for: 'e-for',
-  form: {
-    property: 'e-form',
-    schema: 'e-schema',
-    build: 'e-build',
-    buildarray: 'e-build:array',
-    array: 'e-array',
-  },
-  data: 'data',
-  def: 'e-def',
-  wait: 'wait-data',
-  text: 'e-text',
-  bind: 'e-bind',
-  property: 'e-',
-  skeleton: 'e-skeleton',
-  route: 'route-view',
-  href: ':href',
-  entry: 'e-entry',
-  on: 'on:',
-  silent: '--s',
-  slot: 'slot',
-  ref: 'ref',
-  put: 'e-put',
-  builtInEvents: {
-    add: 'add',
-    compile: 'compile',
-    request: 'request',
-    response: 'response',
-    fail: 'fail',
-    done: 'done',
-  },
-  check(node, cmd) {
-    if (node.nodeName in {
-            [this.form.schema]: 1,
-            [this.form.build]: 1,
-            [this.form.buildarray]: 1,
-            [this.form.array]: 1
-      })
-      return false;
-    return startWith(node.nodeName, cmd);
-  }
-};
 var Task = (function Task() {
   return {
     run(callback, milliseconds) {
@@ -1198,6 +1219,7 @@ class EventHandler {
 class FormSchema {
   constructor(options) {
     this.path = '';
+    $internal(this);
     this.init(options);
     this.schema = $default();
     this.parent = options.scopeData.$form;
@@ -1316,7 +1338,7 @@ class Routing {
     if (ifNullReturn(options.setURL, true))
       this.pushState(resolver.href, DOM.title);
     const routeToSet = urlCombine(resolver.baseURI, (usehash ? '#' : ''), page.route);
-    IoC.app(this.bouer).resolve(ComponentHandler)
+    IoC$1.app(this.bouer).resolve(ComponentHandler)
       .order({
         componentElement: componentElement,
         context: this.bouer,
@@ -1348,7 +1370,7 @@ class Routing {
       return this.defaultPage;
     }
     // Search for the right page
-    return IoC.app(this.bouer).resolve(ComponentHandler)
+    return IoC$1.app(this.bouer).resolve(ComponentHandler)
       .find(component => {
         if (!component.route)
           return false;
@@ -1480,7 +1502,7 @@ class Binder {
     const originalValue = ifNullReturn(node.nodeValue, '');
     const originalName = node.nodeName;
     const ownerNode = node.ownerElement || node.parentNode;
-    const middleware = IoC.app(this.bouer).resolve(Middleware);
+    const middleware = IoC$1.app(this.bouer).resolve(Middleware);
     const onBind = options.onBind || $default;
     const onUpdate = options.onUpdate || $default;
     const onUnbind = options.onUnbind || $default;
@@ -1570,7 +1592,7 @@ class Binder {
         filter(htmlSnippets, (snippetNode) => {
           ownerNode.appendChild(snippetNode);
           snippetNode.isActive = isActive;
-          IoC.app(this.bouer).resolve(Compiler).compile({
+          IoC$1.app(this.bouer).resolve(Compiler).compile({
             el: snippetNode,
             data: data,
             context: context,
@@ -1987,7 +2009,7 @@ function $href(opitons) {
   ownerNode
     .addEventListener('click', event => {
       event.preventDefault();
-      IoC.app(bouer).resolve(Routing)
+      IoC$1.app(bouer).resolve(Routing)
         .navigate(href.value);
     }, false);
 }
@@ -2018,7 +2040,7 @@ function $entry(opitons) {
   if (delimiter.run(nodeValue).length !== 0)
     return Logger.error(errorMsgNodeValue(node));
   ownerNode.removeAttribute(node.nodeName);
-  IoC.app(bouer).resolve(ComponentHandler)
+  IoC$1.app(bouer).resolve(ComponentHandler)
     .prepare([
       {
         name: nodeValue,
@@ -2066,7 +2088,7 @@ function $put(opitons) {
     const componentElement = createEl(nodeValue)
       .appendTo(ownerNode)
       .build();
-    IoC.app(bouer).resolve(ComponentHandler)
+    IoC$1.app(bouer).resolve(ComponentHandler)
       .order({
         componentElement: componentElement,
         context: context,
@@ -2389,7 +2411,7 @@ function $req(opitons) {
   };
   // Inserting the comment node
   container.insertBefore(comment, ownerNode);
-  const skeleton = IoC.app(bouer).resolve(Skeleton);
+  const skeleton = IoC$1.app(bouer).resolve(Skeleton);
   // Only insert if the type is `of
   if (nodeValue.includes(' of '))
     skeleton.insertItems(ownerNode);
@@ -2457,7 +2479,7 @@ function $req(opitons) {
     }
     return true;
   };
-  const middleware = IoC.app(bouer).resolve(Middleware);
+  const middleware = IoC$1.app(bouer).resolve(Middleware);
   if (!middleware.has('req'))
     return Logger.error('There is no “req” middleware provided for the “e-req” directive requests.');
   const createMiddlewareContext = (expObject) => {
@@ -2480,7 +2502,7 @@ function $req(opitons) {
         data: response
       });
       if (dataKey)
-        IoC.app(bouer).resolve(DataStore).set('req', dataKey, response);
+        IoC$1.app(bouer).resolve(DataStore).set('req', dataKey, response);
       subcribeEvent(Constants.builtInEvents.response).emit({
         response: response
       });
@@ -2851,6 +2873,7 @@ const Validator = (function() {
 class FieldSchema {
   constructor(options) {
     this.errors = [];
+    $internal(this);
     this.field = undefined;
     this.name = undefined;
     this.type = undefined;
@@ -3156,7 +3179,6 @@ class FormHandler {
     // Assigning an empty object if formObject is not provided
     this.schema = schema || {};
     this.builderOptions = builderOptions || {};
-    this.evaluator = $default();
     this.formElement = $default();
   }
   resolveElement(el) {
@@ -3179,19 +3201,23 @@ class FormHandler {
       return undefined;
     }
   }
+  /**
+   * Initialize the form
+   * @param options
+   * @returns
+   */
   init(options) {
     const {
       element,
       context,
-      data,
-      bouer
+      data
     } = options;
-    this.bouer = bouer;
+    const bouer = context instanceof Bouer ? context : context.bouer;
     this.context = context;
     this.formElement = this.resolveElement(element);
     this.schemas = [];
-    const compiler = IoC.app(bouer).resolve(Compiler);
-    const evaluator = this.evaluator = IoC.app(bouer).resolve(Evaluator);
+    const compiler = IoC$1.app(bouer).resolve(Compiler);
+    const evaluator = IoC$1.app(bouer).resolve(Evaluator);
     const $builder = this.$builder = new SchemaBuilder(this.context, compiler, evaluator);
     const dataToUse = Extend.obj(data, {
       $form: new FormSchema({
@@ -3199,7 +3225,7 @@ class FormHandler {
         scopeData: data
       })
     });
-    IoC.app(bouer).resolve(DataStore)
+    IoC$1.app(bouer).resolve(DataStore)
       .addNodeData(this.formElement, dataToUse);
     $builder.build({
       element: this.formElement,
@@ -3210,32 +3236,51 @@ class FormHandler {
     this.schemas = $builder.schemas;
     return this;
   }
+  /**
+   * Get a field by path
+   * @param path the path of the field
+   */
   get(path) {
     var _a;
     if (path == null || path == '')
       return undefined;
-    if (this.evaluator == null) {
+    if (this.context == null) {
       (_a = Logger.error('FormHandler is not initialized')) !== null && _a !== void 0 ? _a : undefined;
       return undefined;
     }
-    return this.evaluator.exec({
+    const bouer = this.context instanceof Bouer ?
+      this.context :
+      this.context.bouer;
+    return IoC$1.app(bouer).resolve(Evaluator).exec({
       returnable: true,
       context: this.context,
       data: this.schema,
       code: path,
     });
   }
+  /**
+   * Set the value of a field by path
+   * @param path the path of the field
+   * @param value the value to set
+   */
   set(path, value) {
     const field = this.get(path);
     if (field == null)
       return;
     field.value = value;
   }
+  /**
+   * Validate the form
+   * @returns `true` if the form is valid
+   */
   validate() {
     let isValid = true;
     this.schemas.forEach(f => f.isValid() ? 1 : isValid = false);
     return isValid;
   }
+  /**
+   * Get the form data as an object
+   */
   toObject() {
     if (this.$builder == null) {
       Logger.error('SchemaBuilder is not initialized.');
@@ -3243,6 +3288,9 @@ class FormHandler {
     }
     return this.$builder.toObject();
   }
+  /**
+   * Clear the form
+   */
   clear() {
     this.schemas.forEach(f => f.value = '');
   }
@@ -3294,7 +3342,6 @@ function $formHandling(opitons) {
   return formHandler.init({
     element: ownerNode,
     context: context,
-    bouer: opitons.compiler.bouer,
     data: data,
   });
 }
@@ -3690,10 +3737,10 @@ class Directive {
     this.context = compilerContext;
     this.bouer = compiler.bouer;
     this.customDirectives = customDirective;
-    this.evaluator = IoC.app(this.bouer).resolve(Evaluator);
-    this.delimiter = IoC.app(this.bouer).resolve(DelimiterHandler);
-    this.binder = IoC.app(this.bouer).resolve(Binder);
-    this.eventHandler = IoC.app(this.bouer).resolve(EventHandler);
+    this.evaluator = IoC$1.app(this.bouer).resolve(Evaluator);
+    this.delimiter = IoC$1.app(this.bouer).resolve(DelimiterHandler);
+    this.binder = IoC$1.app(this.bouer).resolve(Binder);
+    this.eventHandler = IoC$1.app(this.bouer).resolve(EventHandler);
   }
   // Directives
   skip(node) {
@@ -3868,19 +3915,19 @@ class Directive {
   }
 }
 class Compiler {
-  constructor(bouer, binder, delimiterHandler, eventHandler, componentHandler, directives) {
+  constructor(bouer, binder, delimiterHandler, eventHandler, componentHandler) {
     this.NODES_TO_IGNORE_IN_COMPILATION = {
       'SCRIPT': 1,
       '#comment': 8
     };
     $internal(this);
     this.bouer = bouer;
-    this.directives = directives !== null && directives !== void 0 ? directives : {};
     this.binder = binder;
     this.delimiter = delimiterHandler;
     this.eventHandler = eventHandler;
     this.component = componentHandler;
-    this.dataStore = IoC.app(bouer).resolve(DataStore);
+    this.directives = bouer.options.directives || {};
+    this.dataStore = IoC$1.app(bouer).resolve(DataStore);
   }
   /**
    * Compiles an html element
@@ -3892,7 +3939,7 @@ class Compiler {
     const rootElement = options.el;
     const context = options.context || this.bouer;
     const data = (options.data || this.bouer.data);
-    const routing = IoC.app(this.bouer).resolve(Routing);
+    const routing = IoC$1.app(this.bouer).resolve(Routing);
     const directivesToIgnore = options.directivesToIgnore || [];
     const beforeCompile = options.beforeCompile || $default;
     const afterCompile = options.afterCompile || $default;
@@ -4241,7 +4288,7 @@ class ComponentHandler {
       // if it is a class
       if (isComponentClass) {
         // Resolve the instance of the class
-        $classComponent = IoC.app(this.bouer).resolve(entry) || IoC.resolve(entry) || IoC.new(entry);
+        $classComponent = IoC$1.app(this.bouer).resolve(entry) || IoC$1.resolve(entry) || IoC$1.new(entry);
         if (!$protoComponent)
           return Logger.error('Could not create the “' + entry.name + '” component');
         $protoComponent = $classComponent.__$proto__;
@@ -4281,7 +4328,7 @@ class ComponentHandler {
       if (Array.isArray($protoComponent.children))
         this.prepare($protoComponent.children, $protoComponent);
       this.components[$protoComponent.name] = $classComponent || $protoComponent;
-      IoC.app(this.bouer).resolve(Routing)
+      IoC$1.app(this.bouer).resolve(Routing)
         .configure($protoComponent);
       const getContent = (path) => {
         if (!path)
@@ -4340,8 +4387,7 @@ class ComponentHandler {
         let $classComponent = null;
         if (entry instanceof Component) {
           const ctor = entry.__$proto__.ctor;
-          const $newClassComponent = IoC.app(this.bouer).resolve(ctor) ||
-            IoC.resolve(ctor) || IoC.new(ctor);
+          const $newClassComponent = IoC$1.resolve(ctor) || IoC$1.new(ctor);
           $classComponent = $newClassComponent;
           $protoComponent = $newClassComponent.__$proto__;
           $protoComponent.prepareClass($newClassComponent);
@@ -4494,7 +4540,7 @@ class ComponentHandler {
     const afterCompile = ((_b = options.compilationHooks) === null || _b === void 0 ? void 0 : _b.afterCompile) || $default;
     const $name = toLower(componentElement.nodeName);
     const container = componentElement.parentElement;
-    const compiler = IoC.app(this.bouer).resolve(Compiler);
+    const compiler = IoC$1.app(this.bouer).resolve(Compiler);
     const context = $protoComponent.parent;
     if (!container) {
       return onComponentFail(componentElement);
@@ -4614,7 +4660,7 @@ class ComponentHandler {
         return data;
       }
       // Otherwise, compiles the object provided
-      const dataAttrValue = IoC.app(this.bouer).resolve(Evaluator)
+      const dataAttrValue = IoC$1.app(this.bouer).resolve(Evaluator)
         .exec({
           data: Extend.obj(data, {
             $data: data,
@@ -4656,7 +4702,7 @@ class ComponentHandler {
         }
         $protoComponent.data = Extend.obj(dataToUse, $protoComponent.data);
         // Executing the mixed scripts
-        IoC.app(this.bouer).resolve(Evaluator)
+        IoC$1.app(this.bouer).resolve(Evaluator)
           .eval((scriptContent || ''), $protoComponent);
         $reactive({
           context: $protoComponent,
@@ -4689,7 +4735,7 @@ class ComponentHandler {
           });
         }
         // Signing the element with it's data
-        IoC.app(this.bouer).resolve(DataStore).addNodeData(mainComponentElement, $protoComponent.data);
+        IoC$1.app(this.bouer).resolve(DataStore).addNodeData(mainComponentElement, $protoComponent.data);
         createdEvent.emit();
         // tranfering the attributes
         filter(toArray(componentElement.attributes), (attr) => {
@@ -4896,7 +4942,7 @@ class ComponentHandler {
    * @param {object?} init the CustomEventInit object where we can provid the event detail
    */
   emit(component, eventName, init) {
-    IoC.app(this.bouer).resolve(EventHandler).emit({
+    IoC$1.app(this.bouer).resolve(EventHandler).emit({
       eventName: eventName,
       attachedNode: component.el,
       init: init
@@ -5039,12 +5085,12 @@ class ComponentPrototype {
    */
   destroy() {
     if (!this.el)
-      return false;
+      return;
     if (this.isDestroyed && this.bouer && this.bouer.isDestroyed)
       return;
     if (!this.keepAlive)
       this.isDestroyed = true;
-    const handler = IoC.app(this.bouer).resolve(ComponentHandler);
+    const handler = IoC$1.app(this.bouer).resolve(ComponentHandler);
     handler.emit(this, 'beforeDestroy');
     const container = this.el.parentElement;
     if (container)
@@ -5077,7 +5123,7 @@ class ComponentPrototype {
     if (registerHooksSet.has(eventName))
       Logger.warn('The “' + eventName + '” Event is called before the component is mounted, to be dispatched' +
         'it needs to be on registration object: { ' + eventName + ': function(){ ... }, ... }.');
-    const evt = IoC.app(this.bouer).resolve(EventHandler).on({
+    const evt = IoC$1.app(this.bouer).resolve(EventHandler).on({
       eventName,
       callback: callback,
       attachedNode: this.el,
@@ -5096,7 +5142,7 @@ class ComponentPrototype {
    * @param {Function} callback the callback function of the event
    */
   off(eventName, callback) {
-    IoC.app(this.bouer).resolve(EventHandler).off({
+    IoC$1.app(this.bouer).resolve(EventHandler).off({
       eventName,
       callback: callback,
       attachedNode: this.el,
@@ -5124,9 +5170,8 @@ class ComponentPrototype {
             'loaded', 'beforeDestroy', 'destroyed', 'blocked', 'failed'
         ];
     const ignorables = [
-            'el', 'bouer', '__$proto__', 'init', 'constructor', 'export', 'watch'
+            Constants.$, 'el', 'bouer', '__$proto__', 'init', 'constructor', 'export', 'watch'
         ].concat(hooks);
-    const cachedInert = {};
     const properties = Object.getOwnPropertyNames(component);
     const methods = Object.getOwnPropertyNames(component.constructor.prototype);
     const fields = filter(Extend.array(properties, methods), key => ignorables.indexOf(key) < 0);
@@ -5144,24 +5189,23 @@ class ComponentPrototype {
       }
       //In case of InertProp, cache the object and return the value
       if (fieldValue instanceof InertProp) {
-        cachedInert[field] = fieldValue;
         Property.set(proto.data, field, {
-          get: function reactive() {
-            return cachedInert[field].get();
+          get: function linked() {
+            return fieldValue.get();
           },
-          set: function reactive(value) {
-            cachedInert[field].set(value);
+          set: function linked(v) {
+            fieldValue.set(v);
           }
         });
       } else {
         proto.data[field] = fieldValue;
       }
       Property.set(component, field, {
-        get: function reactive() {
+        get: function linked() {
           return proto.data[field];
         },
-        set: function reactive(value) {
-          proto.data[field] = value;
+        set: function linked(v) {
+          proto.data[field] = v;
         }
       });
     });
@@ -5544,7 +5588,9 @@ function getRootElement(el) {
 
 function setData(context, inputData, targetObject) {
   if (isNull(targetObject))
-    targetObject = context.data;
+    targetObject = context instanceof Component ?
+    context.__$proto__.data :
+    context.data;
   if (!isObject(inputData)) {
     Logger.error('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".');
     return targetObject;
@@ -5597,16 +5643,17 @@ function errorMsgEmptyNode(node) {
 
 function errorMsgNodeValue(node) {
   return ('Expected an expression in “' + node.nodeName +
-    '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
+    '” and got “' + ifNullReturn(node.nodeValue, '') + '”.');
 }
 
 function $internal($this) {
-  Object.defineProperty($this, 'ͼ', {
-    enumerable: false,
-    configurable: false,
-    writable: false,
-    value: undefined
-  });
+  if (!(Constants.$ in $this))
+    Object.defineProperty($this, Constants.$, {
+      enumerable: false,
+      configurable: false,
+      writable: false,
+      value: true
+    });
   return $this;
 }
 
@@ -5620,10 +5667,26 @@ const WIN = window;
 const DOM = WIN.document;
 const ANCHOR = createEl('a').build();
 class DelimiterHandler {
-  constructor(bouer, delimiters) {
+  constructor(bouer) {
     this.delimiters = [];
     this.bouer = bouer;
-    this.delimiters = delimiters;
+    this.delimiters = [
+      {
+        name: 'html',
+        delimiter: {
+          open: '{{:html ',
+          close: '}}'
+        }
+      },
+      {
+        name: 'common',
+        delimiter: {
+          open: '{{',
+          close: '}}'
+        }
+      },
+        ];
+    this.delimiters.push.apply(this.delimiters, bouer.options.delimiters || []);
   }
   add(item) {
     this.delimiters.push(item);
@@ -5694,7 +5757,7 @@ class ViewChild {
    */
   static by(app, expression) {
     // Retrieving the active component
-    const activeComponents = IoC.app(app).resolve(ComponentHandler)
+    const activeComponents = IoC$1.app(app).resolve(ComponentHandler)
       .activeComponents;
     // Applying filter to the find the component
     return filter(activeComponents, expression);
@@ -5707,7 +5770,7 @@ class ViewChild {
    */
   static byClass(app, ctor) {
     // Retrieving the active component
-    const activeComponents = IoC.app(app).resolve(ComponentHandler)
+    const activeComponents = IoC$1.app(app).resolve(ComponentHandler)
       .activeComponents;
     // Applying filter to the find the component
     return filter(activeComponents, c => c instanceof ctor);
@@ -5720,7 +5783,7 @@ class ViewChild {
    */
   static byName(app, name) {
     // Retrieving the active component
-    const activeComponents = IoC.app(app).resolve(ComponentHandler)
+    const activeComponents = IoC$1.app(app).resolve(ComponentHandler)
       .activeComponents;
     // Applying filter to the find the component
     return filter(activeComponents, c => {
@@ -5740,7 +5803,7 @@ class Bouer {
     this.name = 'Bouer';
     this.version = version;
     /** Unique Id of the instance */
-    this.__id__ = IoC.newId();
+    this.__id__ = IoC$1.newId();
     /**
      * Gets all the elemens having the `ref` attribute
      * @returns an object having all the elements with the `ref attribute value` defined as the key.
@@ -5751,34 +5814,30 @@ class Bouer {
     /** Provides state of the app, if it is already initialized */
     this.isInitialized = false;
     $internal(this);
+    const app = this;
     const $options = options || {};
     this.options = $options;
     this.config = $options.config || {};
     this.pipes = $options.pipes || {};
-    const app = this;
-    const delimiters = $options.delimiters || [];
     // Adding Dependency Injection Services
-    IoC.app(this).add(DataStore, [], true);
-    IoC.app(this).add(Evaluator, [this]);
-    IoC.app(this).add(Middleware, [this], true);
-    IoC.app(this).add(Binder, [this, Evaluator], true);
-    IoC.app(this).add(EventHandler, [this, Evaluator], true);
-    IoC.app(this).add(ComponentHandler, [
-            this, DelimiterHandler, EventHandler, Evaluator, Routing
-        ], true);
-    IoC.app(this).add(Skeleton, [this], true);
-    IoC.app(this).add(Routing, [this], true);
-    IoC.app(this).add(DelimiterHandler, [this, delimiters], true);
-    IoC.app(this).add(Compiler, [
-            this, Binder, DelimiterHandler, EventHandler, ComponentHandler, $options.directives
-        ], true);
-    const dataStore = IoC.app(this).resolve(DataStore);
-    const middleware = IoC.app(this).resolve(Middleware);
-    const componentHandler = IoC.app(this).resolve(ComponentHandler);
-    const compiler = IoC.app(this).resolve(Compiler);
-    const skeleton = IoC.app(this).resolve(Skeleton);
-    const delimiter = IoC.app(this).resolve(DelimiterHandler);
-    const eventHandler = IoC.app(this).resolve(EventHandler);
+    IoC$1.app(this)
+      .add(DataStore, [], true)
+      .add(Evaluator, [this])
+      .add(Middleware, [this], true)
+      .add(Binder, [this, Evaluator], true)
+      .add(EventHandler, [this, Evaluator], true)
+      .add(ComponentHandler, [this, DelimiterHandler, EventHandler, Evaluator, Routing], true)
+      .add(Skeleton, [this], true)
+      .add(Routing, [this], true, true)
+      .add(DelimiterHandler, [this], true)
+      .add(Compiler, [this, Binder, DelimiterHandler, EventHandler, ComponentHandler], true, true);
+    const dataStore = IoC$1.app(this).resolve(DataStore);
+    const middleware = IoC$1.app(this).resolve(Middleware);
+    const componentHandler = IoC$1.app(this).resolve(ComponentHandler);
+    const compiler = IoC$1.app(this).resolve(Compiler);
+    const skeleton = IoC$1.app(this).resolve(Skeleton);
+    const delimiter = IoC$1.app(this).resolve(DelimiterHandler);
+    const eventHandler = IoC$1.app(this).resolve(EventHandler);
     // Register the middleware
     if (typeof $options.middleware === 'function')
       $options.middleware.call(this, middleware.subscribe, this);
@@ -5791,23 +5850,7 @@ class Bouer {
       data: $options.globalData || {},
       context: this
     });
-    delimiters.push.apply(delimiters, [
-      {
-        name: 'html',
-        delimiter: {
-          open: '{{:html ',
-          close: '}}'
-        }
-      },
-      {
-        name: 'common',
-        delimiter: {
-          open: '{{',
-          close: '}}'
-        }
-      },
-        ]);
-    this.$routing = IoC.app(this).resolve(Routing);
+    this.$routing = IoC$1.app(this).resolve(Routing);
     this.$delimiters = {
       add: delimiter.add,
       remove: delimiter.remove,
@@ -5823,7 +5866,7 @@ class Bouer {
             context: app,
             data: data
           });
-        return IoC.app(this).resolve(DataStore).set('data', key, data);
+        return IoC$1.app(this).resolve(DataStore).set('data', key, data);
       },
       unset: key => delete dataStore.data[key]
     };
@@ -5880,7 +5923,10 @@ class Bouer {
       viewByName: (componentName) => ViewChild.byName(this, componentName),
       viewByClass: (ctor) => ViewChild.byClass(this, ctor)
     };
-    this.$deps = IoC.app(this);
+    this.$deps = {
+      add: IoC$1.add,
+      resolve: IoC$1.resolve
+    };
     if (typeof $options.mounted === 'function')
       eventHandler.on({
         eventName: $options.mounted.name,
@@ -5925,12 +5971,12 @@ class Bouer {
     if (!(this.el = el))
       throw Logger.error(new SyntaxError('Element with selector “' + selector + '” not found.'));
     const options = this.options;
-    const binder = IoC.app(this).resolve(Binder);
-    const eventHandler = IoC.app(this).resolve(EventHandler);
-    const routing = IoC.app(this).resolve(Routing);
-    const skeleton = IoC.app(this).resolve(Skeleton);
-    const compiler = IoC.app(this).resolve(Compiler);
-    const dataStore = IoC.app(this).resolve(DataStore);
+    const binder = IoC$1.app(this).resolve(Binder);
+    const eventHandler = IoC$1.app(this).resolve(EventHandler);
+    const routing = IoC$1.app(this).resolve(Routing);
+    const skeleton = IoC$1.app(this).resolve(Skeleton);
+    const compiler = IoC$1.app(this).resolve(Compiler);
+    const dataStore = IoC$1.app(this).resolve(DataStore);
     filter([options.beforeLoad, options.loaded, options.beforeDestroy, options.destroyed], hook => {
       if (typeof hook !== 'function')
         return;
@@ -6019,7 +6065,6 @@ class Bouer {
     const formHandler = new FormHandler({}, Extend.obj({}, {
       type: 'STATIC'
     }, options)).init({
-      bouer: this,
       context: this,
       data: this.data,
       element: input,
@@ -6034,7 +6079,7 @@ class Bouer {
    * @returns the watch object having the method to destroy the watch
    */
   watch(propertyName, callback, targetObject) {
-    return IoC.app(this).resolve(Binder).onPropertyChange(propertyName, callback, (targetObject || this.data));
+    return IoC$1.app(this).resolve(Binder).onPropertyChange(propertyName, callback, (targetObject || this.data));
   }
   /**
    * Watch all reactive properties in the provided scope.
@@ -6042,7 +6087,7 @@ class Bouer {
    * @returns an object having all the watches and the method to destroy watches at once
    */
   react(watchableScope) {
-    return IoC.app(this).resolve(Binder)
+    return IoC$1.app(this).resolve(Binder)
       .onPropertyInScopeChange(watchableScope);
   }
   /**
@@ -6054,7 +6099,7 @@ class Bouer {
    * @returns The event added
    */
   on(eventName, callback, options) {
-    return IoC.app(this).resolve(EventHandler).
+    return IoC$1.app(this).resolve(EventHandler).
     on({
       eventName,
       callback: callback,
@@ -6070,7 +6115,7 @@ class Bouer {
    * @param {Node} attachedNode A node to attach the event
    */
   off(eventName, callback, attachedNode) {
-    return IoC.app(this).resolve(EventHandler).
+    return IoC$1.app(this).resolve(EventHandler).
     off({
       eventName,
       callback: callback,
@@ -6084,7 +6129,7 @@ class Bouer {
    * @param {string} boundPropName the bound property name
    */
   unbind(boundNode, boundAttrName, boundPropName) {
-    return IoC.app(this).resolve(Binder).
+    return IoC$1.app(this).resolve(Binder).
     remove(boundNode, boundPropName, boundAttrName);
   }
   /**
@@ -6097,7 +6142,7 @@ class Bouer {
     mOptions.init = ifNullReturn(mOptions.init, {});
     mOptions.init.detail = ifNullReturn(mOptions.init.detail, {});
     Extend.matcher(mOptions.data || {}, mOptions.init.detail || {});
-    return IoC.app(this).resolve(EventHandler).emit({
+    return IoC$1.app(this).resolve(EventHandler).emit({
       eventName: eventName,
       attachedNode: mOptions.element,
       init: mOptions.init,
@@ -6135,7 +6180,7 @@ class Bouer {
    * @returns the element compiled
    */
   compile(options) {
-    return IoC.app(this).resolve(Compiler).
+    return IoC$1.app(this).resolve(Compiler).
     compile({
       el: options.el,
       data: options.data,
@@ -6151,7 +6196,7 @@ class Bouer {
    */
   destroy() {
     const el = this.el;
-    const $events = IoC.app(this).resolve(EventHandler).$events;
+    const $events = IoC$1.app(this).resolve(EventHandler).$events;
     const destroyedEvents = ($events['destroyed'] || []).concat(($events['component:destroyed'] || []));
     this.emit('destroyed', {
       element: this.el
@@ -6168,7 +6213,7 @@ class Bouer {
       el.parentElement.removeChild(el);
     this.isDestroyed = true;
     this.isInitialized = false;
-    IoC.app(this).clear();
+    IoC$1.app(this).clear();
   }
 }
 /**
@@ -6180,12 +6225,17 @@ class Bouer {
 function $createApp(selector, options) {
   return new Bouer(selector, options);
 }
+const IoC = {
+  add: IoC$1.add,
+  resolve: IoC$1.resolve
+};
 export {
   $computed,
   $createApp,
   $field,
   $form,
   $inert,
+  $inject,
   $reactive,
   Compiler,
   Component,

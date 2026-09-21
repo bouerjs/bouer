@@ -9,6 +9,56 @@
     (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.Bouer = factory());
 })(this, (function() {
   'use strict';
+  const Constants = {
+    $: 'ͼ',
+    skip: 'e-skip',
+    if: 'e-if',
+    elseif: 'e-else-if',
+    else: 'e-else',
+    show: 'e-show',
+    req: 'e-req',
+    for: 'e-for',
+    form: {
+      property: 'e-form',
+      schema: 'e-schema',
+      build: 'e-build',
+      buildarray: 'e-build:array',
+      array: 'e-array',
+    },
+    data: 'data',
+    def: 'e-def',
+    wait: 'wait-data',
+    text: 'e-text',
+    bind: 'e-bind',
+    property: 'e-',
+    skeleton: 'e-skeleton',
+    route: 'route-view',
+    href: ':href',
+    entry: 'e-entry',
+    on: 'on:',
+    silent: '--s',
+    slot: 'slot',
+    ref: 'ref',
+    put: 'e-put',
+    builtInEvents: {
+      add: 'add',
+      compile: 'compile',
+      request: 'request',
+      response: 'response',
+      fail: 'fail',
+      done: 'done',
+    },
+    check(node, cmd) {
+      if (node.nodeName in {
+            [this.form.schema]: 1,
+            [this.form.build]: 1,
+            [this.form.buildarray]: 1,
+            [this.form.array]: 1
+        })
+        return false;
+      return startWith(node.nodeName, cmd);
+    }
+  };
   var Logger = (function Logger() {
     const prefix = '[Bouer]';
     return {
@@ -66,62 +116,66 @@
       isDestroyed: false
     });
     const serviceCollection = new WeakMap();
-    const add = (app, ctor, params, isSingleton) => {
-      if (app.isDestroyed)
+
+    function add(ctor, params, isSingleton, sync) {
+      if (this.isDestroyed)
         throw new Error('Application already disposed.');
-      if (!serviceCollection.has(app))
-        serviceCollection.set(app, new WeakMap());
-      const collection = serviceCollection.get(app);
+      if (!serviceCollection.has(this))
+        serviceCollection.set(this, new WeakMap());
+      const collection = serviceCollection.get(this);
+      if (collection.has(ctor))
+        return;
       collection.set(ctor, {
         ctor: ctor,
         isSingleton: ifNullReturn(isSingleton, false),
         args: params
       });
-    };
-    const resolve = (app, ctor) => {
+      if (sync)
+        add.call(global, ctor, params, isSingleton);
+    }
+
+    function resolve(ctor) {
       var _a;
-      if (app.isDestroyed)
+      if (this.isDestroyed)
         throw new Error('Application already disposed.');
-      const collection = serviceCollection.get(app);
+      const collection = serviceCollection.get(this);
       if (!collection)
         return undefined;
       const service = collection.get(ctor);
       if (service == null)
         return undefined;
       if (!service.isSingleton)
-        return newInstance(ctor, service.args, app);
+        return newInstance(ctor, service.args, this);
       if (service.instance)
         return service.instance;
       // Otherwise, creates the singleton instance
-      return ((_a = service.instance) !== null && _a !== void 0 ? _a : (service.instance = newInstance(ctor, service.args, app)));
-    };
+      return ((_a = service.instance) !== null && _a !== void 0 ? _a : (service.instance = newInstance(ctor, service.args, this)));
+    }
     /**
      * Creates a new instance of a class provided
      * @param ctor the class that the new instance should be created
      * @param params the parameter list that will be injected in the constructor
      * @returns new intance of the class provided
      */
-    const newInstance = (ctor, params, app) => {
+    function newInstance(ctor, params, app) {
       const paramsToProvide = [];
       const $params = params || [];
       const data = {
-        __ctor0: ctor
+        __ctor: ctor
       };
       // Looping all the provided params of the class constructor
       filter($params, (param, index) => {
         // Creating a unique name for the argument
         const paramName = '__arg' + index;
         // If the param is a class
-        // eslint-disable-next-line no-prototype-builtins
         if (param && param.hasOwnProperty('prototype')) {
           if (app) {
-            const localInstance = resolve(app, param);
-            const globalInstance = (!localInstance && app != global) ? resolve(global, param) : localInstance;
-            if (!isNull(param)) {
-              param = localInstance || globalInstance;
-            } else {
-              Logger.warn('Could not create an instance of ' + param.name || param +
-                '. Make sure it is added as a service in IoC[.app(Bouer)].add(Service).');
+            const localInstance = resolve.call(app, param);
+            const globalInstance = (!localInstance && app != global) ? resolve.call(global, param) : localInstance;
+            param = localInstance || globalInstance;
+            if (isNull(param)) {
+              Logger.warn('Could not create an instance of ' + paramName + ' in ' + ctor.name +
+                '. Make sure it is added as a service in IoC.add(Service).');
             }
           } else {
             param = null;
@@ -134,14 +188,15 @@
       });
       // Creating a new instance according to above process
       return Evaluator.run({
-        code: 'new __ctor0(' + paramsToProvide.join(',') + ')',
+        code: 'new __ctor(' + paramsToProvide.join(',') + ')',
         data: data,
         returnable: true
       }) || undefined;
-    };
-    const clear = (app) => {
-      return serviceCollection.delete(app);
-    };
+    }
+
+    function clear() {
+      return serviceCollection.delete(this);
+    }
     const methods = {
       /**
        * Adds a service to generic app
@@ -149,16 +204,22 @@
        * @param params the parameter that needs to be resolved every time the service is requested.
        * @param isSingleton mark the service as singleton to avoid creating an instance whenever it's requested
        */
-      add(ctor, params, isSingleton) {
-        return add(global, ctor, (params || []), isSingleton);
+      add: function(ctor, params, isSingleton) {
+        add.call(global, ctor, params, isSingleton);
+        return {
+          add: this.add
+        };
       },
       /**
        * Resolves the Service with all it's dependencies
        * @param ctor the class the needs to be resolved
        * @returns the instance of the class resolved
        */
-      resolve(ctor) {
-        return resolve(global, ctor);
+      resolve: function(ctor) {
+        const service = resolve.call(global, ctor);
+        if (service)
+          $internal(service); // Add internal mark to skip reactivity
+        return service;
       },
       /**
        * Defines the bouer app containing all the services that needs to be provided in this app
@@ -173,23 +234,24 @@
            * @param params the parameter that needs to be resolved every time the service is requested.
            * @param isSingleton mark the service as singleton to avoid creating an instance whenever it's requested
            */
-          add(ctor, params, isSingleton) {
-            return add(app, ctor, (params || []), isSingleton);
+          add: function(ctor, params, isSingleton, sync) {
+            add.call(app, ctor, params, isSingleton, sync);
+            return {
+              add: this.add
+            };
           },
           /**
            * Resolves the Service with all it's dependencies
            * @param ctor the class the needs to be resolved
            * @returns the instance of the class resolved
            */
-          resolve(ctor) {
-            return resolve(app, ctor);
+          resolve: function(ctor) {
+            return resolve.call(app, ctor);
           },
           /**
            * Dispose all the added service of the current app
            */
-          clear() {
-            clear(app);
-          }
+          clear: clear.bind(app)
         };
       },
       /**
@@ -201,7 +263,7 @@
        * @returns new intance of the class provided
        */
       new(ctor, params, app) {
-        if (ctor instanceof Bouer) {
+        if (ctor === Bouer) {
           Logger.error('Cannot create an instance of Bouer using IoC');
           return undefined;
         }
@@ -954,55 +1016,6 @@
       /** Required Property, expected in data directive */
       required: DataProp.required
     });
-  const Constants = {
-    skip: 'e-skip',
-    if: 'e-if',
-    elseif: 'e-else-if',
-    else: 'e-else',
-    show: 'e-show',
-    req: 'e-req',
-    for: 'e-for',
-    form: {
-      property: 'e-form',
-      schema: 'e-schema',
-      build: 'e-build',
-      buildarray: 'e-build:array',
-      array: 'e-array',
-    },
-    data: 'data',
-    def: 'e-def',
-    wait: 'wait-data',
-    text: 'e-text',
-    bind: 'e-bind',
-    property: 'e-',
-    skeleton: 'e-skeleton',
-    route: 'route-view',
-    href: ':href',
-    entry: 'e-entry',
-    on: 'on:',
-    silent: '--s',
-    slot: 'slot',
-    ref: 'ref',
-    put: 'e-put',
-    builtInEvents: {
-      add: 'add',
-      compile: 'compile',
-      request: 'request',
-      response: 'response',
-      fail: 'fail',
-      done: 'done',
-    },
-    check(node, cmd) {
-      if (node.nodeName in {
-            [this.form.schema]: 1,
-            [this.form.build]: 1,
-            [this.form.buildarray]: 1,
-            [this.form.array]: 1
-        })
-        return false;
-      return startWith(node.nodeName, cmd);
-    }
-  };
   var Task = (function Task() {
     return {
       run(callback, milliseconds) {
@@ -1195,6 +1208,7 @@
   class FormSchema {
     constructor(options) {
       this.path = '';
+      $internal(this);
       this.init(options);
       this.schema = $default();
       this.parent = options.scopeData.$form;
@@ -1849,727 +1863,6 @@
           bind.watch.destroy();
         });
       });
-    }
-  }
-  class ViewChild {
-    /**
-     * Retrieves the actives components matching the a provided expression
-     * @param {Bouer} app the Bouer instance
-     * @param {Function} expression the expression function to match the required component
-     * @returns a list of components matching the expression
-     */
-    static by(app, expression) {
-      // Retrieving the active component
-      const activeComponents = IoC.app(app).resolve(ComponentHandler)
-        .activeComponents;
-      // Applying filter to the find the component
-      return filter(activeComponents, expression);
-    }
-    /**
-     * Retrieves the actives components matching class
-     * @param {Bouer} app the Bouer instance
-     * @param {Function} ctor the class to match
-     * @returns a list of components matching the expression
-     */
-    static byClass(app, ctor) {
-      // Retrieving the active component
-      const activeComponents = IoC.app(app).resolve(ComponentHandler)
-        .activeComponents;
-      // Applying filter to the find the component
-      return filter(activeComponents, c => c instanceof ctor);
-    }
-    /**
-     * Retrieves the actives components matching the component name
-     * @param {Bouer} app the Bouer instance
-     * @param {string} name the component name
-     * @returns a list of components matching the name
-     */
-    static byName(app, name) {
-      // Retrieving the active component
-      const activeComponents = IoC.app(app).resolve(ComponentHandler)
-        .activeComponents;
-      // Applying filter to the find the component
-      return filter(activeComponents, c => {
-        const $proto = c instanceof Component ? c.__$proto__ : c;
-        return $proto.name.toLowerCase() == (name || '').toLowerCase();
-      });
-    }
-  }
-  const Validator = (function() {
-    function innerValidateRequired(fieldInfo) {
-      var _a;
-      const errors = [];
-      const {
-        field,
-        name,
-        value
-      } = fieldInfo;
-      const required = (_a = fieldInfo.required) !== null && _a !== void 0 ? _a : false;
-      const isValidValue = () => {
-        return required == true ? (value != null && (value + '').trim() != '') : true;
-      };
-      if (!isValidValue()) {
-        errors.push({
-          rule: 'required',
-          message: `The field ${name} is required.`,
-          field: field,
-          value: value
-        });
-      }
-      return {
-        errors,
-        isValidValue,
-      };
-    }
-
-    function innerValidateCheck(fieldSchema) {
-      const errors = [];
-      const {
-        field,
-        name,
-        value,
-        check
-      } = fieldSchema;
-      // Check validation
-      if (check != null && check.indexOf(value) < 0) {
-        errors.push({
-          rule: 'check',
-          message: `The field ${name} with value ${value} does not match the required options.`,
-          field: field,
-          value: value
-        });
-      }
-      return {
-        errors
-      };
-    }
-
-    function innerValidateFunction(fieldSchema) {
-      const errors = [];
-      if (!fieldSchema.fn)
-        return {
-          errors,
-          clearPreviousError: false
-        };
-      const {
-        name,
-        field,
-        value,
-        fn
-      } = fieldSchema;
-      const result = fn(fieldSchema);
-      const {
-        valid,
-        message,
-        override
-      } = typeof result == 'object' ? result : {
-        valid: result,
-        message: `The field ${name} does not have the expected value.`,
-        override: false
-      };
-      const clearPreviousError = valid == false && override == true;
-      if (!valid) {
-        errors.push({
-          rule: 'function',
-          message: message,
-          field: field,
-          value: value
-        });
-      }
-      return {
-        errors,
-        clearPreviousError
-      };
-    }
-
-    function validateString(fieldSchema) {
-      const {
-        field,
-        pattern,
-        name,
-        value,
-        length
-      } = fieldSchema;
-      const {
-        min,
-        max
-      } = typeof length == 'object' ? length : {
-        min: 0,
-        max: length
-      };
-      const {
-        errors,
-        isValidValue
-      } = innerValidateRequired(fieldSchema);
-      if (errors.length > 0)
-        return errors;
-      // Minimum length validation
-      if (min != null && isValidValue() && value.length < min) {
-        errors.push({
-          rule: 'length:min',
-          message: `The field ${name} should have at least ${min} characters. Current length: ${value.length}.`,
-          field: field,
-          value: value
-        });
-      }
-      // Maximum length validation
-      if (max != null && isValidValue() && value.length > max) {
-        errors.push({
-          rule: 'length:max',
-          message: `The field ${name} should have at most ${max} characters. Current length: ${value.length}.`,
-          field: field,
-          value: value
-        });
-      }
-      // Regex validation
-      if (pattern != null && isValidValue()) {
-        const validator = {
-          'date': () => {
-            return value.match(
-              // eslint-disable-next-line max-len
-              /^(?:\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])|(?:0[1-9]|1[0-2])\/(?:0[1-9]|[12]\d|3[01])\/\d{4}|(?:0[1-9]|[12]\d|3[01])\/(?:0[1-9]|1[0-2])\/\d{4})$/);
-          },
-          'date-time': () => {
-            return value.match(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])[T ]([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(\.\d{1,3})?Z?$/);
-          },
-          'email': () => {
-            return value.match(/^[a-zA-Z0-9._%+-]{3,}@[a-zA-Z0-9.-]{3,}\.[a-zA-Z]{2,}(?:\.[a-zA-Z]{2,})?$/);
-          },
-          'regex': () => {
-            return value.match(new RegExp(pattern));
-          }
-        };
-        // Validates the pattern as named pattern, otherwise, validate the the pattern as regex
-        const isValidPattern = (validator[pattern] || validator['regex'])();
-        if (!isValidPattern) {
-          errors.push({
-            rule: 'regex',
-            message: `The field ${name} does not match the ${(pattern in validator) ? pattern : 'regex'} pattern.`,
-            field: field,
-            value: value
-          });
-        }
-      }
-      // Check validation
-      errors.push(...innerValidateCheck(fieldSchema).errors);
-      // Function validation
-      const fnValidation = innerValidateFunction(fieldSchema);
-      if (fnValidation.clearPreviousError) {
-        errors.splice(0, errors.length);
-        errors.push(...fnValidation.errors);
-      }
-      return errors;
-    }
-
-    function validateNumber(fieldSchema) {
-      let {
-        name,
-        value,
-        length,
-        field
-      } = fieldSchema;
-      const {
-        min,
-        max
-      } = typeof length == 'object' ? length : {
-        min: 0,
-        max: length
-      };
-      const {
-        errors
-      } = innerValidateRequired(fieldSchema);
-      if (errors.length > 0)
-        return errors;
-      // is value a valid number
-      if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.exec(value)) {
-        errors.push({
-          rule: 'number',
-          message: `The field ${name} should have a number value.`,
-          field: field,
-          value: value
-        });
-      } else {
-        value = value * 1; // Convert to the presented number
-      }
-      // Minimum validation
-      if (min != null && value < min) {
-        errors.push({
-          rule: 'length:min',
-          message: `The field ${name} should be greater than or equal to ${min}.`,
-          field: field,
-          value: value
-        });
-      }
-      // Maximum validation
-      if (max != null && value > max) {
-        errors.push({
-          rule: 'length:max',
-          message: `The field ${name} should be less than or equal to ${max}.`,
-          field: field,
-          value: value
-        });
-      }
-      // Check validation
-      errors.push(...innerValidateCheck(fieldSchema).errors);
-      // Function validation
-      const fnValidation = innerValidateFunction(fieldSchema);
-      if (fnValidation.clearPreviousError) {
-        errors.splice(0, errors.length);
-        errors.push(...fnValidation.errors);
-      }
-      return errors;
-    }
-
-    function validateBoolean(fieldSchema) {
-      let {
-        name,
-        value,
-        field
-      } = fieldSchema;
-      const {
-        errors,
-        isValidValue
-      } = innerValidateRequired(fieldSchema);
-      if (errors.length > 0)
-        return errors;
-      // is value a valid number
-      if (!isValidValue() && !/^(TRUE|True|true|1|FALSE|False|false|0)?$/.exec(value)) {
-        errors.push({
-          rule: 'boolean',
-          message: `The field ${name} should be a boolean. Current value: ${value}`,
-          field: field,
-          value: value
-        });
-      } else {
-        // Convert to the presented boolean value
-        value = ['true', '1'].indexOf(value.toString().toLowerCase()) > -1 ? true : false;
-      }
-      // Function validation
-      const fnValidation = innerValidateFunction(fieldSchema);
-      if (fnValidation.clearPreviousError) {
-        errors.splice(0, errors.length);
-        errors.push(...fnValidation.errors);
-      }
-      return errors;
-    }
-
-    function validate(fieldSchema) {
-      const type = fieldSchema.type = fieldSchema.type || 'string';
-      switch (type) {
-        case 'text':
-        case 'string':
-        case 'checkbox':
-        case 'password':
-          return validateString(fieldSchema);
-        case 'number':
-        case 'range':
-          return validateNumber(fieldSchema);
-        case 'radio':
-        case 'boolean':
-          return validateBoolean(fieldSchema);
-        default:
-          return validateString(fieldSchema);
-      }
-    }
-    return {
-      validate(fieldSchema) {
-        return validate(fieldSchema);
-      }
-    };
-  })();
-  class FieldSchema {
-    constructor(options) {
-      this.errors = [];
-      this.field = undefined;
-      this.name = undefined;
-      this.type = undefined;
-      this.value = undefined;
-      Object.assign(this, options || {});
-    }
-    init(options) {
-      Object.assign(this, options);
-      return this;
-    }
-    merge(schema) {
-      const _this = this;
-      Object.keys(schema).forEach((key) => {
-        if (key in _this && isNull(_this[key]))
-          _this[key] = schema[key];
-      });
-      return this;
-    }
-    isValid() {
-      const errors = Validator.validate(this);
-      return (this.errors = errors).length === 0;
-    }
-    validate() {
-      return this.isValid();
-    }
-  }
-  class SchemaBuilder {
-    constructor(context, compiler, evaluator) {
-      this.schemas = [];
-      $internal(this);
-      this.context = context;
-      this.compiler = compiler;
-      this.evaluator = evaluator;
-      this.schema = {};
-    }
-    build(entry) {
-      const data = entry.data;
-      const $schema = this.schema = entry.schema;
-      const compiler = this.compiler;
-      const evaluator = this.evaluator;
-      const rootElement = entry.element;
-      const options = entry.options || {};
-      const isReactive = (options.type || 'REACTIVE') === 'REACTIVE';
-      const cform = Constants.form;
-      // Remove `[ ]` and `,` and return an array of the names provided
-      const mNames = (options.names || '[name]').replace(/\[|\]/g, '').split(',');
-      const mValues = (options.values || '[value]').replace(/\[|\]/g, '').split(',');
-      // Elements that skipped on serialization process
-      const escapes = {
-        BUTTON: true
-      };
-      const checkables = {
-        checkbox: true,
-        radio: true
-      };
-      const formLayerSchema = new WeakMap();
-      const trySetBuilderInFormSchema = (currentScope, $schema) => {
-        const formSchema = currentScope.$form;
-        if (!formSchema || formSchema.schema)
-          return;
-        formSchema.schema = $schema;
-      };
-      const getValue = (el, fieldName) => {
-        if (fieldName in el)
-          return el[fieldName];
-        return el.getAttribute(fieldName) || el.innerText;
-      };
-      const getFieldValue = (el) => {
-        let val = undefined;
-        mValues.find((field) => (val = getValue(el, field)) ? true : false);
-        return val;
-      };
-      const getFieldStructure = (schema, fieldName, el, scopeData) => {
-        const field = findAttribute(el, [cform.schema], true);
-        const codeFieldInfo = schema[fieldName] || {};
-        if (field == null)
-          return codeFieldInfo;
-        const htmlFieldInfo = evaluator.exec({
-          data: scopeData,
-          context: this.context,
-          code: field.value,
-          returnable: true
-        }) || {};
-        if (!isEmptyObject(htmlFieldInfo) && !isEmptyObject(codeFieldInfo)) {
-          Logger.warn(`WARNING in <${toLower(el.tagName)} name="${fieldName}" />: You cannot ` +
-            `use both \`schema\` attribute “e-schema” and \`schema\` code at the same time.`);
-        }
-        if (codeFieldInfo instanceof FieldSchema) {
-          return codeFieldInfo.merge(htmlFieldInfo);
-        }
-        return Extend.obj(htmlFieldInfo, codeFieldInfo);
-      };
-      // Use the up array to map the layers and check what layer the compiler is
-      const findParentBuildElement = function(el) {
-        const parentElement = el.parentElement;
-        if (parentElement == rootElement || parentElement == null)
-          return rootElement;
-        const isBuild = parentElement.hasAttribute(cform.build) ||
-          parentElement.hasAttribute(cform.buildarray);
-        if (isBuild)
-          return parentElement;
-        return findParentBuildElement(parentElement);
-      };
-      const processInput = (options) => {
-        const {
-          el: input,
-          schema,
-          scopeData
-        } = options;
-        const attr = findAttribute(input, mNames);
-        // Checking if the element has the names on it
-        if (!attr)
-          return;
-        const attrName = attr.value;
-        const type = findAttribute(input, ['type']);
-        const typeName = type ? toLower(type.value) : 'text';
-        // If is escapable, stop
-        if (escapes[input.tagName] === true)
-          return;
-        // If it's is checkable and it's not selected, stop
-        if ((input instanceof HTMLInputElement) && (checkables[input.type] === true && input.checked === false))
-          return;
-        // Retrieving the value if it needs to be build as arry property
-        const isArray = findAttribute(input, [cform.array]) != null;
-        // if it is not an array built type, just set the value
-        const fieldStructure = getFieldStructure(schema, attrName, input, scopeData);
-        // Form Field
-        const $fieldSchema = fieldStructure instanceof FieldSchema ?
-          fieldStructure :
-          new FieldSchema(fieldStructure);
-        $fieldSchema.init({
-          field: input,
-          name: attrName,
-          type: isArray ? typeName + '[]' : typeName
-        });
-        $fieldSchema.form = scopeData.$form;
-        // Assigning the value of element if there is not a
-        if (isNull($fieldSchema.value))
-          $fieldSchema.value = getFieldValue(input);
-        // Transforming the value and errors to reactive
-        $reactive({
-          context: this.context,
-          data: $fieldSchema,
-          keys: ['value', 'errors']
-        });
-        if (!Constants.check(input, 'e-bind'))
-          input.setAttribute('e-bind', 'value');
-        compiler.compile({
-          context: this.context,
-          data: $fieldSchema,
-          el: input
-        });
-        // Adding the element a list to be easier to validate
-        this.schemas.push($fieldSchema);
-        // Setting the element prop in the schema
-        // if it is not an array built type, just set the value
-        if (!isArray) {
-          if (attrName in schema)
-            delete schema[attrName];
-          schema[attrName] = $fieldSchema;
-        } else {
-          // Getting the value from if exists, otherwise set default value as empty array
-          const $oldValue = (schema[attrName] || []);
-          schema[attrName] = $oldValue.concat($schema);
-        }
-        if (isReactive) {
-          $reactive({
-            context: this.context,
-            data: schema,
-            keys: [attrName]
-          }); // Setting the property to reactive
-        }
-      };
-      const getSchema = (options) => {
-        const currentElement = options.el;
-        const currentScopeData = options.scopeData;
-        const parentBuild = findParentBuildElement(currentElement);
-        const currentSchema = formLayerSchema.get(parentBuild);
-        trySetBuilderInFormSchema(currentScopeData, currentSchema);
-        return currentSchema;
-      };
-      const setSchema = (options) => {
-        const currentElement = options.el;
-        const currentScopeData = options.scopeData;
-        const currentParentBuild = findParentBuildElement(currentElement);
-        const currentSchema = formLayerSchema.get(currentParentBuild);
-        // Finding e-build property
-        const attrBuild = findAttribute(currentElement, [
-                cform.build,
-                cform.buildarray,
-            ]);
-        if (!attrBuild)
-          return currentSchema;
-        const attrValue = attrBuild.value;
-        const attrName = attrBuild.name;
-        // Retrieving the value if it needs to be build as arry property
-        const isArray = attrName === cform.buildarray || findAttribute(currentElement, [cform.array]) != null;
-        let $$schema = {};
-        let currentSchemaValue = currentSchema[attrValue];
-        // Setting the element prop in the schema
-        // if it is not an array built type, just set the value
-        if (!isArray) {
-          // if there is already a value, do nothing
-          if (currentSchemaValue) {
-            $$schema = currentSchemaValue;
-          }
-          // Field Info Set
-          currentSchema[attrValue] = $$schema;
-        } else {
-          const values = currentSchemaValue;
-          // Check if there is already a value and the first element is a FieldSchema
-          if (values && values.length > 0) {
-            $$schema = values[values.length - 1];
-          } else {
-            // Getting the value from if exists, otherwise set default value as empty array
-            const $oldValue = (currentSchema[attrValue] || []);
-            currentSchema[attrValue] = $oldValue.concat($$schema);
-          }
-        }
-        if (isReactive) {
-          $reactive({
-            context: this.context,
-            data: currentSchema,
-            keys: [attrValue]
-          }); // Setting the property to reactive
-        }
-        formLayerSchema.set(currentElement, $$schema);
-        trySetBuilderInFormSchema(currentScopeData, currentSchema);
-      };
-      // Clearing the Schemas, in case of FormBuilder re-use
-      this.schemas = [];
-      // Initializing the Schema Layer
-      formLayerSchema.set(rootElement, $schema);
-      if (isReactive) {
-        const arrayElements = Extend.array(toArray(rootElement.querySelectorAll('[e-build\\:array]')), toArray(rootElement.querySelectorAll(`[${cform.array}]`)));
-        filter(arrayElements, (el) => {
-          const attr = findAttribute(el, [cform.buildarray, cform.build]);
-          if (!attr)
-            return;
-          el.setAttribute('e-for', `${code(3, '_')} of $form.parent.get('${attr.value}')`);
-        });
-      }
-      compiler.compile({
-        context: this.context,
-        data: data,
-        el: rootElement,
-        beforeCompile: (element, scopeData) => {
-          if (!(element instanceof Element))
-            return;
-          setSchema({
-            el: element,
-            scopeData: scopeData
-          });
-        },
-        afterCompile: (element, scopeData) => {
-          if (!(element instanceof Element))
-            return;
-          processInput({
-            el: element,
-            schema: getSchema({
-              el: element,
-              scopeData: scopeData
-            }),
-            scopeData: scopeData
-          });
-        }
-      });
-      return this;
-    }
-    toObject() {
-      return (function walker(schema, $obj) {
-        for (const key in schema) {
-          const property = schema[key];
-          if (property instanceof FieldSchema) {
-            Property.set($obj, key, {
-              enumerable: true,
-              get() {
-                return property.value;
-              },
-              set(v) {
-                property.value = v;
-              }
-            });
-            $obj[key] = property.value;
-          } else if (property instanceof Array) {
-            $obj[key] = property.map((item) => walker(item, {}));
-          } else if (typeof property == 'object') {
-            $obj[key] = walker(property, {});
-          }
-        }
-        return $obj;
-      })(this.schema, {});
-    }
-  }
-  class FormHandler {
-    constructor(schema, builderOptions) {
-      this.schemas = [];
-      $internal(this);
-      // Assigning an empty object if formObject is not provided
-      this.schema = schema || {};
-      this.builderOptions = builderOptions || {};
-      this.evaluator = $default();
-      this.formElement = $default();
-    }
-    resolveElement(el) {
-      // If it's not a HTML Element, just return
-      if (el instanceof Element)
-        return el;
-      if (!(typeof el === 'string'))
-        return undefined;
-      try {
-        // If it's a string try to get the element
-        const element = DOM.querySelector(el);
-        if (!element) {
-          Logger.error('Element with "' + element + '" selector not found.');
-          return undefined;
-        }
-        return element;
-      } catch (error) {
-        // Unknown error
-        Logger.error(buildError(error));
-        return undefined;
-      }
-    }
-    init(options) {
-      const {
-        element,
-        context,
-        data,
-        bouer
-      } = options;
-      this.bouer = bouer;
-      this.context = context;
-      this.formElement = this.resolveElement(element);
-      this.schemas = [];
-      const compiler = IoC.app(bouer).resolve(Compiler);
-      const evaluator = this.evaluator = IoC.app(bouer).resolve(Evaluator);
-      const $builder = this.$builder = new SchemaBuilder(this.context, compiler, evaluator);
-      const dataToUse = Extend.obj(data, {
-        $form: new FormSchema({
-          currentNode: this.formElement,
-          scopeData: data
-        })
-      });
-      IoC.app(bouer).resolve(DataStore)
-        .addNodeData(this.formElement, dataToUse);
-      $builder.build({
-        element: this.formElement,
-        schema: this.schema,
-        options: this.builderOptions,
-        data: dataToUse
-      });
-      this.schemas = $builder.schemas;
-      return this;
-    }
-    get(path) {
-      var _a;
-      if (path == null || path == '')
-        return undefined;
-      if (this.evaluator == null) {
-        (_a = Logger.error('FormHandler is not initialized')) !== null && _a !== void 0 ? _a : undefined;
-        return undefined;
-      }
-      return this.evaluator.exec({
-        returnable: true,
-        context: this.context,
-        data: this.schema,
-        code: path,
-      });
-    }
-    set(path, value) {
-      const field = this.get(path);
-      if (field == null)
-        return;
-      field.value = value;
-    }
-    validate() {
-      let isValid = true;
-      this.schemas.forEach(f => f.isValid() ? 1 : isValid = false);
-      return isValid;
-    }
-    toObject() {
-      if (this.$builder == null) {
-        Logger.error('SchemaBuilder is not initialized.');
-        return {};
-      }
-      return this.$builder.toObject();
-    }
-    clear() {
-      this.schemas.forEach(f => f.value = '');
     }
   }
   const constsValues = Object.values(Constants);
@@ -3284,6 +2577,709 @@
       });
     };
   }
+  const Validator = (function() {
+    function innerValidateRequired(fieldInfo) {
+      var _a;
+      const errors = [];
+      const {
+        field,
+        name,
+        value
+      } = fieldInfo;
+      const required = (_a = fieldInfo.required) !== null && _a !== void 0 ? _a : false;
+      const isValidValue = () => {
+        return required == true ? (value != null && (value + '').trim() != '') : true;
+      };
+      if (!isValidValue()) {
+        errors.push({
+          rule: 'required',
+          message: `The field ${name} is required.`,
+          field: field,
+          value: value
+        });
+      }
+      return {
+        errors,
+        isValidValue,
+      };
+    }
+
+    function innerValidateCheck(fieldSchema) {
+      const errors = [];
+      const {
+        field,
+        name,
+        value,
+        check
+      } = fieldSchema;
+      // Check validation
+      if (check != null && check.indexOf(value) < 0) {
+        errors.push({
+          rule: 'check',
+          message: `The field ${name} with value ${value} does not match the required options.`,
+          field: field,
+          value: value
+        });
+      }
+      return {
+        errors
+      };
+    }
+
+    function innerValidateFunction(fieldSchema) {
+      const errors = [];
+      if (!fieldSchema.fn)
+        return {
+          errors,
+          clearPreviousError: false
+        };
+      const {
+        name,
+        field,
+        value,
+        fn
+      } = fieldSchema;
+      const result = fn(fieldSchema);
+      const {
+        valid,
+        message,
+        override
+      } = typeof result == 'object' ? result : {
+        valid: result,
+        message: `The field ${name} does not have the expected value.`,
+        override: false
+      };
+      const clearPreviousError = valid == false && override == true;
+      if (!valid) {
+        errors.push({
+          rule: 'function',
+          message: message,
+          field: field,
+          value: value
+        });
+      }
+      return {
+        errors,
+        clearPreviousError
+      };
+    }
+
+    function validateString(fieldSchema) {
+      const {
+        field,
+        pattern,
+        name,
+        value,
+        length
+      } = fieldSchema;
+      const {
+        min,
+        max
+      } = typeof length == 'object' ? length : {
+        min: 0,
+        max: length
+      };
+      const {
+        errors,
+        isValidValue
+      } = innerValidateRequired(fieldSchema);
+      if (errors.length > 0)
+        return errors;
+      // Minimum length validation
+      if (min != null && isValidValue() && value.length < min) {
+        errors.push({
+          rule: 'length:min',
+          message: `The field ${name} should have at least ${min} characters. Current length: ${value.length}.`,
+          field: field,
+          value: value
+        });
+      }
+      // Maximum length validation
+      if (max != null && isValidValue() && value.length > max) {
+        errors.push({
+          rule: 'length:max',
+          message: `The field ${name} should have at most ${max} characters. Current length: ${value.length}.`,
+          field: field,
+          value: value
+        });
+      }
+      // Regex validation
+      if (pattern != null && isValidValue()) {
+        const validator = {
+          'date': () => {
+            return value.match(
+              // eslint-disable-next-line max-len
+              /^(?:\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])|(?:0[1-9]|1[0-2])\/(?:0[1-9]|[12]\d|3[01])\/\d{4}|(?:0[1-9]|[12]\d|3[01])\/(?:0[1-9]|1[0-2])\/\d{4})$/);
+          },
+          'date-time': () => {
+            return value.match(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])[T ]([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(\.\d{1,3})?Z?$/);
+          },
+          'email': () => {
+            return value.match(/^[a-zA-Z0-9._%+-]{3,}@[a-zA-Z0-9.-]{3,}\.[a-zA-Z]{2,}(?:\.[a-zA-Z]{2,})?$/);
+          },
+          'regex': () => {
+            return value.match(new RegExp(pattern));
+          }
+        };
+        // Validates the pattern as named pattern, otherwise, validate the the pattern as regex
+        const isValidPattern = (validator[pattern] || validator['regex'])();
+        if (!isValidPattern) {
+          errors.push({
+            rule: 'regex',
+            message: `The field ${name} does not match the ${(pattern in validator) ? pattern : 'regex'} pattern.`,
+            field: field,
+            value: value
+          });
+        }
+      }
+      // Check validation
+      errors.push(...innerValidateCheck(fieldSchema).errors);
+      // Function validation
+      const fnValidation = innerValidateFunction(fieldSchema);
+      if (fnValidation.clearPreviousError) {
+        errors.splice(0, errors.length);
+        errors.push(...fnValidation.errors);
+      }
+      return errors;
+    }
+
+    function validateNumber(fieldSchema) {
+      let {
+        name,
+        value,
+        length,
+        field
+      } = fieldSchema;
+      const {
+        min,
+        max
+      } = typeof length == 'object' ? length : {
+        min: 0,
+        max: length
+      };
+      const {
+        errors
+      } = innerValidateRequired(fieldSchema);
+      if (errors.length > 0)
+        return errors;
+      // is value a valid number
+      if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.exec(value)) {
+        errors.push({
+          rule: 'number',
+          message: `The field ${name} should have a number value.`,
+          field: field,
+          value: value
+        });
+      } else {
+        value = value * 1; // Convert to the presented number
+      }
+      // Minimum validation
+      if (min != null && value < min) {
+        errors.push({
+          rule: 'length:min',
+          message: `The field ${name} should be greater than or equal to ${min}.`,
+          field: field,
+          value: value
+        });
+      }
+      // Maximum validation
+      if (max != null && value > max) {
+        errors.push({
+          rule: 'length:max',
+          message: `The field ${name} should be less than or equal to ${max}.`,
+          field: field,
+          value: value
+        });
+      }
+      // Check validation
+      errors.push(...innerValidateCheck(fieldSchema).errors);
+      // Function validation
+      const fnValidation = innerValidateFunction(fieldSchema);
+      if (fnValidation.clearPreviousError) {
+        errors.splice(0, errors.length);
+        errors.push(...fnValidation.errors);
+      }
+      return errors;
+    }
+
+    function validateBoolean(fieldSchema) {
+      let {
+        name,
+        value,
+        field
+      } = fieldSchema;
+      const {
+        errors,
+        isValidValue
+      } = innerValidateRequired(fieldSchema);
+      if (errors.length > 0)
+        return errors;
+      // is value a valid number
+      if (!isValidValue() && !/^(TRUE|True|true|1|FALSE|False|false|0)?$/.exec(value)) {
+        errors.push({
+          rule: 'boolean',
+          message: `The field ${name} should be a boolean. Current value: ${value}`,
+          field: field,
+          value: value
+        });
+      } else {
+        // Convert to the presented boolean value
+        value = ['true', '1'].indexOf(value.toString().toLowerCase()) > -1 ? true : false;
+      }
+      // Function validation
+      const fnValidation = innerValidateFunction(fieldSchema);
+      if (fnValidation.clearPreviousError) {
+        errors.splice(0, errors.length);
+        errors.push(...fnValidation.errors);
+      }
+      return errors;
+    }
+
+    function validate(fieldSchema) {
+      const type = fieldSchema.type = fieldSchema.type || 'string';
+      switch (type) {
+        case 'text':
+        case 'string':
+        case 'checkbox':
+        case 'password':
+          return validateString(fieldSchema);
+        case 'number':
+        case 'range':
+          return validateNumber(fieldSchema);
+        case 'radio':
+        case 'boolean':
+          return validateBoolean(fieldSchema);
+        default:
+          return validateString(fieldSchema);
+      }
+    }
+    return {
+      validate(fieldSchema) {
+        return validate(fieldSchema);
+      }
+    };
+  })();
+  class FieldSchema {
+    constructor(options) {
+      this.errors = [];
+      $internal(this);
+      this.field = undefined;
+      this.name = undefined;
+      this.type = undefined;
+      this.value = undefined;
+      Object.assign(this, options || {});
+    }
+    init(options) {
+      Object.assign(this, options);
+      return this;
+    }
+    merge(schema) {
+      const _this = this;
+      Object.keys(schema).forEach((key) => {
+        if (key in _this && isNull(_this[key]))
+          _this[key] = schema[key];
+      });
+      return this;
+    }
+    isValid() {
+      const errors = Validator.validate(this);
+      return (this.errors = errors).length === 0;
+    }
+    validate() {
+      return this.isValid();
+    }
+  }
+  class SchemaBuilder {
+    constructor(context, compiler, evaluator) {
+      this.schemas = [];
+      $internal(this);
+      this.context = context;
+      this.compiler = compiler;
+      this.evaluator = evaluator;
+      this.schema = {};
+    }
+    build(entry) {
+      const data = entry.data;
+      const $schema = this.schema = entry.schema;
+      const compiler = this.compiler;
+      const evaluator = this.evaluator;
+      const rootElement = entry.element;
+      const options = entry.options || {};
+      const isReactive = (options.type || 'REACTIVE') === 'REACTIVE';
+      const cform = Constants.form;
+      // Remove `[ ]` and `,` and return an array of the names provided
+      const mNames = (options.names || '[name]').replace(/\[|\]/g, '').split(',');
+      const mValues = (options.values || '[value]').replace(/\[|\]/g, '').split(',');
+      // Elements that skipped on serialization process
+      const escapes = {
+        BUTTON: true
+      };
+      const checkables = {
+        checkbox: true,
+        radio: true
+      };
+      const formLayerSchema = new WeakMap();
+      const trySetBuilderInFormSchema = (currentScope, $schema) => {
+        const formSchema = currentScope.$form;
+        if (!formSchema || formSchema.schema)
+          return;
+        formSchema.schema = $schema;
+      };
+      const getValue = (el, fieldName) => {
+        if (fieldName in el)
+          return el[fieldName];
+        return el.getAttribute(fieldName) || el.innerText;
+      };
+      const getFieldValue = (el) => {
+        let val = undefined;
+        mValues.find((field) => (val = getValue(el, field)) ? true : false);
+        return val;
+      };
+      const getFieldStructure = (schema, fieldName, el, scopeData) => {
+        const field = findAttribute(el, [cform.schema], true);
+        const codeFieldInfo = schema[fieldName] || {};
+        if (field == null)
+          return codeFieldInfo;
+        const htmlFieldInfo = evaluator.exec({
+          data: scopeData,
+          context: this.context,
+          code: field.value,
+          returnable: true
+        }) || {};
+        if (!isEmptyObject(htmlFieldInfo) && !isEmptyObject(codeFieldInfo)) {
+          Logger.warn(`WARNING in <${toLower(el.tagName)} name="${fieldName}" />: You cannot ` +
+            `use both \`schema\` attribute “e-schema” and \`schema\` code at the same time.`);
+        }
+        if (codeFieldInfo instanceof FieldSchema) {
+          return codeFieldInfo.merge(htmlFieldInfo);
+        }
+        return Extend.obj(htmlFieldInfo, codeFieldInfo);
+      };
+      // Use the up array to map the layers and check what layer the compiler is
+      const findParentBuildElement = function(el) {
+        const parentElement = el.parentElement;
+        if (parentElement == rootElement || parentElement == null)
+          return rootElement;
+        const isBuild = parentElement.hasAttribute(cform.build) ||
+          parentElement.hasAttribute(cform.buildarray);
+        if (isBuild)
+          return parentElement;
+        return findParentBuildElement(parentElement);
+      };
+      const processInput = (options) => {
+        const {
+          el: input,
+          schema,
+          scopeData
+        } = options;
+        const attr = findAttribute(input, mNames);
+        // Checking if the element has the names on it
+        if (!attr)
+          return;
+        const attrName = attr.value;
+        const type = findAttribute(input, ['type']);
+        const typeName = type ? toLower(type.value) : 'text';
+        // If is escapable, stop
+        if (escapes[input.tagName] === true)
+          return;
+        // If it's is checkable and it's not selected, stop
+        if ((input instanceof HTMLInputElement) && (checkables[input.type] === true && input.checked === false))
+          return;
+        // Retrieving the value if it needs to be build as arry property
+        const isArray = findAttribute(input, [cform.array]) != null;
+        // if it is not an array built type, just set the value
+        const fieldStructure = getFieldStructure(schema, attrName, input, scopeData);
+        // Form Field
+        const $fieldSchema = fieldStructure instanceof FieldSchema ?
+          fieldStructure :
+          new FieldSchema(fieldStructure);
+        $fieldSchema.init({
+          field: input,
+          name: attrName,
+          type: isArray ? typeName + '[]' : typeName
+        });
+        $fieldSchema.form = scopeData.$form;
+        // Assigning the value of element if there is not a
+        if (isNull($fieldSchema.value))
+          $fieldSchema.value = getFieldValue(input);
+        // Transforming the value and errors to reactive
+        $reactive({
+          context: this.context,
+          data: $fieldSchema,
+          keys: ['value', 'errors']
+        });
+        if (!Constants.check(input, 'e-bind'))
+          input.setAttribute('e-bind', 'value');
+        compiler.compile({
+          context: this.context,
+          data: $fieldSchema,
+          el: input
+        });
+        // Adding the element a list to be easier to validate
+        this.schemas.push($fieldSchema);
+        // Setting the element prop in the schema
+        // if it is not an array built type, just set the value
+        if (!isArray) {
+          if (attrName in schema)
+            delete schema[attrName];
+          schema[attrName] = $fieldSchema;
+        } else {
+          // Getting the value from if exists, otherwise set default value as empty array
+          const $oldValue = (schema[attrName] || []);
+          schema[attrName] = $oldValue.concat($schema);
+        }
+        if (isReactive) {
+          $reactive({
+            context: this.context,
+            data: schema,
+            keys: [attrName]
+          }); // Setting the property to reactive
+        }
+      };
+      const getSchema = (options) => {
+        const currentElement = options.el;
+        const currentScopeData = options.scopeData;
+        const parentBuild = findParentBuildElement(currentElement);
+        const currentSchema = formLayerSchema.get(parentBuild);
+        trySetBuilderInFormSchema(currentScopeData, currentSchema);
+        return currentSchema;
+      };
+      const setSchema = (options) => {
+        const currentElement = options.el;
+        const currentScopeData = options.scopeData;
+        const currentParentBuild = findParentBuildElement(currentElement);
+        const currentSchema = formLayerSchema.get(currentParentBuild);
+        // Finding e-build property
+        const attrBuild = findAttribute(currentElement, [
+                cform.build,
+                cform.buildarray,
+            ]);
+        if (!attrBuild)
+          return currentSchema;
+        const attrValue = attrBuild.value;
+        const attrName = attrBuild.name;
+        // Retrieving the value if it needs to be build as arry property
+        const isArray = attrName === cform.buildarray || findAttribute(currentElement, [cform.array]) != null;
+        let $$schema = {};
+        let currentSchemaValue = currentSchema[attrValue];
+        // Setting the element prop in the schema
+        // if it is not an array built type, just set the value
+        if (!isArray) {
+          // if there is already a value, do nothing
+          if (currentSchemaValue) {
+            $$schema = currentSchemaValue;
+          }
+          // Field Info Set
+          currentSchema[attrValue] = $$schema;
+        } else {
+          const values = currentSchemaValue;
+          // Check if there is already a value and the first element is a FieldSchema
+          if (values && values.length > 0) {
+            $$schema = values[values.length - 1];
+          } else {
+            // Getting the value from if exists, otherwise set default value as empty array
+            const $oldValue = (currentSchema[attrValue] || []);
+            currentSchema[attrValue] = $oldValue.concat($$schema);
+          }
+        }
+        if (isReactive) {
+          $reactive({
+            context: this.context,
+            data: currentSchema,
+            keys: [attrValue]
+          }); // Setting the property to reactive
+        }
+        formLayerSchema.set(currentElement, $$schema);
+        trySetBuilderInFormSchema(currentScopeData, currentSchema);
+      };
+      // Clearing the Schemas, in case of FormBuilder re-use
+      this.schemas = [];
+      // Initializing the Schema Layer
+      formLayerSchema.set(rootElement, $schema);
+      if (isReactive) {
+        const arrayElements = Extend.array(toArray(rootElement.querySelectorAll('[e-build\\:array]')), toArray(rootElement.querySelectorAll(`[${cform.array}]`)));
+        filter(arrayElements, (el) => {
+          const attr = findAttribute(el, [cform.buildarray, cform.build]);
+          if (!attr)
+            return;
+          el.setAttribute('e-for', `${code(3, '_')} of $form.parent.get('${attr.value}')`);
+        });
+      }
+      compiler.compile({
+        context: this.context,
+        data: data,
+        el: rootElement,
+        beforeCompile: (element, scopeData) => {
+          if (!(element instanceof Element))
+            return;
+          setSchema({
+            el: element,
+            scopeData: scopeData
+          });
+        },
+        afterCompile: (element, scopeData) => {
+          if (!(element instanceof Element))
+            return;
+          processInput({
+            el: element,
+            schema: getSchema({
+              el: element,
+              scopeData: scopeData
+            }),
+            scopeData: scopeData
+          });
+        }
+      });
+      return this;
+    }
+    toObject() {
+      return (function walker(schema, $obj) {
+        for (const key in schema) {
+          const property = schema[key];
+          if (property instanceof FieldSchema) {
+            Property.set($obj, key, {
+              enumerable: true,
+              get() {
+                return property.value;
+              },
+              set(v) {
+                property.value = v;
+              }
+            });
+            $obj[key] = property.value;
+          } else if (property instanceof Array) {
+            $obj[key] = property.map((item) => walker(item, {}));
+          } else if (typeof property == 'object') {
+            $obj[key] = walker(property, {});
+          }
+        }
+        return $obj;
+      })(this.schema, {});
+    }
+  }
+  class FormHandler {
+    constructor(schema, builderOptions) {
+      this.schemas = [];
+      $internal(this);
+      // Assigning an empty object if formObject is not provided
+      this.schema = schema || {};
+      this.builderOptions = builderOptions || {};
+      this.formElement = $default();
+    }
+    resolveElement(el) {
+      // If it's not a HTML Element, just return
+      if (el instanceof Element)
+        return el;
+      if (!(typeof el === 'string'))
+        return undefined;
+      try {
+        // If it's a string try to get the element
+        const element = DOM.querySelector(el);
+        if (!element) {
+          Logger.error('Element with "' + element + '" selector not found.');
+          return undefined;
+        }
+        return element;
+      } catch (error) {
+        // Unknown error
+        Logger.error(buildError(error));
+        return undefined;
+      }
+    }
+    /**
+     * Initialize the form
+     * @param options
+     * @returns
+     */
+    init(options) {
+      const {
+        element,
+        context,
+        data
+      } = options;
+      const bouer = context instanceof Bouer ? context : context.bouer;
+      this.context = context;
+      this.formElement = this.resolveElement(element);
+      this.schemas = [];
+      const compiler = IoC.app(bouer).resolve(Compiler);
+      const evaluator = IoC.app(bouer).resolve(Evaluator);
+      const $builder = this.$builder = new SchemaBuilder(this.context, compiler, evaluator);
+      const dataToUse = Extend.obj(data, {
+        $form: new FormSchema({
+          currentNode: this.formElement,
+          scopeData: data
+        })
+      });
+      IoC.app(bouer).resolve(DataStore)
+        .addNodeData(this.formElement, dataToUse);
+      $builder.build({
+        element: this.formElement,
+        schema: this.schema,
+        options: this.builderOptions,
+        data: dataToUse
+      });
+      this.schemas = $builder.schemas;
+      return this;
+    }
+    /**
+     * Get a field by path
+     * @param path the path of the field
+     */
+    get(path) {
+      var _a;
+      if (path == null || path == '')
+        return undefined;
+      if (this.context == null) {
+        (_a = Logger.error('FormHandler is not initialized')) !== null && _a !== void 0 ? _a : undefined;
+        return undefined;
+      }
+      const bouer = this.context instanceof Bouer ?
+        this.context :
+        this.context.bouer;
+      return IoC.app(bouer).resolve(Evaluator).exec({
+        returnable: true,
+        context: this.context,
+        data: this.schema,
+        code: path,
+      });
+    }
+    /**
+     * Set the value of a field by path
+     * @param path the path of the field
+     * @param value the value to set
+     */
+    set(path, value) {
+      const field = this.get(path);
+      if (field == null)
+        return;
+      field.value = value;
+    }
+    /**
+     * Validate the form
+     * @returns `true` if the form is valid
+     */
+    validate() {
+      let isValid = true;
+      this.schemas.forEach(f => f.isValid() ? 1 : isValid = false);
+      return isValid;
+    }
+    /**
+     * Get the form data as an object
+     */
+    toObject() {
+      if (this.$builder == null) {
+        Logger.error('SchemaBuilder is not initialized.');
+        return {};
+      }
+      return this.$builder.toObject();
+    }
+    /**
+     * Clear the form
+     */
+    clear() {
+      this.schemas.forEach(f => f.value = '');
+    }
+  }
 
   function $formHandling(opitons) {
     const {
@@ -3327,7 +3323,6 @@
     return formHandler.init({
       element: ownerNode,
       context: context,
-      bouer: opitons.compiler.bouer,
       data: data,
     });
   }
@@ -3901,18 +3896,18 @@
     }
   }
   class Compiler {
-    constructor(bouer, binder, delimiterHandler, eventHandler, componentHandler, directives) {
+    constructor(bouer, binder, delimiterHandler, eventHandler, componentHandler) {
       this.NODES_TO_IGNORE_IN_COMPILATION = {
         'SCRIPT': 1,
         '#comment': 8
       };
       $internal(this);
       this.bouer = bouer;
-      this.directives = directives !== null && directives !== void 0 ? directives : {};
       this.binder = binder;
       this.delimiter = delimiterHandler;
       this.eventHandler = eventHandler;
       this.component = componentHandler;
+      this.directives = bouer.options.directives || {};
       this.dataStore = IoC.app(bouer).resolve(DataStore);
     }
     /**
@@ -4373,8 +4368,7 @@
           let $classComponent = null;
           if (entry instanceof Component) {
             const ctor = entry.__$proto__.ctor;
-            const $newClassComponent = IoC.app(this.bouer).resolve(ctor) ||
-              IoC.resolve(ctor) || IoC.new(ctor);
+            const $newClassComponent = IoC.resolve(ctor) || IoC.new(ctor);
             $classComponent = $newClassComponent;
             $protoComponent = $newClassComponent.__$proto__;
             $protoComponent.prepareClass($newClassComponent);
@@ -5072,7 +5066,7 @@
      */
     destroy() {
       if (!this.el)
-        return false;
+        return;
       if (this.isDestroyed && this.bouer && this.bouer.isDestroyed)
         return;
       if (!this.keepAlive)
@@ -5157,9 +5151,8 @@
             'loaded', 'beforeDestroy', 'destroyed', 'blocked', 'failed'
         ];
       const ignorables = [
-            'el', 'bouer', '__$proto__', 'init', 'constructor', 'export', 'watch'
+            Constants.$, 'el', 'bouer', '__$proto__', 'init', 'constructor', 'export', 'watch'
         ].concat(hooks);
-      const cachedInert = {};
       const properties = Object.getOwnPropertyNames(component);
       const methods = Object.getOwnPropertyNames(component.constructor.prototype);
       const fields = filter(Extend.array(properties, methods), key => ignorables.indexOf(key) < 0);
@@ -5177,24 +5170,23 @@
         }
         //In case of InertProp, cache the object and return the value
         if (fieldValue instanceof InertProp) {
-          cachedInert[field] = fieldValue;
           Property.set(proto.data, field, {
-            get: function reactive() {
-              return cachedInert[field].get();
+            get: function linked() {
+              return fieldValue.get();
             },
-            set: function reactive(value) {
-              cachedInert[field].set(value);
+            set: function linked(v) {
+              fieldValue.set(v);
             }
           });
         } else {
           proto.data[field] = fieldValue;
         }
         Property.set(component, field, {
-          get: function reactive() {
+          get: function linked() {
             return proto.data[field];
           },
-          set: function reactive(value) {
-            proto.data[field] = value;
+          set: function linked(v) {
+            proto.data[field] = v;
           }
         });
       });
@@ -5577,7 +5569,9 @@
 
   function setData(context, inputData, targetObject) {
     if (isNull(targetObject))
-      targetObject = context.data;
+      targetObject = context instanceof Component ?
+      context.__$proto__.data :
+      context.data;
     if (!isObject(inputData)) {
       Logger.error('Invalid inputData value, expected an "Object Literal" and got "' + (typeof inputData) + '".');
       return targetObject;
@@ -5630,16 +5624,17 @@
 
   function errorMsgNodeValue(node) {
     return ('Expected an expression in “' + node.nodeName +
-      '” and got “' + (ifNullReturn(node.nodeValue, '')) + '”.');
+      '” and got “' + ifNullReturn(node.nodeValue, '') + '”.');
   }
 
   function $internal($this) {
-    Object.defineProperty($this, 'ͼ', {
-      enumerable: false,
-      configurable: false,
-      writable: false,
-      value: undefined
-    });
+    if (!(Constants.$ in $this))
+      Object.defineProperty($this, Constants.$, {
+        enumerable: false,
+        configurable: false,
+        writable: false,
+        value: true
+      });
     return $this;
   }
 
@@ -5653,10 +5648,26 @@
   const DOM = WIN.document;
   const ANCHOR = createEl('a').build();
   class DelimiterHandler {
-    constructor(bouer, delimiters) {
+    constructor(bouer) {
       this.delimiters = [];
       this.bouer = bouer;
-      this.delimiters = delimiters;
+      this.delimiters = [
+        {
+          name: 'html',
+          delimiter: {
+            open: '{{:html ',
+            close: '}}'
+          }
+        },
+        {
+          name: 'common',
+          delimiter: {
+            open: '{{',
+            close: '}}'
+          }
+        },
+        ];
+      this.delimiters.push.apply(this.delimiters, bouer.options.delimiters || []);
     }
     add(item) {
       this.delimiters.push(item);
@@ -5718,6 +5729,50 @@
       return this.run('{{' + trim(match[1]) + '}}')[0];
     }
   }
+  class ViewChild {
+    /**
+     * Retrieves the actives components matching the a provided expression
+     * @param {Bouer} app the Bouer instance
+     * @param {Function} expression the expression function to match the required component
+     * @returns a list of components matching the expression
+     */
+    static by(app, expression) {
+      // Retrieving the active component
+      const activeComponents = IoC.app(app).resolve(ComponentHandler)
+        .activeComponents;
+      // Applying filter to the find the component
+      return filter(activeComponents, expression);
+    }
+    /**
+     * Retrieves the actives components matching class
+     * @param {Bouer} app the Bouer instance
+     * @param {Function} ctor the class to match
+     * @returns a list of components matching the expression
+     */
+    static byClass(app, ctor) {
+      // Retrieving the active component
+      const activeComponents = IoC.app(app).resolve(ComponentHandler)
+        .activeComponents;
+      // Applying filter to the find the component
+      return filter(activeComponents, c => c instanceof ctor);
+    }
+    /**
+     * Retrieves the actives components matching the component name
+     * @param {Bouer} app the Bouer instance
+     * @param {string} name the component name
+     * @returns a list of components matching the name
+     */
+    static byName(app, name) {
+      // Retrieving the active component
+      const activeComponents = IoC.app(app).resolve(ComponentHandler)
+        .activeComponents;
+      // Applying filter to the find the component
+      return filter(activeComponents, c => {
+        const $proto = c instanceof Component ? c.__$proto__ : c;
+        return $proto.name.toLowerCase() == (name || '').toLowerCase();
+      });
+    }
+  }
   var version = '3.3.0';
   class Bouer {
     /**
@@ -5740,27 +5795,23 @@
       /** Provides state of the app, if it is already initialized */
       this.isInitialized = false;
       $internal(this);
+      const app = this;
       const $options = options || {};
       this.options = $options;
       this.config = $options.config || {};
       this.pipes = $options.pipes || {};
-      const app = this;
-      const delimiters = $options.delimiters || [];
       // Adding Dependency Injection Services
-      IoC.app(this).add(DataStore, [], true);
-      IoC.app(this).add(Evaluator, [this]);
-      IoC.app(this).add(Middleware, [this], true);
-      IoC.app(this).add(Binder, [this, Evaluator], true);
-      IoC.app(this).add(EventHandler, [this, Evaluator], true);
-      IoC.app(this).add(ComponentHandler, [
-            this, DelimiterHandler, EventHandler, Evaluator, Routing
-        ], true);
-      IoC.app(this).add(Skeleton, [this], true);
-      IoC.app(this).add(Routing, [this], true);
-      IoC.app(this).add(DelimiterHandler, [this, delimiters], true);
-      IoC.app(this).add(Compiler, [
-            this, Binder, DelimiterHandler, EventHandler, ComponentHandler, $options.directives
-        ], true);
+      IoC.app(this)
+        .add(DataStore, [], true)
+        .add(Evaluator, [this])
+        .add(Middleware, [this], true)
+        .add(Binder, [this, Evaluator], true)
+        .add(EventHandler, [this, Evaluator], true)
+        .add(ComponentHandler, [this, DelimiterHandler, EventHandler, Evaluator, Routing], true)
+        .add(Skeleton, [this], true)
+        .add(Routing, [this], true, true)
+        .add(DelimiterHandler, [this], true)
+        .add(Compiler, [this, Binder, DelimiterHandler, EventHandler, ComponentHandler], true, true);
       const dataStore = IoC.app(this).resolve(DataStore);
       const middleware = IoC.app(this).resolve(Middleware);
       const componentHandler = IoC.app(this).resolve(ComponentHandler);
@@ -5780,22 +5831,6 @@
         data: $options.globalData || {},
         context: this
       });
-      delimiters.push.apply(delimiters, [
-        {
-          name: 'html',
-          delimiter: {
-            open: '{{:html ',
-            close: '}}'
-          }
-        },
-        {
-          name: 'common',
-          delimiter: {
-            open: '{{',
-            close: '}}'
-          }
-        },
-        ]);
       this.$routing = IoC.app(this).resolve(Routing);
       this.$delimiters = {
         add: delimiter.add,
@@ -5869,7 +5904,10 @@
         viewByName: (componentName) => ViewChild.byName(this, componentName),
         viewByClass: (ctor) => ViewChild.byClass(this, ctor)
       };
-      this.$deps = IoC.app(this);
+      this.$deps = {
+        add: IoC.add,
+        resolve: IoC.resolve
+      };
       if (typeof $options.mounted === 'function')
         eventHandler.on({
           eventName: $options.mounted.name,
@@ -6008,7 +6046,6 @@
       const formHandler = new FormHandler({}, Extend.obj({}, {
         type: 'STATIC'
       }, options)).init({
-        bouer: this,
         context: this,
         data: this.data,
         element: input,
