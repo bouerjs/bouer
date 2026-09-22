@@ -1,6 +1,7 @@
 import {
   Bouer,
   Compiler,
+  Routing,
   Component,
   toHtml,
   IoC,
@@ -140,7 +141,7 @@ describe('Dependency Injection - IoC Container', () => {
     });
   });
 
-  it('Also injects the dependency as expected if `webClient` is registered global as dependency', async () => {
+  it('Also injects the dependency as expected if `webClient` using $inject function', async () => {
     // Local Class
     class CustomComponent extends Component {
       webClient = $inject(WebClient);
@@ -175,6 +176,45 @@ describe('Dependency Injection - IoC Container', () => {
         const customComponent = context.$components.viewByClass(CustomComponent)[0];
         expect(customComponent.webClient).toBeInstanceOf(WebClient);
         expect(customComponent.webClient.url).toBe('http://localhost:5000/api');
+      }
+    });
+  });
+
+  it('Also injects the internals dependencies `Routing` and `Compiler` using $inject function', async () => {
+    // Local Class
+    class CustomComponent extends Component {
+      routing = $inject(Routing);
+      compiler = $inject(Compiler);
+
+      constructor() {
+        super({
+          template: '<h1>Testing...</h1>',
+        });
+      }
+    }
+
+    const htmlSnippet = `
+    <div id="app">
+      <CustomComponent></CustomComponent>
+      <div route-view><div>
+    </div>`;
+    const element = toHtml(htmlSnippet);
+
+    const context = Bouer.create({
+      components: [CustomComponent]
+    });
+
+    const compiler = IoC.app(context).resolve(Compiler);
+
+    await compiler.compile({
+      data: context.data,
+      context: context,
+      el: element,
+      onComponentLoad: () => {
+        const customComponent = context.$components.viewByClass(CustomComponent)[0];
+
+        expect(customComponent.routing).toBeInstanceOf(Routing);
+        expect(customComponent.compiler).toBeInstanceOf(Compiler);
       }
     });
   });
