@@ -4,6 +4,7 @@ import Bouer, {
   $computed,
   Component,
   ViewChild,
+  Routing,
   $form,
   $inert,
   $field,
@@ -36,6 +37,7 @@ export {
   Computed,
   Component,
   ViewChild,
+  Routing,
 
   IoC,
   prop,
