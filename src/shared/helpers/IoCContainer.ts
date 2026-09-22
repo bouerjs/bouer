@@ -10,11 +10,19 @@ import { $default, $internal, filter, ifNullReturn, isNull } from './Utils';
  * It's a **Service Provider** container with all the services that will be used in the application.
  */
 const IoC = (function () {
-  type Service<S> = { ctor: Constructor<S>, instance?: S, isSingleton: boolean, args?: unknown[] };
+  type Service<S> = {
+    ctor: Constructor<S>,
+    instance?: S,
+    args?: unknown[],
+    isSingleton: boolean,
+    sync?: boolean
+  };
 
   let bouerId: number = 1;
   const global: Bouer = $default<Bouer>({ isDestroyed: false } as any);
-  const serviceCollection: WeakMap<Bouer, WeakMap<Constructor<unknown>, Service<unknown>>> = new WeakMap();
+  const serviceCollection: WeakMap<Bouer, WeakMap<Constructor<unknown>, Service<unknown>>> = new WeakMap(
+    [[global, new WeakMap()]]
+  );
 
   function add<S>(this: Bouer, ctor: Constructor<S>, params?: any[], isSingleton?: boolean, sync?: boolean): void {
     if (this.isDestroyed) throw new Error('Application already disposed.');
@@ -29,15 +37,22 @@ const IoC = (function () {
     collection.set(ctor, {
       ctor: ctor,
       isSingleton: ifNullReturn(isSingleton, false),
-      args: params
+      args: params,
+      sync: sync
     });
 
     if (sync)
       add.call(global, ctor, params, isSingleton);
   };
 
-  function resolve<S>(this: Bouer, ctor: Constructor<S>): S | undefined {
+  function resolve<S>(this: Bouer, ctor: Constructor<S>, sync?: boolean): S | undefined {
     if (this.isDestroyed) throw new Error('Application already disposed.');
+
+    const syncToGlobal = (service: any) => {
+      if (sync !== true) return;
+      // Syncronizing with global services
+      serviceCollection.get(global)!.set(ctor, service);
+    }
 
     const collection = serviceCollection.get(this);
     if (!collection) return undefined;
@@ -49,11 +64,15 @@ const IoC = (function () {
     if (!service.isSingleton)
       return newInstance(ctor, service.args, this);
 
-    if (service.instance)
+    if (service.instance) {
+      syncToGlobal(service);
       return service.instance as S;
+    }
 
     // Otherwise, creates the singleton instance
-    return (service.instance ?? (service.instance = newInstance(ctor, service.args, this))) as S;
+    const $new = (service.instance ?? (service.instance = newInstance(ctor, service.args, this))) as S;
+    syncToGlobal(service);
+    return $new;
   };
 
   /**
@@ -130,8 +149,8 @@ const IoC = (function () {
          * @param params the parameter that needs to be resolved every time the service is requested.
          * @param isSingleton mark the service as singleton to avoid creating an instance whenever it's requested
          */
-        add: function <S>(ctor: Constructor<S>, params?: Params<Constructor<S>>, isSingleton?: boolean, sync?: boolean) {
-          add.call(app, ctor, params as [], isSingleton, sync);
+        add: function <S>(ctor: Constructor<S>, params?: Params<Constructor<S>>, isSingleton?: boolean) {
+          add.call(app, ctor, params as [], isSingleton);
           return { add: this.add };
         },
         /**
@@ -139,8 +158,8 @@ const IoC = (function () {
          * @param ctor the class the needs to be resolved
          * @returns the instance of the class resolved
          */
-        resolve: function <S>(ctor: Constructor<S>): S | undefined {
-          return resolve.call(app, ctor) as S;
+        resolve: function <S>(ctor: Constructor<S>, sync?: boolean): S | undefined {
+          return resolve.call(app, ctor, sync) as S;
         },
         clear: clear.bind(app)
       };

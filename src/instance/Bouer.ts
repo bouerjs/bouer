@@ -284,14 +284,14 @@ export default class Bouer<
        .add(EventHandler, [this, Evaluator], true)
        .add(ComponentHandler, [this, DelimiterHandler, EventHandler, Evaluator, Routing], true)
        .add(Skeleton, [this], true)
-       .add(Routing, [this], true, true)
+       .add(Routing, [this], true)
        .add(DelimiterHandler, [this], true)
-       .add(Compiler, [this, Binder, DelimiterHandler, EventHandler, ComponentHandler],true, true);
+       .add(Compiler, [this, Binder, DelimiterHandler, EventHandler, ComponentHandler], true);
 
     const dataStore = IoC.app(this).resolve(DataStore)!;
     const middleware = IoC.app(this).resolve(Middleware)!;
     const componentHandler = IoC.app(this).resolve(ComponentHandler)!;
-    const compiler = IoC.app(this).resolve(Compiler)!;
+    const compiler = IoC.app(this).resolve(Compiler, true)!;
     const skeleton = IoC.app(this).resolve(Skeleton)!;
     const delimiter = IoC.app(this).resolve(DelimiterHandler)!;
     const eventHandler = IoC.app(this).resolve(EventHandler)!;
@@ -310,7 +310,7 @@ export default class Bouer<
       context: this
     });
 
-    this.$routing = IoC.app(this).resolve(Routing)!;
+    this.$routing = IoC.app(this).resolve(Routing, true)!;
 
     this.$delimiters = {
       add: delimiter.add,
