@@ -5,7 +5,7 @@
   "main": "dist/bouer.common.min.js",
   "bin": "dist/bouer.common.min.js",
   "module": "dist/bouer.esm.min.js",
-  "typings": "types/index.d.ts",
+  "types": "types/index.d.ts",
   "type": "module",
   "engines": {
     "node": ">=22.0.0"
