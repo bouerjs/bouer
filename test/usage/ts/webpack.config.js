@@ -44,7 +44,7 @@ export default {
         loader: 'html-loader',
         options: {
           sources: true
-        },
+        }
       },
 
       { // Processing `html` files except `index.html`
