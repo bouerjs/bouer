@@ -109,7 +109,7 @@ const IoC$1 = (function() {
   const global = $default({
     isDestroyed: false
   });
-  const serviceCollection = new WeakMap();
+  const serviceCollection = new WeakMap([[global, new WeakMap()]]);
 
   function add(ctor, params, isSingleton, sync) {
     if (this.isDestroyed)
@@ -122,16 +122,23 @@ const IoC$1 = (function() {
     collection.set(ctor, {
       ctor: ctor,
       isSingleton: ifNullReturn(isSingleton, false),
-      args: params
+      args: params,
+      sync: sync
     });
     if (sync)
       add.call(global, ctor, params, isSingleton);
   }
 
-  function resolve(ctor) {
+  function resolve(ctor, sync) {
     var _a;
     if (this.isDestroyed)
       throw new Error('Application already disposed.');
+    const syncToGlobal = (service) => {
+      if (sync !== true)
+        return;
+      // Syncronizing with global services
+      serviceCollection.get(global).set(ctor, service);
+    };
     const collection = serviceCollection.get(this);
     if (!collection)
       return undefined;
@@ -140,10 +147,14 @@ const IoC$1 = (function() {
       return undefined;
     if (!service.isSingleton)
       return newInstance(ctor, service.args, this);
-    if (service.instance)
+    if (service.instance) {
+      syncToGlobal(service);
       return service.instance;
+    }
     // Otherwise, creates the singleton instance
-    return ((_a = service.instance) !== null && _a !== void 0 ? _a : (service.instance = newInstance(ctor, service.args, this)));
+    const $new = ((_a = service.instance) !== null && _a !== void 0 ? _a : (service.instance = newInstance(ctor, service.args, this)));
+    syncToGlobal(service);
+    return $new;
   }
   /**
    * Creates a new instance of a class provided
@@ -217,8 +228,8 @@ const IoC$1 = (function() {
          * @param params the parameter that needs to be resolved every time the service is requested.
          * @param isSingleton mark the service as singleton to avoid creating an instance whenever it's requested
          */
-        add: function(ctor, params, isSingleton, sync) {
-          add.call(app, ctor, params, isSingleton, sync);
+        add: function(ctor, params, isSingleton) {
+          add.call(app, ctor, params, isSingleton);
           return {
             add: this.add
           };
@@ -228,8 +239,8 @@ const IoC$1 = (function() {
          * @param ctor the class the needs to be resolved
          * @returns the instance of the class resolved
          */
-        resolve: function(ctor) {
-          return resolve.call(app, ctor);
+        resolve: function(ctor, sync) {
+          return resolve.call(app, ctor, sync);
         },
         clear: clear.bind(app)
       };
@@ -4355,9 +4366,7 @@ class ComponentHandler {
         const protoComponent = toComponentOrOptions(entry);
         const configure = (proto) => {
           proto.bouer = this.bouer;
-          Property.set(proto, 'template', {
-            get: () => protoComponent.template
-          });
+          Property.transfer(proto, protoComponent, 'template');
           Property.set(proto, 'parent', {
             // only assing the parent if is a component prototype
             value: context instanceof ComponentPrototype ? context : null
@@ -5814,13 +5823,13 @@ class Bouer {
       .add(EventHandler, [this, Evaluator], true)
       .add(ComponentHandler, [this, DelimiterHandler, EventHandler, Evaluator, Routing], true)
       .add(Skeleton, [this], true)
-      .add(Routing, [this], true, true)
+      .add(Routing, [this], true)
       .add(DelimiterHandler, [this], true)
-      .add(Compiler, [this, Binder, DelimiterHandler, EventHandler, ComponentHandler], true, true);
+      .add(Compiler, [this, Binder, DelimiterHandler, EventHandler, ComponentHandler], true);
     const dataStore = IoC$1.app(this).resolve(DataStore);
     const middleware = IoC$1.app(this).resolve(Middleware);
     const componentHandler = IoC$1.app(this).resolve(ComponentHandler);
-    const compiler = IoC$1.app(this).resolve(Compiler);
+    const compiler = IoC$1.app(this).resolve(Compiler, true);
     const skeleton = IoC$1.app(this).resolve(Skeleton);
     const delimiter = IoC$1.app(this).resolve(DelimiterHandler);
     const eventHandler = IoC$1.app(this).resolve(EventHandler);
@@ -5836,7 +5845,7 @@ class Bouer {
       data: $options.globalData || {},
       context: this
     });
-    this.$routing = IoC$1.app(this).resolve(Routing);
+    this.$routing = IoC$1.app(this).resolve(Routing, true);
     this.$delimiters = {
       add: delimiter.add,
       remove: delimiter.remove,
