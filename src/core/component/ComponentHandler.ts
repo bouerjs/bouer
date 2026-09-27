@@ -229,7 +229,7 @@ export default class ComponentHandler {
 
         const configure = (proto: ComponentPrototype) => {
           proto.bouer = this.bouer;
-          Property.set(proto, 'template', { get: () => protoComponent.template });
+          Property.transfer(proto, protoComponent, 'template');
           Property.set(proto, 'parent', {
             // only assing the parent if is a component prototype
             value: context instanceof ComponentPrototype ? context : null
