@@ -1,3 +1,5 @@
+/// <reference path="./global.d.ts" />
+
 import Bouer from '../src/index';
 
 // Export all the types from the main index.ts
