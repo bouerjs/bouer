@@ -1,4 +1,4 @@
-import { Component } from "../../../dist/bouer.esm.min.js";
+import { Component } from "../../../../dist/bouer.esm.js";
 
 export default class Contact extends Component {
   constructor() {

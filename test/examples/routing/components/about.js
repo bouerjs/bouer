@@ -1,4 +1,4 @@
-import { Component } from "../../../dist/bouer.esm.min.js";
+import { Component } from "../../../../dist/bouer.esm.js";
 import AboutMe from "./about-me.js";
 
 export default class About extends Component {

@@ -1,7 +1,5 @@
-import { Component } from "../../../../dist/bouer.esm.js";
-import { Injectable } from "../../../../src/index.js";
+import { Component } from "../../../../../dist/bouer.esm.js";
 
-@Injectable
 class AppMain extends Component {
   constructor() {
     super('/components/main/app-main.html', ['./app-main.css']);

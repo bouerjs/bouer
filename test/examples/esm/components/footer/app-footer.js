@@ -1,4 +1,4 @@
-import {Component} from "../../../../dist/bouer.esm.js";
+import { Component } from "../../../../../dist/bouer.esm.js";
 
 export default class AppFooter extends Component {
   constructor() {
