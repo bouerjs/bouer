@@ -2938,9 +2938,11 @@ class SchemaBuilder {
       formSchema.schema = $schema;
     };
     const getValue = (el, fieldName) => {
+      if (fieldName === '#text')
+        return el.textContent;
       if (fieldName in el)
         return el[fieldName];
-      return el.getAttribute(fieldName) || el.innerText;
+      return el.getAttribute(fieldName);
     };
     const getFieldValue = (el) => {
       let val = undefined;
