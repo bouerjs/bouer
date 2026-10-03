@@ -70,8 +70,9 @@ export default class SchemaBuilder {
     }
 
     const getValue = (el: Element, fieldName: string) => {
+      if (fieldName === '#text') return el.textContent;
       if (fieldName in el) return (el as any)[fieldName];
-      return el.getAttribute(fieldName) || (el as any).innerText;
+      return el.getAttribute(fieldName);
     }
 
     const getFieldValue = (el: Element) => {
